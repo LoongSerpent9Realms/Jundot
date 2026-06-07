@@ -178,6 +178,7 @@ public:
 		TOOLS_ORPHAN_RESOURCES,
 		TOOLS_BUILD_PROFILE_MANAGER,
 		TOOLS_PROJECT_UPGRADE,
+		TOOLS_AI_PACKAGE_BUILDER,
 		TOOLS_CUSTOM,
 
 		VCS_METADATA,
@@ -720,6 +721,8 @@ private:
 	void _build_project_menu();
 	void _build_settings_menu();
 	void _build_help_menu();
+	bool _is_ai_package_builder_enabled() const;
+	void _open_ai_package_builder();
 
 	void _update_main_menu_type();
 	void _add_to_main_menu(const String &p_name, PopupMenu *p_menu);

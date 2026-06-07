@@ -969,6 +969,8 @@ Install one of these toolchains, then run this tool again:
             Report("  Copied: GodotSharp/", "output");
         }
 
+        await CopyPackageBuilderAsync();
+
         // Write manifest
         var manifestPath = Path.Combine(_stagingDir, "package-manifest.txt");
         var lines = new List<string>
@@ -993,6 +995,7 @@ Install one of these toolchains, then run this tool again:
         lines.Add("Files:");
         lines.AddRange(products.Select(p => $"  {p.Name}"));
         if (_cfg.Mono) lines.Add("  GodotSharp/");
+        if (_cfg.PlatformName == "windows" && _cfg.Target == "editor") lines.Add("  Tools/PackageBuilder/");
 
         File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);
 
@@ -1007,6 +1010,41 @@ Install one of these toolchains, then run this tool again:
     // ═══════════════════════════════════════════════════════════════
     //  HELPERS
     // ═══════════════════════════════════════════════════════════════
+
+    private async Task CopyPackageBuilderAsync()
+    {
+        if (_cfg.PlatformName != "windows" || _cfg.Target != "editor")
+            return;
+
+        var projectPath = Path.Combine(_repoRoot, "tools", "PackageBuilder", "PackageBuilder.csproj");
+        if (!File.Exists(projectPath))
+        {
+            Report("PackageBuilder project was not found; skipping embedded AI package builder.", "warning");
+            return;
+        }
+
+        var packageBuilderDir = Path.Combine(_stagingDir, "Tools", "PackageBuilder");
+        if (Directory.Exists(packageBuilderDir))
+            Directory.Delete(packageBuilderDir, true);
+        Directory.CreateDirectory(packageBuilderDir);
+
+        Report("Embedding AI package builder", "step");
+        var logPath = Path.Combine(_logRoot, $"{_packageName}-package-builder.log");
+        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, new[]
+        {
+            "publish",
+            projectPath,
+            "-c",
+            "Release",
+            "-o",
+            packageBuilderDir,
+            "--self-contained",
+            "false",
+            "/p:UseAppHost=true"
+        });
+
+        Report("  Copied: Tools/PackageBuilder/", "output");
+    }
 
     private string GetProductPattern(bool monoBuild)
     {

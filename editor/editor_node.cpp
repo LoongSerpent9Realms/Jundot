@@ -4114,6 +4114,9 @@ void EditorNode::_tool_menu_option(int p_idx) {
 		case TOOLS_PROJECT_UPGRADE: {
 			project_upgrade_tool->popup_dialog();
 		} break;
+		case TOOLS_AI_PACKAGE_BUILDER: {
+			_open_ai_package_builder();
+		} break;
 		case TOOLS_CUSTOM: {
 			if (tool_menu->get_item_submenu(p_idx) == "") {
 				Callable callback = tool_menu->get_item_metadata(p_idx);
@@ -7004,6 +7007,51 @@ Dictionary EditorNode::drag_files_and_dirs(const Vector<String> &p_paths, Contro
 	return drag_data;
 }
 
+bool EditorNode::_is_ai_package_builder_enabled() const {
+	if (!OS::get_singleton()->has_environment("GODOT_AI_PACKAGE_BUILDER")) {
+		return false;
+	}
+
+	const String value = OS::get_singleton()->get_environment("GODOT_AI_PACKAGE_BUILDER").to_lower();
+	return value == "1" || value == "true" || value == "yes" || value == "on";
+}
+
+void EditorNode::_open_ai_package_builder() {
+	if (!_is_ai_package_builder_enabled()) {
+		show_warning(TTR("The AI package builder is disabled for this editor session."));
+		return;
+	}
+
+	const String editor_dir = OS::get_singleton()->get_executable_path().get_base_dir();
+	Vector<String> candidates;
+	candidates.push_back(editor_dir.path_join("Tools").path_join("PackageBuilder").path_join("GodotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.path_join("tools").path_join("PackageBuilder").path_join("GodotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.path_join("GodotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.get_base_dir().path_join("tools").path_join("PackageBuilder").path_join("bin").path_join("Debug").path_join("net8.0-windows").path_join("GodotPackageBuilder.exe"));
+	candidates.push_back(ProjectSettings::get_singleton()->globalize_path("res://tools/PackageBuilder/bin/Debug/net8.0-windows/GodotPackageBuilder.exe"));
+
+	String package_builder_path;
+	for (const String &candidate : candidates) {
+		if (FileAccess::exists(candidate)) {
+			package_builder_path = candidate;
+			break;
+		}
+	}
+
+	if (package_builder_path.is_empty()) {
+		show_warning(TTR("GodotPackageBuilder.exe was not found next to the editor."));
+		return;
+	}
+
+	List<String> args;
+	args.push_back("--ai-package-builder");
+	ProcessID pid = 0;
+	const Error err = OS::get_singleton()->create_process(package_builder_path, args, &pid, false);
+	if (err != OK) {
+		show_warning(vformat(TTR("Failed to start GodotPackageBuilder.exe. Error: %s"), itos(err)));
+	}
+}
+
 void EditorNode::add_tool_menu_item(const String &p_name, const Callable &p_callback) {
 	int idx = tool_menu->get_item_count();
 	tool_menu->add_item(p_name, TOOLS_CUSTOM);
@@ -8087,6 +8135,10 @@ void EditorNode::_build_project_menu() {
 		tool_menu->add_shortcut(ED_GET_SHORTCUT("editor/orphan_resource_explorer"), TOOLS_ORPHAN_RESOURCES);
 		tool_menu->add_shortcut(ED_GET_SHORTCUT("editor/engine_compilation_configuration_editor"), TOOLS_BUILD_PROFILE_MANAGER);
 		tool_menu->add_shortcut(ED_GET_SHORTCUT("editor/upgrade_project"), TOOLS_PROJECT_UPGRADE);
+		if (_is_ai_package_builder_enabled()) {
+			tool_menu->add_separator();
+			tool_menu->add_item(TTRC("AI Package Builder..."), TOOLS_AI_PACKAGE_BUILDER);
+		}
 	}
 	project_menu->add_submenu_node_item(TTRC("Tools"), tool_menu);
 
