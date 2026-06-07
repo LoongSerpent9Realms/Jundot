@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MarkupUI" inherits="Control" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Control that builds child UI nodes from XML and a small SCSS/CSS subset.
+	</brief_description>
+	<description>
+		[MarkupUI] can be added to a scene and rebuilt from inline XML/SCSS strings or external files. XML tags map to common Control classes such as [Label], [Button], [VBoxContainer], [HBoxContainer], [PanelContainer], and [LineEdit]. Styles support tag selectors, [code].class[/code] selectors, and [code]#id[/code] selectors.
+	</description>
+	<methods>
+		<method name="load_from_files">
+			<return type="int" enum="Error" />
+			<param index="0" name="xml_file" type="String" />
+			<param index="1" name="scss_file" type="String" default="&quot;&quot;" />
+			<description>
+				Sets file paths and rebuilds the generated UI.
+			</description>
+		</method>
+		<method name="rebuild">
+			<return type="int" enum="Error" />
+			<description>
+				Clears generated children, parses styles, and rebuilds the UI from the current sources.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="auto_rebuild" type="bool" setter="set_auto_rebuild" getter="is_auto_rebuild_enabled" default="true">
+			If [code]true[/code], the UI rebuilds when entering the tree and when inline source changes while inside the tree.
+		</member>
+		<member name="scss_file" type="String" setter="set_scss_file" getter="get_scss_file" default="&quot;&quot;">
+			Optional path to a SCSS/CSS style file.
+		</member>
+		<member name="scss_source" type="String" setter="set_scss_source" getter="get_scss_source" default="&quot;&quot;">
+			Inline SCSS/CSS style source.
+		</member>
+		<member name="xml_file" type="String" setter="set_xml_file" getter="get_xml_file" default="&quot;&quot;">
+			Optional path to an XML UI file.
+		</member>
+		<member name="xml_source" type="String" setter="set_xml_source" getter="get_xml_source" default="&quot;&quot;">
+			Inline XML UI source.
+		</member>
+	</members>
+</class>

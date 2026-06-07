@@ -38,6 +38,31 @@
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
 
+namespace {
+
+const char *GODOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Godot-Auto/releases";
+const char *GODOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Godot-Auto/releases";
+
+bool _split_github_release_tag(const String &p_tag, String &r_base_version, String &r_release_status) {
+	String tag = p_tag.strip_edges();
+	tag = tag.trim_prefix("refs/tags/");
+	tag = tag.trim_prefix("godot-");
+	tag = tag.trim_prefix("v");
+
+	int separator = tag.find_char('-');
+	if (separator == -1) {
+		r_base_version = tag;
+		r_release_status = "stable";
+	} else {
+		r_base_version = tag.substr(0, separator);
+		r_release_status = tag.substr(separator + 1);
+	}
+
+	return r_base_version.split(".").size() >= 2;
+}
+
+} // namespace
+
 bool EngineUpdateLabel::_can_check_updates() const {
 	return int(EDITOR_GET("network/connection/network_mode")) == EditorSettings::NETWORK_ONLINE &&
 			UpdateMode(int(EDITOR_GET("network/connection/check_for_updates"))) != UpdateMode::DISABLED;
@@ -46,7 +71,11 @@ bool EngineUpdateLabel::_can_check_updates() const {
 void EngineUpdateLabel::_check_update() {
 	checked_update = true;
 	_set_status(UpdateStatus::BUSY);
-	http->request("https://godotengine.org/versions.json");
+
+	PackedStringArray headers;
+	headers.push_back("Accept: application/vnd.github+json");
+	headers.push_back("User-Agent: Godot-Auto");
+	http->request(GODOT_AUTO_RELEASES_API, headers);
 }
 
 void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
@@ -92,10 +121,28 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 	bool stable_only = update_mode == UpdateMode::NEWEST_STABLE || update_mode == UpdateMode::NEWEST_PATCH;
 
 	available_newer_version = String();
+	available_newer_url = String();
 	for (const Variant &data_bit : version_array) {
 		const Dictionary version_info = data_bit;
 
-		const String base_version_string = version_info.get("name", "");
+		String base_version_string;
+		Array releases;
+		String release_url;
+		if (version_info.has("tag_name")) {
+			String release_string;
+			if (!_split_github_release_tag(version_info.get("tag_name", ""), base_version_string, release_string)) {
+				continue;
+			}
+
+			Dictionary release_info;
+			release_info["name"] = release_string;
+			releases.push_back(release_info);
+			release_url = version_info.get("html_url", GODOT_AUTO_RELEASES_PAGE);
+		} else {
+			base_version_string = version_info.get("name", "");
+			releases = version_info.get("releases", Array());
+		}
+
 		const PackedStringArray version_bits = base_version_string.split(".");
 
 		if (version_bits.size() < 2) {
@@ -120,7 +167,6 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 			continue;
 		}
 
-		const Array releases = version_info.get("releases", Array());
 		if (releases.is_empty()) {
 			continue;
 		}
@@ -137,6 +183,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 			}
 
 			available_newer_version = vformat("%s-%s", base_version_string, release_string);
+			available_newer_url = release_url;
 			break;
 		}
 
@@ -152,6 +199,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 		}
 
 		available_newer_version = vformat("%s-%s", base_version_string, release_string);
+		available_newer_url = release_url;
 		break;
 	}
 
@@ -294,7 +342,10 @@ void EngineUpdateLabel::pressed() {
 		} break;
 
 		case UpdateStatus::UPDATE_AVAILABLE: {
-			OS::get_singleton()->shell_open("https://godotengine.org/download/archive/" + available_newer_version);
+			if (available_newer_url.is_empty()) {
+				available_newer_url = String(GODOT_AUTO_RELEASES_PAGE) + "/tag/" + available_newer_version;
+			}
+			OS::get_singleton()->shell_open(available_newer_url);
 		} break;
 
 		default: {

@@ -1,4 +1,4 @@
-short_name = "godot"
+﻿short_name = "godot"
 name = "Godot Engine"
 major = 4
 minor = 7

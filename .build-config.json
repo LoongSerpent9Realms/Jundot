@@ -1,0 +1,20 @@
+﻿{
+  "Target": "editor",
+  "PlatformName": "windows",
+  "Arch": "x86_64",
+  "RepoRoot": "H:\\Godot-Auto",
+  "OutputDir": "artifacts/packages",
+  "LogDir": "artifacts/logs",
+  "PackageName": "",
+  "Jobs": 0,
+  "SkipBuild": false,
+  "InstallSCons": true,
+  "Mono": true,
+  "UseMinGW": false,
+  "MingwPrefix": "",
+  "EnableWindowsOptionalDeps": true,
+  "CleanPackageDir": false,
+  "ExtraSConsArgs": "",
+  "Language": "zh_CN",
+  "AutoUpdateVersion": true
+}

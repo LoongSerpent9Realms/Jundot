@@ -102,6 +102,7 @@ platform/android/java/*/libs/
 platform/web/node_modules/
 
 # Misc
+artifacts/
 *.debug
 
 #############################

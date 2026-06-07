@@ -176,7 +176,9 @@ def get_tools(env: "SConsEnvironment"):
     from SCons.Tool.MSCommon import msvc_exists
     from SCons.Tool.MSCommon.vc import get_default_version
 
-    if os.name != "nt" or env.get("use_mingw") or not msvc_exists():
+    has_msvc_prompt = bool(os.getenv("VCTOOLSINSTALLDIR")) and try_cmd("cl", "", "")
+
+    if os.name != "nt" or env.get("use_mingw") or not (msvc_exists() or has_msvc_prompt):
         return ["mingw"]
     else:
         msvc_arch_aliases = {"x86_32": "x86", "arm32": "arm"}
@@ -192,7 +194,7 @@ def get_tools(env: "SConsEnvironment"):
             sys.exit(255)
 
         env["TARGET_ARCH"] = msvc_arch_aliases.get(env["arch"], env["arch"])
-        env["MSVC_VERSION"] = env["MSVS_VERSION"] = env.get("msvc_version")
+        env["MSVC_VERSION"] = env["MSVS_VERSION"] = msvc_ver
         env["MSVC_SDK_VERSION"] = check_mssdk_version(env, env.get("mssdk_version"), msvc_ver)
 
         return ["msvc", "mslink", "mslib"]

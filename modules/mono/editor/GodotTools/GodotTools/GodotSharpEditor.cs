@@ -28,6 +28,7 @@ namespace GodotTools
         public static class Settings
         {
             public const string ExternalEditor = "dotnet/editor/external_editor";
+            public const string IdePathOptional = "dotnet/editor/ide_path_optional";
             public const string CustomExecPath = "dotnet/editor/custom_exec_path";
             public const string CustomExecPathArgs = "dotnet/editor/custom_exec_path_args";
             public const string VerbosityLevel = "dotnet/build/verbosity_level";
@@ -46,6 +47,8 @@ namespace GodotTools
 
         private Button _bottomPanelBtn;
         private Button _toolBarBuildButton;
+        private Button _toolBarOpenIdeButton;
+        private PopupMenu _openIdePopup;
 
         // TODO Use WeakReference once we have proper serialization.
         private WeakRef _exportPluginWeak;
@@ -138,9 +141,323 @@ namespace GodotTools
                     }
                     break;
                 }
+                case MenuOptions.OpenSln:
+                    OpenProjectInExternalEditor(_editorSettings.GetSetting(Settings.ExternalEditor).As<ExternalEditorId>());
+                    break;
+                case MenuOptions.OpenSlnLocal:
+                    OpenProjectInExternalEditor(_editorSettings.GetSetting(Settings.ExternalEditor).As<ExternalEditorId>(), useConfiguredPath: false);
+                    break;
+                case MenuOptions.OpenSlnInVisualStudio:
+                    OpenProjectInExternalEditor(OS.IsMacOS ? ExternalEditorId.VisualStudioForMac : ExternalEditorId.VisualStudio);
+                    break;
+                case MenuOptions.OpenSlnInVsCode:
+                    OpenProjectInExternalEditor(ExternalEditorId.VsCode);
+                    break;
+                case MenuOptions.OpenSlnInRider:
+                    OpenProjectInExternalEditor(ExternalEditorId.Rider);
+                    break;
+                case MenuOptions.OpenSlnInFleet:
+                    OpenProjectInExternalEditor(ExternalEditorId.Fleet);
+                    break;
+                case MenuOptions.OpenSlnInMonoDevelop:
+                    OpenProjectInExternalEditor(ExternalEditorId.MonoDevelop);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, "Invalid menu option");
             }
+        }
+
+        private bool EnsureProjectSolution()
+        {
+            if (File.Exists(GodotSharpDirs.ProjectSlnPath) && File.Exists(GodotSharpDirs.ProjectCsProjPath))
+                return true;
+
+            if (File.Exists(GodotSharpDirs.ProjectCsProjPath) && !File.Exists(GodotSharpDirs.ProjectSlnPath))
+                return CreateSolutionForExistingProject();
+
+            if (File.Exists(GodotSharpDirs.ProjectSlnPath) && !File.Exists(GodotSharpDirs.ProjectCsProjPath))
+            {
+                ShowErrorDialog("C# solution exists, but the C# project file is missing. Use Create C# solution to rebuild both files.".TTR());
+                return false;
+            }
+
+            return CreateProjectSolution();
+        }
+
+        private bool CreateSolutionForExistingProject()
+        {
+            string? errorMessage = null;
+            string slnDir = Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)!;
+            string name = GodotSharpDirs.ProjectAssemblyName;
+
+            var solution = new DotNetSolution(name, slnDir);
+            var projectInfo = new DotNetSolution.ProjectInfo(
+                Guid.NewGuid().ToString().ToUpperInvariant(),
+                Path.GetRelativePath(slnDir, GodotSharpDirs.ProjectCsProjPath),
+                new List<string> { "Debug", "ExportDebug", "ExportRelease" });
+
+            solution.AddNewProject(name, projectInfo);
+
+            try
+            {
+                solution.Save();
+            }
+            catch (IOException e)
+            {
+                errorMessage = "Failed to save solution. Exception message: ".TTR() + e.Message;
+            }
+
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                ShowErrorDialog(errorMessage);
+                return false;
+            }
+
+            _ShowDotnetFeatures();
+            return true;
+        }
+
+        private Error OpenProjectInExternalEditor(ExternalEditorId editorId, bool useConfiguredPath = true)
+        {
+            if (!EnsureProjectSolution())
+                return Error.Failed;
+
+            switch (editorId)
+            {
+                case ExternalEditorId.None:
+                    ShowErrorDialog("No C# external editor is selected. Choose a specific editor from the C# menu or set one in Editor Settings.".TTR());
+                    return Error.Unavailable;
+                case ExternalEditorId.CustomEditor:
+                {
+                    string project = Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)!;
+                    var execCommand = _editorSettings.GetSetting(Settings.CustomExecPath).As<string>();
+                    var execArgs = _editorSettings.GetSetting(Settings.CustomExecPathArgs).As<string>();
+                    var args = new List<string>();
+
+                    if (!string.IsNullOrEmpty(execArgs))
+                    {
+                        args.AddRange(ParseExternalEditorArgs(execArgs, project, GodotSharpDirs.ProjectSlnPath, -1, -1, out bool hasFileFlag));
+                        if (!hasFileFlag)
+                        {
+                            args.Add(GodotSharpDirs.ProjectSlnPath);
+                        }
+                    }
+                    else
+                    {
+                        args.Add(GodotSharpDirs.ProjectSlnPath);
+                    }
+
+                    OS.RunProcess(execCommand, args);
+                    return Error.Ok;
+                }
+                case ExternalEditorId.VisualStudio:
+                {
+                    if (!OS.IsWindows)
+                    {
+                        ShowErrorDialog("Visual Studio project opening is only available on Windows. Use Visual Studio Code, Rider, Fleet, MonoDevelop, or a custom editor on this platform.".TTR());
+                        return Error.Unavailable;
+                    }
+
+                    string configuredPath = GetConfiguredIdePath(editorId);
+                    if (useConfiguredPath && !string.IsNullOrEmpty(configuredPath) && File.Exists(configuredPath))
+                    {
+                        OS.RunProcess(configuredPath, new[] { GodotSharpDirs.ProjectSlnPath });
+                        return Error.Ok;
+                    }
+
+                    var args = new List<string>
+                    {
+                        Path.Combine(GodotSharpDirs.DataEditorToolsDir, "GodotTools.OpenVisualStudio.dll"),
+                        GodotSharpDirs.ProjectSlnPath
+                    };
+
+                    string command = DotNetFinder.FindDotNetExe() ?? "dotnet";
+                    OS.RunProcess(command, args);
+                    return Error.Ok;
+                }
+                case ExternalEditorId.VisualStudioForMac:
+                case ExternalEditorId.MonoDevelop:
+                    _ = GodotIdeManager.LaunchIdeAsync(editorId);
+                    return Error.Ok;
+                case ExternalEditorId.VsCode:
+                    return OpenProjectInVsCode(useConfiguredPath);
+                case ExternalEditorId.Rider:
+                case ExternalEditorId.Fleet:
+                    RiderPathManager.InitializeIfNeeded(editorId);
+                    RiderPathManager.OpenProject(editorId, GodotSharpDirs.ProjectSlnPath, useConfiguredPath);
+                    return Error.Ok;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(editorId), editorId, "Invalid external editor");
+            }
+        }
+
+        private string GetConfiguredIdePath(ExternalEditorId editorId)
+        {
+            if (!_editorSettings.HasSetting(Settings.IdePathOptional))
+                return string.Empty;
+
+            string configuredPath = _editorSettings.GetSetting(Settings.IdePathOptional).As<string>();
+            if (string.IsNullOrEmpty(configuredPath) || !ConfiguredIdePathMatches(editorId, configuredPath))
+                return string.Empty;
+
+            return configuredPath;
+        }
+
+        private static bool ConfiguredIdePathMatches(ExternalEditorId editorId, string configuredPath)
+        {
+            string fileName = Path.GetFileName(configuredPath).ToLowerInvariant();
+
+            switch (editorId)
+            {
+                case ExternalEditorId.VisualStudio:
+                case ExternalEditorId.VisualStudioForMac:
+                    return fileName.Contains("devenv", StringComparison.OrdinalIgnoreCase) ||
+                           fileName.Contains("visualstudio", StringComparison.OrdinalIgnoreCase) ||
+                           fileName.Contains("visual studio", StringComparison.OrdinalIgnoreCase);
+                case ExternalEditorId.VsCode:
+                    return VsCodeNames.Any(name => fileName.Contains(name, StringComparison.OrdinalIgnoreCase)) ||
+                           fileName.Contains("code", StringComparison.OrdinalIgnoreCase);
+                case ExternalEditorId.Rider:
+                    return fileName.Contains("rider", StringComparison.OrdinalIgnoreCase);
+                case ExternalEditorId.Fleet:
+                    return fileName.Contains("fleet", StringComparison.OrdinalIgnoreCase);
+                case ExternalEditorId.MonoDevelop:
+                    return fileName.Contains("monodevelop", StringComparison.OrdinalIgnoreCase);
+                case ExternalEditorId.CustomEditor:
+                    return true;
+                case ExternalEditorId.None:
+                default:
+                    return false;
+            }
+        }
+
+        private Error OpenProjectInVsCode(bool useConfiguredPath = true)
+        {
+            string configuredPath = GetConfiguredIdePath(ExternalEditorId.VsCode);
+            if (useConfiguredPath && !string.IsNullOrEmpty(configuredPath))
+            {
+                if (!File.Exists(configuredPath))
+                {
+                    GD.PushError($"Configured IDE path does not exist: {configuredPath}");
+                    return Error.FileNotFound;
+                }
+
+                OS.RunProcess(configuredPath, new[] { Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)! });
+                return Error.Ok;
+            }
+
+            if (string.IsNullOrEmpty(_vsCodePath) || !File.Exists(_vsCodePath))
+            {
+                _vsCodePath = VsCodeNames.SelectFirstNotNull(OS.PathWhich, orElse: string.Empty);
+            }
+
+            var args = new List<string>();
+            string command;
+            bool macOSAppBundleInstalled = false;
+
+            if (OS.IsMacOS)
+            {
+                const string vscodeBundleId = "com.microsoft.VSCode";
+                macOSAppBundleInstalled = Internal.IsMacOSAppBundleInstalled(vscodeBundleId);
+
+                if (macOSAppBundleInstalled)
+                {
+                    args.Add("-b");
+                    args.Add(vscodeBundleId);
+                    args.Add("-n");
+                    args.Add("--wait-apps");
+                    args.Add("--args");
+                }
+
+                if (!macOSAppBundleInstalled)
+                {
+                    const string vscodiumBundleId = "com.vscodium.codium";
+                    macOSAppBundleInstalled = Internal.IsMacOSAppBundleInstalled(vscodiumBundleId);
+
+                    if (macOSAppBundleInstalled)
+                    {
+                        args.Add("-b");
+                        args.Add(vscodiumBundleId);
+                        args.Add("-n");
+                        args.Add("--wait-apps");
+                        args.Add("--args");
+                    }
+                }
+
+                if (!macOSAppBundleInstalled && string.IsNullOrEmpty(_vsCodePath))
+                {
+                    GD.PushError("Cannot find code editor: Visual Studio Code or VSCodium");
+                    return Error.FileNotFound;
+                }
+
+                command = macOSAppBundleInstalled ? "/usr/bin/open" : _vsCodePath;
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(_vsCodePath))
+                {
+                    GD.PushError("Cannot find code editor: Visual Studio Code or VSCodium");
+                    return Error.FileNotFound;
+                }
+
+                command = _vsCodePath;
+            }
+
+            args.Add(Path.GetDirectoryName(GodotSharpDirs.ProjectSlnPath)!);
+            OS.RunProcess(command, args);
+            return Error.Ok;
+        }
+
+        private static List<string> ParseExternalEditorArgs(string execArgs, string project, string file, int line, int col, out bool hasFileFlag)
+        {
+            execArgs = execArgs.ReplaceN("{line}", line.ToString(CultureInfo.InvariantCulture));
+            execArgs = execArgs.ReplaceN("{col}", col.ToString(CultureInfo.InvariantCulture));
+            execArgs = execArgs.StripEdges(true, true);
+            execArgs = execArgs.Replace("\\\\", "\\", StringComparison.Ordinal);
+
+            var args = new List<string>();
+            var from = 0;
+            var numChars = 0;
+            var insideQuotes = false;
+            hasFileFlag = false;
+
+            for (int i = 0; i < execArgs.Length; ++i)
+            {
+                if ((execArgs[i] == '"' && (i == 0 || execArgs[i - 1] != '\\')) && i != execArgs.Length - 1)
+                {
+                    if (!insideQuotes)
+                    {
+                        from++;
+                    }
+                    insideQuotes = !insideQuotes;
+                }
+                else if ((execArgs[i] == ' ' && !insideQuotes) || i == execArgs.Length - 1)
+                {
+                    if (i == execArgs.Length - 1 && !insideQuotes)
+                    {
+                        numChars++;
+                    }
+
+                    var arg = execArgs.Substr(from, numChars);
+                    if (arg.Contains("{file}", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasFileFlag = true;
+                    }
+
+                    arg = arg.ReplaceN("{project}", project);
+                    arg = arg.ReplaceN("{file}", file);
+                    args.Add(arg);
+
+                    from = i + 1;
+                    numChars = 0;
+                }
+                else
+                {
+                    numChars++;
+                }
+            }
+
+            return args;
         }
 
         private void BuildProjectPressed()
@@ -157,6 +474,13 @@ namespace GodotTools
         private enum MenuOptions
         {
             CreateSln,
+            OpenSln,
+            OpenSlnLocal,
+            OpenSlnInVisualStudio,
+            OpenSlnInVsCode,
+            OpenSlnInRider,
+            OpenSlnInFleet,
+            OpenSlnInMonoDevelop,
         }
 
         public void ShowErrorDialog(string message, string title = "Error")
@@ -180,6 +504,24 @@ namespace GodotTools
             "code", "code-oss", "vscode", "vscode-oss", "visual-studio-code", "visual-studio-code-oss", "codium"
         };
 
+        private void OpenSelectedIdePressed()
+        {
+            OpenProjectInExternalEditor(_editorSettings.GetSetting(Settings.ExternalEditor).As<ExternalEditorId>());
+        }
+
+        private void OpenIdeButtonGuiInput(InputEvent @event)
+        {
+            var mouseButton = @event as InputEventMouseButton;
+            if (mouseButton == null)
+                return;
+
+            if (mouseButton.ButtonIndex != MouseButton.Right || !mouseButton.Pressed)
+                return;
+
+            _openIdePopup.Position = (Vector2I)(_toolBarOpenIdeButton.GetScreenPosition() + new Vector2(0, _toolBarOpenIdeButton.Size.Y));
+            _openIdePopup.Popup();
+        }
+
         [UsedImplicitly]
         public Error OpenInExternalEditor(Script script, int line, int col)
         {
@@ -198,52 +540,7 @@ namespace GodotTools
                     project = project[..^1];
                     var execCommand = _editorSettings.GetSetting(Settings.CustomExecPath).As<string>();
                     var execArgs = _editorSettings.GetSetting(Settings.CustomExecPathArgs).As<string>();
-                    var args = new List<string>();
-                    var from = 0;
-                    var numChars = 0;
-                    var insideQuotes = false;
-                    var hasFileFlag = false;
-
-                    execArgs = execArgs.ReplaceN("{line}", line.ToString(CultureInfo.InvariantCulture));
-                    execArgs = execArgs.ReplaceN("{col}", col.ToString(CultureInfo.InvariantCulture));
-                    execArgs = execArgs.StripEdges(true, true);
-                    execArgs = execArgs.Replace("\\\\", "\\", StringComparison.Ordinal);
-
-                    for (int i = 0; i < execArgs.Length; ++i)
-                    {
-                        if ((execArgs[i] == '"' && (i == 0 || execArgs[i - 1] != '\\')) && i != execArgs.Length - 1)
-                        {
-                            if (!insideQuotes)
-                            {
-                                from++;
-                            }
-                            insideQuotes = !insideQuotes;
-                        }
-                        else if ((execArgs[i] == ' ' && !insideQuotes) || i == execArgs.Length - 1)
-                        {
-                            if (i == execArgs.Length - 1 && !insideQuotes)
-                            {
-                                numChars++;
-                            }
-
-                            var arg = execArgs.Substr(from, numChars);
-                            if (arg.Contains("{file}", StringComparison.OrdinalIgnoreCase))
-                            {
-                                hasFileFlag = true;
-                            }
-
-                            arg = arg.ReplaceN("{project}", project);
-                            arg = arg.ReplaceN("{file}", file);
-                            args.Add(arg);
-
-                            from = i + 1;
-                            numChars = 0;
-                        }
-                        else
-                        {
-                            numChars++;
-                        }
-                    }
+                    var args = ParseExternalEditorArgs(execArgs, project, file, line, col, out bool hasFileFlag);
 
                     if (!hasFileFlag)
                     {
@@ -309,7 +606,15 @@ namespace GodotTools
                 }
                 case ExternalEditorId.VsCode:
                 {
-                    if (string.IsNullOrEmpty(_vsCodePath) || !File.Exists(_vsCodePath))
+                    string configuredPath = GetConfiguredIdePath(ExternalEditorId.VsCode);
+                    bool usingConfiguredPath = !string.IsNullOrEmpty(configuredPath);
+                    if (usingConfiguredPath && !File.Exists(configuredPath))
+                    {
+                        GD.PushError($"Configured IDE path does not exist: {configuredPath}");
+                        return Error.FileNotFound;
+                    }
+
+                    if (!usingConfiguredPath && (string.IsNullOrEmpty(_vsCodePath) || !File.Exists(_vsCodePath)))
                     {
                         // Try to search it again if it wasn't found last time or if it was removed from its location
                         _vsCodePath = VsCodeNames.SelectFirstNotNull(OS.PathWhich, orElse: string.Empty);
@@ -319,7 +624,7 @@ namespace GodotTools
 
                     bool macOSAppBundleInstalled = false;
 
-                    if (OS.IsMacOS)
+                    if (OS.IsMacOS && !usingConfiguredPath)
                     {
                         // The package path is '/Applications/Visual Studio Code.app'
                         const string vscodeBundleId = "com.microsoft.VSCode";
@@ -380,7 +685,7 @@ namespace GodotTools
 
                     string command;
 
-                    if (OS.IsMacOS)
+                    if (OS.IsMacOS && !usingConfiguredPath)
                     {
                         if (!macOSAppBundleInstalled && string.IsNullOrEmpty(_vsCodePath))
                         {
@@ -392,13 +697,13 @@ namespace GodotTools
                     }
                     else
                     {
-                        if (string.IsNullOrEmpty(_vsCodePath))
+                        if (!usingConfiguredPath && string.IsNullOrEmpty(_vsCodePath))
                         {
                             GD.PushError("Cannot find code editor: Visual Studio Code or VSCodium");
                             return Error.FileNotFound;
                         }
 
-                        command = _vsCodePath;
+                        command = usingConfiguredPath ? configuredPath : _vsCodePath;
                     }
 
                     try
@@ -533,6 +838,28 @@ namespace GodotTools
             // Move Build button so it appears to the left of the Play button.
             _toolBarBuildButton.GetParent().MoveChild(_toolBarBuildButton, 0);
 
+            _openIdePopup = new PopupMenu
+            {
+                Name = "OpenCSharpIdePopup",
+            };
+            _openIdePopup.AddItem("Open selected IDE".TTR(), (int)MenuOptions.OpenSln);
+            _openIdePopup.AddItem("Open selected IDE locally".TTR(), (int)MenuOptions.OpenSlnLocal);
+            _openIdePopup.IdPressed += _MenuOptionPressed;
+
+            _toolBarOpenIdeButton = new Button
+            {
+                Flat = false,
+                Icon = EditorInterface.Singleton.GetEditorTheme().GetIcon("CSharpScript", "EditorIcons"),
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = "Open C# IDE".TTR(),
+                ThemeTypeVariation = "RunBarButton",
+            };
+            _toolBarOpenIdeButton.Pressed += OpenSelectedIdePressed;
+            _toolBarOpenIdeButton.GuiInput += OpenIdeButtonGuiInput;
+            _toolBarOpenIdeButton.AddChild(_openIdePopup);
+            Internal.EditorPlugin_AddControlToEditorRunBar(_toolBarOpenIdeButton);
+            _toolBarOpenIdeButton.GetParent().MoveChild(_toolBarOpenIdeButton, 1);
+
             EditorInterface.Singleton.GetCommandPalette().AddCommand("Build C# project".TTR(), "dotnet/build_solution", Callable.From(BuildProjectPressed), _toolBarBuildButton.Shortcut.GetAsText());
 
             if (File.Exists(GodotSharpDirs.ProjectCsProjPath))
@@ -545,11 +872,20 @@ namespace GodotTools
                 _toolBarBuildButton.Hide();
             }
             _menuPopup.AddItem("Create C# solution".TTR(), (int)MenuOptions.CreateSln);
+            _menuPopup.AddSeparator();
+            _menuPopup.AddItem("Open selected C# IDE".TTR(), (int)MenuOptions.OpenSln);
+            _menuPopup.AddItem("Open selected C# IDE locally".TTR(), (int)MenuOptions.OpenSlnLocal);
+            _menuPopup.AddItem("Open with Visual Studio".TTR(), (int)MenuOptions.OpenSlnInVisualStudio);
+            _menuPopup.AddItem("Open with Visual Studio Code".TTR(), (int)MenuOptions.OpenSlnInVsCode);
+            _menuPopup.AddItem("Open with JetBrains Rider".TTR(), (int)MenuOptions.OpenSlnInRider);
+            _menuPopup.AddItem("Open with JetBrains Fleet".TTR(), (int)MenuOptions.OpenSlnInFleet);
+            _menuPopup.AddItem("Open with MonoDevelop".TTR(), (int)MenuOptions.OpenSlnInMonoDevelop);
 
             _menuPopup.IdPressed += _MenuOptionPressed;
 
             // External editor settings
             EditorDef(Settings.ExternalEditor, Variant.From(ExternalEditorId.None));
+            EditorDef(Settings.IdePathOptional, "");
             EditorDef(Settings.CustomExecPath, "");
             EditorDef(Settings.CustomExecPathArgs, "");
             EditorDef(Settings.VerbosityLevel, Variant.From(VerbosityLevelId.Normal));
@@ -592,6 +928,14 @@ namespace GodotTools
                 ["name"] = Settings.ExternalEditor,
                 ["hint"] = (int)PropertyHint.Enum,
                 ["hint_string"] = settingsHintStr
+            });
+
+            _editorSettings.AddPropertyInfo(new Godot.Collections.Dictionary
+            {
+                ["type"] = (int)Variant.Type.String,
+                ["name"] = Settings.IdePathOptional,
+                ["hint"] = (int)PropertyHint.GlobalFile,
+                ["hint_string"] = "",
             });
 
             _editorSettings.AddPropertyInfo(new Godot.Collections.Dictionary

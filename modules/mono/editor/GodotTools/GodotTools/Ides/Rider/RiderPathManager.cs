@@ -4,12 +4,13 @@ using System.Linq;
 using Godot;
 using GodotTools.Internals;
 using JetBrains.Rider.PathLocator;
+using OS = GodotTools.Utils.OS;
 
 namespace GodotTools.Ides.Rider
 {
     public static class RiderPathManager
     {
-        internal const string EditorPathSettingName = "dotnet/editor/editor_path_optional";
+        internal const string EditorPathSettingName = "dotnet/editor/ide_path_optional";
 
         private static readonly RiderPathLocator RiderPathLocator;
         private static readonly RiderFileOpener RiderFileOpener;
@@ -115,6 +116,19 @@ namespace GodotTools.Ides.Rider
             }
 
             RiderFileOpener.OpenFile(path, slnPath, scriptPath, line, column);
+        }
+
+        public static void OpenProject(ExternalEditorId editorId, string slnPath, bool useConfiguredPath = true)
+        {
+            var pathFromSettings = useConfiguredPath ? GetRiderPathFromSettings() : null;
+            var path = CheckAndUpdatePath(editorId, pathFromSettings);
+            if (string.IsNullOrEmpty(path))
+            {
+                GD.PushError($"Error when trying to run code editor: JetBrains Rider or Fleet. Could not find path to the editor.");
+                return;
+            }
+
+            OS.RunProcess(path, new[] { slnPath });
         }
     }
 }
