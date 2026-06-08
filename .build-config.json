@@ -12,7 +12,7 @@
   "Mono": true,
   "UseMinGW": false,
   "MingwPrefix": "",
-  "EnableWindowsOptionalDeps": true,
+  "EnableWindowsOptionalDeps": false,
   "CleanPackageDir": false,
   "ExtraSConsArgs": "",
   "Language": "zh_CN",

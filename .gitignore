@@ -23,7 +23,6 @@
 ###########################
 
 .claude/
-.github/
 .workbuddy/
 
 /custom.py

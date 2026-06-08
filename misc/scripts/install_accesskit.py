@@ -5,10 +5,20 @@ if __name__ != "__main__":
 
 import os
 import shutil
+import ssl
 import sys
 import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
+
+# Python ≥ 3.14 enables VERIFY_X509_STRICT by default, which requires the
+# Authority Key Identifier extension on intermediate certs. GitHub's CDN
+# sometimes serves intermediates without it, so we relax that one flag
+# while keeping full hostname + chain verification.
+_ssl_ctx = ssl.create_default_context()
+_ssl_ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+_https_handler = urllib.request.HTTPSHandler(context=_ssl_ctx)
+urllib.request.install_opener(urllib.request.build_opener(_https_handler))
 
 
 # Base Godot dependencies path

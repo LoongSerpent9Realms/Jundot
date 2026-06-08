@@ -92,10 +92,6 @@ private:
 	VersionType _get_version_type(const String &p_string, int *r_index = nullptr) const;
 	String _extract_sub_string(const String &p_line) const;
 
-	// Expose update info for external consumers (e.g. UpdateDialog).
-	String get_available_update_version() const { return available_newer_version; }
-	String get_available_update_url() const { return available_newer_url; }
-
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();

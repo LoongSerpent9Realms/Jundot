@@ -11,6 +11,8 @@
 #include "update_dialog.h"
 
 #include "core/object/callable_mp.h"
+#include "editor/editor_string_names.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
@@ -35,7 +37,7 @@ UpdateDialog::UpdateDialog() {
 	_version_label = memnew(Label);
 	_version_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_LEFT);
 	_version_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	_version_label->add_theme_font_size_override(SceneStringName(font_size), 16 * EDSCALE);
+	_version_label->add_theme_font_size_override(SceneStringName(font_size), int(16 * EDSCALE));
 	info_vbox->add_child(_version_label);
 
 	_size_label = memnew(Label);

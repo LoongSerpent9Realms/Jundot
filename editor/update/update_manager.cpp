@@ -10,6 +10,7 @@
 
 #include "update_manager.h"
 
+#include "core/error/error_macros.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
