@@ -2,10 +2,10 @@
 /*  os_apple_embedded.mm                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -42,8 +42,8 @@
 #import "drivers/apple/os_log_logger.h"
 #import "drivers/apple_embedded/app_delegate_service.h"
 #import "drivers/apple_embedded/display_server_apple_embedded.h"
-#import "drivers/apple_embedded/godot_view_apple_embedded.h"
-#import "drivers/apple_embedded/godot_view_controller.h"
+#import "drivers/apple_embedded/jundot_view_apple_embedded.h"
+#import "drivers/apple_embedded/jundot_view_controller.h"
 #ifdef SDL_ENABLED
 #include "drivers/sdl/joypad_sdl.h"
 #endif
@@ -65,7 +65,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 
 #if defined(VULKAN_ENABLED)
-#include <drivers/vulkan/godot_vulkan.h>
+#include <drivers/vulkan/jundot_vulkan.h>
 #endif // VULKAN_ENABLED
 #endif
 
@@ -223,8 +223,8 @@ bool OS_AppleEmbedded::iterate() {
 		return true;
 	}
 
-	GodotProfileFrameMark;
-	GodotProfileZone("OS_AppleEmbedded::iterate");
+	JundotProfileFrameMark;
+	JundotProfileZone("OS_AppleEmbedded::iterate");
 
 	if (DisplayServer::get_singleton()) {
 		DisplayServer::get_singleton()->process_events();
@@ -441,7 +441,7 @@ String OS_AppleEmbedded::get_resource_dir() const {
 }
 
 String OS_AppleEmbedded::get_bundle_resource_dir() const {
-	NSString *str = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"godot_path"];
+	NSString *str = [[[NSBundle mainBundle] infoDictionary] objectForKey:@"jundot_path"];
 	if (!str) {
 		return OS_Unix::get_bundle_resource_dir();
 	} else {
@@ -783,7 +783,7 @@ void OS_AppleEmbedded::on_focus_out() {
 			OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_APPLICATION_FOCUS_OUT);
 		}
 
-		[GDTAppDelegateService.viewController.godotView stopRendering];
+		[GDTAppDelegateService.viewController.jundotView stopRendering];
 
 		audio_driver.stop();
 	}
@@ -801,7 +801,7 @@ void OS_AppleEmbedded::on_focus_in() {
 			OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_APPLICATION_FOCUS_IN);
 		}
 
-		[GDTAppDelegateService.viewController.godotView startRendering];
+		[GDTAppDelegateService.viewController.jundotView startRendering];
 
 		audio_driver.start();
 	}
@@ -849,7 +849,7 @@ Rect2 OS_AppleEmbedded::calculate_boot_screen_rect(const Size2 &p_window_size, c
 	} else if (scalemodestr == "center") {
 		return OS_Unix::calculate_boot_screen_rect(p_window_size, p_imgrect_size);
 	} else {
-		WARN_PRINT(vformat("Boot screen scale mode mismatch between iOS and Godot: %s not supported", scalemodestr));
+		WARN_PRINT(vformat("Boot screen scale mode mismatch between iOS and Jundot: %s not supported", scalemodestr));
 		return OS_Unix::calculate_boot_screen_rect(p_window_size, p_imgrect_size);
 	}
 }

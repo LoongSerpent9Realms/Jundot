@@ -1,7 +1,7 @@
-# Vietnamese translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Vietnamese translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # 01lifeleft <01lifeleft@gmail.com>, 2018.
 # Dlean Jeans <dleanjeans@gmail.com>, 2018.
 # Hai Le <dark.hades.1102@gmail.com>, 2017.
@@ -37,13 +37,13 @@
 # Khắc Vinh Vũ <vukhacvinh31@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-06 10:05+0000\n"
 "Last-Translator: Khắc Vinh Vũ <vukhacvinh31@gmail.com>\n"
-"Language-Team: Vietnamese <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/vi/>\n"
+"Language-Team: Vietnamese <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/vi/>\n"
 "Language: vi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1755,8 +1755,8 @@ msgstr "Ánh sáng"
 msgid "Roots"
 msgstr "Gốc"
 
-msgid "Godot Skin"
-msgstr "Godot Skin"
+msgid "Jundot Skin"
+msgstr "Jundot Skin"
 
 msgid "Sampler"
 msgstr "Trình lấy mẫu"

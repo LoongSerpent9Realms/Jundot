@@ -2,10 +2,10 @@
 /*  os_macos.mm                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -32,8 +32,8 @@
 
 #import "dir_access_macos.h"
 #import "display_server_macos.h"
-#import "godot_application.h"
-#import "godot_application_delegate.h"
+#import "jundot_application.h"
+#import "jundot_application_delegate.h"
 
 #ifdef TOOLS_ENABLED
 #import "display_server_macos_embedded.h"
@@ -291,7 +291,7 @@ void OS_MacOS::load_shell_environment() const {
 	static bool shell_env_loaded = false;
 	if (unlikely(!shell_env_loaded)) {
 		shell_env_loaded = true;
-		if (OS::get_singleton()->has_environment("TERM") || OS::get_singleton()->has_environment("__GODOT_SHELL_ENV_SET")) {
+		if (OS::get_singleton()->has_environment("TERM") || OS::get_singleton()->has_environment("__JUNDOT_SHELL_ENV_SET")) {
 			return; // Already started from terminal, or other the instance with the shell environment, do nothing.
 		}
 		String pipe;
@@ -303,13 +303,13 @@ void OS_MacOS::load_shell_environment() const {
 			Vector<String> env_vars = pipe.split("\n");
 			for (const String &E : env_vars) {
 				Vector<String> tags = E.split("=", 2);
-				if (tags.size() != 2 || tags[0] == "SHELL" || tags[0] == "USER" || tags[0] == "COMMAND_MODE" || tags[0] == "TMPDIR" || tags[0] == "TERM_SESSION_ID" || tags[0] == "PWD" || tags[0] == "OLDPWD" || tags[0] == "SHLVL" || tags[0] == "HOME" || tags[0] == "DISPLAY" || tags[0] == "LOGNAME" || tags[0] == "TERM" || tags[0] == "COLORTERM" || tags[0] == "_" || tags[0].begins_with("__CF") || tags[0].begins_with("XPC_") || tags[0].begins_with("__GODOT")) {
+				if (tags.size() != 2 || tags[0] == "SHELL" || tags[0] == "USER" || tags[0] == "COMMAND_MODE" || tags[0] == "TMPDIR" || tags[0] == "TERM_SESSION_ID" || tags[0] == "PWD" || tags[0] == "OLDPWD" || tags[0] == "SHLVL" || tags[0] == "HOME" || tags[0] == "DISPLAY" || tags[0] == "LOGNAME" || tags[0] == "TERM" || tags[0] == "COLORTERM" || tags[0] == "_" || tags[0].begins_with("__CF") || tags[0].begins_with("XPC_") || tags[0].begins_with("__JUNDOT")) {
 					continue;
 				}
 				OS::get_singleton()->set_environment(tags[0], tags[1]);
 			}
 		}
-		OS::get_singleton()->set_environment("__GODOT_SHELL_ENV_SET", "1");
+		OS::get_singleton()->set_environment("__JUNDOT_SHELL_ENV_SET", "1");
 	}
 }
 
@@ -351,7 +351,7 @@ String OS_MacOS::get_version_alias() const {
 	} else {
 		macos_string += "Unknown";
 	}
-	// macOS versions older than 10.13 cannot run Godot.
+	// macOS versions older than 10.13 cannot run Jundot.
 	return vformat("%s (%s)", macos_string, get_version());
 }
 
@@ -499,8 +499,8 @@ String OS_MacOS::get_bundle_icon_name() const {
 }
 
 // Get properly capitalized engine name for system paths
-String OS_MacOS::get_godot_dir_name() const {
-	return String(GODOT_VERSION_SHORT_NAME).capitalize();
+String OS_MacOS::get_jundot_dir_name() const {
+	return String(JUNDOT_VERSION_SHORT_NAME).capitalize();
 }
 
 String OS_MacOS::get_system_dir(SystemDir p_dir, bool p_shared_storage) const {
@@ -1132,8 +1132,8 @@ void OS_MacOS_NSApp::start_main() {
 				pre_wait_observer = CFRunLoopObserverCreateWithHandler(kCFAllocatorDefault, kCFRunLoopBeforeWaiting, true, 0, ^(CFRunLoopObserverRef observer, CFRunLoopActivity activity) {
 					@autoreleasepool {
 						@try {
-							GodotProfileFrameMark;
-							GodotProfileZone("macOS main loop");
+							JundotProfileFrameMark;
+							JundotProfileZone("macOS main loop");
 
 							if (ds_mac) {
 								ds_mac->_process_events(false);
@@ -1193,13 +1193,13 @@ void OS_MacOS_NSApp::cleanup() {
 			Main::cleanup();
 		}
 	}
-	godot_cleanup_profiler();
+	jundot_cleanup_profiler();
 }
 
 OS_MacOS_NSApp::OS_MacOS_NSApp(const char *p_execpath, int p_argc, char **p_argv) :
 		OS_MacOS(p_execpath, p_argc, p_argv) {
 	// Implicitly create shared NSApplication instance.
-	[GodotApplication sharedApplication];
+	[JundotApplication sharedApplication];
 
 	// In case we are unbundled, make us a proper UI application.
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
@@ -1211,7 +1211,7 @@ OS_MacOS_NSApp::OS_MacOS_NSApp(const char *p_execpath, int p_argc, char **p_argv
 	NSMenu *main_menu = [[NSMenu alloc] initWithTitle:@""];
 	[NSApp setMainMenu:main_menu];
 
-	delegate = [[GodotApplicationDelegate alloc] initWithOS:this];
+	delegate = [[JundotApplicationDelegate alloc] initWithOS:this];
 	ERR_FAIL_NULL(delegate);
 	[NSApp setDelegate:delegate];
 	[NSApp registerUserInterfaceItemSearchHandler:delegate];
@@ -1310,8 +1310,8 @@ void OS_MacOS_Embedded::run() {
 		while (true) {
 			@autoreleasepool {
 				@try {
-					GodotProfileFrameMark;
-					GodotProfileZone("macOS embedded main loop");
+					JundotProfileFrameMark;
+					JundotProfileZone("macOS embedded main loop");
 
 					ds->process_events();
 

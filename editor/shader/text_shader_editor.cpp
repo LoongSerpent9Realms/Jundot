@@ -2,10 +2,10 @@
 /*  text_shader_editor.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1638,7 +1638,7 @@ void TextShaderEditor::_menu_option(int p_option) {
 			_focus_preview_line(bpoints[bpoint_idx]);
 		} break;
 		case HELP_DOCS: {
-			OS::get_singleton()->shell_open(vformat("%s/tutorials/shaders/shader_reference/index.html", GODOT_VERSION_DOCS_URL));
+			OS::get_singleton()->shell_open(vformat("%s/tutorials/shaders/shader_reference/index.html", JUNDOT_VERSION_DOCS_URL));
 		} break;
 		case EDIT_EMOJI_AND_SYMBOL: {
 			tx->show_emoji_and_symbol_picker();
@@ -2259,7 +2259,7 @@ TextShaderEditor::TextShaderEditor() {
 	site_search->set_theme_type_variation(SceneStringName(FlatButton));
 	site_search->connect(SceneStringName(pressed), callable_mp(this, &TextShaderEditor::_menu_option).bind(HELP_DOCS));
 	site_search->set_text(TTRC("Online Docs"));
-	site_search->set_tooltip_text(TTRC("Open Godot online documentation."));
+	site_search->set_tooltip_text(TTRC("Open Jundot online documentation."));
 	menu_bar_hbox->add_child(site_search);
 
 	menu_bar_hbox->add_theme_style_override(SceneStringName(panel), EditorNode::get_singleton()->get_editor_theme()->get_stylebox(SNAME("ScriptEditorPanel"), EditorStringName(EditorStyles)));

@@ -2,10 +2,10 @@
 /*  app_delegate_service.mm                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -33,8 +33,8 @@
 #include "core/config/project_settings.h"
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
-#import "drivers/apple_embedded/godot_view_apple_embedded.h"
-#import "drivers/apple_embedded/godot_view_controller.h"
+#import "drivers/apple_embedded/jundot_view_apple_embedded.h"
+#import "drivers/apple_embedded/jundot_view_controller.h"
 #import "drivers/apple_embedded/os_apple_embedded.h"
 #import "drivers/coreaudio/audio_driver_coreaudio.h"
 #include "main/main.h"
@@ -72,7 +72,7 @@ static GDTViewController *mainViewController = nil;
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 	// TODO: might be required to make an early return, so app wouldn't crash because of timeout.
 	// TODO: logo screen is not displayed while shaders are compiling
-	// DummyViewController(Splash/LoadingViewController) -> setup -> GodotViewController
+	// DummyViewController(Splash/LoadingViewController) -> setup -> JundotViewController
 
 	// Fetch the command-line arguments from NSProcessInfo
 	NSArray *arguments = [[NSProcessInfo processInfo] arguments];

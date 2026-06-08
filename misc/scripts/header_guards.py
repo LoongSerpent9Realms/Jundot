@@ -23,14 +23,14 @@ for file in sys.argv[1:]:
             if sline == "":  # Skip empty lines at the top.
                 continue
 
-            if sline.startswith("/**********"):  # Godot header starts this way.
+            if sline.startswith("/**********"):  # Jundot header starts this way.
                 header_start = idx
             else:
-                header_end = 0  # There is no Godot header.
+                header_end = 0  # There is no Jundot header.
                 break
         else:
-            if not sline.startswith(("*", "/*")):  # Not in the Godot header anymore.
-                header_end = idx + 1  # The guard should be two lines below the Godot header.
+            if not sline.startswith(("*", "/*")):  # Not in the Jundot header anymore.
+                header_end = idx + 1  # The guard should be two lines below the Jundot header.
                 break
 
     if (HEADER_CHECK_OFFSET := header_end) < 0 or HEADER_CHECK_OFFSET >= len(lines):

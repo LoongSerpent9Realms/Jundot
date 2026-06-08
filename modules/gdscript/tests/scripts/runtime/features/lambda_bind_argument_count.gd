@@ -1,4 +1,4 @@
-# https://github.com/godotengine/godot/issues/93952
+# https://github.com/jundotengine/jundot/issues/93952
 
 func foo():
 	pass

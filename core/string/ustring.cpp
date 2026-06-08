@@ -2,10 +2,10 @@
 /*  ustring.cpp                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -3554,7 +3554,7 @@ String String::format(const Variant &values, const String &placeholder) const {
 		Array values_arr = values;
 
 		for (int i = 0; i < values_arr.size(); i++) {
-			if (values_arr[i].get_type() == Variant::ARRAY) { //Array in Array structure [["name","RobotGuy"],[0,"godot"],["strength",9000.91]]
+			if (values_arr[i].get_type() == Variant::ARRAY) { //Array in Array structure [["name","RobotGuy"],[0,"jundot"],["strength",9000.91]]
 				Array value_arr = values_arr[i];
 
 				if (value_arr.size() == 2) {
@@ -5744,10 +5744,10 @@ String DTR(const String &p_text, const String &p_context) {
 	const String text = p_text.dedent().strip_edges();
 
 	if (TranslationServer::get_singleton()) {
-		return String(TranslationServer::get_singleton()->get_doc_domain()->translate(text, p_context)).replace("$DOCS_URL", GODOT_VERSION_DOCS_URL);
+		return String(TranslationServer::get_singleton()->get_doc_domain()->translate(text, p_context)).replace("$DOCS_URL", JUNDOT_VERSION_DOCS_URL);
 	}
 
-	return text.replace("$DOCS_URL", GODOT_VERSION_DOCS_URL);
+	return text.replace("$DOCS_URL", JUNDOT_VERSION_DOCS_URL);
 }
 
 /**
@@ -5761,14 +5761,14 @@ String DTRN(const String &p_text, const String &p_text_plural, int p_n, const St
 	const String text_plural = p_text_plural.dedent().strip_edges();
 
 	if (TranslationServer::get_singleton()) {
-		return String(TranslationServer::get_singleton()->get_doc_domain()->translate_plural(text, text_plural, p_n, p_context)).replace("$DOCS_URL", GODOT_VERSION_DOCS_URL);
+		return String(TranslationServer::get_singleton()->get_doc_domain()->translate_plural(text, text_plural, p_n, p_context)).replace("$DOCS_URL", JUNDOT_VERSION_DOCS_URL);
 	}
 
 	// Return message based on English plural rule if translation is not possible.
 	if (p_n == 1) {
-		return text.replace("$DOCS_URL", GODOT_VERSION_DOCS_URL);
+		return text.replace("$DOCS_URL", JUNDOT_VERSION_DOCS_URL);
 	}
-	return text_plural.replace("$DOCS_URL", GODOT_VERSION_DOCS_URL);
+	return text_plural.replace("$DOCS_URL", JUNDOT_VERSION_DOCS_URL);
 }
 #endif
 

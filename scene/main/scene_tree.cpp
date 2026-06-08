@@ -2,10 +2,10 @@
 /*  scene_tree.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -584,7 +584,7 @@ void SceneTree::set_group(const StringName &p_group, const String &p_name, const
 }
 
 void SceneTree::initialize() {
-	GodotProfileZone("SceneTree::initialize");
+	JundotProfileZone("SceneTree::initialize");
 	ERR_FAIL_NULL(root);
 	MainLoop::initialize();
 	root->_set_tree(this);

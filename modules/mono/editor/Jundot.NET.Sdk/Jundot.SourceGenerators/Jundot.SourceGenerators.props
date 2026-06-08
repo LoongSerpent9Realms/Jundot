@@ -1,0 +1,10 @@
+<Project>
+  <ItemGroup>
+    <!-- $(JundotProjectDir) is defined by Jundot.NET.Sdk -->
+    <CompilerVisibleProperty Include="JundotDisabledSourceGenerators" />
+    <CompilerVisibleProperty Include="JundotProjectDir" />
+    <CompilerVisibleProperty Include="JundotProjectDirBase64" />
+    <CompilerVisibleProperty Include="JundotSourceGenerators" />
+    <CompilerVisibleProperty Include="IsJundotToolsProject" />
+  </ItemGroup>
+</Project>

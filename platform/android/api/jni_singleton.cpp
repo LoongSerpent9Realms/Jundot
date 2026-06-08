@@ -2,10 +2,10 @@
 /*  jni_singleton.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -46,7 +46,7 @@ bool JNISingleton::_get(const StringName &p_name, Variant &r_property) const {
 }
 
 Variant JNISingleton::callp(const StringName &p_method, const Variant **p_args, int p_argcount, Callable::CallError &r_error) {
-	// Godot methods take precedence.
+	// Jundot methods take precedence.
 	Variant ret = Object::callp(p_method, p_args, p_argcount, r_error);
 	if (r_error.error == Callable::CallError::CALL_OK) {
 		return ret;
@@ -54,10 +54,10 @@ Variant JNISingleton::callp(const StringName &p_method, const Variant **p_args, 
 
 	// Check the method we're looking for is in the JNISingleton map.
 	// This is done because JNISingletons register methods differently than wrapped JavaClass / JavaObject to allow
-	// for access to private methods annotated with the @UsedByGodot annotation.
+	// for access to private methods annotated with the @UsedByJundot annotation.
 	// In the future, we should remove access to private methods and require that JNISingletons' methods exposed to
 	// GDScript be all public, similarly to what we do for wrapped JavaClass / JavaObject methods. Doing so will
-	// also allow dropping and deprecating the @UsedByGodot annotation.
+	// also allow dropping and deprecating the @UsedByJundot annotation.
 	RBMap<StringName, MethodData>::Element *E = method_map.find(p_method);
 	if (E) {
 		if (wrapped_object.is_valid()) {

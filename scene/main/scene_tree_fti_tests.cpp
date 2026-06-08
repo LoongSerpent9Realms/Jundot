@@ -2,10 +2,10 @@
 /*  scene_tree_fti_tests.cpp                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #ifndef _3D_DISABLED
 
-#ifdef GODOT_SCENE_TREE_FTI_VERIFY
+#ifdef JUNDOT_SCENE_TREE_FTI_VERIFY
 #include "scene_tree_fti_tests.h"
 
 #include "scene/3d/node_3d.h"
@@ -238,9 +238,9 @@ void SceneTreeFTITests::frame_update(Node *p_root, uint32_t p_half_frame, float 
 
 SceneTreeFTITests::SceneTreeFTITests(SceneTreeFTI &p_fti) :
 		_fti(p_fti) {
-	print_line("SceneTreeFTI : GODOT_SCENE_TREE_FTI_VERIFY defined");
+	print_line("SceneTreeFTI : JUNDOT_SCENE_TREE_FTI_VERIFY defined");
 }
 
-#endif // def GODOT_SCENE_TREE_FTI_VERIFY
+#endif // def JUNDOT_SCENE_TREE_FTI_VERIFY
 
 #endif // ndef _3D_DISABLED

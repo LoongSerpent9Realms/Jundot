@@ -2,10 +2,10 @@
 /*  animation_mixer.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1925,7 +1925,7 @@ void AnimationMixer::_blend_apply() {
 						return;
 					}
 
-					// TODO: Once https://github.com/godotengine/godot/pull/113441 makes it in
+					// TODO: Once https://github.com/jundotengine/jundot/pull/113441 makes it in
 					// Use set_bone_pose_components when loc_used, rot_used, and scale_used are all true.
 
 					if (t->loc_used) {

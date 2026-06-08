@@ -2,10 +2,10 @@
 /*  d3d12_hooks.h                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <drivers/d3d12/godot_d3dx12.h>
+#include <drivers/d3d12/jundot_d3dx12.h>
 
 class D3D12Hooks {
 private:

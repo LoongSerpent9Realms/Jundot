@@ -2,10 +2,10 @@
 /*  class_db.cpp                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -381,7 +381,7 @@ uint32_t ClassDB::get_api_hash(APIType p_api) {
 		return api_hashes_cache[p_api];
 	}
 
-	uint64_t hash = hash_murmur3_one_64(HashMapHasherDefault::hash(GODOT_VERSION_FULL_CONFIG));
+	uint64_t hash = hash_murmur3_one_64(HashMapHasherDefault::hash(JUNDOT_VERSION_FULL_CONFIG));
 
 	List<StringName> class_list;
 	for (const KeyValue<StringName, ClassInfo> &E : classes) {

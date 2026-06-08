@@ -5,15 +5,15 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>Godot</string>
+	<string>Jundot</string>
 	<key>CFBundleName</key>
-	<string>Godot</string>
+	<string>Jundot</string>
 	<key>CFBundleIconFile</key>
-	<string>GodotLG.icns</string>
+	<string>JundotLG.icns</string>
 	<key>CFBundleIconName</key>
-	<string>GodotLG</string>
+	<string>JundotLG</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.godotengine.godot</string>
+	<string>org.jundotengine.jundot</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundlePackageType</key>
@@ -33,7 +33,7 @@
 	<key>NSCameraUseContinuityCameraDeviceType</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>© 2007-present Juan Linietsky, Ariel Manzur &amp; Godot Engine contributors</string>
+	<string>© 2007-present Juan Linietsky, Ariel Manzur &amp; Jundot Engine contributors</string>
 	<key>CFBundleSupportedPlatforms</key>
 	<array>
 		<string>MacOSX</string>
@@ -75,11 +75,11 @@
 			<string>Editor</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>public.godot</string>
+				<string>public.jundot</string>
 			</array>
 			<key>NSExportableTypes</key>
 			<array>
-				<string>public.godot</string>
+				<string>public.jundot</string>
 			</array>
 		</dict>
 	</array>
@@ -91,7 +91,7 @@
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeDescription</key>
-			<string>Godot Engine scene</string>
+			<string>Jundot Engine scene</string>
 			<key>UTTypeIconFile</key>
 			<string>Scene.icns</string>
 			<key>UTTypeConformsTo</key>
@@ -107,7 +107,7 @@
 					<string>escn</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/x-godot-scene</string>
+				<string>application/x-jundot-scene</string>
 			</dict>
 		</dict>
 		<dict>
@@ -139,7 +139,7 @@
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeDescription</key>
-			<string>Godot Engine resource</string>
+			<string>Jundot Engine resource</string>
 			<key>UTTypeIconFile</key>
 			<string>Resource.icns</string>
 			<key>UTTypeConformsTo</key>
@@ -154,7 +154,7 @@
 					<string>tres</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/x-godot-resource</string>
+				<string>application/x-jundot-resource</string>
 			</dict>
 		</dict>
 		<dict>
@@ -163,7 +163,7 @@
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeDescription</key>
-			<string>Godot Engine shader</string>
+			<string>Jundot Engine shader</string>
 			<key>UTTypeIconFile</key>
 			<string>Shader.icns</string>
 			<key>UTTypeConformsTo</key>
@@ -177,16 +177,16 @@
 					<string>gdshader</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/x-godot-shader</string>
+				<string>application/x-jundot-shader</string>
 			</dict>
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
-			<string>public.godot</string>
+			<string>public.jundot</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeDescription</key>
-			<string>Godot Engine project</string>
+			<string>Jundot Engine project</string>
 			<key>UTTypeIconFile</key>
 			<string>Project.icns</string>
 			<key>UTTypeConformsTo</key>
@@ -197,10 +197,10 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>godot</string>
+					<string>jundot</string>
 				</array>
 				<key>public.mime-type</key>
-				<string>application/x-godot-project</string>
+				<string>application/x-jundot-project</string>
 			</dict>
 		</dict>
 	</array>

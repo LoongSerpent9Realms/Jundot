@@ -2,10 +2,10 @@
 /*  rasterizer_gles3.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -321,7 +321,7 @@ RasterizerGLES3::RasterizerGLES3() {
 			}
 
 			if (callback) {
-				print_line("godot: ENABLING GL DEBUG");
+				print_line("jundot: ENABLING GL DEBUG");
 				glEnable(_EXT_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
 				callback((DEBUGPROCARB)_gl_debug_print, nullptr);
 				glEnable(_EXT_DEBUG_OUTPUT);
@@ -385,7 +385,7 @@ RasterizerGLES3::RasterizerGLES3() {
 	// Has to be a separate call due to TextureStorage & MaterialStorage needing to interact for TexBlit Shaders
 	texture_storage->_tex_blit_shader_initialize();
 
-	// Disable OpenGL linear to sRGB conversion, because Godot will always do this conversion itself.
+	// Disable OpenGL linear to sRGB conversion, because Jundot will always do this conversion itself.
 	if (config->srgb_framebuffer_supported) {
 		glDisable(GL_FRAMEBUFFER_SRGB);
 	}
@@ -411,7 +411,7 @@ void RasterizerGLES3::_blit_render_target_to_screen(DisplayServerEnums::WindowID
 		// It is 99% likely our texture uses the GL_SRGB8_ALPHA8 texture format in
 		// which case we have a GPU sRGB to Linear conversion on texture read.
 		// We need to counter this.
-		// Unfortunately we do not have an API to check this as Godot does not
+		// Unfortunately we do not have an API to check this as Jundot does not
 		// track this.
 		linear_to_srgb = true;
 	}

@@ -2,10 +2,10 @@
 /*  method_bind.h                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -99,7 +99,7 @@ public:
 	void set_argument_names(const Vector<StringName> &p_names); // Set by ClassDB, can't be inferred otherwise.
 	Vector<StringName> get_argument_names() const;
 
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const = 0;
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const = 0;
 #endif // DEBUG_ENABLED
 
 	void set_hint_flags(uint32_t p_hint) { hint_flags = p_hint; }
@@ -160,8 +160,8 @@ public:
 	}
 
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int) const override {
-		return GodotTypeInfo::METADATA_NONE;
+	virtual JundotTypeInfo::Metadata get_argument_meta(int) const override {
+		return JundotTypeInfo::METADATA_NONE;
 	}
 #endif // DEBUG_ENABLED
 
@@ -255,7 +255,7 @@ class MethodBindVarArgTR : public MethodBindVarArgBase<MethodBindVarArgTR<T, R>,
 	friend class MethodBindVarArgBase<MethodBindVarArgTR<T, R>, T, R, true>;
 
 public:
-	GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wmaybe-uninitialized") // Workaround GH-66343 raised only with UBSAN, seems to be a false positive.
+	JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wmaybe-uninitialized") // Workaround GH-66343 raised only with UBSAN, seems to be a false positive.
 
 	virtual Variant call(Object *p_object, const Variant **p_args, int p_arg_count, Callable::CallError &r_error) const override {
 #ifdef TOOLS_ENABLED
@@ -264,7 +264,7 @@ public:
 		return (static_cast<T *>(p_object)->*MethodBindVarArgBase<MethodBindVarArgTR<T, R>, T, R, true>::method)(p_args, p_arg_count, r_error);
 	}
 
-	GODOT_GCC_WARNING_POP
+	JUNDOT_GCC_WARNING_POP
 
 	MethodBindVarArgTR(
 			R (T::*p_method)(const Variant **, int, Callable::CallError &),

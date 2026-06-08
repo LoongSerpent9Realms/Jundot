@@ -1,7 +1,7 @@
-# French translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# French translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Antoine Carrier <ac.g392@gmail.com>, 2017-2018.
 # ARocherVj <a.rocher.vj@gmail.com>, 2017.
 # Arthur Templé <tuturtemple@gmail.com>, 2018.
@@ -32,7 +32,7 @@
 # Przemyslaw Gasinski <gasinski.przemek@protonmail.ch>, 2017.
 # rafeu <duchainer@gmail.com>, 2016-2017.
 # rawida <rawida@tempinbox.com>, 2018.
-# Rémi Verschelde <akien@godotengine.org>, 2016-2022.
+# Rémi Verschelde <akien@jundotengine.org>, 2016-2022.
 # Robin Arys <robinarys@hotmail.com>, 2017.
 # Roger BR <drai_kin@hotmail.com>, 2016.
 # salty64 <cedric.arrabie@univ-pau.fr>, 2018, 2020, 2021.
@@ -163,12 +163,12 @@
 # "Alyx.dev" <alyxdev@ik.me>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-19 14:04+0000\n"
 "Last-Translator: \"Alyx.dev\" <alyxdev@ik.me>\n"
-"Language-Team: French <https://hosted.weblate.org/projects/godot-engine/godot-"
+"Language-Team: French <https://hosted.weblate.org/projects/jundot-engine/jundot-"
 "properties/fr/>\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
@@ -3974,8 +3974,8 @@ msgstr "Toujours suivre les piles d'appel"
 msgid "Always Track Local Variables"
 msgstr "Toujours suivre les variables locales"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Indice de renommage dans Godot 4"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Indice de renommage dans Jundot 4"
 
 msgid "Unassigned Variable"
 msgstr "Variable non assignée"
@@ -4367,11 +4367,11 @@ msgstr "Lumière"
 msgid "Visible"
 msgstr "Visible"
 
-msgid "glTF to Godot Expression"
-msgstr "Expression glTF vers Godot"
+msgid "glTF to Jundot Expression"
+msgstr "Expression glTF vers Jundot"
 
-msgid "Godot to glTF Expression"
-msgstr "Expression Godot vers glTF"
+msgid "Jundot to glTF Expression"
+msgstr "Expression Jundot vers glTF"
 
 msgid "Node Paths"
 msgstr "Chemins de nœud"
@@ -4391,8 +4391,8 @@ msgstr "Jointures"
 msgid "Roots"
 msgstr "Racines"
 
-msgid "Godot Bone Node"
-msgstr "Nœud d'os de Godot"
+msgid "Jundot Bone Node"
+msgstr "Nœud d'os de Jundot"
 
 msgid "Skin Root"
 msgstr "Racine de l'enveloppe"
@@ -4403,8 +4403,8 @@ msgstr "Jointure à l'original"
 msgid "Non Joints"
 msgstr "Non jointures"
 
-msgid "Godot Skin"
-msgstr "Enveloppe Godot"
+msgid "Jundot Skin"
+msgstr "Enveloppe Jundot"
 
 msgid "Src Image"
 msgstr "Image source"
@@ -5750,8 +5750,8 @@ msgstr "Icône 512 X 512"
 msgid "Emscripten Pool Size"
 msgstr "Place allouée pour Emscripten"
 
-msgid "Godot Pool Size"
-msgstr "Taille de Pool de Godot"
+msgid "Jundot Pool Size"
+msgstr "Taille de Pool de Jundot"
 
 msgid "Windows"
 msgstr "Windows"

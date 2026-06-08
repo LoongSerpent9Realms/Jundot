@@ -2,10 +2,10 @@
 /*  native_ptr.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -123,7 +123,7 @@ struct GDExtensionPtr {
 template <typename T>
 struct GetTypeInfo<GDExtensionConstPtr<T>> {
 	static const Variant::Type VARIANT_TYPE = Variant::INT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_INT_IS_POINTER, GDExtensionConstPtr<T>::get_name());
 	}
@@ -132,7 +132,7 @@ struct GetTypeInfo<GDExtensionConstPtr<T>> {
 template <typename T>
 struct GetTypeInfo<GDExtensionPtr<T>> {
 	static const Variant::Type VARIANT_TYPE = Variant::INT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_INT_IS_POINTER, GDExtensionPtr<T>::get_name());
 	}

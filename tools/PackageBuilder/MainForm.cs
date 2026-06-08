@@ -1,6 +1,7 @@
 using System.ComponentModel;
+using System.Reflection;
 
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 public partial class MainForm : Form
 {
@@ -50,6 +51,7 @@ public partial class MainForm : Form
     private TextBox _txtVerStatus = null!;
     private Label _lblVerDisplay = null!;
     private CheckBox _chkAutoVersion = null!;
+    private CheckBox _chkGenManifest = null!;
 
     // Builds tab
     private ListView _lvBuilds = null!;
@@ -81,7 +83,7 @@ public partial class MainForm : Form
 
     public MainForm()
     {
-        Text = I18N.T("Title");
+        SetTitleWithVersion();
         Size = new Size(960, 720);
         MinimumSize = new Size(800, 600);
         StartPosition = FormStartPosition.CenterScreen;
@@ -97,6 +99,9 @@ public partial class MainForm : Form
 
         // Save config on close
         FormClosing += (s, e) => SaveConfig();
+
+        // Auto-check for updates after form is fully loaded
+        Shown += OnShown;
     }
 
     // ── Language Switch ─────────────────────────────────────
@@ -115,7 +120,7 @@ public partial class MainForm : Form
     private void ApplyLanguage()
     {
         // Update form title
-        Text = I18N.T("Title");
+        SetTitleWithVersion();
         ApplyBottomBarText();
 
         // Update all controls recursively
@@ -455,10 +460,10 @@ public partial class MainForm : Form
             AutoSizeMode = AutoSizeMode.GrowOnly,
             Dock = DockStyle.Top,
             ColumnCount = 3,
-            RowCount = 15,
+            RowCount = 16,
             Padding = new Padding(12, 12, 12, 4)
         };
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < 16; i++)
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); // label
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70));   // input
@@ -612,6 +617,18 @@ public partial class MainForm : Form
             AutoSize = true
         };
         layout.Controls.Add(_chkAutoVersion, 1, row);
+
+        // Row 15: Generate Update Manifest
+        row++;
+        AddLabel(layout, "", row);
+        _chkGenManifest = new CheckBox
+        {
+            Text = I18N.T("Check.GenManifest"),
+            Tag = "i18n:Check.GenManifest",
+            AutoSize = true,
+            Checked = true
+        };
+        layout.Controls.Add(_chkGenManifest, 1, row);
 
         return wrapper;
     }
@@ -792,7 +809,7 @@ public partial class MainForm : Form
             _txtVerPatch.Text = patch;
             _txtVerStatus.Text = status;
 
-            _lblVerDisplay.Text = FormatGodotVersion(major, minor, patch, status);
+            _lblVerDisplay.Text = FormatJundotVersion(major, minor, patch, status);
         }
         catch (Exception ex)
         {
@@ -800,7 +817,7 @@ public partial class MainForm : Form
         }
     }
 
-    private static string FormatGodotVersion(string major, string minor, string patch, string status)
+    private static string FormatJundotVersion(string major, string minor, string patch, string status)
     {
         var version = $"{major}.{minor}";
         if (!string.IsNullOrWhiteSpace(patch) && patch != "0")
@@ -930,7 +947,7 @@ public partial class MainForm : Form
         // Row 2: Info label
         var infoLabel = new Label
         {
-            Text = "This tool wraps scripts/package-godot.ps1 into a GUI.\n" +
+            Text = "This tool wraps scripts/package-jundot.ps1 into a GUI.\n" +
                    "All settings mirror the original PowerShell script parameters.\n\n" +
                    "Requirements:\n" +
                    "  • Python 3.x with SCons\n" +
@@ -1027,7 +1044,7 @@ public partial class MainForm : Form
 
     private void LoadDefaults()
     {
-        // Try to detect the Godot repo root
+        // Try to detect the Jundot repo root
         var dir = AppContext.BaseDirectory;
         while (dir != null && !File.Exists(Path.Combine(dir, "SConstruct")))
         {
@@ -1082,6 +1099,7 @@ public partial class MainForm : Form
                 RepoRoot = _txtRepoRoot.Text.Trim(),
                 Language = GetSelectedLanguage(),
                 AutoUpdateVersion = _chkAutoVersion?.Checked ?? false,
+                GenerateUpdateManifest = _chkGenManifest?.Checked ?? true
             };
 
             var json = System.Text.Json.JsonSerializer.Serialize(cfg, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
@@ -1121,6 +1139,8 @@ public partial class MainForm : Form
             _txtRepoRoot.Text = cfg.RepoRoot;
             if (_chkAutoVersion != null)
                 _chkAutoVersion.Checked = cfg.AutoUpdateVersion;
+            if (_chkGenManifest != null)
+                _chkGenManifest.Checked = cfg.GenerateUpdateManifest;
 
             // Restore language combobox selection
             var selIdx = 0;
@@ -1188,7 +1208,8 @@ public partial class MainForm : Form
             ExtraSConsArgs = _txtExtraSCons.Text.Trim(),
             RepoRoot = _txtRepoRoot.Text.Trim(),
             Language = GetSelectedLanguage(),
-            AutoUpdateVersion = _chkAutoVersion?.Checked ?? false
+            AutoUpdateVersion = _chkAutoVersion?.Checked ?? false,
+            GenerateUpdateManifest = _chkGenManifest?.Checked ?? true
         };
 
         _cts = new CancellationTokenSource();
@@ -1446,8 +1467,8 @@ public partial class MainForm : Form
             };
 
             var nameDisplay = b.PackageName;
-            // Prettify: godot-4.7-beta-windows-editor-x86_64-20260606-142153-build → Godot 4.7-beta Editor (x86_64)
-            if (nameDisplay.StartsWith("godot-"))
+            // Prettify: jundot-4.7-beta-windows-editor-x86_64-20260606-142153-build → Jundot 4.7-beta Editor (x86_64)
+            if (nameDisplay.StartsWith("jundot-"))
             {
                 var parts = nameDisplay.Split('-');
                 if (parts.Length >= 4)
@@ -1458,11 +1479,11 @@ public partial class MainForm : Form
                     {
                         // Has status like "beta"
                         statusPart = $"-{parts[2]}";
-                        nameDisplay = $"Godot {verPart}{statusPart} {char.ToUpper(parts[3][0]) + parts[3][1..]} ({parts[4]})";
+                        nameDisplay = $"Jundot {verPart}{statusPart} {char.ToUpper(parts[3][0]) + parts[3][1..]} ({parts[4]})";
                     }
                     else
                     {
-                        nameDisplay = $"Godot {verPart} {char.ToUpper(parts[2][0]) + parts[2][1..]} ({parts[3]})";
+                        nameDisplay = $"Jundot {verPart} {char.ToUpper(parts[2][0]) + parts[2][1..]} ({parts[3]})";
                     }
                     if (b.Mono) nameDisplay += " [Mono]";
                 }
@@ -1631,6 +1652,146 @@ public partial class MainForm : Form
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to delete: {ex.Message}", "Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  AUTO UPDATE
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>Get the current application version from the assembly.</summary>
+    private static string GetAppVersion()
+    {
+        try
+        {
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            return ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.0.0";
+        }
+        catch
+        {
+            return "1.0.0";
+        }
+    }
+
+    /// <summary>Set the window title to include the version number.</summary>
+    private void SetTitleWithVersion()
+    {
+        var baseTitle = I18N.T("Title");
+        var version = GetAppVersion();
+        Text = $"{baseTitle}  v{version}";
+    }
+
+    /// <summary>
+    /// Called when the form is first shown. Kicks off the background
+    /// update check (non-blocking, silent on error).
+    /// </summary>
+    private async void OnShown(object? sender, EventArgs e)
+    {
+        // Only check once per session
+        Shown -= OnShown;
+
+        try
+        {
+            await CheckForUpdatesAsync();
+        }
+        catch
+        {
+            // Silently ignore — update check failures should not disturb the user
+        }
+    }
+
+    /// <summary>
+    /// Background update check flow:
+    /// 1. Query GitHub Releases for latest version
+    /// 2. If newer, show dialog asking whether to install
+    /// 3. If confirmed, download and trigger self-replacing install
+    /// </summary>
+    private async Task CheckForUpdatesAsync()
+    {
+        var currentVersion = GetAppVersion();
+
+        // Write a brief note to the console
+        AppendConsole(I18N.T("Update.Checking"), "info");
+
+        var result = await UpdateChecker.CheckForUpdateAsync(currentVersion);
+
+        if (result.HasUpdate && !string.IsNullOrEmpty(result.DownloadUrl))
+        {
+            // Show update dialog
+            var message = string.Format(
+                I18N.T("Update.NewVersion"),
+                result.LatestVersion ?? "?",
+                currentVersion);
+            var caption = I18N.T("Update.Available");
+
+            var dialogResult = MessageBox.Show(
+                this,
+                message,
+                caption,
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Information,
+                MessageBoxDefaultButton.Button1);
+
+            if (dialogResult != DialogResult.Yes)
+                return;
+
+            // Download and install
+            await DownloadAndApplyUpdateAsync(result.DownloadUrl);
+        }
+        else if (!string.IsNullOrEmpty(result.Error))
+        {
+            // Log the error to console but don't bother the user
+            AppendConsole(
+                string.Format(I18N.T("Update.Failed"), result.Error),
+                "warning");
+        }
+        // else: no update — nothing to do (silent)
+    }
+
+    /// <summary>Download the update package and trigger self-replacing install.</summary>
+    private async Task DownloadAndApplyUpdateAsync(string downloadUrl)
+    {
+        var exeDir = AppContext.BaseDirectory;
+
+        try
+        {
+            // Show progress in console
+            UpdateStatus(I18N.T("Update.Downloading").Replace("{0}", "0"), Color.DodgerBlue);
+
+            await UpdateChecker.DownloadAndInstallAsync(
+                downloadUrl,
+                exeDir,
+                progress =>
+                {
+                    // Update status on UI thread
+                    if (InvokeRequired)
+                    {
+                        BeginInvoke(() => UpdateStatus(
+                            I18N.T("Update.Downloading").Replace("{0}", progress.ToString()),
+                            Color.DodgerBlue));
+                    }
+                    else
+                    {
+                        UpdateStatus(
+                            I18N.T("Update.Downloading").Replace("{0}", progress.ToString()),
+                            Color.DodgerBlue);
+                    }
+                });
+
+            // Notify the user
+            AppendConsole(I18N.T("Update.InstallingDesc"), "success");
+            UpdateStatus(I18N.T("Update.Installing"), Color.Green);
+
+            // Give the user a moment to see the message, then exit
+            await Task.Delay(1500);
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            var msg = string.Format(I18N.T("Update.DownloadFailed"), ex.Message);
+            AppendConsole(msg, "error");
+            MessageBox.Show(this, msg, I18N.T("Update.Error"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

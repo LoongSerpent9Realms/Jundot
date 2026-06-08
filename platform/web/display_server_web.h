@@ -2,10 +2,10 @@
 /*  display_server_web.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "godot_js.h"
+#include "jundot_js.h"
 
 #include "core/input/input_enums.h"
 #include "core/os/keyboard.h"
@@ -118,8 +118,8 @@ private:
 	void _mouse_update_mode();
 
 	// utilities
-	static void dom2godot_mod(Ref<InputEventWithModifiers> ev, int p_mod, Key p_keycode);
-	static const char *godot2dom_cursor(DisplayServerEnums::CursorShape p_shape);
+	static void dom2jundot_mod(Ref<InputEventWithModifiers> ev, int p_mod, Key p_keycode);
+	static const char *jundot2dom_cursor(DisplayServerEnums::CursorShape p_shape);
 
 	// events
 	WASM_EXPORT static void fullscreen_change_callback(int p_fullscreen);

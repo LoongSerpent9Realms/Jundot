@@ -2,10 +2,10 @@
 /*  openxr_util.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -181,7 +181,7 @@ XrUuid OpenXRUtil::xruuid_from_string(const String &p_uuid) {
 // SPDX-License-Identifier: Apache-2.0
 
 // Creates a projection matrix based on the specified dimensions.
-// The projection matrix transforms -Z=forward, +Y=up, +X=right to the appropriate clip space for Godot (OpenGL convention).
+// The projection matrix transforms -Z=forward, +Y=up, +X=right to the appropriate clip space for Jundot (OpenGL convention).
 // The far plane is placed at infinity if farZ <= nearZ.
 // An infinite projection matrix is preferred for rasterization because, except for
 // things *right* up against the near plane, it always provides better precision:

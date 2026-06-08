@@ -2,10 +2,10 @@
 /*  renderer_scene_render_rd.cpp                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1793,9 +1793,9 @@ void RendererSceneRenderRD::init() {
 
 	/* Register the include files we make available by default to our users */
 	{
-		ShaderIncludeDB::register_built_in_include_file("godot/decal_data_inc.glsl", decal_data_inc_shader_glsl);
-		ShaderIncludeDB::register_built_in_include_file("godot/light_data_inc.glsl", light_data_inc_shader_glsl);
-		ShaderIncludeDB::register_built_in_include_file("godot/scene_data_inc.glsl", scene_data_inc_shader_glsl);
+		ShaderIncludeDB::register_built_in_include_file("jundot/decal_data_inc.glsl", decal_data_inc_shader_glsl);
+		ShaderIncludeDB::register_built_in_include_file("jundot/light_data_inc.glsl", light_data_inc_shader_glsl);
+		ShaderIncludeDB::register_built_in_include_file("jundot/scene_data_inc.glsl", scene_data_inc_shader_glsl);
 	}
 
 	/* SKY SHADER */

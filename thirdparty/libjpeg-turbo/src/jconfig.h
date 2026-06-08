@@ -21,11 +21,11 @@
 #define MEM_SRCDST_SUPPORTED  1
 
 /* Use accelerated SIMD routines when using 8-bit samples */
-// Godot: Disabled for simplicity of compiling the library cross-platform.
+// Jundot: Disabled for simplicity of compiling the library cross-platform.
 // Could be enabled if it's confirmed to be worth the effort.
 //#define WITH_SIMD 1
 
-// Godot: Disable those as they're for forcing different SIMD CPU support
+// Jundot: Disable those as they're for forcing different SIMD CPU support
 // via environment variables, that's super niche and we don't build with SIMD.
 #define NO_GETENV
 #define NO_PUTENV

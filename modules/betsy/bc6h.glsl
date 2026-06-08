@@ -48,8 +48,8 @@ const float HALF_MIN = 0.0f;
 #endif
 
 #ifdef SIGNED
-// https://github.com/godotengine/godot/pull/96377#issuecomment-2323488254
-// https://github.com/godotengine/godot/pull/96377#issuecomment-2323450950
+// https://github.com/jundotengine/jundot/pull/96377#issuecomment-2323488254
+// https://github.com/jundotengine/jundot/pull/96377#issuecomment-2323450950
 bool isNegative(float a) {
 	return a < 0.0f;
 }

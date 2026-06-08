@@ -7,7 +7,7 @@ env.Append(CPPPATH=["src"])
 env.Append(CFLAGS=["-O0", "-g"])
 
 library = env.SharedLibrary(
-    target="#godot/compatibility_test",
+    target="#jundot/compatibility_test",
     source="#src/compat_checker.c",
 )
 

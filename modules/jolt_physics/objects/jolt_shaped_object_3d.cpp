@@ -2,10 +2,10 @@
 /*  jolt_shaped_object_3d.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -135,7 +135,7 @@ JPH::ShapeRefC JoltShapedObject3D::_try_build_compound_shape(bool p_optimize) {
 	}
 
 	const JPH::ShapeSettings::ShapeResult shape_result = p_optimize ? static_compound_shape_settings.Create(space->get_temp_allocator()) : mutable_compound_shape_settings.Create();
-	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to create compound shape for body '%s'. It returned the following error: '%s'.", to_string(), to_godot(shape_result.GetError())));
+	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to create compound shape for body '%s'. It returned the following error: '%s'.", to_string(), to_jundot(shape_result.GetError())));
 
 	return shape_result.Get();
 }
@@ -205,9 +205,9 @@ JoltShapedObject3D::~JoltShapedObject3D() {
 
 Transform3D JoltShapedObject3D::get_transform_unscaled() const {
 	if (!in_space()) {
-		return Transform3D(to_godot(jolt_settings->mRotation), to_godot(jolt_settings->mPosition));
+		return Transform3D(to_jundot(jolt_settings->mRotation), to_jundot(jolt_settings->mPosition));
 	} else {
-		return Transform3D(to_godot(jolt_body->GetRotation()), to_godot(jolt_body->GetPosition()));
+		return Transform3D(to_jundot(jolt_body->GetRotation()), to_jundot(jolt_body->GetPosition()));
 	}
 }
 
@@ -217,23 +217,23 @@ Transform3D JoltShapedObject3D::get_transform_scaled() const {
 
 Basis JoltShapedObject3D::get_basis() const {
 	if (!in_space()) {
-		return to_godot(jolt_settings->mRotation);
+		return to_jundot(jolt_settings->mRotation);
 	} else {
-		return to_godot(jolt_body->GetRotation());
+		return to_jundot(jolt_body->GetRotation());
 	}
 }
 
 Vector3 JoltShapedObject3D::get_position() const {
 	if (!in_space()) {
-		return to_godot(jolt_settings->mPosition);
+		return to_jundot(jolt_settings->mPosition);
 	} else {
-		return to_godot(jolt_body->GetPosition());
+		return to_jundot(jolt_body->GetPosition());
 	}
 }
 
 Vector3 JoltShapedObject3D::get_center_of_mass() const {
 	ERR_FAIL_COND_V_MSG(!in_space(), Vector3(), vformat("Failed to retrieve center-of-mass of '%s'. Doing so without a physics space is not supported when using Jolt Physics. If this relates to a node, try adding the node to a scene tree first.", to_string()));
-	return to_godot(jolt_body->GetCenterOfMassPosition());
+	return to_jundot(jolt_body->GetCenterOfMassPosition());
 }
 
 Vector3 JoltShapedObject3D::get_center_of_mass_relative() const {
@@ -248,17 +248,17 @@ Vector3 JoltShapedObject3D::get_center_of_mass_local() const {
 
 Vector3 JoltShapedObject3D::get_linear_velocity() const {
 	if (!in_space()) {
-		return to_godot(jolt_settings->mLinearVelocity);
+		return to_jundot(jolt_settings->mLinearVelocity);
 	} else {
-		return to_godot(jolt_body->GetLinearVelocity());
+		return to_jundot(jolt_body->GetLinearVelocity());
 	}
 }
 
 Vector3 JoltShapedObject3D::get_angular_velocity() const {
 	if (!in_space()) {
-		return to_godot(jolt_settings->mAngularVelocity);
+		return to_jundot(jolt_settings->mAngularVelocity);
 	} else {
-		return to_godot(jolt_body->GetAngularVelocity());
+		return to_jundot(jolt_body->GetAngularVelocity());
 	}
 }
 

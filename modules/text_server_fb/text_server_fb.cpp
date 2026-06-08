@@ -2,10 +2,10 @@
 /*  text_server_fb.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -45,8 +45,8 @@
 // Thirdparty headers.
 
 #ifdef MODULE_MSDFGEN_ENABLED
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
-GODOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides class member".
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
+JUNDOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides class member".
 
 #include <core/EdgeHolder.h>
 #include <core/ShapeDistanceFinder.h>
@@ -54,8 +54,8 @@ GODOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides c
 #include <core/edge-selectors.h>
 #include <msdfgen.h>
 
-GODOT_GCC_WARNING_POP
-GODOT_MSVC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
+JUNDOT_MSVC_WARNING_POP
 #endif
 
 #ifdef MODULE_FREETYPE_ENABLED

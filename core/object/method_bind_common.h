@@ -2,10 +2,10 @@
 /*  method_bind_common.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -70,7 +70,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		return call_get_argument_metadata<P...>(p_arg);
 	}
 
@@ -154,7 +154,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		return call_get_argument_metadata<P...>(p_arg);
 	}
 
@@ -243,7 +243,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		if (p_arg >= 0) {
 			return call_get_argument_metadata<P...>(p_arg);
 		} else {
@@ -338,7 +338,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		if (p_arg >= 0) {
 			return call_get_argument_metadata<P...>(p_arg);
 		} else {
@@ -427,7 +427,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		return call_get_argument_metadata<P...>(p_arg);
 	}
 
@@ -489,7 +489,7 @@ protected:
 
 public:
 #ifdef DEBUG_ENABLED
-	virtual GodotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
+	virtual JundotTypeInfo::Metadata get_argument_meta(int p_arg) const override {
 		if (p_arg >= 0) {
 			return call_get_argument_metadata<P...>(p_arg);
 		} else {

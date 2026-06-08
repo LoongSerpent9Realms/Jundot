@@ -2,10 +2,10 @@
 /*  apple_embedded.mm                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -32,7 +32,7 @@
 
 #include "core/object/class_db.h"
 #import "drivers/apple_embedded/app_delegate_service.h"
-#import "drivers/apple_embedded/godot_view_controller.h"
+#import "drivers/apple_embedded/jundot_view_controller.h"
 
 #import <CoreHaptics/CoreHaptics.h>
 #import <UIKit/UIKit.h>

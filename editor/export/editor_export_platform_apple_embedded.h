@@ -2,10 +2,10 @@
 /*  editor_export_platform_apple_embedded.h                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -45,10 +45,10 @@
 
 // Optional environment variables for defining confidential information. If any
 // of these is set, they will override the values set in the credentials file.
-const String ENV_APPLE_PLATFORM_PROFILE_UUID_DEBUG = "GODOT_APPLE_PLATFORM_PROVISIONING_PROFILE_UUID_DEBUG";
-const String ENV_APPLE_PLATFORM_PROFILE_UUID_RELEASE = "GODOT_APPLE_PLATFORM_PROVISIONING_PROFILE_UUID_RELEASE";
-const String ENV_APPLE_PLATFORM_PROFILE_SPECIFIER_DEBUG = "GODOT_APPLE_PLATFORM_PROFILE_SPECIFIER_DEBUG";
-const String ENV_APPLE_PLATFORM_PROFILE_SPECIFIER_RELEASE = "GODOT_APPLE_PLATFORM_PROFILE_SPECIFIER_RELEASE";
+const String ENV_APPLE_PLATFORM_PROFILE_UUID_DEBUG = "JUNDOT_APPLE_PLATFORM_PROVISIONING_PROFILE_UUID_DEBUG";
+const String ENV_APPLE_PLATFORM_PROFILE_UUID_RELEASE = "JUNDOT_APPLE_PLATFORM_PROVISIONING_PROFILE_UUID_RELEASE";
+const String ENV_APPLE_PLATFORM_PROFILE_SPECIFIER_DEBUG = "JUNDOT_APPLE_PLATFORM_PROFILE_SPECIFIER_DEBUG";
+const String ENV_APPLE_PLATFORM_PROFILE_SPECIFIER_RELEASE = "JUNDOT_APPLE_PLATFORM_PROFILE_SPECIFIER_RELEASE";
 
 static const String storyboard_image_scale_mode[] = {
 	"center",

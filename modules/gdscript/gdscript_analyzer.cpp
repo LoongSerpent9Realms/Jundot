@@ -2,10 +2,10 @@
 /*  gdscript_analyzer.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -45,7 +45,7 @@
 #include "scene/main/node.h"
 
 #if defined(TOOLS_ENABLED) && !defined(DISABLE_DEPRECATED)
-#define SUGGEST_GODOT4_RENAMES
+#define SUGGEST_JUNDOT4_RENAMES
 #include "editor/project_upgrade/renames_map_3_to_4.h"
 #endif
 
@@ -3195,7 +3195,7 @@ void GDScriptAnalyzer::reduce_binary_op(GDScriptParser::BinaryOpNode *p_binary_o
 	p_binary_op->set_datatype(result);
 }
 
-#ifdef SUGGEST_GODOT4_RENAMES
+#ifdef SUGGEST_JUNDOT4_RENAMES
 const char *get_rename_from_map(const char *map[][2], String key) {
 	for (int index = 0; map[index][0]; index++) {
 		if (map[index][0] == key) {
@@ -3205,7 +3205,7 @@ const char *get_rename_from_map(const char *map[][2], String key) {
 	return nullptr;
 }
 
-// Checks if an identifier/function name has been renamed in Godot 4, uses ProjectConverter3To4 for rename map.
+// Checks if an identifier/function name has been renamed in Jundot 4, uses ProjectConverter3To4 for rename map.
 // Returns the new name if found, nullptr otherwise.
 const char *check_for_renamed_identifier(String identifier, GDScriptParser::Node::Type type) {
 	switch (type) {
@@ -3247,7 +3247,7 @@ const char *check_for_renamed_identifier(String identifier, GDScriptParser::Node
 			return nullptr;
 	}
 }
-#endif // SUGGEST_GODOT4_RENAMES
+#endif // SUGGEST_JUNDOT4_RENAMES
 
 void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_await, bool p_is_root) {
 	bool all_is_constant = true;
@@ -3756,9 +3756,9 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 		}
 		if (!found && (is_self || (base_type.is_hard_type() && base_type.kind == GDScriptParser::DataType::BUILTIN))) {
 			String base_name = is_self && !p_call->is_super ? "self" : base_type.to_string();
-#ifdef SUGGEST_GODOT4_RENAMES
+#ifdef SUGGEST_JUNDOT4_RENAMES
 			String rename_hint;
-			if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_godot_4_hint")) {
+			if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_jundot_4_hint")) {
 				const char *renamed_function_name = check_for_renamed_identifier(p_call->function_name, p_call->type);
 				if (renamed_function_name) {
 					rename_hint = " " + vformat(R"(Did you mean to use "%s"?)", String(renamed_function_name) + "()");
@@ -3767,7 +3767,7 @@ void GDScriptAnalyzer::reduce_call(GDScriptParser::CallNode *p_call, bool p_is_a
 			push_error(vformat(R"*(Function "%s()" not found in base %s.%s)*", p_call->function_name, base_name, rename_hint), p_call->is_super ? p_call : p_call->callee);
 #else
 			push_error(vformat(R"*(Function "%s()" not found in base %s.)*", p_call->function_name, base_name), p_call->is_super ? p_call : p_call->callee);
-#endif // SUGGEST_GODOT4_RENAMES
+#endif // SUGGEST_JUNDOT4_RENAMES
 		} else if (!found && (!p_call->is_super && base_type.is_hard_type() && base_type.is_meta_type)) {
 			push_error(vformat(R"*(Static function "%s()" not found in base "%s".)*", p_call->function_name, base_type.to_string()), p_call);
 		}
@@ -3927,7 +3927,7 @@ Ref<GDScriptParserRef> GDScriptAnalyzer::ensure_cached_external_parser_for_class
 	// Delicate piece of code that intentionally doesn't use the GDScript cache or `get_depended_parser_for`.
 	// Search dependencies for the parser that owns `p_class` and make a cache entry for it.
 	// Required for how we store pointers to classes owned by other parser trees and need to call `resolve_class_member` and such on the same parser tree.
-	// Since https://github.com/godotengine/godot/pull/94871 there can technically be multiple parsers for the same script in the same parser tree.
+	// Since https://github.com/jundotengine/jundot/pull/94871 there can technically be multiple parsers for the same script in the same parser tree.
 	// Even if unlikely, getting the wrong parser could lead to strange undefined behavior without errors.
 
 	if (p_class == nullptr) {
@@ -4109,9 +4109,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 			}
 
 			if (!valid && base.is_hard_type()) {
-#ifdef SUGGEST_GODOT4_RENAMES
+#ifdef SUGGEST_JUNDOT4_RENAMES
 				String rename_hint;
-				if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_godot_4_hint")) {
+				if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_jundot_4_hint")) {
 					const char *renamed_identifier_name = check_for_renamed_identifier(name, p_identifier->type);
 					if (renamed_identifier_name) {
 						rename_hint = " " + vformat(R"(Did you mean to use "%s"?)", renamed_identifier_name);
@@ -4120,7 +4120,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 				push_error(vformat(R"(Cannot find member "%s" in base "%s".%s)", name, base.to_string(), rename_hint), p_identifier);
 #else
 				push_error(vformat(R"(Cannot find member "%s" in base "%s".)", name, base.to_string()), p_identifier);
-#endif // SUGGEST_GODOT4_RENAMES
+#endif // SUGGEST_JUNDOT4_RENAMES
 			}
 		} else {
 			switch (base.builtin_type) {
@@ -4153,9 +4153,9 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 						return;
 					}
 					if (base.is_hard_type()) {
-#ifdef SUGGEST_GODOT4_RENAMES
+#ifdef SUGGEST_JUNDOT4_RENAMES
 						String rename_hint;
-						if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_godot_4_hint")) {
+						if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_jundot_4_hint")) {
 							const char *renamed_identifier_name = check_for_renamed_identifier(name, p_identifier->type);
 							if (renamed_identifier_name) {
 								rename_hint = " " + vformat(R"(Did you mean to use "%s"?)", renamed_identifier_name);
@@ -4164,7 +4164,7 @@ void GDScriptAnalyzer::reduce_identifier_from_base(GDScriptParser::IdentifierNod
 						push_error(vformat(R"(Cannot find member "%s" in base "%s".%s)", name, base.to_string(), rename_hint), p_identifier);
 #else
 						push_error(vformat(R"(Cannot find member "%s" in base "%s".)", name, base.to_string()), p_identifier);
-#endif // SUGGEST_GODOT4_RENAMES
+#endif // SUGGEST_JUNDOT4_RENAMES
 					}
 				}
 			}
@@ -4672,9 +4672,9 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 	}
 
 	// Not found.
-#ifdef SUGGEST_GODOT4_RENAMES
+#ifdef SUGGEST_JUNDOT4_RENAMES
 	String rename_hint;
-	if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_godot_4_hint")) {
+	if (GLOBAL_GET_CACHED(bool, "debug/gdscript/warnings/renamed_in_jundot_4_hint")) {
 		const char *renamed_identifier_name = check_for_renamed_identifier(name, p_identifier->type);
 		if (renamed_identifier_name) {
 			rename_hint = " " + vformat(R"(Did you mean to use "%s"?)", renamed_identifier_name);
@@ -4683,7 +4683,7 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 	push_error(vformat(R"(Identifier "%s" not declared in the current scope.%s)", name, rename_hint), p_identifier);
 #else
 	push_error(vformat(R"(Identifier "%s" not declared in the current scope.)", name), p_identifier);
-#endif // SUGGEST_GODOT4_RENAMES
+#endif // SUGGEST_JUNDOT4_RENAMES
 	GDScriptParser::DataType dummy;
 	dummy.kind = GDScriptParser::DataType::VARIANT;
 	p_identifier->set_datatype(dummy); // Just so type is set to something.

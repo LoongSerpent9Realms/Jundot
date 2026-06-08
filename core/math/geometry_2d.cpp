@@ -2,10 +2,10 @@
 /*  geometry_2d.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -32,9 +32,9 @@
 
 #include "core/math/math_funcs_binary.h"
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Walloc-zero")
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Walloc-zero")
 #include <thirdparty/clipper2/include/clipper2/clipper.h>
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 #include <thirdparty/misc/polypartition.h>
 #define STB_RECT_PACK_IMPLEMENTATION
 #include <thirdparty/misc/stb_rect_pack.h>

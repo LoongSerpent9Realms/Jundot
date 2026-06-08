@@ -2,10 +2,10 @@
 /*  safe_binary_mutex.h                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -36,7 +36,7 @@
 
 #ifdef THREADS_ENABLED
 
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wundefined-var-template")
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wundefined-var-template")
 
 // A very special kind of mutex, used in scenarios where these
 // requirements hold at the same time:
@@ -44,7 +44,7 @@ GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wundefined-var-template")
 // - Must have recursive semnantics (or simulate, as this one does).
 // The implementation keeps the lock count in TS. Therefore, only
 // one object of each version of the template can exists; hence the Tag argument.
-// Tags must be unique across the Godot codebase.
+// Tags must be unique across the Jundot codebase.
 // Also, don't forget to declare the thread_local variable on each use.
 template <int Tag>
 class SafeBinaryMutex {
@@ -116,7 +116,7 @@ public:
 	// TODO: Implement a `try_temp_relock` if needed (will also need a dummy method below).
 };
 
-GODOT_CLANG_WARNING_POP
+JUNDOT_CLANG_WARNING_POP
 
 #else // No threads.
 

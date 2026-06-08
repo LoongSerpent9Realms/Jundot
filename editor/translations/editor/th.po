@@ -1,7 +1,7 @@
-# Thai translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Thai translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Kaveeta Vivatchai <goodytong@gmail.com>, 2017.
 # Poommetee Ketson (Noshyaar) <poommetee@protonmail.com>, 2017-2018.
 # Thanachart Monpassorn <nunf_2539@hotmail.com>, 2020, 2021.
@@ -31,12 +31,12 @@
 # Krissaphon Natpaphatpisit <krissaphonfocus@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-02-21 13:09+0000\n"
 "Last-Translator: Krissaphon Natpaphatpisit <krissaphonfocus@gmail.com>\n"
-"Language-Team: Thai <https://hosted.weblate.org/projects/godot-engine/godot/"
+"Language-Team: Thai <https://hosted.weblate.org/projects/jundot-engine/jundot/"
 "th/>\n"
 "Language: th\n"
 "MIME-Version: 1.0\n"
@@ -2144,8 +2144,8 @@ msgstr "คลาสนี้ถูกทำเครื่องหมายว
 msgid "This class is marked as experimental."
 msgstr "คลาสนี้ถูกทำเครื่องหมายว่าเป็นคลาสทดลอง"
 
-msgid "%s - Godot Engine"
-msgstr "%s - Godot Engine"
+msgid "%s - Jundot Engine"
+msgstr "%s - Jundot Engine"
 
 msgid "Dock Position"
 msgstr "ตำแหน่งแผง"
@@ -2874,8 +2874,8 @@ msgstr "จัดการเทมเพลตส่งออก"
 msgid "Select Template File"
 msgstr "เลือกไฟล์เทมเพลต"
 
-msgid "Godot Export Templates"
-msgstr "เทมเพลตการส่งออก Godot"
+msgid "Jundot Export Templates"
+msgstr "เทมเพลตการส่งออก Jundot"
 
 msgid "Export templates for this platform are missing:"
 msgstr "ไม่พบเทมเพลตส่งออกสำหรับแพลตฟอร์มนี้:"
@@ -3104,14 +3104,14 @@ msgstr "สมาชิกระดับไททาเนียม"
 msgid "Using slashes in folder names will create subfolders recursively."
 msgstr "การใช้เครื่องหมายทับในชื่อโฟลเดอร์จะสร้างโฟลเดอร์ย่อยขึ้นมาซ้ำๆ"
 
-msgid "Godot Engine contributors"
-msgstr "ผู้ช่วยพัฒนา Godot Engine"
+msgid "Jundot Engine contributors"
+msgstr "ผู้ช่วยพัฒนา Jundot Engine"
 
 msgid "Double-click to open in browser."
 msgstr "ดับเบิลคลิกเพื่อเปิดในเบราว์เซอร์"
 
-msgid "Thanks from the Godot community!"
-msgstr "ขอขอบคุณจากชุมชนผู้ใช้ Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "ขอขอบคุณจากชุมชนผู้ใช้ Jundot!"
 
 msgid "Authors"
 msgstr "ทีมงาน"
@@ -3123,12 +3123,12 @@ msgid "Third-party Licenses"
 msgstr "สัญญาอนุญาตจากบุคคลที่สาม"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot Engine อาศัยไลบรารีต่าง ๆ ที่นำมาใช้ได้อย่างเสรีและเปิดเผยโค้ดเป็นจำนวนมาก "
+"Jundot Engine อาศัยไลบรารีต่าง ๆ ที่นำมาใช้ได้อย่างเสรีและเปิดเผยโค้ดเป็นจำนวนมาก "
 "ซึ่งเข้ากันได้กับสัญญาอนุญาต MIT ต่อไปนี้เป็นรายชื่อของไลบรารีทั้งหมดของบุคคลที่สาม "
 "รวมถึงข้อความลิขสิทธิ์ และข้อกำหนดการใช้งานของแต่ละไลบรารี"
 
@@ -3337,8 +3337,8 @@ msgid "It would be a good idea to name your project."
 msgstr "ควรตั้งชื่อโปรเจกต์"
 
 msgid ""
-"Invalid \".zip\" project file; it doesn't contain a \"project.godot\" file."
-msgstr "ไฟล์โปรเจกต์ \".zip\" ผิดพลาด เนื่องจากไม่มีไฟล์ \"project.godot\""
+"Invalid \".zip\" project file; it doesn't contain a \"project.jundot\" file."
+msgstr "ไฟล์โปรเจกต์ \".zip\" ผิดพลาด เนื่องจากไม่มีไฟล์ \"project.jundot\""
 
 msgid "The path specified doesn't exist."
 msgstr "ไม่พบที่อยู่ที่ระบุเอาไว้"
@@ -3346,8 +3346,8 @@ msgstr "ไม่พบที่อยู่ที่ระบุเอาไว
 msgid "New Game Project"
 msgstr "โปรเจกต์เกมใหม่"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "สร้างไฟล์ project.godot ไม่ได้"
+msgid "Couldn't create project.jundot in project path."
+msgstr "สร้างไฟล์ project.jundot ไม่ได้"
 
 msgid "Error opening package file, not in ZIP format."
 msgstr "ผิดพลาดขณะเปิดไฟล์แพคเกจ, ไม่ใช่รูปแบบ zip"
@@ -3408,19 +3408,19 @@ msgstr ""
 "ไม่สามารถเริ่มการทำงานของโปรแกรมแก้ไข (Editor) ได้"
 
 msgid ""
-"The selected project \"%s\" does not specify its supported Godot version in "
-"its configuration file (\"project.godot\").\n"
+"The selected project \"%s\" does not specify its supported Jundot version in "
+"its configuration file (\"project.jundot\").\n"
 "\n"
 "Project path: %s\n"
 "\n"
-"If you proceed with opening it, it will be converted to Godot's current "
+"If you proceed with opening it, it will be converted to Jundot's current "
 "configuration file format.\n"
 "\n"
 "Warning: You won't be able to open the project with previous versions of the "
 "engine anymore."
 msgstr ""
-"โปรเจกต์ที่เลือก \"%s\" ไม่ได้ระบุเวอร์ชั่น Godot ที่ซัพพอร์ตเอาไว้ในไฟล์การตั้งค่า "
-"(\"project.godot\")\n"
+"โปรเจกต์ที่เลือก \"%s\" ไม่ได้ระบุเวอร์ชั่น Jundot ที่ซัพพอร์ตเอาไว้ในไฟล์การตั้งค่า "
+"(\"project.jundot\")\n"
 "\n"
 "ตำแหน่งโปรเจกต์: %s\n"
 "\n"
@@ -5261,7 +5261,7 @@ msgstr "บันทึกธีมเป็น"
 msgid "Online Docs"
 msgstr "คู่มือ"
 
-msgid "Open Godot online documentation."
+msgid "Open Jundot online documentation."
 msgstr "เปิดคู่มือออนไลน์"
 
 msgid "%s Class Reference"
@@ -5641,8 +5641,8 @@ msgstr "สร้าง หรือนำเข้าโปรไฟล์ก�
 msgid "New profile name:"
 msgstr "ชื่อโปรไฟล์ใหม่:"
 
-msgid "Godot Feature Profile"
-msgstr "รายละเอียดคุณสมบัติ Godot"
+msgid "Jundot Feature Profile"
+msgstr "รายละเอียดคุณสมบัติ Jundot"
 
 msgid "Import Profile(s)"
 msgstr "นำเข้าโปรไฟล์"
@@ -5698,8 +5698,8 @@ msgstr "เปลี่ยน Action deadzone"
 msgid "Erase Input Action"
 msgstr "ลบการกระทำ"
 
-msgid "Project Settings (project.godot)"
-msgstr "ตัวเลือกโปรเจกต์ (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "ตัวเลือกโปรเจกต์ (project.jundot)"
 
 msgid "Input Map"
 msgstr "ปุ่มกด"
@@ -6411,11 +6411,11 @@ msgid ""
 msgstr "(โหมดแฟรกเมนต์/แสง เท่านั้น) (เวกเตอร์) ผลรวมของอนุพันธ์สัมบูรณ์ใน 'x' และ 'y'"
 
 msgid ""
-"Custom Godot Shader Language expression, with custom amount of input and "
+"Custom Jundot Shader Language expression, with custom amount of input and "
 "output ports. This is a direct injection of code into the vertex/fragment/"
 "light function, do not use it to write the function declarations inside."
 msgstr ""
-"นิพจน์ภาษาเชดเดอร์ Godot แบบกำหนดเอง พร้อมจำนวนพอร์ตอินพุตและเอาต์พุตที่กำหนดเอง "
+"นิพจน์ภาษาเชดเดอร์ Jundot แบบกำหนดเอง พร้อมจำนวนพอร์ตอินพุตและเอาต์พุตที่กำหนดเอง "
 "จำทำการแทรกโค้ดลงในฟังก์ชันเวอร์เทก / แฟรกเมนต์ / แสง "
 "ห้ามใช้เพื่อเขียนการประกาศฟังก์ชันภายใน"
 

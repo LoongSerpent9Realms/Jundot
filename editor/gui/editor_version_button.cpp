@@ -2,10 +2,10 @@
 /*  editor_version_button.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -38,20 +38,20 @@ String _get_version_string(EditorVersionButton::VersionFormat p_format) {
 	String main;
 	switch (p_format) {
 		case EditorVersionButton::FORMAT_BASIC: {
-			return GODOT_VERSION_FULL_CONFIG;
+			return JUNDOT_VERSION_FULL_CONFIG;
 		} break;
 		case EditorVersionButton::FORMAT_WITH_BUILD: {
-			main = "v" GODOT_VERSION_FULL_BUILD;
+			main = "v" JUNDOT_VERSION_FULL_BUILD;
 		} break;
 		case EditorVersionButton::FORMAT_WITH_NAME_AND_BUILD: {
-			main = GODOT_VERSION_FULL_NAME;
+			main = JUNDOT_VERSION_FULL_NAME;
 		} break;
 		default: {
-			ERR_FAIL_V_MSG(GODOT_VERSION_FULL_NAME, "Unexpected format: " + itos(p_format));
+			ERR_FAIL_V_MSG(JUNDOT_VERSION_FULL_NAME, "Unexpected format: " + itos(p_format));
 		} break;
 	}
 
-	String hash = GODOT_VERSION_HASH;
+	String hash = JUNDOT_VERSION_HASH;
 	if (!hash.is_empty()) {
 		hash = vformat(" [%s]", hash.left(9));
 	}
@@ -68,8 +68,8 @@ void EditorVersionButton::_notification(int p_what) {
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 			String build_date;
-			if (GODOT_VERSION_TIMESTAMP > 0) {
-				build_date = Time::get_singleton()->get_datetime_string_from_unix_time(GODOT_VERSION_TIMESTAMP, true) + " UTC";
+			if (JUNDOT_VERSION_TIMESTAMP > 0) {
+				build_date = Time::get_singleton()->get_datetime_string_from_unix_time(JUNDOT_VERSION_TIMESTAMP, true) + " UTC";
 			} else {
 				build_date = TTR("(unknown)");
 			}

@@ -2,10 +2,10 @@
 /*  path_utils.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -227,7 +227,7 @@ String relative_to(const String &p_path, const String &p_relative_to) {
 	return relative_to_impl(path_abs_norm, relative_to_abs_norm);
 }
 
-const Vector<String> reserved_assembly_names = { "GodotSharp", "GodotSharpEditor", "Godot.SourceGenerators" };
+const Vector<String> reserved_assembly_names = { "JundotSharp", "JundotSharpEditor", "Jundot.SourceGenerators" };
 
 String get_csharp_project_name() {
 	String name = GLOBAL_GET("dotnet/project/assembly_name");
@@ -250,7 +250,7 @@ String get_csharp_project_name() {
 		name = "UnnamedProject";
 	}
 
-	// Avoid reserved names that conflict with Godot assemblies.
+	// Avoid reserved names that conflict with Jundot assemblies.
 	if (reserved_assembly_names.has(name)) {
 		name += "_";
 	}

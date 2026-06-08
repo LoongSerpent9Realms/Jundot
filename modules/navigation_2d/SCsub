@@ -30,7 +30,7 @@ if env["builtin_rvo2_2d"]:
 
 env.modules_sources += thirdparty_obj
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

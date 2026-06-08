@@ -2,10 +2,10 @@
 /*  fsr2.cpp                                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -527,8 +527,8 @@ FSR2Effect::FSR2Effect() {
 			"\n#define FFX_FSR2_OPTION_LOW_RESOLUTION_MOTION_VECTORS 1\n"
 			"\n#define FFX_FSR2_OPTION_HDR_COLOR_INPUT 1\n"
 			"\n#define FFX_FSR2_OPTION_INVERTED_DEPTH 1\n"
-			"\n#define FFX_FSR2_OPTION_GODOT_REACTIVE_MASK_CLAMP 1\n"
-			"\n#define FFX_FSR2_OPTION_GODOT_DERIVE_INVALID_MOTION_VECTORS 1\n";
+			"\n#define FFX_FSR2_OPTION_JUNDOT_REACTIVE_MASK_CLAMP 1\n"
+			"\n#define FFX_FSR2_OPTION_JUNDOT_DERIVE_INVALID_MOTION_VECTORS 1\n";
 
 	Vector<String> modes_single;
 	modes_single.push_back("");
@@ -537,7 +537,7 @@ FSR2Effect::FSR2Effect() {
 	modes_with_fp16.push_back("");
 	modes_with_fp16.push_back("\n#define FFX_HALF 1\n");
 
-	// Since Godot currently lacks a shader reflection mechanism to persist the name of the bindings in the shader cache and
+	// Since Jundot currently lacks a shader reflection mechanism to persist the name of the bindings in the shader cache and
 	// there's also no mechanism to compile the shaders offline, the bindings are created manually by looking at the GLSL
 	// files included in FSR2 and mapping the macro bindings (#define FSR2_BIND_*) to their respective implementation names.
 	//

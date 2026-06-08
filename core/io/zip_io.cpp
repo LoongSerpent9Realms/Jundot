@@ -2,10 +2,10 @@
 /*  zip_io.cpp                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -32,7 +32,7 @@
 
 #include "core/templates/local_vector.h"
 
-int godot_unzip_get_current_file_info(unzFile p_zip_file, unz_file_info64 &r_file_info, String &r_filepath) {
+int jundot_unzip_get_current_file_info(unzFile p_zip_file, unz_file_info64 &r_file_info, String &r_filepath) {
 	const uLong short_file_path_buffer_size = 16384ul;
 	char short_file_path_buffer[short_file_path_buffer_size];
 
@@ -53,12 +53,12 @@ int godot_unzip_get_current_file_info(unzFile p_zip_file, unz_file_info64 &r_fil
 	return err;
 }
 
-int godot_unzip_locate_file(unzFile p_zip_file, const String &p_filepath, bool p_case_sensitive) {
+int jundot_unzip_locate_file(unzFile p_zip_file, const String &p_filepath, bool p_case_sensitive) {
 	int err = unzGoToFirstFile(p_zip_file);
 	while (err == UNZ_OK) {
 		unz_file_info64 current_file_info;
 		String current_filepath;
-		err = godot_unzip_get_current_file_info(p_zip_file, current_file_info, current_filepath);
+		err = jundot_unzip_get_current_file_info(p_zip_file, current_file_info, current_filepath);
 		if (err == UNZ_OK) {
 			bool filepaths_are_equal = p_case_sensitive ? (p_filepath == current_filepath) : (p_filepath.nocasecmp_to(current_filepath) == 0);
 			if (filepaths_are_equal) {

@@ -1,7 +1,7 @@
-# Czech translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Czech translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Fadex <vitekpaulik@gmail.com>, 2017.
 # Jan 'spl!te' Kondelík <j.kondelik@centrum.cz>, 2016, 2018.
 # Jiri Hysek <contact@jirihysek.com>, 2017.
@@ -49,12 +49,12 @@
 # Jakub Szydlowski <kubkii27@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-24 11:13+0000\n"
 "Last-Translator: Jakub Szydlowski <kubkii27@gmail.com>\n"
-"Language-Team: Czech <https://hosted.weblate.org/projects/godot-engine/godot-"
+"Language-Team: Czech <https://hosted.weblate.org/projects/jundot-engine/jundot-"
 "properties/cs/>\n"
 "Language: cs\n"
 "MIME-Version: 1.0\n"
@@ -3502,8 +3502,8 @@ msgstr "GDScript"
 msgid "Max Call Stack"
 msgstr "Maximální velikost zásobníku volání"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Nápověda přejmenování v Godotu 4"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Nápověda přejmenování v Jundotu 4"
 
 msgid "Copyright"
 msgstr "Copyright"
@@ -3748,11 +3748,11 @@ msgstr "Světlo"
 msgid "Visible"
 msgstr "Viditelný"
 
-msgid "glTF to Godot Expression"
-msgstr "glTF na výraz Godotu"
+msgid "glTF to Jundot Expression"
+msgstr "glTF na výraz Jundotu"
 
-msgid "Godot to glTF Expression"
-msgstr "Godot na výraz glTF"
+msgid "Jundot to glTF Expression"
+msgstr "Jundot na výraz glTF"
 
 msgid "Node Paths"
 msgstr "Cesty k uzlům"
@@ -3772,8 +3772,8 @@ msgstr "Klouby"
 msgid "Roots"
 msgstr "Kořeny"
 
-msgid "Godot Bone Node"
-msgstr "Uzel kosti Godotu"
+msgid "Jundot Bone Node"
+msgstr "Uzel kosti Jundotu"
 
 msgid "Skin Root"
 msgstr "Kořen slupky"
@@ -3784,8 +3784,8 @@ msgstr "Původní klouby"
 msgid "Non Joints"
 msgstr "Ne klouby"
 
-msgid "Godot Skin"
-msgstr "Slupka Godotu"
+msgid "Jundot Skin"
+msgstr "Slupka Jundotu"
 
 msgid "Src Image"
 msgstr "Zdrojový obrázek"

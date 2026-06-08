@@ -1,7 +1,7 @@
-# Esperanto translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Esperanto translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Scott Starkey <yekrats@gmail.com>, 2019.
 # AlexHoratio <yukithetupper@gmail.com>, 2019.
 # Teashrock <kajitsu22@gmail.com>, 2019.
@@ -29,12 +29,12 @@
 # Matty-H <matissegouery@yahoo.fr>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "PO-Revision-Date: 2026-05-05 18:11+0000\n"
 "Last-Translator: Matty-H <matissegouery@yahoo.fr>\n"
-"Language-Team: Esperanto <https://hosted.weblate.org/projects/godot-engine/"
-"godot/eo/>\n"
+"Language-Team: Esperanto <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/eo/>\n"
 "Language: eo\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8-bit\n"
@@ -3367,11 +3367,11 @@ msgstr "Raporti cimon"
 msgid "Send Docs Feedback"
 msgstr "Sendi rimarkojn pri la dokumentaro"
 
-msgid "About Godot..."
-msgstr "Pri Godot..."
+msgid "About Jundot..."
+msgstr "Pri Jundot..."
 
-msgid "Support Godot Development"
-msgstr "Subteni Godot ellaboradon"
+msgid "Support Jundot Development"
+msgstr "Subteni Jundot ellaboradon"
 
 msgid "Open 2D Workspace"
 msgstr "Malfermi la 2D-an scen-redaktilon"
@@ -3478,8 +3478,8 @@ msgstr "Mastrumilo de eksportaj ŝablonoj"
 msgid "Select Template File"
 msgstr "Elekti ŝablonan dosieron"
 
-msgid "Godot Export Templates"
-msgstr "Eksportajn ŝablonojn de Godot"
+msgid "Jundot Export Templates"
+msgstr "Eksportajn ŝablonojn de Jundot"
 
 msgid "Advanced Options"
 msgstr "Specialaj opcioj"
@@ -3658,11 +3658,11 @@ msgstr "Arĝentaj Sponsoroj"
 msgid "Base path: %s"
 msgstr "Vojprefikso: %s"
 
-msgid "Godot Engine contributors"
-msgstr "Kontribuantoj de Godot Engine"
+msgid "Jundot Engine contributors"
+msgstr "Kontribuantoj de Jundot Engine"
 
-msgid "Thanks from the Godot community!"
-msgstr "Dankon de la komunumo de Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "Dankon de la komunumo de Jundot!"
 
 msgid "Authors"
 msgstr "Aŭtoroj"
@@ -3674,12 +3674,12 @@ msgid "Third-party Licenses"
 msgstr "Permesiloj de eksteraj liverantoj"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot Engine fidas al multe liberaj kaj malfermitkodaj bibliotekoj de ekstera "
+"Jundot Engine fidas al multe liberaj kaj malfermitkodaj bibliotekoj de ekstera "
 "liveranto, ĉio kongruas kun la kondiĉoj de ĝia MIT-permesilo. La jenoj estas "
 "elĉerpa listo de ĉiom tiaj komponantoj de ekstera liveranto kun iliaj "
 "kopirajtaj atentigoj kaj permesilaj kondiĉoj respektive."
@@ -3887,16 +3887,16 @@ msgid "Invalid \".zip\" project file; it is not in ZIP format."
 msgstr "Nevalida ZIP-dosiero: ĝi ne enhavas la ZIP-formon."
 
 msgid ""
-"Invalid \".zip\" project file; it doesn't contain a \"project.godot\" file."
+"Invalid \".zip\" project file; it doesn't contain a \"project.jundot\" file."
 msgstr ""
-"Nevalida ZIP-dosiero por projekto: ĝi ne enhavas la dosieron «project.godot»."
+"Nevalida ZIP-dosiero por projekto: ĝi ne enhavas la dosieron «project.jundot»."
 
 msgid "Valid project found at path."
 msgstr "Valida projekto ĉe tiu indiko."
 
 msgid ""
-"Please choose a \"project.godot\", a directory with one, or a \".zip\" file."
-msgstr "Elektu dosierujon aŭ ZIP-dosieron kun la dosiero «project.godot»."
+"Please choose a \"project.jundot\", a directory with one, or a \".zip\" file."
+msgstr "Elektu dosierujon aŭ ZIP-dosieron kun la dosiero «project.jundot»."
 
 msgid ""
 "The directory name specified contains invalid characters or trailing "
@@ -3982,8 +3982,8 @@ msgstr "Plej rapida bildigo de simplaj scenoj."
 msgid "Warning: This folder is not empty"
 msgstr "Averto: Ĉi tiu dosierujo ne estas malplena"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "Ne eblas krei project.godot en projekta dosierindiko."
+msgid "Couldn't create project.jundot in project path."
+msgstr "Ne eblas krei project.jundot en projekta dosierindiko."
 
 msgid "Error opening package file, not in ZIP format."
 msgstr "Eraro dum malfermi la pakaĵan dosieron, ne de ZIP formato."
@@ -4038,15 +4038,15 @@ msgstr "Nomo de la projekto"
 msgid "Project Path"
 msgstr "Dosierindiko de la projekto"
 
-msgid "This project was last edited in a different Godot version: "
+msgid "This project was last edited in a different Jundot version: "
 msgstr ""
-"Oni redaktis ĉi tiun projekton je la lasta fojo per alia versio de Godot: "
+"Oni redaktis ĉi tiun projekton je la lasta fojo per alia versio de Jundot: "
 
 msgid "Unknown version"
 msgstr "Nekonata versio"
 
 msgid "This project uses features unsupported by the current build:"
-msgstr "Ĉi tiu projekto uzas eblojn nedisponeblajn en la nuna versio de Godot:"
+msgstr "Ĉi tiu projekto uzas eblojn nedisponeblajn en la nuna versio de Jundot:"
 
 msgid "Error: Project is missing on the filesystem."
 msgstr "Eraro: La projekto mankas en la dosiersistemo."
@@ -4086,12 +4086,12 @@ msgid "Are you sure to run %d projects at once?"
 msgstr "Ĉu vi vere volas ruli %d projektojn samtempe?"
 
 msgid ""
-"Warning: This project was last edited in Godot %s. Opening will change it to "
-"Godot %s.\n"
+"Warning: This project was last edited in Jundot %s. Opening will change it to "
+"Jundot %s.\n"
 "\n"
 msgstr ""
-"Averto: Oni redaktis ĉi tiun projekton je la lasta fojo per Godot %s. "
-"Malfermi ĝin adaptos ĝin por Godot %s.\n"
+"Averto: Oni redaktis ĉi tiun projekton je la lasta fojo per Jundot %s. "
+"Malfermi ĝin adaptos ĝin por Jundot %s.\n"
 "\n"
 
 msgid "Open anyway? Project will be modified."
@@ -4125,8 +4125,8 @@ msgstr "La etikedo ne devas enhavi sinsekvajn substrekojn aŭ spacetojn."
 msgid "These characters are not allowed in tags: %s."
 msgstr "Etikedoj ne devas enhavi ĉi tiujn signojn: %s"
 
-msgid "About Godot"
-msgstr "Pri Godot"
+msgid "About Jundot"
+msgstr "Pri Jundot"
 
 msgid "Settings"
 msgstr "Agordoj"
@@ -4240,7 +4240,7 @@ msgid "Display Scale"
 msgstr "Dimensioj de la fenestroj"
 
 msgid "Network Mode"
-msgstr "Sinkronigado kun la retejo de Godot"
+msgstr "Sinkronigado kun la retejo de Jundot"
 
 msgid "Check for Updates"
 msgstr "Serĉi ĝisdatigojn"
@@ -5231,8 +5231,8 @@ msgstr "Konservi fasonon kiel..."
 msgid "Make the script editor floating."
 msgstr "Ŝvebigi la kod-redaktilon."
 
-msgid "Open '%s' in Godot online documentation."
-msgstr "Malfermi «%s» en la enreta dokumentaro de Godot."
+msgid "Open '%s' in Jundot online documentation."
+msgstr "Malfermi «%s» en la enreta dokumentaro de Jundot."
 
 msgid "Open in Online Docs"
 msgstr "Malfermi la enretan dokumentaron"
@@ -5240,8 +5240,8 @@ msgstr "Malfermi la enretan dokumentaron"
 msgid "Online Docs"
 msgstr "Enreta dokumentaro"
 
-msgid "Open Godot online documentation."
-msgstr "Malfermi enretan dokumentaron de Godot."
+msgid "Open Jundot online documentation."
+msgstr "Malfermi enretan dokumentaron de Jundot."
 
 msgid "Find Next"
 msgstr "Trovi la sekvan"
@@ -5549,8 +5549,8 @@ msgstr ""
 msgid "New profile name:"
 msgstr "Nomo de nova profilo:"
 
-msgid "Godot Feature Profile"
-msgstr "Profilo de funkciaro de Godot"
+msgid "Jundot Feature Profile"
+msgstr "Profilo de funkciaro de Jundot"
 
 msgid "Import Profile(s)"
 msgstr "Enporti profilo(j)n"
@@ -5600,8 +5600,8 @@ msgstr "Ŝanĝi mortzonon de faro"
 msgid "Erase Input Action"
 msgstr "Forigi enigan faron"
 
-msgid "Project Settings (project.godot)"
-msgstr "Projektaj agordoj (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Projektaj agordoj (project.jundot)"
 
 msgid "Input Map"
 msgstr "Eniga mapo"

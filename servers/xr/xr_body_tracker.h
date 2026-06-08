@@ -2,10 +2,10 @@
 /*  xr_body_tracker.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -129,7 +129,7 @@ public:
 		JOINT_RIGHT_PINKY_FINGER_PHALANX_DISTAL,
 		JOINT_RIGHT_PINKY_FINGER_TIP,
 
-		// Extra joints that aren't part of the Godot humanoid skeleton, but are commonly used in some VR avatars.
+		// Extra joints that aren't part of the Jundot humanoid skeleton, but are commonly used in some VR avatars.
 		JOINT_LOWER_CHEST,
 		JOINT_LEFT_SCAPULA,
 		JOINT_LEFT_WRIST_TWIST,

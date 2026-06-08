@@ -28,10 +28,10 @@ if (
     or file_contents.find("Aborted (core dumped)") != -1
     or file_contents.find("terminate called without an active exception") != -1
 ):
-    print("FATAL ERROR: Godot has been crashed.")
+    print("FATAL ERROR: Jundot has been crashed.")
     sys.exit(52)
 
-# Finding memory leaks in Godot is quite difficult, because we need to take into
+# Finding memory leaks in Jundot is quite difficult, because we need to take into
 # account leaks also in external libraries. They are usually provided without
 # debugging symbols, so the leak report from it usually has only 2/3 lines,
 # so searching for 5 element - "#4 0x" - should correctly detect the vast
@@ -42,7 +42,7 @@ if file_contents.find("ERROR: LeakSanitizer:") != -1:
         print("ERROR: Memory leak was found")
         sys.exit(53)
 
-# It may happen that Godot detects leaking nodes/resources and removes them, so
+# It may happen that Jundot detects leaking nodes/resources and removes them, so
 # this possibility should also be handled as a potential error, even if
 # LeakSanitizer doesn't report anything
 
@@ -61,13 +61,13 @@ if file_contents.find("Assertion failed") != -1:
     print("ERROR: Assertion failed in project, check execution log for more info")
     sys.exit(55)
 
-if os.environ.get("GODOT_CHECK_CI_LOG_ALL_ERRORS"):
+if os.environ.get("JUNDOT_CHECK_CI_LOG_ALL_ERRORS"):
     # If any occurrence of "ERROR:" is found in the log, we consider it a failure.
     if file_contents.find("ERROR:") != -1:
-        print("ERROR: 'ERROR:' found in log and GODOT_CHECK_CI_LOG_ALL_ERRORS is set.")
+        print("ERROR: 'ERROR:' found in log and JUNDOT_CHECK_CI_LOG_ALL_ERRORS is set.")
         sys.exit(56)
 
-# For now Godot leaks a lot of rendering stuff so for now we just show info
+# For now Jundot leaks a lot of rendering stuff so for now we just show info
 # about it and this needs to be re-enabled after fixing this memory leaks.
 
 if file_contents.find("were leaked") != -1 or file_contents.find("were never freed") != -1:

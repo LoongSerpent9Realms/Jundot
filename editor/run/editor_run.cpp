@@ -2,10 +2,10 @@
 /*  editor_run.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -191,7 +191,7 @@ Error EditorRun::run(const String &p_scene, const String &p_write_movie, const V
 		running_scene = p_scene;
 	}
 	// Clear debug features in environment
-	OS::get_singleton()->unset_environment("GODOT_EDITOR_CUSTOM_FEATURES");
+	OS::get_singleton()->unset_environment("JUNDOT_EDITOR_CUSTOM_FEATURES");
 	return OK;
 }
 

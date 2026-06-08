@@ -2,10 +2,10 @@
 /*  pixel_formats.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -118,7 +118,7 @@ bool PixelFormats::isPVRTCFormat(MTL::PixelFormat p_format) {
 	return false;
 #else
 	// Deprecated in SDK 26.0
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
 	switch (p_format) {
 		case MTL::PixelFormatPVRTC_RGBA_2BPP:
 		case MTL::PixelFormatPVRTC_RGBA_2BPP_sRGB:
@@ -132,7 +132,7 @@ bool PixelFormats::isPVRTCFormat(MTL::PixelFormat p_format) {
 		default:
 			return false;
 	}
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 #endif
 }
 
@@ -461,7 +461,7 @@ void PixelFormats::initDataFormatCapabilities() {
 
 	addDataFormatDesc(X8_D24_UNORM_PACK32, Invalid, Depth24Unorm_Stencil8, Invalid, Invalid, 1, 1, 4, DepthStencil);
 
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 
 	addDataFormatDesc(BC1_RGB_UNORM_BLOCK, BC1_RGBA, Invalid, Invalid, Invalid, 4, 4, 8, Compressed);
 	addDataFormatDesc(BC1_RGB_SRGB_BLOCK, BC1_RGBA_sRGB, Invalid, Invalid, Invalid, 4, 4, 8, Compressed);
@@ -486,7 +486,7 @@ void PixelFormats::initDataFormatCapabilities() {
 	addDataFormatDesc(BC7_UNORM_BLOCK, BC7_RGBAUnorm, Invalid, Invalid, Invalid, 4, 4, 16, Compressed);
 	addDataFormatDesc(BC7_SRGB_BLOCK, BC7_RGBAUnorm_sRGB, Invalid, Invalid, Invalid, 4, 4, 16, Compressed);
 
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 
 	addDataFormatDesc(ETC2_R8G8B8_UNORM_BLOCK, ETC2_RGB8, Invalid, Invalid, Invalid, 4, 4, 8, Compressed);
 	addDataFormatDesc(ETC2_R8G8B8_SRGB_BLOCK, ETC2_RGB8_sRGB, Invalid, Invalid, Invalid, 4, 4, 8, Compressed);
@@ -680,13 +680,13 @@ void PixelFormats::initMTLPixelFormatCapabilities() {
 	addMTLPixelFormatDesc(RGBA32Float, Color128, All);
 
 #if !defined(VISIONOS_ENABLED)
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
 	// Compressed pixel formats
 	addMTLPixelFormatDesc(PVRTC_RGBA_2BPP, PVRTC_RGBA_2BPP, RF);
 	addMTLPixelFormatDescSRGB(PVRTC_RGBA_2BPP_sRGB, PVRTC_RGBA_2BPP, RF, PVRTC_RGBA_2BPP);
 	addMTLPixelFormatDesc(PVRTC_RGBA_4BPP, PVRTC_RGBA_4BPP, RF);
 	addMTLPixelFormatDescSRGB(PVRTC_RGBA_4BPP_sRGB, PVRTC_RGBA_4BPP, RF, PVRTC_RGBA_4BPP);
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 #endif
 
 	addMTLPixelFormatDesc(ETC2_RGB8, ETC2_RGB8, RF);
@@ -743,7 +743,7 @@ void PixelFormats::initMTLPixelFormatCapabilities() {
 	addMTLPixelFormatDescSRGB(ASTC_12x12_sRGB, ASTC_12x12, RF, ASTC_12x12_LDR);
 	addMTLPixelFormatDesc(ASTC_12x12_HDR, ASTC_12x12, RF);
 
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 
 	addMTLPixelFormatDesc(BC1_RGBA, BC1_RGBA, RF);
 	addMTLPixelFormatDescSRGB(BC1_RGBA_sRGB, BC1_RGBA, RF, BC1_RGBA);
@@ -760,7 +760,7 @@ void PixelFormats::initMTLPixelFormatCapabilities() {
 	addMTLPixelFormatDesc(BC7_RGBAUnorm, BC7_RGBA, RF);
 	addMTLPixelFormatDescSRGB(BC7_RGBAUnorm_sRGB, BC7_RGBA, RF, BC7_RGBAUnorm);
 
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 
 	// YUV pixel formats
 	addMTLPixelFormatDesc(GBGR422, None, RF);
@@ -981,7 +981,7 @@ void PixelFormats::modifyMTLFormatCapabilities(const MetalFeatures &p_feat) {
 	setMTLPixFmtCapsIf(noHDR_ASTC, ASTC_12x10_HDR, None);
 	setMTLPixFmtCapsIf(noHDR_ASTC, ASTC_12x12_HDR, None);
 
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 
 	bool noBC = !p_feat.supportsBCTextureCompression;
 	setMTLPixFmtCapsIf(noBC, BC1_RGBA, None);
@@ -999,7 +999,7 @@ void PixelFormats::modifyMTLFormatCapabilities(const MetalFeatures &p_feat) {
 	setMTLPixFmtCapsIf(noBC, BC7_RGBAUnorm, None);
 	setMTLPixFmtCapsIf(noBC, BC7_RGBAUnorm_sRGB, None);
 
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 
 	setMTLPixFmtCapsIf(iosOnly2, BGRA10_XR, None);
 	setMTLPixFmtCapsIf(iosOnly2, BGRA10_XR_sRGB, None);
@@ -1013,12 +1013,12 @@ void PixelFormats::modifyMTLFormatCapabilities(const MetalFeatures &p_feat) {
 	setMTLPixFmtCapsIf(iosOnly2, Depth32Float_Stencil8, DRM);
 }
 
-// Populates the DataFormat lookup maps and connects Godot and Metal pixel formats to one-another.
+// Populates the DataFormat lookup maps and connects Jundot and Metal pixel formats to one-another.
 void PixelFormats::buildDFFormatMaps() {
 	for (DataFormatDesc &dfDesc : _data_format_descs) {
-		// Populate the back reference from the Metal formats to the Godot format.
+		// Populate the back reference from the Metal formats to the Jundot format.
 		// Validate the corresponding Metal formats for the platform, and clear them
-		// in the Godot format if not supported.
+		// in the Jundot format if not supported.
 		if (dfDesc.mtlPixelFormat) {
 			MTLFormatDesc &mtlDesc = getMTLPixelFormatDesc(dfDesc.mtlPixelFormat);
 			if (mtlDesc.dataFormat == RDC::DATA_FORMAT_MAX) {

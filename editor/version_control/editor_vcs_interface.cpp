@@ -2,10 +2,10 @@
 /*  editor_vcs_interface.cpp                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -387,8 +387,8 @@ void EditorVCSInterface::create_vcs_metadata_files(VCSMetadata p_vcs_metadata_ty
 		if (f.is_null()) {
 			ERR_FAIL_MSG("Couldn't create .gitignore in project path.");
 		} else {
-			f->store_line("# Godot 4+ specific ignores");
-			f->store_line(".godot/");
+			f->store_line("# Jundot 4+ specific ignores");
+			f->store_line(".jundot/");
 			f->store_line("/android/");
 		}
 		f = FileAccess::open(p_dir.path_join(".gitattributes"), FileAccess::WRITE);

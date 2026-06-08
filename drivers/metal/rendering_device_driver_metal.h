@@ -2,10 +2,10 @@
 /*  rendering_device_driver_metal.h                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -103,9 +103,9 @@ protected:
 	Mutex copy_queue_mutex;
 	/// A command queue used for internal copy operations.
 	NS::SharedPtr<MTL::CommandQueue> copy_queue;
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 	NS::SharedPtr<MTL::ResidencySet> copy_queue_rs;
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 	// If this is not nullptr, there are pending copy operations.
 	NS::SharedPtr<MTL::CommandBuffer> copy_queue_command_buffer;
 	NS::SharedPtr<MTL::BlitCommandEncoder> copy_queue_blit_encoder;
@@ -152,11 +152,11 @@ protected:
 	String pipeline_cache_id;
 
 	virtual MTL::CommandQueue *get_command_queue() const = 0;
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 	virtual void add_residency_set_to_main_queue(MTL::ResidencySet *p_set) = 0;
 	virtual void remove_residency_set_to_main_queue(MTL::ResidencySet *p_set) = 0;
 	NS::SharedPtr<MTL::ResidencySet> main_residency_set;
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 
 	bool use_barriers = false;
 	MTL::ResourceOptions base_hazard_tracking = MTL::ResourceHazardTrackingModeTracked;

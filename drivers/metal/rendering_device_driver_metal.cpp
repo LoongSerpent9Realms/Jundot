@@ -2,10 +2,10 @@
 /*  rendering_device_driver_metal.cpp                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -315,9 +315,9 @@ RDD::TextureID RenderingDeviceDriverMetal::texture_create(const TextureFormat &p
 #if defined(VISIONOS_ENABLED)
 	const bool supports_memoryless = true;
 #else
-	GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
+	JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
 	const bool supports_memoryless = (*device_properties).features.highestFamily >= MTL::GPUFamilyApple2 && (*device_properties).features.highestFamily < MTL::GPUFamilyMac1;
-	GODOT_CLANG_WARNING_POP
+	JUNDOT_CLANG_WARNING_POP
 #endif
 	if (supports_memoryless && p_format.usage_bits & TEXTURE_USAGE_TRANSIENT_BIT) {
 		options = base_hazard_tracking | MTL::ResourceStorageModeMemoryless;
@@ -896,9 +896,9 @@ void RenderingDeviceDriverMetal::_swap_chain_release_buffers(SwapChain *p_swap_c
 RDD::SwapChainID RenderingDeviceDriverMetal::swap_chain_create(RenderingContextDriver::SurfaceID p_surface) {
 	RenderingContextDriverMetal::Surface const *surface = (RenderingContextDriverMetal::Surface *)(p_surface);
 	if (use_barriers) {
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 		add_residency_set_to_main_queue(surface->get_residency_set());
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 	}
 
 	SwapChain *swap_chain = memnew(SwapChain);
@@ -997,10 +997,10 @@ void RenderingDeviceDriverMetal::swap_chain_set_max_fps(SwapChainID p_swap_chain
 void RenderingDeviceDriverMetal::swap_chain_free(SwapChainID p_swap_chain) {
 	SwapChain *swap_chain = (SwapChain *)(p_swap_chain.id);
 	if (use_barriers) {
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 		RenderingContextDriverMetal::Surface *surface = (RenderingContextDriverMetal::Surface *)(swap_chain->surface);
 		remove_residency_set_to_main_queue(surface->get_residency_set());
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 	}
 	_swap_chain_release(swap_chain);
 	memdelete(swap_chain);
@@ -1286,7 +1286,7 @@ RDD::UniformSetID RenderingDeviceDriverMetal::uniform_set_create(VectorView<Boun
 		arg_buffer_data.resize(shader_set.buffer_size);
 
 		// If argument buffers are enabled, we have already verified availability, so we can skip the runtime check.
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability-new")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability-new")
 		uint64_t *ptr = (uint64_t *)arg_buffer_data.ptrw();
 
 		HashMap<MTL::Resource *, StageResourceUsage, HashMapHasherDefault> bound_resources;
@@ -1431,7 +1431,7 @@ RDD::UniformSetID RenderingDeviceDriverMetal::uniform_set_create(VectorView<Boun
 			set->arg_buffer_data = arg_buffer_data;
 		}
 
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 	}
 	Vector<BoundUniform> bound_uniforms;
 	bound_uniforms.resize(p_uniforms.size());
@@ -2538,7 +2538,7 @@ uint64_t RenderingDeviceDriverMetal::get_total_memory_used() {
 }
 
 uint64_t RenderingDeviceDriverMetal::get_lazily_memory_used() {
-	return 0; // TODO: Track this (grep for memoryless in Godot's Metal backend).
+	return 0; // TODO: Track this (grep for memoryless in Jundot's Metal backend).
 }
 
 uint64_t RenderingDeviceDriverMetal::limit_get(Limit p_limit) {
@@ -2738,12 +2738,12 @@ size_t RenderingDeviceDriverMetal::get_texel_buffer_alignment_for_format(MTL::Pi
 RenderingDeviceDriverMetal::RenderingDeviceDriverMetal(RenderingContextDriverMetal *p_context_driver) :
 		context_driver(p_context_driver) {
 	DEV_ASSERT(p_context_driver != nullptr);
-	if (String res = OS::get_singleton()->get_environment("GODOT_MTL_ARCHIVE_FAIL_ON_MISS"); res == "1") {
+	if (String res = OS::get_singleton()->get_environment("JUNDOT_MTL_ARCHIVE_FAIL_ON_MISS"); res == "1") {
 		archive_fail_on_miss = true;
 	}
 
 #if TARGET_OS_OSX
-	if (String res = OS::get_singleton()->get_environment("GODOT_MTL_SHADER_LOAD_STRATEGY"); res == U"lazy") {
+	if (String res = OS::get_singleton()->get_environment("JUNDOT_MTL_SHADER_LOAD_STRATEGY"); res == U"lazy") {
 		_shader_load_strategy = ShaderLoadStrategy::LAZY;
 	}
 #else
@@ -2776,7 +2776,7 @@ Error RenderingDeviceDriverMetal::_create_device() {
 	device = context_driver->get_metal_device();
 
 	device_scope = NS::TransferPtr(MTL::CaptureManager::sharedCaptureManager()->newCaptureScope(device));
-	device_scope->setLabel(MTLSTR("Godot Frame"));
+	device_scope->setLabel(MTLSTR("Jundot Frame"));
 	device_scope->beginScope(); // Allow Xcode to capture the first frame, if desired.
 
 	return OK;
@@ -2894,7 +2894,7 @@ Error RenderingDeviceDriverMetal::_initialize(uint32_t p_device_index, uint32_t 
 
 	// The Metal renderer requires Apple4 family. This is 2017 era A11 chips and newer.
 	if (device_properties->features.highestFamily < MTL::GPUFamilyApple4) {
-		String error_string = vformat("Your Apple GPU does not support the following features, which are required to use Metal-based renderers in Godot:\n\n");
+		String error_string = vformat("Your Apple GPU does not support the following features, which are required to use Metal-based renderers in Jundot:\n\n");
 		if (!device_properties->features.imageCubeArray) {
 			error_string += "- No support for image cube arrays.\n";
 		}

@@ -2,10 +2,10 @@
 /*  api.cpp                                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -33,11 +33,11 @@
 #if defined(IOS_ENABLED)
 
 void register_ios_api() {
-	godot_apple_embedded_plugins_initialize();
+	jundot_apple_embedded_plugins_initialize();
 }
 
 void unregister_ios_api() {
-	godot_apple_embedded_plugins_deinitialize();
+	jundot_apple_embedded_plugins_deinitialize();
 }
 
 #else

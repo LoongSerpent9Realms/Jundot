@@ -2,10 +2,10 @@
 /*  camera_android.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -33,7 +33,7 @@
 #include "core/os/os.h"
 
 #include "platform/android/display_server_android.h"
-#include "platform/android/java_godot_io_wrapper.h"
+#include "platform/android/java_jundot_io_wrapper.h"
 #include "platform/android/os_android.h"
 
 // Scope guard to ensure AImage instances are always deleted.
@@ -908,10 +908,10 @@ int CameraFeedAndroid::get_display_rotation() {
 }
 
 int CameraFeedAndroid::get_app_orientation() {
-	GodotIOJavaWrapper *godot_io_java = OS_Android::get_singleton()->get_godot_io_java();
-	ERR_FAIL_NULL_V(godot_io_java, 0);
+	JundotIOJavaWrapper *jundot_io_java = OS_Android::get_singleton()->get_jundot_io_java();
+	ERR_FAIL_NULL_V(jundot_io_java, 0);
 
-	int orientation = godot_io_java->get_screen_orientation();
+	int orientation = jundot_io_java->get_screen_orientation();
 	switch (orientation) {
 		case 0: // SCREEN_LANDSCAPE
 			return 90;

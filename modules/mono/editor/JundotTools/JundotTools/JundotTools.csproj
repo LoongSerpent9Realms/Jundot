@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ProjectGuid>{27B00618-A6F2-4828-B922-05CAEB08C286}</ProjectGuid>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <!-- The Jundot editor uses the Debug Jundot API assemblies -->
+    <JundotApiConfiguration>Debug</JundotApiConfiguration>
+    <JundotSourceRootPath>$(SolutionDir)/../../../../</JundotSourceRootPath>
+    <JundotOutputDataDir>$(JundotSourceRootPath)/bin/JundotSharp</JundotOutputDataDir>
+    <JundotApiAssembliesDir>$(JundotOutputDataDir)/Api/$(JundotApiConfiguration)</JundotApiAssembliesDir>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- Needed for our source generators to work despite this not being a Jundot game project -->
+  <PropertyGroup>
+    <IsJundotToolsProject>true</IsJundotToolsProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="IsJundotToolsProject" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" Exists('$(JundotApiAssembliesDir)/JundotSharp.dll') ">
+    <!-- The project is part of the Jundot source tree -->
+    <!-- Use the Jundot source tree output folder instead of '$(ProjectDir)/bin' -->
+    <OutputPath>$(JundotOutputDataDir)/Tools</OutputPath>
+    <!-- Must not append '$(TargetFramework)' to the output path in this case -->
+    <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2019.1.3.0" ExcludeAssets="runtime" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <PackageReference Include="JetBrains.Rider.PathLocator" Version="1.0.12" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <Reference Include="JundotSharp">
+      <HintPath>$(JundotApiAssembliesDir)/JundotSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="JundotSharpEditor">
+      <HintPath>$(JundotApiAssembliesDir)/JundotSharpEditor.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Jundot.NET.Sdk\Jundot.SourceGenerators\Jundot.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\..\glue\JundotSharp\Jundot.SourceGenerators.Internal\Jundot.SourceGenerators.Internal.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JundotTools.BuildLogger\JundotTools.BuildLogger.csproj" />
+    <ProjectReference Include="..\JundotTools.IdeMessaging\JundotTools.IdeMessaging.csproj" />
+    <ProjectReference Include="..\JundotTools.ProjectEditor\JundotTools.ProjectEditor.csproj" />
+    <ProjectReference Include="..\JundotTools.Core\JundotTools.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,10 +2,10 @@
 /*  editor_settings_dialog.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -110,7 +110,7 @@ void EditorSettingsDialog::update_navigation_preset() {
 	Ref<InputEventKey> orbit_snap_mod_key_2;
 	bool set_preset = false;
 
-	if (nav_scheme == View3DController::NAV_SCHEME_GODOT) {
+	if (nav_scheme == View3DController::NAV_SCHEME_JUNDOT) {
 		set_preset = true;
 		set_orbit_mouse_button = View3DController::NAV_MOUSE_BUTTON_MIDDLE;
 		set_pan_mouse_button = View3DController::NAV_MOUSE_BUTTON_MIDDLE;

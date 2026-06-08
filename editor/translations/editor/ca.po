@@ -1,7 +1,7 @@
-# Catalan translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Catalan translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # BennyBeat <bennybeat@gmail.com>, 2017.
 # Javier Ocampos <xavier.ocampos@gmail.com>, 2018.
 # Roger Blanco Ribera <roger.blancoribera@gmail.com>, 2016-2018, 2020, 2025.
@@ -39,13 +39,13 @@
 # "Drussentis@gmail.com" <drussentis@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-01-25 00:39+0000\n"
 "Last-Translator: \"Drussentis@gmail.com\" <drussentis@gmail.com>\n"
-"Language-Team: Catalan <https://hosted.weblate.org/projects/godot-engine/"
-"godot/ca/>\n"
+"Language-Team: Catalan <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/ca/>\n"
 "Language: ca\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2678,8 +2678,8 @@ msgstr "Obre l'acoblador %s."
 msgid "Focus on the %s dock."
 msgstr "Enfocar l'acoblador %s."
 
-msgid "%s - Godot Engine"
-msgstr "%s - Motor Godot"
+msgid "%s - Jundot Engine"
+msgstr "%s - Motor Jundot"
 
 msgid "Move this dock right one tab."
 msgstr "Mou aquest acoblador una pestanya cap a la dreta."
@@ -3308,8 +3308,8 @@ msgstr "Suggerir una Característica"
 msgid "Send Docs Feedback"
 msgstr "Enviar suggeriments sobre la Documentació"
 
-msgid "Support Godot Development"
-msgstr "Contribueix al Desenvolupament de Godot"
+msgid "Support Jundot Development"
+msgstr "Contribueix al Desenvolupament de Jundot"
 
 msgid "Open Script Editor"
 msgstr "Editor d'Scripts"
@@ -3717,8 +3717,8 @@ msgstr "Membres Platí"
 msgid "Gold Members"
 msgstr "Membres Or"
 
-msgid "Thank you for choosing Godot Engine!"
-msgstr "Gràcies per triar Godot !"
+msgid "Thank you for choosing Jundot Engine!"
+msgstr "Gràcies per triar Jundot !"
 
 msgid "Name cannot be empty."
 msgstr "El nom no pot estar buit."
@@ -3771,14 +3771,14 @@ msgstr "Camí base: %s"
 msgid "Folder name is valid."
 msgstr "El nom de la carpeta és vàlid."
 
-msgid "Godot Engine contributors"
-msgstr "Col·laboradors de Godot Engine"
+msgid "Jundot Engine contributors"
+msgstr "Col·laboradors de Jundot Engine"
 
 msgid "Double-click to open in browser."
 msgstr "Fes doble clic per obrir-ho al navegador."
 
-msgid "Thanks from the Godot community!"
-msgstr "Gràcies de la part de la Comunitat del Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "Gràcies de la part de la Comunitat del Jundot!"
 
 msgid "Authors"
 msgstr "Autors"
@@ -3790,12 +3790,12 @@ msgid "Third-party Licenses"
 msgstr "Llicències de Tercers"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot Engine compta amb diverses biblioteques gratuïtes i de codi obert de "
+"Jundot Engine compta amb diverses biblioteques gratuïtes i de codi obert de "
 "tercers, totes compatibles amb els termes de la seva llicència MIT. A "
 "continuació, es mostra una llista exhaustiva de tots aquests components de "
 "tercers amb les seves respectives declaracions de copyright i termes de "
@@ -4007,8 +4007,8 @@ msgstr "Fóra bo anomenar el projecte."
 msgid "New Game Project"
 msgstr "Nou Projecte de Joc"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "No es pot crear el fitxer 'project.godot' en el camí del projecte."
+msgid "Couldn't create project.jundot in project path."
+msgstr "No es pot crear el fitxer 'project.jundot' en el camí del projecte."
 
 msgid "Error opening package file, not in ZIP format."
 msgstr ""
@@ -5628,8 +5628,8 @@ msgstr "Desa el Tema com a..."
 msgid "Online Docs"
 msgstr "Documentació en línia"
 
-msgid "Open Godot online documentation."
-msgstr "Obrir la documentació en línia de Godot."
+msgid "Open Jundot online documentation."
+msgstr "Obrir la documentació en línia de Jundot."
 
 msgid "%s Class Reference"
 msgstr "Referència de Classe %s"
@@ -5911,11 +5911,11 @@ msgstr "Metal"
 msgid "OpenGL"
 msgstr "OpenGL"
 
-msgid "Godot Physics (2D)"
-msgstr "Motor físic de Godot (2D)"
+msgid "Jundot Physics (2D)"
+msgstr "Motor físic de Jundot (2D)"
 
-msgid "Godot Physics (3D)"
-msgstr "Motor físic de Godot (3D)"
+msgid "Jundot Physics (3D)"
+msgstr "Motor físic de Jundot (3D)"
 
 msgid "Text Server: Fallback"
 msgstr "Servidor de text: Alternatiu"
@@ -5947,11 +5947,11 @@ msgstr "Renderització Forward+ per a gràfics 3D avançats."
 msgid "Mobile renderer for less advanced 3D graphics."
 msgstr "Renderització Mòbil per a gràfics menys avançats."
 
-msgid "Godot Physics backend (2D)."
-msgstr "Motor intern de física de Godot (2D)."
+msgid "Jundot Physics backend (2D)."
+msgstr "Motor intern de física de Jundot (2D)."
 
-msgid "Godot Physics backend (3D)."
-msgstr "Motor intern de física de Godot (3D)."
+msgid "Jundot Physics backend (3D)."
+msgstr "Motor intern de física de Jundot (3D)."
 
 msgid "Jolt Physics backend (3D only)."
 msgstr "Motor intern de física Jolt (3D)."
@@ -6187,8 +6187,8 @@ msgstr ""
 msgid "New profile name:"
 msgstr "Nom del nou perfil:"
 
-msgid "Godot Feature Profile"
-msgstr "Perfil de les funcionalitats del Godot"
+msgid "Jundot Feature Profile"
+msgstr "Perfil de les funcionalitats del Jundot"
 
 msgid "Import Profile(s)"
 msgstr "Importar Perfil(s)"
@@ -6241,8 +6241,8 @@ msgstr "Canviar zona morta de l'acció"
 msgid "Erase Input Action"
 msgstr "Elimina l'Acció d'Entrada"
 
-msgid "Project Settings (project.godot)"
-msgstr "Configuració del Projecte (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Configuració del Projecte (project.jundot)"
 
 msgid "Input Map"
 msgstr "Mapa d'Entrades"
@@ -6665,11 +6665,11 @@ msgstr ""
 "Retorna 0,0 si 'x' és menor que'edge0 ' o 1.0 en cas contrari."
 
 msgid ""
-"Custom Godot Shader Language expression, with custom amount of input and "
+"Custom Jundot Shader Language expression, with custom amount of input and "
 "output ports. This is a direct injection of code into the vertex/fragment/"
 "light function, do not use it to write the function declarations inside."
 msgstr ""
-"Expressió personalitzada del llenguatge de Shader de Godot, amb una quantitat "
+"Expressió personalitzada del llenguatge de Shader de Jundot, amb una quantitat "
 "de ports d'entrada i sortida personalitzats. Això es una injecció de codi "
 "directa en la funció vertex/fragment/light, no lo utilitzau per a escriure "
 "les declaracions de la funció dins seu."

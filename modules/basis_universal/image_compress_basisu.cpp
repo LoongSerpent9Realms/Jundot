@@ -2,10 +2,10 @@
 /*  image_compress_basisu.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -36,10 +36,10 @@
 #include "core/string/print_string.h"
 #include "servers/rendering/rendering_server.h"
 
-GODOT_GCC_WARNING_PUSH
-GODOT_GCC_WARNING_IGNORE("-Wenum-conversion")
-GODOT_GCC_WARNING_IGNORE("-Wshadow")
-GODOT_GCC_WARNING_IGNORE("-Wunused-value")
+JUNDOT_GCC_WARNING_PUSH
+JUNDOT_GCC_WARNING_IGNORE("-Wenum-conversion")
+JUNDOT_GCC_WARNING_IGNORE("-Wshadow")
+JUNDOT_GCC_WARNING_IGNORE("-Wunused-value")
 
 #include <transcoder/basisu_transcoder.h>
 #ifdef TOOLS_ENABLED
@@ -49,7 +49,7 @@ static Mutex init_mutex;
 static bool initialized = false;
 #endif
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 
 void basis_universal_init() {
 	basist::basisu_transcoder_init();

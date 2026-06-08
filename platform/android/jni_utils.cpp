@@ -2,10 +2,10 @@
 /*  jni_utils.cpp                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -46,7 +46,7 @@ jobject callable_to_jcallable(JNIEnv *p_env, const Variant &p_callable) {
 
 	Variant *callable_jcopy = memnew(Variant(p_callable));
 
-	jclass bclass = jni_find_class(p_env, "org/godotengine/godot/variant/Callable");
+	jclass bclass = jni_find_class(p_env, "org/jundotengine/jundot/variant/Callable");
 	jmethodID ctor = p_env->GetMethodID(bclass, "<init>", "(J)V");
 	jobject jcallable = p_env->NewObject(bclass, ctor, reinterpret_cast<int64_t>(callable_jcopy));
 	p_env->DeleteLocalRef(bclass);
@@ -59,7 +59,7 @@ Callable jcallable_to_callable(JNIEnv *p_env, jobject p_jcallable_obj) {
 
 	const Variant *callable_variant = nullptr;
 	if (p_jcallable_obj) {
-		jclass callable_class = jni_find_class(p_env, "org/godotengine/godot/variant/Callable");
+		jclass callable_class = jni_find_class(p_env, "org/jundotengine/jundot/variant/Callable");
 		if (callable_class && p_env->IsInstanceOf(p_jcallable_obj, callable_class)) {
 			jmethodID get_native_pointer = p_env->GetMethodID(callable_class, "getNativePointer", "()J");
 			jlong native_callable = p_env->CallLongMethod(p_jcallable_obj, get_native_pointer);
@@ -157,7 +157,7 @@ jobject _variant_to_jobject(JNIEnv *env, Variant::Type p_type, const Variant *p_
 
 		case Variant::DICTIONARY: {
 			Dictionary dict = *p_arg;
-			jclass dclass = jni_find_class(env, "org/godotengine/godot/Dictionary");
+			jclass dclass = jni_find_class(env, "org/jundotengine/jundot/Dictionary");
 			jmethodID ctor = env->GetMethodID(dclass, "<init>", "()V");
 			jobject jdict = env->NewObject(dclass, ctor);
 
@@ -428,7 +428,7 @@ Variant _jobject_to_variant(JNIEnv *env, jobject obj, int p_depth) {
 		return varr;
 	}
 
-	if (name == "org.godotengine.godot.Dictionary") {
+	if (name == "org.jundotengine.jundot.Dictionary") {
 		Dictionary ret;
 		jclass oclass = c;
 
@@ -471,7 +471,7 @@ Variant _jobject_to_variant(JNIEnv *env, jobject obj, int p_depth) {
 		return ret;
 	}
 
-	if (name == "org.godotengine.godot.variant.Callable") {
+	if (name == "org.jundotengine.jundot.variant.Callable") {
 		return jcallable_to_callable(env, obj);
 	}
 
@@ -502,8 +502,8 @@ Variant::Type get_jni_type(const String &p_type) {
 		{ "[D", Variant::PACKED_FLOAT64_ARRAY },
 		{ "[Ljava.lang.String;", Variant::PACKED_STRING_ARRAY },
 		{ "[Ljava.lang.CharSequence;", Variant::PACKED_STRING_ARRAY },
-		{ "org.godotengine.godot.Dictionary", Variant::DICTIONARY },
-		{ "org.godotengine.godot.variant.Callable", Variant::CALLABLE },
+		{ "org.jundotengine.jundot.Dictionary", Variant::DICTIONARY },
+		{ "org.jundotengine.jundot.variant.Callable", Variant::CALLABLE },
 		{ nullptr, Variant::NIL }
 	};
 
@@ -521,7 +521,7 @@ Variant::Type get_jni_type(const String &p_type) {
 }
 
 void setup_android_class_loader() {
-	// Find a known class defined in the Godot package and obtain its ClassLoader.
+	// Find a known class defined in the Jundot package and obtain its ClassLoader.
 	// This ClassLoader will be used by jni_find_class() to locate classes at runtime
 	// in a thread-safe manner, avoiding issues with FindClass in non-main threads.
 
@@ -532,7 +532,7 @@ void setup_android_class_loader() {
 	JNIEnv *env = get_jni_env();
 	ERR_FAIL_NULL(env);
 
-	jclass known_class = env->FindClass("org/godotengine/godot/Godot");
+	jclass known_class = env->FindClass("org/jundotengine/jundot/Jundot");
 	ERR_FAIL_NULL(known_class);
 
 	jclass class_class = env->FindClass("java/lang/Class");

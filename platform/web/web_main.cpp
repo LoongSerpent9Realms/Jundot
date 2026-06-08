@@ -2,10 +2,10 @@
 /*  web_main.cpp                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -29,7 +29,7 @@
 /**************************************************************************/
 
 #include "display_server_web.h"
-#include "godot_js.h"
+#include "jundot_js.h"
 #include "os_web.h"
 
 #include "core/config/engine.h"
@@ -69,7 +69,7 @@ void exit_callback() {
 	int exit_code = OS_Web::get_singleton()->get_exit_code();
 	memdelete(os);
 	os = nullptr;
-	godot_cleanup_profiler();
+	jundot_cleanup_profiler();
 	emscripten_force_exit(exit_code); // Exit runtime.
 }
 
@@ -106,15 +106,15 @@ void main_loop_callback() {
 	if (os->main_loop_iterate()) {
 		emscripten_cancel_main_loop(); // Cancel current loop and set the cleanup one.
 		emscripten_set_main_loop(exit_callback, -1, false);
-		godot_js_os_finish_async(cleanup_after_sync);
+		jundot_js_os_finish_async(cleanup_after_sync);
 	}
 }
 
 void print_web_header() {
 	// Emscripten.
-	char *emscripten_version_char = godot_js_emscripten_get_version();
+	char *emscripten_version_char = jundot_js_emscripten_get_version();
 	String emscripten_version = vformat("Emscripten %s", emscripten_version_char);
-	// `free()` is used here because it's not memory that was allocated by Godot.
+	// `free()` is used here because it's not memory that was allocated by Jundot.
 	free(emscripten_version_char);
 
 	// Build features.
@@ -130,8 +130,8 @@ void print_web_header() {
 }
 
 /// When calling main, it is assumed FS is setup and synced.
-extern EMSCRIPTEN_KEEPALIVE int godot_web_main(int argc, char *argv[]) {
-	godot_init_profiler();
+extern EMSCRIPTEN_KEEPALIVE int jundot_web_main(int argc, char *argv[]) {
+	jundot_init_profiler();
 
 	os = new OS_Web();
 
@@ -148,7 +148,7 @@ extern EMSCRIPTEN_KEEPALIVE int godot_web_main(int argc, char *argv[]) {
 	if (err != OK) {
 		// Will only exit after sync.
 		emscripten_set_main_loop(exit_callback, -1, false);
-		godot_js_os_finish_async(cleanup_after_sync);
+		jundot_js_os_finish_async(cleanup_after_sync);
 		if (err == ERR_HELP) { // Returned by --help and --version, so success.
 			return EXIT_SUCCESS;
 		}

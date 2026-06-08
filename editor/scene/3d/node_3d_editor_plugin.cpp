@@ -2,10 +2,10 @@
 /*  node_3d_editor_plugin.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -6635,7 +6635,7 @@ void Node3DEditorViewport::update_transform_numeric() {
 			break;
 		case TRANSFORM_SCALE:
 			// To halve the size of an object in Blender, you scale it by 0.5.
-			// Doing the same in Godot is considered scaling it by -0.5.
+			// Doing the same in Jundot is considered scaling it by -0.5.
 			motion *= (value - 1.0);
 			set_message(vformat(TTR("Scaling %s."), motion));
 			break;

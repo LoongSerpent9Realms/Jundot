@@ -16,7 +16,7 @@
         android:required="true" />
 
     <application
-        android:label="@string/godot_project_name_string"
+        android:label="@string/jundot_project_name_string"
         android:allowBackup="false"
         android:icon="@mipmap/icon"
         android:appCategory="game"
@@ -30,8 +30,8 @@
             tools:targetApi="29" />
 
         <activity
-            android:name=".GodotApp"
-            android:theme="@style/GodotAppSplashTheme"
+            android:name=".JundotApp"
+            android:theme="@style/JundotAppSplashTheme"
             android:launchMode="singleInstancePerTask"
             android:excludeFromRecents="false"
             android:exported="false"
@@ -42,8 +42,8 @@
             android:resizeableActivity="false"
             tools:ignore="UnusedAttribute" />
         <activity-alias
-            android:name=".GodotAppLauncher"
-            android:targetActivity=".GodotApp"
+            android:name=".JundotAppLauncher"
+            android:targetActivity=".JundotApp"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

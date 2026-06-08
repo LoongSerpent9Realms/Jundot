@@ -2,10 +2,10 @@
 /*  profiling.cpp                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #include "profiling.h"
 
-#if defined(GODOT_USE_TRACY)
+#if defined(JUNDOT_USE_TRACY)
 // Use the tracy profiler.
 
 #include "core/os/mutex.h"
@@ -140,7 +140,7 @@ const tracy::SourceLocationData *intern_source_location(const void *p_function_p
 	_data->source_location_data.name = _data->name->name_utf8.get_data();
 
 	_data->source_location_data.line = p_line;
-	_data->source_location_data.color = p_is_script ? 0x478cbf : 0; // godot_logo_blue
+	_data->source_location_data.color = p_is_script ? 0x478cbf : 0; // jundot_logo_blue
 
 	_data->next = TracyInternTable::source_location_table[idx];
 	_data->prev = nullptr;
@@ -154,7 +154,7 @@ const tracy::SourceLocationData *intern_source_location(const void *p_function_p
 }
 } // namespace tracy
 
-void godot_init_profiler() {
+void jundot_init_profiler() {
 	MutexLock lock(tracy::TracyInternTable::mutex);
 	ERR_FAIL_COND(tracy::configured);
 
@@ -172,7 +172,7 @@ void godot_init_profiler() {
 	FrameMark;
 }
 
-void godot_cleanup_profiler() {
+void jundot_cleanup_profiler() {
 	MutexLock lock(tracy::TracyInternTable::mutex);
 	ERR_FAIL_COND(!tracy::configured);
 
@@ -194,10 +194,10 @@ void godot_cleanup_profiler() {
 	tracy::configured = false;
 }
 
-#elif defined(GODOT_USE_PERFETTO)
+#elif defined(JUNDOT_USE_PERFETTO)
 PERFETTO_TRACK_EVENT_STATIC_STORAGE();
 
-void godot_init_profiler() {
+void jundot_init_profiler() {
 	perfetto::TracingInitArgs args;
 
 	args.backends |= perfetto::kSystemBackend;
@@ -206,11 +206,11 @@ void godot_init_profiler() {
 	perfetto::TrackEvent::Register();
 }
 
-void godot_cleanup_profiler() {
+void jundot_cleanup_profiler() {
 	// Stub
 }
 
-#elif defined(GODOT_USE_INSTRUMENTS)
+#elif defined(JUNDOT_USE_INSTRUMENTS)
 
 namespace apple::instruments {
 
@@ -219,29 +219,29 @@ os_log_t LOG_TRACING;
 
 } // namespace apple::instruments
 
-void godot_init_profiler() {
+void jundot_init_profiler() {
 	static bool initialized = false;
 	if (initialized) {
 		return;
 	}
 	initialized = true;
-	apple::instruments::LOG = os_log_create("org.godotengine.godot", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
+	apple::instruments::LOG = os_log_create("org.jundotengine.jundot", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
 #ifdef INSTRUMENTS_SAMPLE_CALLSTACKS
-	apple::instruments::LOG_TRACING = os_log_create("org.godotengine.godot", OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING);
+	apple::instruments::LOG_TRACING = os_log_create("org.jundotengine.jundot", OS_LOG_CATEGORY_DYNAMIC_STACK_TRACING);
 #else
-	apple::instruments::LOG_TRACING = os_log_create("org.godotengine.godot", "tracing");
+	apple::instruments::LOG_TRACING = os_log_create("org.jundotengine.jundot", "tracing");
 #endif
 }
 
-void godot_cleanup_profiler() {
+void jundot_cleanup_profiler() {
 }
 
 #else
-void godot_init_profiler() {
+void jundot_init_profiler() {
 	// Stub
 }
 
-void godot_cleanup_profiler() {
+void jundot_cleanup_profiler() {
 	// Stub
 }
 #endif

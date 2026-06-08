@@ -2,10 +2,10 @@
 /*  csharp_script.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -143,7 +143,7 @@ private:
 
 	/**
 	 * Base script that this script derives from, or null if it derives from a
-	 * native Godot class.
+	 * native Jundot class.
 	 */
 	Ref<CSharpScript> base_script;
 
@@ -431,7 +431,7 @@ class CSharpLanguage : public ScriptLanguage {
 	friend class GDMono;
 
 #ifdef TOOLS_ENABLED
-	EditorPlugin *godotsharp_editor = nullptr;
+	EditorPlugin *jundotsharp_editor = nullptr;
 
 	static void _editor_init_callback();
 #endif
@@ -465,8 +465,8 @@ public:
 	}
 
 #ifdef TOOLS_ENABLED
-	_FORCE_INLINE_ EditorPlugin *get_godotsharp_editor() const {
-		return godotsharp_editor;
+	_FORCE_INLINE_ EditorPlugin *get_jundotsharp_editor() const {
+		return jundotsharp_editor;
 	}
 #endif
 

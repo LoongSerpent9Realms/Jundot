@@ -29,8 +29,8 @@
 		}
 		[/gdscript]
 		[csharp]
-		var myDict = new Godot.Collections.Dictionary(); // Creates an empty dictionary.
-		var pointsDict = new Godot.Collections.Dictionary
+		var myDict = new Jundot.Collections.Dictionary(); // Creates an empty dictionary.
+		var pointsDict = new Jundot.Collections.Dictionary
 		{
 			{ "White", 50 },
 			{ "Yellow", 75 },
@@ -50,7 +50,7 @@
 		[csharp]
 		[Export(PropertyHint.Enum, "White,Yellow,Orange")]
 		public string MyColor { get; set; }
-		private Godot.Collections.Dictionary _pointsDict = new Godot.Collections.Dictionary
+		private Jundot.Collections.Dictionary _pointsDict = new Jundot.Collections.Dictionary
 		{
 			{ "White", 50 },
 			{ "Yellow", 75 },
@@ -72,9 +72,9 @@
 		}
 		[/gdscript]
 		[csharp]
-		var myDict = new Godot.Collections.Dictionary
+		var myDict = new Jundot.Collections.Dictionary
 		{
-			{ "First Array", new Godot.Collections.Array { 1, 2, 3, 4 } }
+			{ "First Array", new Jundot.Collections.Array { 1, 2, 3, 4 } }
 		};
 		[/csharp]
 		[/codeblocks]
@@ -85,7 +85,7 @@
 		points_dict["Blue"] = 150 # Add "Blue" as a key and assign 150 as its value.
 		[/gdscript]
 		[csharp]
-		var pointsDict = new Godot.Collections.Dictionary
+		var pointsDict = new Jundot.Collections.Dictionary
 		{
 			{ "White", 50 },
 			{ "Yellow", 75 },
@@ -109,12 +109,12 @@
 		[/gdscript]
 		[csharp]
 		// This is a valid dictionary.
-		// To access the string "Nested value" below, use `((Godot.Collections.Dictionary)myDict["sub_dict"])["sub_key"]`.
-		var myDict = new Godot.Collections.Dictionary {
+		// To access the string "Nested value" below, use `((Jundot.Collections.Dictionary)myDict["sub_dict"])["sub_key"]`.
+		var myDict = new Jundot.Collections.Dictionary {
 			{ "String Key", 5 },
-			{ 4, new Godot.Collections.Array { 1, 2, 3 } },
+			{ 4, new Jundot.Collections.Array { 1, 2, 3 } },
 			{ 7, "Hello" },
-			{ "sub_dict", new Godot.Collections.Dictionary { { "sub_key", "Nested value" } } },
+			{ "sub_dict", new Jundot.Collections.Dictionary { { "sub_key", "Nested value" } } },
 		};
 		[/csharp]
 		[/codeblocks]
@@ -126,7 +126,7 @@
 			var amount = groceries[fruit]
 		[/gdscript]
 		[csharp]
-		var groceries = new Godot.Collections.Dictionary { { "Orange", 20 }, { "Apple", 2 }, { "Banana", 4 } };
+		var groceries = new Jundot.Collections.Dictionary { { "Orange", 20 }, { "Apple", 2 }, { "Banana", 4 } };
 		foreach (var (fruit, amount) in groceries)
 		{
 			// `fruit` is the key, `amount` is the value.
@@ -153,14 +153,14 @@
 		[csharp]
 		// Creates a typed dictionary with String keys and int values.
 		// Attempting to use any other type for keys or values will result in an error.
-		var typedDict = new Godot.Collections.Dictionary&lt;String, int&gt; {
+		var typedDict = new Jundot.Collections.Dictionary&lt;String, int&gt; {
 			{"some_key", 1},
 			{"some_other_key", 2},
 		};
 
 		// Creates a typed dictionary with String keys and values of any type.
 		// Attempting to use any other type for keys will result in an error.
-		var typedDictKeyOnly = new Godot.Collections.Dictionary&lt;String, Variant&gt; {
+		var typedDictKeyOnly = new Jundot.Collections.Dictionary&lt;String, Variant&gt; {
 			{"some_key", 12.34},
 			{"some_other_key", "string"},
 		};
@@ -172,8 +172,8 @@
 	</description>
 	<tutorials>
 		<link title="GDScript basics: Dictionary">$DOCS_URL/tutorials/scripting/gdscript/gdscript_basics.html#dictionary</link>
-		<link title="3D Voxel Demo">https://godotengine.org/asset-library/asset/2755</link>
-		<link title="Operating System Testing Demo">https://godotengine.org/asset-library/asset/2789</link>
+		<link title="3D Voxel Demo">https://jundotengine.org/asset-library/asset/2755</link>
+		<link title="Operating System Testing Demo">https://jundotengine.org/asset-library/asset/2789</link>
 	</tutorials>
 	<constructors>
 		<constructor name="Dictionary">
@@ -317,29 +317,29 @@
 				[codeblocks]
 				[gdscript]
 				var my_dict = {
-					"Godot" : 4,
+					"Jundot" : 4,
 					210 : null,
 				}
 
-				print(my_dict.has("Godot")) # Prints true
+				print(my_dict.has("Jundot")) # Prints true
 				print(my_dict.has(210))     # Prints true
 				print(my_dict.has(4))       # Prints false
 				[/gdscript]
 				[csharp]
-				var myDict = new Godot.Collections.Dictionary
+				var myDict = new Jundot.Collections.Dictionary
 				{
-					{ "Godot", 4 },
+					{ "Jundot", 4 },
 					{ 210, default },
 				};
 
-				GD.Print(myDict.ContainsKey("Godot")); // Prints True
+				GD.Print(myDict.ContainsKey("Jundot")); // Prints True
 				GD.Print(myDict.ContainsKey(210));     // Prints True
 				GD.Print(myDict.ContainsKey(4));       // Prints False
 				[/csharp]
 				[/codeblocks]
 				In GDScript, this is equivalent to the [code]in[/code] operator:
 				[codeblock]
-				if "Godot" in { "Godot": 4 }:
+				if "Jundot" in { "Jundot": 4 }:
 					print("The key is here!") # Will be printed.
 				[/codeblock]
 				[b]Note:[/b] This method returns [code]true[/code] as long as the [param key] exists, even if its corresponding value is [code]null[/code].
@@ -368,10 +368,10 @@
 				print(dict1.hash() == dict2.hash()) # Prints true
 				[/gdscript]
 				[csharp]
-				var dict1 = new Godot.Collections.Dictionary { { "A", 10 }, { "B", 2 } };
-				var dict2 = new Godot.Collections.Dictionary { { "A", 10 }, { "B", 2 } };
+				var dict1 = new Jundot.Collections.Dictionary { { "A", 10 }, { "B", 2 } };
+				var dict2 = new Jundot.Collections.Dictionary { { "A", 10 }, { "B", 2 } };
 
-				// Godot.Collections.Dictionary has no Hash() method. Use GD.Hash() instead.
+				// Jundot.Collections.Dictionary has no Hash() method. Use GD.Hash() instead.
 				GD.Print(GD.Hash(dict1) == GD.Hash(dict2)); // Prints True
 				[/csharp]
 				[/codeblocks]
@@ -462,13 +462,13 @@
 				print(dict)  # { "item": "sword", "quantity": 15, "color": "silver" }
 				[/gdscript]
 				[csharp]
-				var dict = new Godot.Collections.Dictionary
+				var dict = new Jundot.Collections.Dictionary
 				{
 					["item"] = "sword",
 					["quantity"] = 2,
 				};
 
-				var otherDict = new Godot.Collections.Dictionary
+				var otherDict = new Jundot.Collections.Dictionary
 				{
 					["quantity"] = 15,
 					["color"] = "silver",

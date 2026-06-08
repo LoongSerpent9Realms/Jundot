@@ -1995,7 +1995,7 @@ You can access it in multiple ways:
 <b>Is it a mature project?</b>
 
 Yes! The library is in development since May 2019, has over 300 commits, and multiple contributors.
-It is used by many software projects, including some large and popular ones like Qt or Godot Engine,
+It is used by many software projects, including some large and popular ones like Qt or Jundot Engine,
 as well as some AAA games.
 
 <b>How can I contribute to the project?</b>

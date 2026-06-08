@@ -2,10 +2,10 @@
 /*  gl_manager_windows_native.cpp                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -172,7 +172,7 @@ void GLManagerNative_Windows::_nvapi_setup_profile() {
 	// We need a name anyways, so let's use the engine name if an application name is not available
 	// (this is used mostly by the Project Manager)
 	if (app_profile_name.is_empty()) {
-		app_profile_name = GODOT_VERSION_NAME;
+		app_profile_name = JUNDOT_VERSION_NAME;
 	}
 	String old_profile_name = app_profile_name + " Nvidia Profile";
 	Char16String app_profile_name_u16 = app_profile_name.utf16();

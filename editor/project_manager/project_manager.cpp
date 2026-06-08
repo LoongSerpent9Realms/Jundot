@@ -2,10 +2,10 @@
 /*  project_manager.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -56,6 +56,8 @@
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
 #include "editor/themes/editor_theme_manager.h"
+#include "editor/update/update_dialog.h"
+#include "editor/update/update_manager.h"
 #include "main/main.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/flow_container.h"
@@ -82,7 +84,7 @@
 
 #include "modules/modules_enabled.gen.h" // For gdscript, mono. (For editor help highlighter).
 
-constexpr int GODOT4_CONFIG_VERSION = 5;
+constexpr int JUNDOT4_CONFIG_VERSION = 5;
 
 ProjectManager *ProjectManager::singleton = nullptr;
 
@@ -115,8 +117,8 @@ void ProjectManager::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
-			// TRANSLATORS: This refers to the application where users manage their Godot projects.
-			SceneTree::get_singleton()->get_root()->set_title(GODOT_VERSION_NAME + String(" - ") + TTR("Project Manager", "Application"));
+			// TRANSLATORS: This refers to the application where users manage their Jundot projects.
+			SceneTree::get_singleton()->get_root()->set_title(JUNDOT_VERSION_NAME + String(" - ") + TTR("Project Manager", "Application"));
 
 			const String line1 = TTR("You don't have any projects yet.");
 			const String line2 = TTR("Get started by creating a new one,\nimporting one that exists, or by downloading a project template from the Asset Store!");
@@ -149,16 +151,16 @@ void ProjectManager::_notification(int p_what) {
 // Utility data.
 
 Ref<Texture2D> ProjectManager::_file_dialog_get_icon(const String &p_path) {
-	if (p_path.has_extension("godot")) {
-		return singleton->icon_type_cache["GodotMonochrome"];
+	if (p_path.has_extension("jundot")) {
+		return singleton->icon_type_cache["JundotMonochrome"];
 	}
 
 	return singleton->icon_type_cache["Object"];
 }
 
 Ref<Texture2D> ProjectManager::_file_dialog_get_thumbnail(const String &p_path) {
-	if (p_path.has_extension("godot")) {
-		return singleton->icon_type_cache["GodotFile"];
+	if (p_path.has_extension("jundot")) {
+		return singleton->icon_type_cache["JundotFile"];
 	}
 
 	return Ref<Texture2D>();
@@ -481,6 +483,41 @@ void ProjectManager::_restart_confirmed() {
 	get_tree()->quit();
 }
 
+// ── Hot-update system handlers ──────────────────────────────
+
+void ProjectManager::_on_update_download_requested(const String &p_version, const String &p_url) {
+	if (!update_dialog || !update_manager) {
+		return;
+	}
+
+	// Populate the update dialog with version info from EngineUpdateLabel.
+	// For full manifest info (size, changelog, etc.), we'd need to fetch it.
+	// For now, we show what we have and let the launcher handle the rest.
+	UpdateManifest info;
+	info.version.full = p_version;
+	info.download_url = p_url;
+	info.package_size = 0; // Unknown until launcher fetches manifest
+
+	update_dialog->set_update_info(info);
+	update_dialog->popup_centered();
+}
+
+void ProjectManager::_on_update_now_requested() {
+	if (!update_manager) {
+		return;
+	}
+
+	// Trigger the launcher. This is synchronous (blocks until launcher finishes).
+	// The launcher will handle download, verification, and installation.
+	// After it completes, it typically restarts the engine.
+	update_manager->trigger_launcher_update();
+}
+
+void ProjectManager::_on_skip_version_requested() {
+	// Save skipped version so EngineUpdateLabel doesn't nag again.
+	// For now, just dismiss. Persistence can be added via UpdateStateStore.
+}
+
 // Project list.
 
 void ProjectManager::_update_list_placeholder() {
@@ -563,7 +600,7 @@ void ProjectManager::_open_selected_projects() {
 
 	const HashSet<String> &selected_list = project_list->get_selected_project_keys();
 	for (const String &path : selected_list) {
-		String conf = path.path_join("project.godot");
+		String conf = path.path_join("project.jundot");
 
 		if (!FileAccess::exists(conf)) {
 			loading_label->hide();
@@ -640,19 +677,19 @@ void ProjectManager::_open_selected_projects_check_warnings() {
 
 	// Check if the config_version property was empty or 0.
 	if (config_version == 0) {
-		ask_update_label->set_text(vformat(TTR("The selected project \"%s\" does not specify its supported Godot version in its configuration file (\"project.godot\").\n\nProject path: %s\n\nIf you proceed with opening it, it will be converted to Godot's current configuration file format.\n\nWarning: You won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
+		ask_update_label->set_text(vformat(TTR("The selected project \"%s\" does not specify its supported Jundot version in its configuration file (\"project.jundot\").\n\nProject path: %s\n\nIf you proceed with opening it, it will be converted to Jundot's current configuration file format.\n\nWarning: You won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
 		ask_update_settings->popup_centered(popup_min_size);
 		return;
 	}
 	// Check if we need to convert project settings from an earlier engine version.
 	if (config_version < ProjectSettings::CONFIG_VERSION) {
-		if (config_version == GODOT4_CONFIG_VERSION - 1 && ProjectSettings::CONFIG_VERSION == GODOT4_CONFIG_VERSION) { // Conversion from Godot 3 to 4.
+		if (config_version == JUNDOT4_CONFIG_VERSION - 1 && ProjectSettings::CONFIG_VERSION == JUNDOT4_CONFIG_VERSION) { // Conversion from Jundot 3 to 4.
 			full_convert_button->show();
-			ask_update_label->set_text(vformat(TTR("The selected project \"%s\" was generated by Godot 3.x, and needs to be converted for Godot 4.x.\n\nProject path: %s\n\nYou have three options:\n- Convert only the configuration file (\"project.godot\"). Use this to open the project without attempting to convert its scenes, resources and scripts.\n- Convert the entire project including its scenes, resources and scripts (recommended if you are upgrading).\n- Do nothing and go back.\n\nWarning: If you select a conversion option, you won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
-			ask_update_settings->get_ok_button()->set_text(TTRC("Convert project.godot Only"));
+			ask_update_label->set_text(vformat(TTR("The selected project \"%s\" was generated by Jundot 3.x, and needs to be converted for Jundot 4.x.\n\nProject path: %s\n\nYou have three options:\n- Convert only the configuration file (\"project.jundot\"). Use this to open the project without attempting to convert its scenes, resources and scripts.\n- Convert the entire project including its scenes, resources and scripts (recommended if you are upgrading).\n- Do nothing and go back.\n\nWarning: If you select a conversion option, you won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
+			ask_update_settings->get_ok_button()->set_text(TTRC("Convert project.jundot Only"));
 		} else {
 			ask_update_label->set_text(vformat(TTR("The selected project \"%s\" was generated by an older engine version, and needs to be converted for this version.\n\nProject path: %s\n\nDo you want to convert it?\n\nWarning: You won't be able to open the project with previous versions of the engine anymore."), project.project_name, project.path));
-			ask_update_settings->get_ok_button()->set_text(TTRC("Convert project.godot"));
+			ask_update_settings->get_ok_button()->set_text(TTRC("Convert project.jundot"));
 		}
 		ask_update_backup->show();
 		migration_guide_button->show();
@@ -665,32 +702,32 @@ void ProjectManager::_open_selected_projects_check_warnings() {
 		_show_error(vformat(TTR("Can't open project \"%s\" at the following path:\n\n%s\n\nThe project settings were created by a newer engine version, whose settings are not compatible with this version."), project.project_name, project.path), popup_min_size);
 		return;
 	}
-	// Check if the project is using features not supported by this build of Godot.
+	// Check if the project is using features not supported by this build of Jundot.
 	if (!unsupported_features.is_empty()) {
 		String warning_message = "";
 		for (int i = 0; i < unsupported_features.size(); i++) {
 			const String &feature = unsupported_features[i];
 			if (feature == "Double Precision") {
 				ask_update_backup->show();
-				warning_message += TTR("Warning: This project uses double precision floats, but this version of\nGodot uses single precision floats. Opening this project may cause data loss.\n\n");
+				warning_message += TTR("Warning: This project uses double precision floats, but this version of\nJundot uses single precision floats. Opening this project may cause data loss.\n\n");
 				unsupported_features.remove_at(i);
 				i--;
 			} else if (feature == "C#") {
-				warning_message += TTR("Warning: This project uses C#, but this build of Godot does not have\nthe Mono module. If you proceed you will not be able to use any C# scripts.\n\n");
+				warning_message += TTR("Warning: This project uses C#, but this build of Jundot does not have\nthe Mono module. If you proceed you will not be able to use any C# scripts.\n\n");
 				unsupported_features.remove_at(i);
 				i--;
 			} else if (ProjectList::project_feature_looks_like_version(feature)) {
 				ask_update_backup->show();
 				migration_guide_button->show();
 				version_convert_feature = feature;
-				warning_message += vformat(TTR("Warning: This project was last edited in Godot %s. Opening will change it to Godot %s.\n\n"), Variant(feature), Variant(GODOT_VERSION_BRANCH));
+				warning_message += vformat(TTR("Warning: This project was last edited in Jundot %s. Opening will change it to Jundot %s.\n\n"), Variant(feature), Variant(JUNDOT_VERSION_BRANCH));
 				unsupported_features.remove_at(i);
 				i--;
 			}
 		}
 		if (!unsupported_features.is_empty()) {
 			String unsupported_features_str = String(", ").join(unsupported_features);
-			warning_message += vformat(TTR("Warning: This project uses the following features not supported by this build of Godot:\n\n%s\n\n"), unsupported_features_str);
+			warning_message += vformat(TTR("Warning: This project uses the following features not supported by this build of Jundot:\n\n%s\n\n"), unsupported_features_str);
 		}
 		warning_message += TTR("Open anyway? Project will be modified.");
 		ask_update_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
@@ -882,7 +919,7 @@ void ProjectManager::_open_recovery_mode_ask(bool manual) {
 	// Only show the initial crash preamble if this popup wasn't manually triggered.
 	if (!manual) {
 		recovery_mode_details +=
-				TTR("It looks like Godot crashed when opening this project the last time. If you're having problems editing this project, you can try to open it in Recovery Mode.") +
+				TTR("It looks like Jundot crashed when opening this project the last time. If you're having problems editing this project, you can try to open it in Recovery Mode.") +
 				String::utf8("\n\n");
 	}
 
@@ -1049,22 +1086,22 @@ void ProjectManager::_apply_project_tags() {
 		}
 	}
 
-	const String project_godot = project_list->get_selected_projects()[0].path.path_join("project.godot");
-	ProjectSettings *cfg = memnew(ProjectSettings(project_godot));
+	const String project_jundot = project_list->get_selected_projects()[0].path.path_join("project.jundot");
+	ProjectSettings *cfg = memnew(ProjectSettings(project_jundot));
 	if (!cfg->is_project_loaded()) {
 		memdelete(cfg);
-		tag_edit_error->set_text(vformat(TTR("Couldn't load project at '%s'. It may be missing or corrupted."), project_godot));
+		tag_edit_error->set_text(vformat(TTR("Couldn't load project at '%s'. It may be missing or corrupted."), project_jundot));
 		tag_edit_error->show();
 		callable_mp((Window *)tag_manage_dialog, &Window::show).call_deferred(); // Make sure the dialog does not disappear.
 		return;
 	} else {
 		tags.sort();
 		cfg->set("application/config/tags", tags);
-		Error err = cfg->save_custom(project_godot);
+		Error err = cfg->save_custom(project_jundot);
 		memdelete(cfg);
 
 		if (err != OK) {
-			tag_edit_error->set_text(vformat(TTR("Couldn't save project at '%s' (error %d)."), project_godot, err));
+			tag_edit_error->set_text(vformat(TTR("Couldn't save project at '%s' (error %d)."), project_jundot, err));
 			tag_edit_error->show();
 			callable_mp((Window *)tag_manage_dialog, &Window::show).call_deferred();
 			return;
@@ -1147,7 +1184,7 @@ void ProjectManager::_minor_project_migrate() {
 			Ref<ConfigFile> layout_file;
 			layout_file.instantiate();
 
-			const String layout_path = migrated_project.path.path_join(".godot/editor/editor_layout.cfg");
+			const String layout_path = migrated_project.path.path_join(".jundot/editor/editor_layout.cfg");
 			Error err = layout_file->load(layout_path);
 			if (err == OK) {
 				for (int i = 0; i < 4; i++) {
@@ -1179,7 +1216,7 @@ void ProjectManager::_full_convert_button_pressed() {
 }
 
 void ProjectManager::_migration_guide_button_pressed() {
-	const String url = vformat("%s/tutorials/migrating/index.html", GODOT_VERSION_DOCS_URL);
+	const String url = vformat("%s/tutorials/migrating/index.html", JUNDOT_VERSION_DOCS_URL);
 	OS::get_singleton()->shell_open(url);
 }
 
@@ -1202,7 +1239,7 @@ void ProjectManager::_perform_full_project_conversion() {
 	Error err = OS::get_singleton()->create_instance(args);
 	ERR_FAIL_COND(err);
 
-	project_list->set_project_version(path, GODOT4_CONFIG_VERSION);
+	project_list->set_project_version(path, JUNDOT4_CONFIG_VERSION);
 }
 
 // Input and I/O.
@@ -1317,7 +1354,7 @@ void ProjectManager::_titlebar_resized() {
 }
 
 void ProjectManager::_open_donate_page() {
-	OS::get_singleton()->shell_open("https://fund.godotengine.org/?ref=project_manager");
+	OS::get_singleton()->shell_open("https://fund.jundotengine.org/?ref=project_manager");
 }
 
 // Object methods.
@@ -1445,7 +1482,7 @@ ProjectManager::ProjectManager() {
 
 		title_bar_logo = memnew(Button);
 		title_bar_logo->set_flat(true);
-		title_bar_logo->set_tooltip_text(TTR("About Godot"));
+		title_bar_logo->set_tooltip_text(TTR("About Jundot"));
 		left_hbox->add_child(title_bar_logo);
 		title_bar_logo->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_show_about));
 
@@ -1755,6 +1792,7 @@ ProjectManager::ProjectManager() {
 		EngineUpdateLabel *update_label = memnew(EngineUpdateLabel);
 		footer_bar->add_child(update_label);
 		update_label->connect("offline_clicked", callable_mp(this, &ProjectManager::_show_quick_settings));
+		update_label->connect("update_download_requested", callable_mp(this, &ProjectManager::_on_update_download_requested));
 #endif
 
 		EditorVersionButton *version_btn = memnew(EditorVersionButton(EditorVersionButton::FORMAT_WITH_BUILD));
@@ -1768,6 +1806,15 @@ ProjectManager::ProjectManager() {
 		quick_settings_dialog = memnew(QuickSettingsDialog);
 		add_child(quick_settings_dialog);
 		quick_settings_dialog->connect("restart_required", callable_mp(this, &ProjectManager::_restart_confirmed));
+
+		// ── Hot-update system ────────────────────────────────
+		update_dialog = memnew(UpdateDialog);
+		add_child(update_dialog);
+		update_dialog->connect("update_now_requested", callable_mp(this, &ProjectManager::_on_update_now_requested));
+		update_dialog->connect("skip_version_requested", callable_mp(this, &ProjectManager::_on_skip_version_requested));
+
+		update_manager = memnew(UpdateManager);
+		add_child(update_manager);
 
 		scan_dir = memnew(EditorFileDialog);
 		scan_dir->set_access(EditorFileDialog::ACCESS_FILESYSTEM);
@@ -1844,7 +1891,7 @@ ProjectManager::ProjectManager() {
 
 		ask_full_convert_dialog = memnew(ConfirmationDialog);
 		ask_full_convert_dialog->set_autowrap(true);
-		ask_full_convert_dialog->set_text(TTRC("This option will perform full project conversion, updating scenes, resources and scripts from Godot 3 to work in Godot 4.\n\nNote that this is a best-effort conversion, i.e. it makes upgrading the project easier, but it will not open out-of-the-box and will still require manual adjustments.\n\nIMPORTANT: Make sure to backup your project before converting, as this operation makes it impossible to open it in older versions of Godot."));
+		ask_full_convert_dialog->set_text(TTRC("This option will perform full project conversion, updating scenes, resources and scripts from Jundot 3 to work in Jundot 4.\n\nNote that this is a best-effort conversion, i.e. it makes upgrading the project easier, but it will not open out-of-the-box and will still require manual adjustments.\n\nIMPORTANT: Make sure to backup your project before converting, as this operation makes it impossible to open it in older versions of Jundot."));
 		ask_full_convert_dialog->connect(SceneStringName(confirmed), callable_mp(this, &ProjectManager::_perform_full_project_conversion));
 		add_child(ask_full_convert_dialog);
 

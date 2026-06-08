@@ -51,7 +51,7 @@ if env.editor_build:
     )
 
     # Editor interface and class reference translations incur a significant size
-    # cost for the editor binary (see godot-proposals#3421).
+    # cost for the editor binary (see jundot-proposals#3421).
     # To limit it, we only include translations with a high enough completion
     # ratio (20% for the editor UI, 10% for the class reference).
     # Generated with `make include-list` for each resource.
@@ -75,6 +75,7 @@ if env.editor_build:
     env.add_source_files(env.editor_sources, translation_targets.keys())
 
     SConscript("animation/SCsub")
+    SConscript("ai/SCsub")
     SConscript("asset_library/SCsub")
     SConscript("audio/SCsub")
     SConscript("debugger/SCsub")

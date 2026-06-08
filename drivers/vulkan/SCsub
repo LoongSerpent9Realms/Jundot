@@ -66,7 +66,7 @@ env_thirdparty_respirv.add_source_files(thirdparty_obj, thirdparty_sources_respi
 env.drivers_sources += thirdparty_obj
 
 
-# Godot source files
+# Jundot source files
 
 driver_obj = []
 

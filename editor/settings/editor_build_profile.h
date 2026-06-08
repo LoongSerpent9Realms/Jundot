@@ -2,10 +2,10 @@
 /*  editor_build_profile.h                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -59,9 +59,9 @@ public:
 		BUILD_OPTION_METAL,
 		BUILD_OPTION_OPENGL,
 		BUILD_OPTION_PHYSICS_2D,
-		BUILD_OPTION_PHYSICS_GODOT_2D,
+		BUILD_OPTION_PHYSICS_JUNDOT_2D,
 		BUILD_OPTION_PHYSICS_3D,
-		BUILD_OPTION_PHYSICS_GODOT_3D,
+		BUILD_OPTION_PHYSICS_JUNDOT_3D,
 		BUILD_OPTION_PHYSICS_JOLT,
 		BUILD_OPTION_TEXT_SERVER_FALLBACK,
 		BUILD_OPTION_TEXT_SERVER_ADVANCED,

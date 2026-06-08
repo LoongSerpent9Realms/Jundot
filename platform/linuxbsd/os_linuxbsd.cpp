@@ -2,10 +2,10 @@
 /*  os_linuxbsd.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -727,7 +727,7 @@ Vector<String> OS_LinuxBSD::get_system_fonts() const {
 	}
 	return ret;
 #else
-	ERR_FAIL_V_MSG(Vector<String>(), "Godot was compiled without fontconfig, system font support is disabled.");
+	ERR_FAIL_V_MSG(Vector<String>(), "Jundot was compiled without fontconfig, system font support is disabled.");
 #endif
 }
 
@@ -833,7 +833,7 @@ Vector<String> OS_LinuxBSD::get_system_font_path_for_text(const String &p_font_n
 
 	return ret;
 #else
-	ERR_FAIL_V_MSG(Vector<String>(), "Godot was compiled without fontconfig, system font support is disabled.");
+	ERR_FAIL_V_MSG(Vector<String>(), "Jundot was compiled without fontconfig, system font support is disabled.");
 #endif
 }
 
@@ -889,7 +889,7 @@ String OS_LinuxBSD::get_system_font_path(const String &p_font_name, int p_weight
 
 	return String();
 #else
-	ERR_FAIL_V_MSG(String(), "Godot was compiled without fontconfig, system font support is disabled.");
+	ERR_FAIL_V_MSG(String(), "Jundot was compiled without fontconfig, system font support is disabled.");
 #endif
 }
 
@@ -995,8 +995,8 @@ void OS_LinuxBSD::run() {
 	//uint64_t frame=0;
 
 	while (true) {
-		GodotProfileFrameMark;
-		GodotProfileZone("OS_LinuxBSD::run");
+		JundotProfileFrameMark;
+		JundotProfileZone("OS_LinuxBSD::run");
 		DisplayServer::get_singleton()->process_events(); // get rid of pending events
 #ifdef SDL_ENABLED
 		if (joypad_sdl) {

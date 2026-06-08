@@ -2,10 +2,10 @@
 /*  editor_log.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -221,7 +221,7 @@ void EditorLog::_meta_clicked(const String &p_meta) {
 			InspectorDock::get_singleton()->edit_resource(res);
 		}
 	} else if (path.has_extension("cpp") || path.has_extension("h") || path.has_extension("mm") || path.has_extension("hpp")) {
-		// Godot source file. Try to open it in external editor.
+		// Jundot source file. Try to open it in external editor.
 		if (path.begins_with("./") || path.begins_with(".\\")) {
 			// Relative path. Convert to absolute, using executable path as reference.
 			path = path.trim_prefix("./").trim_prefix(".\\");
@@ -234,11 +234,11 @@ void EditorLog::_meta_clicked(const String &p_meta) {
 		if (!FileAccess::exists(path)) {
 			// The file does not exist. Try on GitHub instead.
 			String branch = "master";
-			if (str_compare(GODOT_VERSION_BUILD, "official") == 0) {
+			if (str_compare(JUNDOT_VERSION_BUILD, "official") == 0) {
 				// In official builds it's safe to use specific commit hash, so the line number is more accurate.
-				branch = GODOT_VERSION_HASH;
+				branch = JUNDOT_VERSION_HASH;
 			}
-			OS::get_singleton()->shell_open(vformat("https://github.com/godotengine/godot/blob/%s/%s#L%d", branch, path, line + 1));
+			OS::get_singleton()->shell_open(vformat("https://github.com/jundotengine/jundot/blob/%s/%s#L%d", branch, path, line + 1));
 			return;
 		}
 
@@ -583,7 +583,7 @@ EditorLog::EditorLog() {
 	hbox->add_child(editor_filter->toggle_button);
 	type_filter_map.insert(MSG_TYPE_EDITOR, editor_filter);
 
-	add_message(GODOT_VERSION_FULL_NAME " (c) 2007-present Juan Linietsky, Ariel Manzur & Godot Contributors.");
+	add_message(JUNDOT_VERSION_FULL_NAME " (c) 2007-present Juan Linietsky, Ariel Manzur & Jundot Contributors.");
 
 	eh.errfunc = _error_handler;
 	eh.userdata = this;

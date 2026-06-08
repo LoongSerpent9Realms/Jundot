@@ -1,6 +1,6 @@
 extends Node2D
 
-var _plugin_name = "GodotAppInstrumentedTestPlugin"
+var _plugin_name = "JundotAppInstrumentedTestPlugin"
 var _android_plugin
 
 var _signal_test_plugin_name = "SignalTestPlugin"
@@ -75,4 +75,4 @@ func _on_gd_script_toast_button_pressed() -> void:
 			var ToastClass = JavaClassWrapper.wrap("android.widget.Toast")
 			ToastClass.makeText(activity, "Toast from GDScript", ToastClass.LENGTH_LONG).show()
 
-		activity.runOnUiThread(android_runtime.createRunnableFromGodotCallable(toastCallable))
+		activity.runOnUiThread(android_runtime.createRunnableFromJundotCallable(toastCallable))

@@ -11,11 +11,11 @@ if "serve" in COMMAND_LINE_TARGETS or "run" in COMMAND_LINE_TARGETS:
 
     from serve import serve
 
-    port = os.environ.get("GODOT_WEB_TEST_PORT", 8060)
+    port = os.environ.get("JUNDOT_WEB_TEST_PORT", 8060)
     try:
         port = int(port)
     except Exception:
-        print_error("GODOT_WEB_TEST_PORT must be a valid integer")
+        print_error("JUNDOT_WEB_TEST_PORT must be a valid integer")
         sys.exit(255)
     serve(env.Dir(env.GetTemplateZipPath()).abspath, port, "run" in COMMAND_LINE_TARGETS)
     sys.exit(0)
@@ -35,18 +35,18 @@ if env["target"] == "editor":
 
 sys_env = env.Clone()
 sys_env.AddJSLibraries([
-    "js/libs/library_godot_audio.js",
-    "js/libs/library_godot_display.js",
-    "js/libs/library_godot_emscripten.js",
-    "js/libs/library_godot_fetch.js",
-    "js/libs/library_godot_webmidi.js",
-    "js/libs/library_godot_os.js",
-    "js/libs/library_godot_runtime.js",
-    "js/libs/library_godot_input.js",
-    "js/libs/library_godot_webgl2.js",
+    "js/libs/library_jundot_audio.js",
+    "js/libs/library_jundot_display.js",
+    "js/libs/library_jundot_emscripten.js",
+    "js/libs/library_jundot_fetch.js",
+    "js/libs/library_jundot_webmidi.js",
+    "js/libs/library_jundot_os.js",
+    "js/libs/library_jundot_runtime.js",
+    "js/libs/library_jundot_input.js",
+    "js/libs/library_jundot_webgl2.js",
 ])
 sys_env.AddJSExterns([
-    "js/libs/library_godot_webgl2.externs.js",
+    "js/libs/library_jundot_webgl2.externs.js",
 ])
 
 sys_env.AddJSPost([
@@ -54,7 +54,7 @@ sys_env.AddJSPost([
 ])
 
 if env["javascript_eval"]:
-    sys_env.AddJSLibraries(["js/libs/library_godot_javascript_singleton.js"])
+    sys_env.AddJSLibraries(["js/libs/library_jundot_javascript_singleton.js"])
 
 for lib in sys_env["JS_LIBS"]:
     sys_env.Append(LINKFLAGS=["--js-library", lib.abspath])
@@ -75,9 +75,9 @@ if len(env["EXPORTED_RUNTIME_METHODS"]):
     sys_env.Append(LINKFLAGS=["-sEXPORTED_RUNTIME_METHODS=" + repr(sorted(list(set(env["EXPORTED_RUNTIME_METHODS"]))))])
 
 build = []
-build_targets = ["#bin/godot${PROGSUFFIX}.js", "#bin/godot${PROGSUFFIX}.wasm"]
+build_targets = ["#bin/jundot${PROGSUFFIX}.js", "#bin/jundot${PROGSUFFIX}.wasm"]
 if env["dlink_enabled"]:
-    # Reset libraries. The main runtime will only link emscripten libraries, not godot ones.
+    # Reset libraries. The main runtime will only link emscripten libraries, not jundot ones.
     sys_env["LIBS"] = []
     # We use IDBFS. Since Emscripten 1.39.1 it needs to be linked explicitly.
     sys_env.Append(LIBS=["idbfs.js"])
@@ -94,8 +94,8 @@ if env["dlink_enabled"]:
     # The main emscripten runtime, with exported standard libraries.
     sys = sys_env.add_program(build_targets, ["web_runtime.cpp"])
 
-    # The side library, containing all Godot code.
-    wasm = env.add_program("#bin/godot.side${PROGSUFFIX}.wasm", web_files)
+    # The side library, containing all Jundot code.
+    wasm = env.add_program("#bin/jundot.side${PROGSUFFIX}.wasm", web_files)
     build = sys + [wasm[0]]
 else:
     # We use IDBFS. Since Emscripten 1.39.1 it needs to be linked explicitly.
@@ -114,7 +114,7 @@ engine = [
     "js/engine/engine.js",
 ]
 externs = [env.File("#platform/web/js/engine/engine.externs.js")]
-js_engine = env.CreateEngineFile("#bin/godot${PROGSUFFIX}.engine.js", engine, externs, env["threads"])
+js_engine = env.CreateEngineFile("#bin/jundot${PROGSUFFIX}.engine.js", engine, externs, env["threads"])
 env.Depends(js_engine, externs)
 
 wrap_list = [
@@ -122,7 +122,7 @@ wrap_list = [
     js_engine,
 ]
 js_wrapped = env.NoCache(
-    env.Textfile("#bin/godot", [env.File(f) for f in wrap_list], TEXTFILESUFFIX="${PROGSUFFIX}.wrapped.js")
+    env.Textfile("#bin/jundot", [env.File(f) for f in wrap_list], TEXTFILESUFFIX="${PROGSUFFIX}.wrapped.js")
 )
 
 # 0 - unwrapped js file (use wrapped one instead)

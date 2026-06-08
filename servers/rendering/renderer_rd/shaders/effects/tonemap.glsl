@@ -8,7 +8,7 @@ layout(location = 0) out vec2 uv_interp;
 
 void main() {
 	// old code, ARM driver bug on Mali-GXXx GPUs and Vulkan API 1.3.xxx
-	// https://github.com/godotengine/godot/pull/92817#issuecomment-2168625982
+	// https://github.com/jundotengine/jundot/pull/92817#issuecomment-2168625982
 	//vec2 base_arr[3] = vec2[](vec2(-1.0, -1.0), vec2(-1.0, 3.0), vec2(3.0, -1.0));
 	//gl_Position = vec4(base_arr[gl_VertexIndex], 0.0, 1.0);
 	//uv_interp = clamp(gl_Position.xy, vec2(0.0, 0.0), vec2(1.0, 1.0)) * 2.0; // saturate(x) * 2.0
@@ -143,7 +143,7 @@ vec3 tonemap_aces(vec3 color) {
 	return color_tonemapped / params.tonemapper_params.x;
 }
 
-// allenwp tonemapping curve; developed for use in the Godot game engine.
+// allenwp tonemapping curve; developed for use in the Jundot game engine.
 // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/
 // Input must be a non-negative linear scene value.
 vec3 allenwp_curve(vec3 x) {
@@ -193,7 +193,7 @@ vec3 tonemap_agx(vec3 color) {
 	// matrices will not perform well with non-Rec. 709 output (more testing with
 	// future wide-gamut displays is be needed).
 	// See this comment from the author on the decisions made to create the matrices:
-	// https://github.com/godotengine/godot-proposals/issues/12317#issuecomment-2835824250
+	// https://github.com/jundotengine/jundot-proposals/issues/12317#issuecomment-2835824250
 
 	// Combined Rec. 709 to Rec. 2020 and Blender AgX inset matrices:
 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(

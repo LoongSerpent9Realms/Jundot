@@ -1,7 +1,7 @@
-# Portuguese translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Portuguese translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # António Sarmento <antonio.luis.sarmento@gmail.com>, 2016.
 # Carlos Vieira <carlos.vieira@gmail.com>, 2017.
 # João <joao@nogordio.com>, 2018.
@@ -52,13 +52,13 @@
 # Augusto Milão <augusto.milao01@gmail.com>, 2025.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-01-11 23:26+0000\n"
 "Last-Translator: 100Nome <100nome.portugal@gmail.com>\n"
-"Language-Team: Portuguese <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/pt/>\n"
+"Language-Team: Portuguese <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/pt/>\n"
 "Language: pt\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3499,8 +3499,8 @@ msgstr "GDScript"
 msgid "Max Call Stack"
 msgstr "Máximo Empilhamento de Chamadas"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Dica Renomeado no Godot 4"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Dica Renomeado no Jundot 4"
 
 msgid "Empty File"
 msgstr "Ficheiro Vazio"
@@ -3757,11 +3757,11 @@ msgstr "Luz"
 msgid "Visible"
 msgstr "Visível"
 
-msgid "glTF to Godot Expression"
-msgstr "glTF para Expressão do Godot"
+msgid "glTF to Jundot Expression"
+msgstr "glTF para Expressão do Jundot"
 
-msgid "Godot to glTF Expression"
-msgstr "Godot para Expressão glTF"
+msgid "Jundot to glTF Expression"
+msgstr "Jundot para Expressão glTF"
 
 msgid "Node Paths"
 msgstr "Caminhos de Nó"
@@ -3781,8 +3781,8 @@ msgstr "Pontos"
 msgid "Roots"
 msgstr "Raizes"
 
-msgid "Godot Bone Node"
-msgstr "Nó de Osso Godot"
+msgid "Jundot Bone Node"
+msgstr "Nó de Osso Jundot"
 
 msgid "Skin Root"
 msgstr "Raiz da Skin"
@@ -3793,8 +3793,8 @@ msgstr "Pontos Originais"
 msgid "Non Joints"
 msgstr "Não-Juntas"
 
-msgid "Godot Skin"
-msgstr "Skin Godot"
+msgid "Jundot Skin"
+msgstr "Skin Jundot"
 
 msgid "Src Image"
 msgstr "Imagem fonte"

@@ -67,10 +67,10 @@ env_thirdparty.Append(
         # Enable ktx2 zstd supercompression.
         ("BASISD_SUPPORT_KTX2_ZSTD", 1),
         # GPU compression formats.
-        ("BASISD_SUPPORT_ATC", 0),  # Proprietary Adreno format not supported by Godot.
-        ("BASISD_SUPPORT_FXT1", 0),  # Legacy format not supported by Godot.
-        ("BASISD_SUPPORT_PVRTC1", 0),  # Legacy format not supported by Godot.
-        ("BASISD_SUPPORT_PVRTC2", 0),  # Legacy format not supported by Godot.
+        ("BASISD_SUPPORT_ATC", 0),  # Proprietary Adreno format not supported by Jundot.
+        ("BASISD_SUPPORT_FXT1", 0),  # Legacy format not supported by Jundot.
+        ("BASISD_SUPPORT_PVRTC1", 0),  # Legacy format not supported by Jundot.
+        ("BASISD_SUPPORT_PVRTC2", 0),  # Legacy format not supported by Jundot.
     ]
 )
 
@@ -80,7 +80,7 @@ if basisu_encoder:
 env_thirdparty.add_source_files(thirdparty_obj, transcoder_sources)
 env.modules_sources += thirdparty_obj
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

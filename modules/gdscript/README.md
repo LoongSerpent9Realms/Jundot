@@ -1,24 +1,24 @@
 # Basic GDScript module architecture
-This provides some basic information in how GDScript is implemented and integrates with the rest of the engine. You can learn more about GDScript in the [documentation](https://docs.godotengine.org/en/latest/tutorials/scripting/gdscript/index.html). It describes the syntax and user facing systems and concepts, and can be used as a reference for what user expectations are.
+This provides some basic information in how GDScript is implemented and integrates with the rest of the engine. You can learn more about GDScript in the [documentation](https://docs.jundotengine.org/en/latest/tutorials/scripting/gdscript/index.html). It describes the syntax and user facing systems and concepts, and can be used as a reference for what user expectations are.
 
-For general language design guidelines, please visit the [contributing docs](https://contributing.godotengine.org/en/latest/engine/guidelines/gdscript_language_guidelines.html).
+For general language design guidelines, please visit the [contributing docs](https://contributing.jundotengine.org/en/latest/engine/guidelines/gdscript_language_guidelines.html).
 
-## Integration into Godot
+## Integration into Jundot
 
-GDScript is integrated into Godot as a module. Since modules are optional, this means that Godot may be built without GDScript and work perfectly fine without it!
+GDScript is integrated into Jundot as a module. Since modules are optional, this means that Jundot may be built without GDScript and work perfectly fine without it!
 
-The GDScript module interfaces with Godot's codebase by inheriting from the engine's scripting-related classes. New languages inherit from [`ScriptLanguage`](/core/object/script_language.h), and are registered in Godot's [`ScriptServer`](/core/object/script_language.h). Scripts, referring to a file containing code, are represented in the engine by the `Script` class. Instances of that script, which are used at runtime when actually executing the code, inherit from [`ScriptInstance`](/core/object/script_instance.h).
+The GDScript module interfaces with Jundot's codebase by inheriting from the engine's scripting-related classes. New languages inherit from [`ScriptLanguage`](/core/object/script_language.h), and are registered in Jundot's [`ScriptServer`](/core/object/script_language.h). Scripts, referring to a file containing code, are represented in the engine by the `Script` class. Instances of that script, which are used at runtime when actually executing the code, inherit from [`ScriptInstance`](/core/object/script_instance.h).
 
-To access Godot's internal classes, GDScript uses [`ClassDB`](/core/object/class_db.h). `ClassDB` is where Godot registers classes, methods and properties that it wants exposed to its scripting system. This is how GDScript understands that `Node2D` is a class it can use, and that it has a `get_parent()` method.
+To access Jundot's internal classes, GDScript uses [`ClassDB`](/core/object/class_db.h). `ClassDB` is where Jundot registers classes, methods and properties that it wants exposed to its scripting system. This is how GDScript understands that `Node2D` is a class it can use, and that it has a `get_parent()` method.
 
-[Built-in GDScript methods](https://docs.godotengine.org/en/latest/classes/class_@gdscript.html#methods) are defined and exported by [`GDScriptUtilityFunctions`](gdscript_utility_functions.h), whereas [global scope methods](https://docs.godotengine.org/en/latest/classes/class_%2540globalscope.html) are registered in [`Variant::_register_variant_utility_functions()`](/core/variant/variant_utility.cpp).
+[Built-in GDScript methods](https://docs.jundotengine.org/en/latest/classes/class_@gdscript.html#methods) are defined and exported by [`GDScriptUtilityFunctions`](gdscript_utility_functions.h), whereas [global scope methods](https://docs.jundotengine.org/en/latest/classes/class_%2540globalscope.html) are registered in [`Variant::_register_variant_utility_functions()`](/core/variant/variant_utility.cpp).
 
 
 ## Compilation
 
 Scripts can be at different stages of compilation. The process isn't entirely linear, but consists of this general order: tokenizing, parsing, analyzing, and finally compiling. This process is the same for scripts in the editor and scripts in an exported game. Scripts are stored as text files in both cases, and the compilation process must happen in full before the bytecode can be passed to the virtual machine and run.
 
-The main class of the GDScript module is the [`GDScript`](gdscript.h) class, which represents a class defined in GDScript. Each `.gd` file is called a _class file_ because it implicitly defines a class in GDScript, and thus results in an associated `GDScript` object. However, GDScript classes may define [_inner classes_](https://docs.godotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_basics.html#inner-classes), and those are also represented by further `GDScript` objects, even though they are not in files of their own.
+The main class of the GDScript module is the [`GDScript`](gdscript.h) class, which represents a class defined in GDScript. Each `.gd` file is called a _class file_ because it implicitly defines a class in GDScript, and thus results in an associated `GDScript` object. However, GDScript classes may define [_inner classes_](https://docs.jundotengine.org/en/stable/tutorials/scripting/gdscript/gdscript_basics.html#inner-classes), and those are also represented by further `GDScript` objects, even though they are not in files of their own.
 
 The `GDScript` class contains all the information related to the corresponding GDScript class: its name and path, its members like variables, functions, symbols, signals, implicit methods like initializers, etc. This is the main class that the compilation step deals with.
 
@@ -39,9 +39,9 @@ Tokenizing is the process of converting the source code `String` into a sequence
 
 The parser takes a sequence of tokens and builds [the abstract syntax tree (AST)](https://en.wikipedia.org/wiki/Abstract_syntax_tree) of the GDScript program. The AST is used in the analyzing and compilation steps, and the source code `String` and sequence of tokens are discarded. The AST-building process finds syntax errors in a GDScript program and reports them to the user.
 
-The parser class also defines all the possible nodes of the AST as subtypes of `GDScriptParser::Node`, not to be confused with Godot's scene tree `Node`. For example, `GDScriptParser::IfNode` has two children nodes, one for the code in the `if` block, and one for the code in the `else` block. A `GDScriptParser::FunctionNode` contains children nodes for its name, parameters, return type, body, etc. The parser also defines typechecking data structures like `GDScriptParser::Datatype`.
+The parser class also defines all the possible nodes of the AST as subtypes of `GDScriptParser::Node`, not to be confused with Jundot's scene tree `Node`. For example, `GDScriptParser::IfNode` has two children nodes, one for the code in the `if` block, and one for the code in the `else` block. A `GDScriptParser::FunctionNode` contains children nodes for its name, parameters, return type, body, etc. The parser also defines typechecking data structures like `GDScriptParser::Datatype`.
 
-The parser was [intentionally designed](https://godotengine.org/article/gdscript-progress-report-writing-new-parser/#less-lookahead) with a look-ahead of a single token. This means that the parser only has access to the current token and the previous token (or, if you prefer, the current token and the next token). This parsing limitation ensures that GDScript will remain syntactically simple and accessible, and that the parsing process cannot become overly complex.
+The parser was [intentionally designed](https://jundotengine.org/article/gdscript-progress-report-writing-new-parser/#less-lookahead) with a look-ahead of a single token. This means that the parser only has access to the current token and the previous token (or, if you prefer, the current token and the next token). This parsing limitation ensures that GDScript will remain syntactically simple and accessible, and that the parsing process cannot become overly complex.
 
 
 ### Analysis and typechecking (see [`GDScriptAnalyzer`](gdscript_analyzer.h))
@@ -109,12 +109,12 @@ Shallow, or "just parsed" scripts, provide information such as defined classes, 
 
 The distinction between full and shallow scripts is very important, as shallow scripts cannot create cyclic dependency problems, whereas full scripts can. The analyzer, for example, never asks for full scripts. Choosing when to request a shallow vs a full script is an important but subtle decision.
 
-In practice, full scripts are simply scripts where `GDScript::reload()` has been called. This critical function is the primary way in which scripts get compiled in Godot, and essentially does all the compilation steps covered so far in order. Whenever a script is loaded, or updated and reloaded in Godot, it will end up going through `GDScript::reload()`, except in very rare circumstances like the test runner. It is an excellent place to start reading and understanding the GDScript module!
+In practice, full scripts are simply scripts where `GDScript::reload()` has been called. This critical function is the primary way in which scripts get compiled in Jundot, and essentially does all the compilation steps covered so far in order. Whenever a script is loaded, or updated and reloaded in Jundot, it will end up going through `GDScript::reload()`, except in very rare circumstances like the test runner. It is an excellent place to start reading and understanding the GDScript module!
 
 
 ## Special types of scripts
 
-Certain types of GDScripts behave slightly differently. For example, autoloads are loaded with `ResourceLoader::load()` during `Main::start()`, very soon after Godot is launched. Many systems aren't initialized at that time, so error reporting is often significantly reduced and may not even show up in the editor.
+Certain types of GDScripts behave slightly differently. For example, autoloads are loaded with `ResourceLoader::load()` during `Main::start()`, very soon after Jundot is launched. Many systems aren't initialized at that time, so error reporting is often significantly reduced and may not even show up in the editor.
 
 Tool scripts, declared with the `@tool` annotation on a GDScript file, run in the editor itself as opposed to just when the game is launched. This leads to a significant increase in complexity, as many things that can be changed in the editor may affect a currently executing tool script.
 

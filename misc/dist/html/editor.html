@@ -3,21 +3,21 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
-		<meta name="author" content="Godot Engine">
-		<meta name="description" content="Use the Godot Engine editor directly in your web browser, without having to install anything.">
+		<meta name="author" content="Jundot Engine">
+		<meta name="description" content="Use the Jundot Engine editor directly in your web browser, without having to install anything.">
 		<meta name="mobile-web-app-capable" content="yes">
 		<meta name="apple-mobile-web-app-capable" content="yes">
-		<meta name="application-name" content="Godot">
-		<meta name="apple-mobile-web-app-title" content="Godot">
+		<meta name="application-name" content="Jundot">
+		<meta name="apple-mobile-web-app-title" content="Jundot">
 		<meta name="theme-color" content="#202531">
 		<meta name="msapplication-navbutton-color" content="#202531">
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 		<meta name="msapplication-starturl" content="/latest">
-		<meta property="og:site_name" content="Godot Engine Web Editor">
-		<meta property="og:url" name="twitter:url" content="https://editor.godotengine.org/releases/stable/">
+		<meta property="og:site_name" content="Jundot Engine Web Editor">
+		<meta property="og:url" name="twitter:url" content="https://editor.jundotengine.org/releases/stable/">
 		<meta property="og:title" name="twitter:title" content="Free and open source 2D and 3D game engine">
-		<meta property="og:description" name="twitter:description" content="Use the Godot Engine editor directly in your web browser, without having to install anything.">
-		<meta property="og:image" name="twitter:image" content="https://godotengine.org/assets/share-image.webp">
+		<meta property="og:description" name="twitter:description" content="Use the Jundot Engine editor directly in your web browser, without having to install anything.">
+		<meta property="og:image" name="twitter:image" content="https://jundotengine.org/assets/share-image.webp">
 		<meta property="og:type" content="website">
 		<meta name="twitter:card" content="summary">
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="favicon.png">
@@ -25,7 +25,7 @@
 		<link rel="manifest" href="manifest.json">
 		<link rel="preload" href="inter-regular.woff2" as="font" crossorigin="anonymous">
 		<link rel="preload" href="inter-bold.woff2" as="font" crossorigin="anonymous">
-		<title>Godot Engine Web Editor (___GODOT_VERSION___)</title>
+		<title>Jundot Engine Web Editor (___JUNDOT_VERSION___)</title>
 		<style>
 /* Use Inter in the same configuration as used in the editor (e.g. alternate lowercase `l`). */
 @font-face {
@@ -148,7 +148,7 @@ a:active {
 	outline: none;
 }
 
-.godot {
+.jundot {
 	color: #d0d0d0;
 	background-color: #1b1b1b;
 	background-image: linear-gradient(to bottom, #403e48, #35333c);
@@ -303,21 +303,21 @@ a:active {
 				<h2 id="welcome-modal-title" class="welcome-modal-title">Important - Please read before continuing</h2>
 				<div id="welcome-modal-description">
 					<p>
-						The Godot Web Editor has some limitations compared to the native version.<br>
+						The Jundot Web Editor has some limitations compared to the native version.<br>
 						Its main focus is education and experimentation;
 						<strong>it is not recommended for production</strong>.
 					</p>
 					<p>
 						For a more optimal experience, <a
-							href="https://godotengine.org/download/"
+							href="https://jundotengine.org/download/"
 							target="_blank"
 							rel="noopener"
-						>download</a> the native Godot Editor.
+						>download</a> the native Jundot Editor.
 					</p>
 					<p>
 						Refer to the
 						<a
-							href="https://docs.godotengine.org/en/stable/tutorials/editor/using_the_web_editor.html"
+							href="https://docs.jundotengine.org/en/stable/tutorials/editor/using_the_web_editor.html"
 							target="_blank"
 							rel="noopener"
 						>Web editor documentation</a> for usage instructions and limitations.
@@ -325,7 +325,7 @@ a:active {
 				</div>
 				<div id="welcome-modal-missing-description" style="display: none">
 					<p>
-						<strong>The following features required by the Godot Web Editor are missing:</strong>
+						<strong>The following features required by the Jundot Web Editor are missing:</strong>
 					</p>
 					<ul id="welcome-modal-missing-list">
 					</ul>
@@ -333,7 +333,7 @@ a:active {
 						If you are self-hosting the web editor,
 						refer to
 						<a
-							href="https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html"
+							href="https://docs.jundotengine.org/en/stable/tutorials/export/exporting_for_web.html"
 							target="_blank"
 							rel="noopener"
 						>Exporting for the Web</a> for more information.
@@ -358,9 +358,9 @@ a:active {
 			<div id="tab-loader">
 				<div style="color: #e0e0e0;" id="persistence">
 					<br >
-					<img src="logo.svg" alt="Godot Engine logo" width="1024" height="414" style="width: auto; height: auto; max-width: min(85%, 50vh); max-height: 200px">
+					<img src="logo.svg" alt="Jundot Engine logo" width="1024" height="414" style="width: auto; height: auto; max-width: min(85%, 50vh); max-height: 200px">
 					<br >
-					___GODOT_VERSION___ - <a href="/releases/">Change version</a>
+					___JUNDOT_VERSION___ - <a href="/releases/">Change version</a>
 					<br >
 					<br >
 					<label for="zip-file" style="margin-right: 1rem">Preload project ZIP:</label>
@@ -368,11 +368,11 @@ a:active {
 					<br>
 					<a href="demo.zip" id="zip-demo">(Try this for example)</a>
 					<br >
-					<button id="startButton" class="btn" style="margin-top: 2rem; margin-bottom: 3rem; font-weight: 700">Start Godot Editor</button>
+					<button id="startButton" class="btn" style="margin-top: 2rem; margin-bottom: 3rem; font-weight: 700">Start Jundot Editor</button>
 					<br >
 					<button class="btn" onclick="clearPersistence()" style="margin-bottom: 1.5rem">Clear Persistent Data</button>
 					<br >
-					<a href="https://docs.godotengine.org/en/stable/tutorials/editor/using_the_web_editor.html">Web editor documentation</a>
+					<a href="https://docs.jundotengine.org/en/stable/tutorials/editor/using_the_web_editor.html">Web editor documentation</a>
 				</div>
 			</div>
 			<div id="tab-editor" style="display: none;">
@@ -401,7 +401,7 @@ a:active {
 					<div></div>
 					<div></div>
 				</div>
-				<div id="status-notice" class="godot" style="display: none;"></div>
+				<div id="status-notice" class="jundot" style="display: none;"></div>
 			</div>
 		</div>
 		<script>
@@ -444,7 +444,7 @@ window.addEventListener('load', () => {
 	}
 
 	const missing = Engine.getMissingFeatures({
-		threads: ___GODOT_THREADS_ENABLED___,
+		threads: ___JUNDOT_THREADS_ENABLED___,
 	});
 	if (missing.length) {
 		// Display error dialog as threading support is required for the editor.
@@ -473,7 +473,7 @@ function closeWelcomeModal(dontShowAgain) { // eslint-disable-line no-unused-var
 	}
 }
 		</script>
-		<script src="godot.editor.js"></script>
+		<script src="jundot.editor.js"></script>
 		<script>
 let editor = null;
 let game = null;
@@ -723,7 +723,7 @@ function startEditor(zip) {
 
 	const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 	// We need at least 6 free threads from the pool to start the editor.
-	// At least 4 more will be reserved for the godot thread pool (3 is the bare minimum with the multithreaded variant of the servers).
+	// At least 4 more will be reserved for the jundot thread pool (3 is the bare minimum with the multithreaded variant of the servers).
 	const concurrency = clamp(navigator.hardwareConcurrency ?? 1, 12, 24);
 	const editorConfig = {
 		'unloadAfterInit': false,
@@ -752,7 +752,7 @@ function startEditor(zip) {
 		'onExecute': Execute,
 		'persistentPaths': persistentPaths,
 		'emscriptenPoolSize': concurrency,
-		'godotPoolSize': Math.floor(concurrency / 3), // Ensures at least 4 threads for the pool (see above).
+		'jundotPoolSize': Math.floor(concurrency / 3), // Ensures at least 4 threads for the pool (see above).
 	};
 	editor = new Engine(editorConfig);
 
@@ -773,7 +773,7 @@ function startEditor(zip) {
 		displayFailureNotice('WebGL not available');
 	} else {
 		setStatusMode('indeterminate');
-		editor.init('godot.editor').then(function () {
+		editor.init('jundot.editor').then(function () {
 			if (zip) {
 				editor.copyToFS('/tmp/preload.zip', zip);
 			}

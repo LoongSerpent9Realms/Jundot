@@ -2,10 +2,10 @@
 /*  editor_utils_jni.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -43,7 +43,7 @@
 #endif
 
 extern "C" {
-JNIEXPORT void JNICALL Java_org_godotengine_godot_editor_utils_EditorUtils_runScene(JNIEnv *p_env, jclass, jstring p_scene, jobjectArray p_scene_args) {
+JNIEXPORT void JNICALL Java_org_jundotengine_jundot_editor_utils_EditorUtils_runScene(JNIEnv *p_env, jclass, jstring p_scene, jobjectArray p_scene_args) {
 #ifdef TOOLS_ENABLED
 	Vector<String> scene_args;
 	jint length = p_env->GetArrayLength(p_scene_args);
@@ -96,7 +96,7 @@ JNIEXPORT void JNICALL Java_org_godotengine_godot_editor_utils_EditorUtils_runSc
 #endif
 }
 
-JNIEXPORT void JNICALL Java_org_godotengine_godot_editor_utils_EditorUtils_toggleTitleBar(JNIEnv *p_env, jclass, jboolean p_visible) {
+JNIEXPORT void JNICALL Java_org_jundotengine_jundot_editor_utils_EditorUtils_toggleTitleBar(JNIEnv *p_env, jclass, jboolean p_visible) {
 #ifdef TOOLS_ENABLED
 	if (EditorNode::get_singleton() != nullptr) {
 		EditorTitleBar *title_bar = EditorNode::get_singleton()->get_title_bar();

@@ -2,10 +2,10 @@
 /*  snapshot_collector.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -49,5 +49,5 @@ public:
 	static Error parse_message(void *p_user, const String &p_msg, const Array &p_args, bool &r_captured);
 	static void initialize();
 	static void deinitialize();
-	static String get_godot_version_string();
+	static String get_jundot_version_string();
 };

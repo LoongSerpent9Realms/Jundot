@@ -2,10 +2,10 @@
 /*  gdscript_extend_parser.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -35,28 +35,28 @@
 #include "gdscript_language_protocol.h"
 #include "gdscript_workspace.h"
 
-LSP::Position GodotPosition::to_lsp() const {
+LSP::Position JundotPosition::to_lsp() const {
 	LSP::Position res;
 	res.line = line - 1;
 	res.character = column - 1;
 	return res;
 }
 
-GodotPosition GodotPosition::from_lsp(const LSP::Position p_pos) {
-	return GodotPosition(p_pos.line + 1, p_pos.character + 1);
+JundotPosition JundotPosition::from_lsp(const LSP::Position p_pos) {
+	return JundotPosition(p_pos.line + 1, p_pos.character + 1);
 }
 
-LSP::Range GodotRange::to_lsp() const {
+LSP::Range JundotRange::to_lsp() const {
 	LSP::Range res;
 	res.start = start.to_lsp();
 	res.end = end.to_lsp();
 	return res;
 }
 
-GodotRange GodotRange::from_lsp(const LSP::Range &p_range) {
-	GodotPosition start = GodotPosition::from_lsp(p_range.start);
-	GodotPosition end = GodotPosition::from_lsp(p_range.end);
-	return GodotRange(start, end);
+JundotRange JundotRange::from_lsp(const LSP::Range &p_range) {
+	JundotPosition start = JundotPosition::from_lsp(p_range.start);
+	JundotPosition end = JundotPosition::from_lsp(p_range.end);
+	return JundotRange(start, end);
 }
 
 void ExtendGDScriptParser::update_diagnostics() {
@@ -69,11 +69,11 @@ void ExtendGDScriptParser::update_diagnostics() {
 		diagnostic.message = error.message;
 		diagnostic.source = "gdscript";
 
-		GodotRange godot_range(
-				GodotPosition(error.start_line, error.start_column),
-				GodotPosition(error.end_line, error.end_column));
+		JundotRange jundot_range(
+				JundotPosition(error.start_line, error.start_column),
+				JundotPosition(error.end_line, error.end_column));
 
-		diagnostic.range = godot_range.to_lsp();
+		diagnostic.range = jundot_range.to_lsp();
 		diagnostics.push_back(diagnostic);
 	}
 
@@ -84,11 +84,11 @@ void ExtendGDScriptParser::update_diagnostics() {
 		diagnostic.message = "(" + warning.get_name() + "): " + warning.get_message();
 		diagnostic.source = "gdscript";
 
-		GodotRange godot_range(
-				GodotPosition(warning.start_line, warning.start_column),
-				GodotPosition(warning.end_line, warning.end_column));
+		JundotRange jundot_range(
+				JundotPosition(warning.start_line, warning.start_column),
+				JundotPosition(warning.end_line, warning.end_column));
 
-		diagnostic.range = godot_range.to_lsp();
+		diagnostic.range = jundot_range.to_lsp();
 		diagnostics.push_back(diagnostic);
 	}
 }
@@ -139,7 +139,7 @@ void ExtendGDScriptParser::update_document_links(const String &p_code) {
 					String value = const_val;
 					LSP::DocumentLink link;
 					link.target = GDScriptLanguageProtocol::get_singleton()->get_workspace()->get_file_uri(scr_path);
-					link.range = GodotRange(GodotPosition(token.start_line, token.start_column), GodotPosition(token.end_line, token.end_column)).to_lsp();
+					link.range = JundotRange(JundotPosition(token.start_line, token.start_column), JundotPosition(token.end_line, token.end_column)).to_lsp();
 					document_links.push_back(link);
 				}
 			}
@@ -148,9 +148,9 @@ void ExtendGDScriptParser::update_document_links(const String &p_code) {
 }
 
 LSP::Range ExtendGDScriptParser::range_of_node(const GDScriptParser::Node *p_node) const {
-	GodotPosition start(p_node->start_line, p_node->start_column);
-	GodotPosition end(p_node->end_line, p_node->end_column);
-	return GodotRange(start, end).to_lsp();
+	JundotPosition start(p_node->start_line, p_node->start_column);
+	JundotPosition end(p_node->end_line, p_node->end_column);
+	return JundotRange(start, end).to_lsp();
 }
 
 void ExtendGDScriptParser::parse_class_symbol(const GDScriptParser::ClassNode *p_class, LSP::DocumentSymbol &r_symbol) {
@@ -326,8 +326,8 @@ void ExtendGDScriptParser::parse_class_symbol(const GDScriptParser::ClassNode *p
 				symbol.name = m.enum_value.identifier->name;
 				symbol.kind = LSP::SymbolKind::EnumMember;
 				symbol.deprecated = false;
-				symbol.range.start = GodotPosition(m.enum_value.line, m.enum_value.start_column).to_lsp();
-				symbol.range.end = GodotPosition(m.enum_value.line, m.enum_value.end_column).to_lsp();
+				symbol.range.start = JundotPosition(m.enum_value.line, m.enum_value.start_column).to_lsp();
+				symbol.range.end = JundotPosition(m.enum_value.line, m.enum_value.end_column).to_lsp();
 				symbol.selectionRange = range_of_node(m.enum_value.identifier);
 				symbol.documentation = m.enum_value.doc_data.description;
 				symbol.uri = uri;
@@ -362,8 +362,8 @@ void ExtendGDScriptParser::parse_class_symbol(const GDScriptParser::ClassNode *p
 					child.name = value.identifier->name;
 					child.kind = LSP::SymbolKind::EnumMember;
 					child.deprecated = false;
-					child.range.start = GodotPosition(value.line, value.start_column).to_lsp();
-					child.range.end = GodotPosition(value.line, value.end_column).to_lsp();
+					child.range.start = JundotPosition(value.line, value.start_column).to_lsp();
+					child.range.end = JundotPosition(value.line, value.end_column).to_lsp();
 					child.selectionRange = range_of_node(value.identifier);
 					child.documentation = value.doc_data.description;
 					child.uri = uri;
@@ -537,8 +537,8 @@ void ExtendGDScriptParser::parse_function_symbol(const GDScriptParser::FunctionN
 					break;
 				default:
 					// Fallback.
-					symbol.range.start = GodotPosition(local.start_line, local.start_column).to_lsp();
-					symbol.range.end = GodotPosition(local.end_line, local.end_column).to_lsp();
+					symbol.range.start = JundotPosition(local.start_line, local.start_column).to_lsp();
+					symbol.range.end = JundotPosition(local.end_line, local.end_column).to_lsp();
 					symbol.selectionRange = symbol.range;
 					break;
 			}

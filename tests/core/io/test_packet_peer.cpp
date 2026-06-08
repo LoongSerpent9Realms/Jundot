@@ -2,10 +2,10 @@
 /*  test_packet_peer.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -68,11 +68,11 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Encode buffer max size") {
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Read a variant from peer") {
-	String godot_rules = "Godot Rules!!!";
+	String jundot_rules = "Jundot Rules!!!";
 
 	Ref<StreamPeerBuffer> spb;
 	spb.instantiate();
-	spb->put_var(godot_rules);
+	spb->put_var(jundot_rules);
 	spb->seek(0);
 
 	Ref<PacketPeerStream> pps;
@@ -81,7 +81,7 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Read a variant from peer") {
 
 	Variant value;
 	CHECK_EQ(pps->get_var(value), Error::OK);
-	CHECK_EQ(String(value), godot_rules);
+	CHECK_EQ(String(value), jundot_rules);
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Read a variant from peer fails") {
@@ -95,7 +95,7 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Read a variant from peer fails") {
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Put a variant to peer") {
-	String godot_rules = "Godot Rules!!!";
+	String jundot_rules = "Jundot Rules!!!";
 
 	Ref<StreamPeerBuffer> spb;
 	spb.instantiate();
@@ -104,10 +104,10 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Put a variant to peer") {
 	pps.instantiate();
 	pps->set_stream_peer(spb);
 
-	CHECK_EQ(pps->put_var(godot_rules), Error::OK);
+	CHECK_EQ(pps->put_var(jundot_rules), Error::OK);
 
 	spb->seek(0);
-	CHECK_EQ(String(spb->get_var()), godot_rules);
+	CHECK_EQ(String(spb->get_var()), jundot_rules);
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Put a variant to peer out of memory failure") {
@@ -127,12 +127,12 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Put a variant to peer out of memory fa
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Get packet buffer") {
-	String godot_rules = "Godot Rules!!!";
+	String jundot_rules = "Jundot Rules!!!";
 
 	Ref<StreamPeerBuffer> spb;
 	spb.instantiate();
 	// First 4 bytes are the length of the string.
-	CharString cs = godot_rules.ascii();
+	CharString cs = jundot_rules.ascii();
 	Vector<uint8_t> buffer = { (uint8_t)(cs.length() + 1), 0, 0, 0 };
 	buffer.resize_initialized(4 + cs.length() + 1);
 	memcpy(buffer.ptrw() + 4, cs.get_data(), cs.length());
@@ -145,7 +145,7 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Get packet buffer") {
 	buffer.clear();
 	CHECK_EQ(pps->get_packet_buffer(buffer), Error::OK);
 
-	CHECK_EQ(String(reinterpret_cast<const char *>(buffer.ptr())), godot_rules);
+	CHECK_EQ(String(reinterpret_cast<const char *>(buffer.ptr())), jundot_rules);
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Get packet buffer from an empty peer") {
@@ -164,7 +164,7 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Get packet buffer from an empty peer")
 }
 
 TEST_CASE("[PacketPeer][PacketPeerStream] Put packet buffer") {
-	String godot_rules = "Godot Rules!!!";
+	String jundot_rules = "Jundot Rules!!!";
 
 	Ref<StreamPeerBuffer> spb;
 	spb.instantiate();
@@ -173,12 +173,12 @@ TEST_CASE("[PacketPeer][PacketPeerStream] Put packet buffer") {
 	pps.instantiate();
 	pps->set_stream_peer(spb);
 
-	CHECK_EQ(pps->put_packet_buffer(godot_rules.to_ascii_buffer()), Error::OK);
+	CHECK_EQ(pps->put_packet_buffer(jundot_rules.to_ascii_buffer()), Error::OK);
 
 	spb->seek(0);
-	CHECK_EQ(spb->get_string(), godot_rules);
+	CHECK_EQ(spb->get_string(), jundot_rules);
 	// First 4 bytes are the length of the string.
-	CharString cs = godot_rules.ascii();
+	CharString cs = jundot_rules.ascii();
 	Vector<uint8_t> buffer = { (uint8_t)cs.length(), 0, 0, 0 };
 	buffer.resize(4 + cs.length());
 	memcpy(buffer.ptrw() + 4, cs.get_data(), cs.length());

@@ -2,10 +2,10 @@
 /*  audio_driver_wasapi.cpp                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -92,7 +92,7 @@ __CRT_UUID_DECL(IAudioClient3, 0x7ED4EE07, 0x8E67, 0x4CD4, 0x8C, 0x1A, 0x2B, 0x7
 
 #endif // __MINGW32__ || __MINGW64__
 
-#ifndef PKEY_Device_FriendlyNameGodot
+#ifndef PKEY_Device_FriendlyNameJundot
 
 #undef DEFINE_PROPERTYKEY
 /* clang-format off */
@@ -100,7 +100,7 @@ __CRT_UUID_DECL(IAudioClient3, 0x7ED4EE07, 0x8E67, 0x4CD4, 0x8C, 0x1A, 0x2B, 0x7
 	const PROPERTYKEY id = { { a, b, c, { d, e, f, g, h, i, j, k, } }, l };
 /* clang-format on */
 
-DEFINE_PROPERTYKEY(PKEY_Device_FriendlyNameGodot, 0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 14);
+DEFINE_PROPERTYKEY(PKEY_Device_FriendlyNameJundot, 0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 14);
 #endif
 
 const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
@@ -126,7 +126,7 @@ static bool default_input_device_changed = false;
 static int output_reinit_countdown = 0;
 static int input_reinit_countdown = 0;
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wnon-virtual-dtor") // Silence warning due to a COM API weirdness (GH-35194).
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wnon-virtual-dtor") // Silence warning due to a COM API weirdness (GH-35194).
 
 class CMMNotificationClient : public IMMNotificationClient {
 	LONG _cRef = 1;
@@ -192,7 +192,7 @@ public:
 	}
 };
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 
 static CMMNotificationClient notif_client;
 
@@ -235,7 +235,7 @@ Error AudioDriverWASAPI::audio_device_init(AudioDeviceWASAPI *p_device, bool p_i
 			PROPVARIANT propvar;
 			PropVariantInit(&propvar);
 
-			hr = props->GetValue(PKEY_Device_FriendlyNameGodot, &propvar);
+			hr = props->GetValue(PKEY_Device_FriendlyNameJundot, &propvar);
 			ERR_BREAK_MSG(hr != S_OK, "Cannot get value.");
 
 			if (p_device->device_name == String(propvar.pwszVal)) {
@@ -421,7 +421,7 @@ Error AudioDriverWASAPI::audio_device_init(AudioDeviceWASAPI *p_device, bool p_i
 			audio_output.audio_client->GetStreamLatency(&latency);
 			// WASAPI REFERENCE_TIME units are 100 nanoseconds per unit
 			// https://docs.microsoft.com/en-us/windows/win32/directshow/reference-time
-			// Convert REFTIME to seconds as godot uses for latency
+			// Convert REFTIME to seconds as jundot uses for latency
 			real_latency = (float)latency / (float)REFTIMES_PER_SEC;
 		}
 
@@ -646,7 +646,7 @@ PackedStringArray AudioDriverWASAPI::audio_device_get_list(bool p_input) {
 		PROPVARIANT propvar;
 		PropVariantInit(&propvar);
 
-		hr = props->GetValue(PKEY_Device_FriendlyNameGodot, &propvar);
+		hr = props->GetValue(PKEY_Device_FriendlyNameJundot, &propvar);
 		ERR_BREAK(hr != S_OK);
 
 		list.push_back(String(propvar.pwszVal));

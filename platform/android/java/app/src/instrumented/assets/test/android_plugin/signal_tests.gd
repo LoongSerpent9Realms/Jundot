@@ -58,8 +58,8 @@ func test_signal_emission() -> bool:
 	await emission_test_signal_emitted
 
 	# Test case: Same signal name, but different type and number of parameters
-	# The "launch_tests" signal is registered by both GodotAppInstrumentedTestPlugin and SignalTestPlugin.
-	# SignalTestPlugin emits it with a boolean and a string arguments, while GodotAppInstrumentedTestPlugin emits it with one string.
+	# The "launch_tests" signal is registered by both JundotAppInstrumentedTestPlugin and SignalTestPlugin.
+	# SignalTestPlugin emits it with a boolean and a string arguments, while JundotAppInstrumentedTestPlugin emits it with one string.
 	var err2 = _plugin.connect(launch_test_signal, _on_launch_tests_emitted)
 	assert_equal(err2, OK)
 	_plugin.triggerLaunchTestSignal()

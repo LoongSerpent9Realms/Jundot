@@ -2,10 +2,10 @@
 /*  display_server_macos_base.mm                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #import "display_server_macos_base.h"
 
-#import "godot_application_delegate.h"
+#import "jundot_application_delegate.h"
 #import "key_mapping_macos.h"
 #import "tts_macos.h"
 
@@ -469,26 +469,26 @@ void DisplayServerMacOSBase::screen_set_keep_on(bool p_enable) {
 
 	if (p_enable) {
 		String app_name_string = GLOBAL_GET("application/config/name");
-		NSString *name = [NSString stringWithUTF8String:(app_name_string.is_empty() ? "Godot Engine" : app_name_string.utf8().get_data())];
-		NSString *reason = @"Godot Engine running with display/window/energy_saving/keep_screen_on = true";
+		NSString *name = [NSString stringWithUTF8String:(app_name_string.is_empty() ? "Jundot Engine" : app_name_string.utf8().get_data())];
+		NSString *reason = @"Jundot Engine running with display/window/energy_saving/keep_screen_on = true";
 		IOPMAssertionCreateWithDescription(kIOPMAssertPreventUserIdleDisplaySleep, (__bridge CFStringRef)name, (__bridge CFStringRef)reason, (__bridge CFStringRef)reason, nullptr, 0, nullptr, &screen_keep_on_assertion);
 	}
 }
 
 int DisplayServerMacOSBase::accessibility_should_increase_contrast() const {
-	return [(GodotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getHighContrast];
+	return [(JundotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getHighContrast];
 }
 
 int DisplayServerMacOSBase::accessibility_should_reduce_animation() const {
-	return [(GodotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getReduceMotion];
+	return [(JundotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getReduceMotion];
 }
 
 int DisplayServerMacOSBase::accessibility_should_reduce_transparency() const {
-	return [(GodotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getReduceTransparency];
+	return [(JundotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getReduceTransparency];
 }
 
 int DisplayServerMacOSBase::accessibility_screen_reader_active() const {
-	return [(GodotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getVoiceOver];
+	return [(JundotApplicationDelegate *)[[NSApplication sharedApplication] delegate] getVoiceOver];
 }
 
 void DisplayServerMacOSBase::update_im_text(const Point2i &p_selection, const String &p_text) {

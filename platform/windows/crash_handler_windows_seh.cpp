@@ -2,10 +2,10 @@
 /*  crash_handler_windows_seh.cpp                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -145,10 +145,10 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 	print_error(vformat("%s: Program crashed", __FUNCTION__));
 
 	// Print the engine version just before, so that people are reminded to include the version in backtrace reports.
-	if (String(GODOT_VERSION_HASH).is_empty()) {
-		print_error(vformat("Engine version: %s", GODOT_VERSION_FULL_NAME));
+	if (String(JUNDOT_VERSION_HASH).is_empty()) {
+		print_error(vformat("Engine version: %s", JUNDOT_VERSION_FULL_NAME));
 	} else {
-		print_error(vformat("Engine version: %s (%s)", GODOT_VERSION_FULL_NAME, GODOT_VERSION_HASH));
+		print_error(vformat("Engine version: %s (%s)", JUNDOT_VERSION_FULL_NAME, JUNDOT_VERSION_HASH));
 	}
 	print_error(vformat("Dumping the backtrace. %s", msg));
 

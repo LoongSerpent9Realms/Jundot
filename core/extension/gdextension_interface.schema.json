@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://godotengine.org/gdextension_interface.schema.json",
+    "$id": "https://jundotengine.org/gdextension_interface.schema.json",
     "title": "GDExtension Interface",
     "type": "object",
     "properties": {

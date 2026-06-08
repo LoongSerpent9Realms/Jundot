@@ -2,10 +2,10 @@
 /*  resource_importer_scene.cpp                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1418,7 +1418,7 @@ Node *ResourceImporterScene::_replace_node_with_type_and_script(Node *p_node, St
 		}
 	}
 	if (!p_node_type.is_empty() && p_node->get_class_name() != p_node_type) {
-		// If the user specified a Godot node type that does not match
+		// If the user specified a Jundot node type that does not match
 		// what the scene import gave us, replace the root node.
 		Node *new_base_node = Object::cast_to<Node>(ClassDB::instantiate(p_node_type));
 		if (new_base_node) {
@@ -2141,8 +2141,8 @@ void ResourceImporterScene::_compress_animations(AnimationPlayer *anim, int p_pa
 	}
 }
 
-Error ResourceImporterScene::_save_scene_as_mesh_library(const String &p_source_file, const String &p_save_path, Node *p_godot_scene, const HashMap<StringName, Variant> &p_options, int p_flags) {
-	TypedArray<Node> mesh_instances = p_godot_scene->find_children("*", "MeshInstance3D", true, false);
+Error ResourceImporterScene::_save_scene_as_mesh_library(const String &p_source_file, const String &p_save_path, Node *p_jundot_scene, const HashMap<StringName, Variant> &p_options, int p_flags) {
+	TypedArray<Node> mesh_instances = p_jundot_scene->find_children("*", "MeshInstance3D", true, false);
 	const int mesh_inst_count = mesh_instances.size();
 	HashSet<Ref<Mesh>> unique_meshes;
 	const bool use_node_names_as_mesh_names = p_options.has("mesh_library/use_node_names_as_mesh_names") && p_options["mesh_library/use_node_names_as_mesh_names"];
@@ -2172,8 +2172,8 @@ Error ResourceImporterScene::_save_scene_as_mesh_library(const String &p_source_
 	return ResourceSaver::save(mesh_library, p_save_path + ".res", p_flags);
 }
 
-Error ResourceImporterScene::_save_scene_as_single_mesh(const String &p_source_file, const String &p_save_path, Node *p_godot_scene, const HashMap<StringName, Variant> &p_options, int p_flags) {
-	TypedArray<Node> mesh_instance_nodes = p_godot_scene->find_children("*", "MeshInstance3D", true, false);
+Error ResourceImporterScene::_save_scene_as_single_mesh(const String &p_source_file, const String &p_save_path, Node *p_jundot_scene, const HashMap<StringName, Variant> &p_options, int p_flags) {
+	TypedArray<Node> mesh_instance_nodes = p_jundot_scene->find_children("*", "MeshInstance3D", true, false);
 	const int mesh_inst_count = mesh_instance_nodes.size();
 	ERR_FAIL_COND_V_MSG(mesh_inst_count == 0, ERR_INVALID_DATA, "Cannot import GLTF file " + p_source_file + " as a single mesh, because it contains no meshes.");
 	const String save_file_path = p_save_path + ".res";
@@ -3318,7 +3318,7 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 
 	String root_name = p_options["nodes/root_name"];
 	if (!root_name.is_empty() && root_name != "Scene Root") {
-		// TODO: Remove `&& root_name != "Scene Root"` for Godot 5.0.
+		// TODO: Remove `&& root_name != "Scene Root"` for Jundot 5.0.
 		// For backwards compatibility with existing .import files,
 		// treat "Scene Root" as having no root name override.
 		scene->set_name(root_name);

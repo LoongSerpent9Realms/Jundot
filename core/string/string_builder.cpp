@@ -2,10 +2,10 @@
 /*  string_builder.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -65,21 +65,21 @@ String StringBuilder::as_string() const {
 
 	int current_position = 0;
 
-	int godot_string_elem = 0;
+	int jundot_string_elem = 0;
 	int c_string_elem = 0;
 
 	for (uint32_t i = 0; i < appended_strings.size(); i++) {
 		const int32_t str_len = appended_strings[i];
 
 		if (str_len == -1) {
-			// Godot string
-			const String &s = strings[godot_string_elem];
+			// Jundot string
+			const String &s = strings[jundot_string_elem];
 
 			memcpy(buffer + current_position, s.ptr(), s.length() * sizeof(char32_t));
 
 			current_position += s.length();
 
-			godot_string_elem++;
+			jundot_string_elem++;
 		} else {
 			const char *s = c_strings[c_string_elem];
 

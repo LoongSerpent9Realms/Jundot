@@ -2,10 +2,10 @@
 /*  test_validate_testing.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -49,10 +49,10 @@ TEST_SUITE("Validate tests") {
 			CHECK_MESSAGE(true, "Pending test is run with `--no-skip`");
 		}
 	}
-	TEST_CASE("Muting Godot error messages") {
+	TEST_CASE("Muting Jundot error messages") {
 		ERR_PRINT_OFF;
 		CHECK_MESSAGE(!CoreGlobals::print_error_enabled, "Error printing should be disabled.");
-		ERR_PRINT("Still waiting for Godot!"); // This should never get printed!
+		ERR_PRINT("Still waiting for Jundot!"); // This should never get printed!
 		ERR_PRINT_ON;
 		CHECK_MESSAGE(CoreGlobals::print_error_enabled, "Error printing should be re-enabled.");
 	}
@@ -60,7 +60,7 @@ TEST_SUITE("Validate tests") {
 		Variant var;
 		INFO(var);
 
-		String string("Godot is finally here!");
+		String string("Jundot is finally here!");
 		INFO(string);
 
 		Vector2 vec2(0.5, 1.0);
@@ -105,7 +105,7 @@ TEST_SUITE("Validate tests") {
 		StringName string_name("has_method");
 		INFO(string_name);
 
-		NodePath node_path("godot/sprite");
+		NodePath node_path("jundot/sprite");
 		INFO(node_path);
 
 		INFO(RID());
@@ -196,7 +196,7 @@ TEST_SUITE("Validate tests") {
 		REQUIRE_FALSE(ed.has_error);
 
 		ERR_PRINT_OFF;
-		ERR_PRINT("Still waiting for Godot!");
+		ERR_PRINT("Still waiting for Jundot!");
 		ERR_PRINT_ON;
 
 		REQUIRE(ed.has_error);

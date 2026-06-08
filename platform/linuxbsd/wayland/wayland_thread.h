@@ -2,10 +2,10 @@
 /*  wayland_thread.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -81,7 +81,7 @@
 #include "wayland/protocol/xdg_foreign_v1.gen.h"
 
 // Custom internal protocol.
-#include "wayland/protocol/godot_embedding_compositor.gen.h"
+#include "wayland/protocol/jundot_embedding_compositor.gen.h"
 
 #ifdef LIBDECOR_ENABLED
 #ifdef SOWRAP_ENABLED
@@ -112,7 +112,7 @@ public:
 		float reference_luminance = 0;
 	};
 
-	// Messages used for exchanging information between Godot's and Wayland's thread.
+	// Messages used for exchanging information between Jundot's and Wayland's thread.
 	class Message : public RefCounted {
 		GDSOFTCLASS(Message, RefCounted);
 
@@ -281,8 +281,8 @@ public:
 		// whether it's available.
 		uint32_t wp_fifo_manager_name = 0;
 
-		struct godot_embedding_compositor *godot_embedding_compositor = nullptr;
-		uint32_t godot_embedding_compositor_name = 0;
+		struct jundot_embedding_compositor *jundot_embedding_compositor = nullptr;
+		uint32_t jundot_embedding_compositor_name = 0;
 	};
 
 	// General Wayland-specific states. Shouldn't be accessed directly.
@@ -381,7 +381,7 @@ public:
 		WaylandThread *wayland_thread;
 	};
 
-	// "High level" Godot-side screen data.
+	// "High level" Jundot-side screen data.
 	struct ScreenData {
 		// Geometry data.
 		Point2i position;
@@ -516,7 +516,7 @@ public:
 
 		// Used for delta calculations.
 		// NOTE: The wp_pointer_gestures protocol keeps track of the total scale of
-		// the pinch gesture, while godot instead wants its delta.
+		// the pinch gesture, while jundot instead wants its delta.
 		wl_fixed_t old_pinch_scale = 0;
 
 		struct wl_surface *cursor_surface = nullptr;
@@ -632,16 +632,16 @@ public:
 	};
 
 	struct EmbeddingCompositorState {
-		LocalVector<struct godot_embedded_client *> clients;
+		LocalVector<struct jundot_embedded_client *> clients;
 
 		// Only a client per PID can create a window.
-		HashMap<int, struct godot_embedded_client *> mapped_clients;
+		HashMap<int, struct jundot_embedded_client *> mapped_clients;
 
 		ProcessID focused_pid = -1;
 	};
 
 	struct EmbeddedClientState {
-		struct godot_embedding_compositor *embedding_compositor = nullptr;
+		struct jundot_embedding_compositor *embedding_compositor = nullptr;
 
 		uint32_t pid = 0;
 		bool window_mapped = false;
@@ -656,7 +656,7 @@ private:
 	};
 
 	// FIXME: Is this the right thing to do?
-	inline static const char *proxy_tag = "godot";
+	inline static const char *proxy_tag = "jundot";
 
 	Thread events_thread;
 	ThreadData thread_data;
@@ -717,7 +717,7 @@ private:
 	struct wl_seat *wl_seat_current = nullptr;
 	bool has_touch = false;
 
-	// We got plenty of different pointing devices but Godot can only hover a
+	// We got plenty of different pointing devices but Jundot can only hover a
 	// single window at a time. This helps track that and gives us a way to avoid
 	// invalid mouse enter/leave event combinations.
 	DisplayServerEnums::WindowID hovered_window_id = DisplayServerEnums::INVALID_WINDOW_ID;
@@ -905,12 +905,12 @@ private:
 
 	static void _xdg_activation_token_on_done(void *data, struct xdg_activation_token_v1 *xdg_activation_token, const char *token);
 
-	static void _godot_embedding_compositor_on_client(void *data, struct godot_embedding_compositor *godot_embedding_compositor, struct godot_embedded_client *godot_embedded_client, int32_t pid);
+	static void _jundot_embedding_compositor_on_client(void *data, struct jundot_embedding_compositor *jundot_embedding_compositor, struct jundot_embedded_client *jundot_embedded_client, int32_t pid);
 
-	static void _godot_embedded_client_on_disconnected(void *data, struct godot_embedded_client *godot_embedded_client);
-	static void _godot_embedded_client_on_window_embedded(void *data, struct godot_embedded_client *godot_embedded_client);
-	static void _godot_embedded_client_on_window_focus_in(void *data, struct godot_embedded_client *godot_embedded_client);
-	static void _godot_embedded_client_on_window_focus_out(void *data, struct godot_embedded_client *godot_embedded_client);
+	static void _jundot_embedded_client_on_disconnected(void *data, struct jundot_embedded_client *jundot_embedded_client);
+	static void _jundot_embedded_client_on_window_embedded(void *data, struct jundot_embedded_client *jundot_embedded_client);
+	static void _jundot_embedded_client_on_window_focus_in(void *data, struct jundot_embedded_client *jundot_embedded_client);
+	static void _jundot_embedded_client_on_window_focus_out(void *data, struct jundot_embedded_client *jundot_embedded_client);
 
 	// Core Wayland event listeners.
 	static constexpr struct wl_registry_listener wl_registry_listener = {
@@ -1142,16 +1142,16 @@ private:
 		.done = _xdg_activation_token_on_done,
 	};
 
-	// Godot interfaces.
-	static constexpr struct godot_embedding_compositor_listener godot_embedding_compositor_listener = {
-		.client = _godot_embedding_compositor_on_client,
+	// Jundot interfaces.
+	static constexpr struct jundot_embedding_compositor_listener jundot_embedding_compositor_listener = {
+		.client = _jundot_embedding_compositor_on_client,
 	};
 
-	static constexpr struct godot_embedded_client_listener godot_embedded_client_listener = {
-		.disconnected = _godot_embedded_client_on_disconnected,
-		.window_embedded = _godot_embedded_client_on_window_embedded,
-		.window_focus_in = _godot_embedded_client_on_window_focus_in,
-		.window_focus_out = _godot_embedded_client_on_window_focus_out,
+	static constexpr struct jundot_embedded_client_listener jundot_embedded_client_listener = {
+		.disconnected = _jundot_embedded_client_on_disconnected,
+		.window_embedded = _jundot_embedded_client_on_window_embedded,
+		.window_focus_in = _jundot_embedded_client_on_window_focus_in,
+		.window_focus_out = _jundot_embedded_client_on_window_focus_out,
 	};
 
 #ifdef LIBDECOR_ENABLED
@@ -1231,8 +1231,8 @@ public:
 	struct wl_display *get_wl_display() const;
 
 	// Core Wayland utilities for integrating with our own data structures.
-	static bool wl_proxy_is_godot(struct wl_proxy *p_proxy);
-	static void wl_proxy_tag_godot(struct wl_proxy *p_proxy);
+	static bool wl_proxy_is_jundot(struct wl_proxy *p_proxy);
+	static void wl_proxy_tag_jundot(struct wl_proxy *p_proxy);
 
 	static WindowState *wl_surface_get_window_state(struct wl_surface *p_surface);
 	static ScreenState *wl_output_get_screen_state(struct wl_output *p_output);
@@ -1243,7 +1243,7 @@ public:
 	static OfferState *wp_primary_selection_offer_get_offer_state(struct zwp_primary_selection_offer_v1 *p_offer);
 	static ColorManagementState *wp_color_manager_get_state(wp_color_manager_v1 *p_color_manager);
 
-	static EmbeddingCompositorState *godot_embedding_compositor_get_state(struct godot_embedding_compositor *p_compositor);
+	static EmbeddingCompositorState *jundot_embedding_compositor_get_state(struct jundot_embedding_compositor *p_compositor);
 
 	void seat_state_unlock_pointer(SeatState *p_ss);
 	void seat_state_lock_pointer(SeatState *p_ss);
@@ -1375,7 +1375,7 @@ public:
 
 	bool window_wait_ready(DisplayServerEnums::WindowID p_window_id, int p_timeout_ms);
 
-	struct godot_embedding_compositor *get_embedding_compositor();
+	struct jundot_embedding_compositor *get_embedding_compositor();
 
 	ProcessID embedded_compositor_get_focused_pid();
 

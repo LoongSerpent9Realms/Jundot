@@ -2,10 +2,10 @@
 /*  engine_update_label.h                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -81,6 +81,7 @@ private:
 	String available_newer_version;
 	String available_newer_url;
 
+	void _trigger_launcher_update();
 	bool _can_check_updates() const;
 	void _check_update();
 	void _http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
@@ -90,6 +91,10 @@ private:
 
 	VersionType _get_version_type(const String &p_string, int *r_index = nullptr) const;
 	String _extract_sub_string(const String &p_line) const;
+
+	// Expose update info for external consumers (e.g. UpdateDialog).
+	String get_available_update_version() const { return available_newer_version; }
+	String get_available_update_url() const { return available_newer_url; }
 
 protected:
 	void _notification(int p_what);

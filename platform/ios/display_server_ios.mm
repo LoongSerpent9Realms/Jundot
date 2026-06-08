@@ -2,10 +2,10 @@
 /*  display_server_ios.mm                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -41,7 +41,7 @@ DisplayServerIOS *DisplayServerIOS::get_singleton() {
 
 DisplayServerIOS::DisplayServerIOS(const String &p_rendering_driver, DisplayServerEnums::WindowMode p_mode, DisplayServerEnums::VSyncMode p_vsync_mode, uint32_t p_flags, const Vector2i *p_position, const Vector2i &p_resolution, int p_screen, DisplayServerEnums::Context p_context, int64_t p_parent_window, Error &r_error) :
 		DisplayServerAppleEmbedded(p_rendering_driver, p_mode, p_vsync_mode, p_flags, p_position, p_resolution, p_screen, p_context, p_parent_window, r_error) {
-	// See: https://github.com/godotengine/godot/pull/106814#discussion_r2854262156 for why this was set to 203 nits.
+	// See: https://github.com/jundotengine/jundot/pull/106814#discussion_r2854262156 for why this was set to 203 nits.
 	hardware_reference_luminance_nits = 203.0f;
 }
 

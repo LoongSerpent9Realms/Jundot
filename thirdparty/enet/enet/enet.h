@@ -20,7 +20,7 @@ extern "C"
 #include "enet/unix.h"
 #endif
 #endif
-#include "enet/enet_godot.h"
+#include "enet/enet_jundot.h"
 
 #include "enet/types.h"
 #include "enet/protocol.h"
@@ -614,7 +614,7 @@ ENET_API size_t enet_range_coder_decompress (void *, const enet_uint8 *, size_t,
    
 extern size_t enet_protocol_command_size (enet_uint8);
 
-#include "enet/enet_godot_ext.h"
+#include "enet/enet_jundot_ext.h"
 
 #ifdef __cplusplus
 }

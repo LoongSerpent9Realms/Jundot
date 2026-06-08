@@ -99,7 +99,7 @@ if env["builtin_libjpeg_turbo"]:
     env.modules_sources += thirdparty_obj
 
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

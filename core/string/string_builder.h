@@ -2,10 +2,10 @@
 /*  string_builder.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -39,7 +39,7 @@ class StringBuilder {
 	LocalVector<String> strings;
 	LocalVector<const char *> c_strings;
 
-	// -1 means it's a Godot String
+	// -1 means it's a Jundot String
 	// a natural number means C string.
 	LocalVector<int32_t> appended_strings;
 

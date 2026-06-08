@@ -2,10 +2,10 @@
 /*  jni_utils.h                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -46,34 +46,34 @@ Variant _jobject_to_variant(JNIEnv *env, jobject obj, int p_depth = 0);
 Variant::Type get_jni_type(const String &p_type);
 
 /**
- * Convert a Godot Callable to a org.godotengine.godot.variant.Callable java object.
+ * Convert a Jundot Callable to a org.jundotengine.jundot.variant.Callable java object.
  * @param p_env JNI environment instance
  * @param p_callable Callable parameter to convert. If null or invalid type, a null jobject is returned.
- * @return org.godotengine.godot.variant.Callable jobject or null
+ * @return org.jundotengine.jundot.variant.Callable jobject or null
  */
 jobject callable_to_jcallable(JNIEnv *p_env, const Variant &p_callable);
 
 /**
- * Convert a org.godotengine.godot.variant.Callable java object to a Godot Callable variant.
+ * Convert a org.jundotengine.jundot.variant.Callable java object to a Jundot Callable variant.
  * @param p_env JNI environment instance
- * @param p_jcallable_obj org.godotengine.godot.variant.Callable java object to convert.
+ * @param p_jcallable_obj org.jundotengine.jundot.variant.Callable java object to convert.
  * @return Callable variant
  */
 Callable jcallable_to_callable(JNIEnv *p_env, jobject p_jcallable_obj);
 
 /**
- * Converts a java.lang.CharSequence object to a Godot String.
+ * Converts a java.lang.CharSequence object to a Jundot String.
  * @param p_env  JNI environment instance
  * @param p_charsequence java.lang.CharSequence object to convert
- * @return Godot String instance.
+ * @return Jundot String instance.
  */
 String charsequence_to_string(JNIEnv *p_env, jobject p_charsequence);
 
 /**
- * Converts JNI jstring to Godot String.
+ * Converts JNI jstring to Jundot String.
  * @param source Source JNI string. If null an empty string is returned.
  * @param env JNI environment instance. If null obtained by get_jni_env().
- * @return Godot string instance.
+ * @return Jundot string instance.
  */
 static inline String jstring_to_string(jstring source, JNIEnv *env = nullptr) {
 	String result;

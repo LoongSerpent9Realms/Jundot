@@ -4,9 +4,9 @@ plugins {
 }
 
 ext {
-    DEBUG_PUBLISH_ARTIFACT_ID = 'godot-debug'
-    PUBLISH_ARTIFACT_ID = 'godot'
-    TOOLS_PUBLISH_ARTIFACT_ID = 'godot-tools'
+    DEBUG_PUBLISH_ARTIFACT_ID = 'jundot-debug'
+    PUBLISH_ARTIFACT_ID = 'jundot'
+    TOOLS_PUBLISH_ARTIFACT_ID = 'jundot-tools'
 }
 
 apply from: "../scripts/publish-module.gradle"
@@ -29,10 +29,10 @@ android {
         minSdkVersion versions.minSdk
         targetSdkVersion versions.targetSdk
 
-        manifestPlaceholders = [godotLibraryVersion: getGodotLibraryVersionName()]
+        manifestPlaceholders = [jundotLibraryVersion: getJundotLibraryVersionName()]
     }
 
-    namespace = "org.godotengine.godot"
+    namespace = "org.jundotengine.jundot"
 
     compileOptions {
         sourceCompatibility versions.javaVersion
@@ -117,7 +117,7 @@ android {
         // Update the name of the generated library
         def outputSuffix = "${sconsTarget}"
         variant.outputs.all { output ->
-            output.outputFileName = "godot-lib.${outputSuffix}.aar"
+            output.outputFileName = "jundot-lib.${outputSuffix}.aar"
         }
 
         // Find scons' executable path

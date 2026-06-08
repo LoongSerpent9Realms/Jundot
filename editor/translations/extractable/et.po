@@ -1,15 +1,15 @@
-# Estonian translation of the Godot Engine extractable strings.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Estonian translation of the Jundot Engine extractable strings.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine extractable strings\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine extractable strings\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "PO-Revision-Date: 2023-09-29 19:03+0000\n"
 "Last-Translator: Andreas Kuuskaru <andrku@tlu.ee>\n"
-"Language-Team: Estonian <https://hosted.weblate.org/projects/godot-engine/"
-"godot/et/>\n"
+"Language-Team: Estonian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/et/>\n"
 "Language: et\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8-bit\n"

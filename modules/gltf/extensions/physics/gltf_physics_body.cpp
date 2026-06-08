@@ -2,10 +2,10 @@
 /*  gltf_physics_body.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -263,11 +263,11 @@ Ref<GLTFPhysicsBody> GLTFPhysicsBody::from_dictionary(const Dictionary &p_dictio
 #endif // DISABLE_DEPRECATED
 	}
 	if (motion.has("type")) {
-		// Read the body type. This representation sits between glTF's and Godot's physics nodes.
+		// Read the body type. This representation sits between glTF's and Jundot's physics nodes.
 		// While we may only read "static", "kinematic", or "dynamic" from a valid glTF file, we
-		// want to allow another extension to override this to another Godot node type mid-import.
+		// want to allow another extension to override this to another Jundot node type mid-import.
 		// For example, a vehicle extension may want to override the body type to "vehicle"
-		// so Godot generates a VehicleBody3D node. Therefore we distinguish by importing
+		// so Jundot generates a VehicleBody3D node. Therefore we distinguish by importing
 		// "dynamic" as "rigid", and "kinematic" as "animatable", in the GLTFPhysicsBody code.
 		String body_type_string = motion["type"];
 		if (body_type_string == "static") {
@@ -339,7 +339,7 @@ Ref<GLTFPhysicsBody> GLTFPhysicsBody::from_dictionary(const Dictionary &p_dictio
 Dictionary GLTFPhysicsBody::to_dictionary() const {
 	Dictionary ret;
 	if (body_type == PhysicsBodyType::TRIGGER) {
-		// The equivalent of a Godot Area3D node in glTF is a node that
+		// The equivalent of a Jundot Area3D node in glTF is a node that
 		// defines that it is a trigger, but does not have a shape.
 		Dictionary trigger;
 		ret["trigger"] = trigger;
@@ -347,7 +347,7 @@ Dictionary GLTFPhysicsBody::to_dictionary() const {
 	}
 	// All non-trigger body types are defined using the motion property.
 	Dictionary motion;
-	// When stored in memory, the body type can correspond to a Godot
+	// When stored in memory, the body type can correspond to a Jundot
 	// node type. However, when exporting to glTF, we need to squash
 	// this down to one of "static", "kinematic", or "dynamic".
 	if (body_type == PhysicsBodyType::STATIC) {

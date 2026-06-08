@@ -1,0 +1,20 @@
+name: Test Jundot project converter
+description: Test the Jundot project converter.
+
+inputs:
+  bin:
+    description: The path to the Jundot executable
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Test 3-to-4 conversion
+      shell: sh
+      run: |
+        mkdir converter_test
+        cd converter_test
+        touch project.jundot
+        ../${{ inputs.bin }} --headless --validate-conversion-3to4
+        cd ..
+        rm converter_test -rf

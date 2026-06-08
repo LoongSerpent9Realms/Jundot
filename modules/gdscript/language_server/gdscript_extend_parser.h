@@ -2,10 +2,10 @@
 /*  gdscript_extend_parser.h                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -31,7 +31,7 @@
 #pragma once
 
 #include "../gdscript_parser.h"
-#include "godot_lsp.h"
+#include "jundot_lsp.h"
 
 #include "core/variant/variant.h"
 
@@ -58,23 +58,23 @@ typedef HashMap<String, const LSP::DocumentSymbol *> ClassMembers;
  * →→var my_value = 42
  * ```
  * `_` is at:
- * * Godot: `column=12`
+ * * Jundot: `column=12`
  * 	* using `indent/size=4`
  * 	* Note: counting starts at `1`
  * * LSP: `character=8`
  * 	* Note: counting starts at `0`
  */
-struct GodotPosition {
+struct JundotPosition {
 	int line;
 	int column;
 
-	GodotPosition(int p_line, int p_column) :
+	JundotPosition(int p_line, int p_column) :
 			line(p_line), column(p_column) {}
 
 	LSP::Position to_lsp() const;
-	static GodotPosition from_lsp(const LSP::Position p_pos);
+	static JundotPosition from_lsp(const LSP::Position p_pos);
 
-	bool operator==(const GodotPosition &p_other) const {
+	bool operator==(const JundotPosition &p_other) const {
 		return line == p_other.line && column == p_other.column;
 	}
 
@@ -83,17 +83,17 @@ struct GodotPosition {
 	}
 };
 
-struct GodotRange {
-	GodotPosition start;
-	GodotPosition end;
+struct JundotRange {
+	JundotPosition start;
+	JundotPosition end;
 
-	GodotRange(GodotPosition p_start, GodotPosition p_end) :
+	JundotRange(JundotPosition p_start, JundotPosition p_end) :
 			start(p_start), end(p_end) {}
 
 	LSP::Range to_lsp() const;
-	static GodotRange from_lsp(const LSP::Range &p_range);
+	static JundotRange from_lsp(const LSP::Range &p_range);
 
-	bool operator==(const GodotRange &p_other) const {
+	bool operator==(const JundotRange &p_other) const {
 		return start == p_other.start && end == p_other.end;
 	}
 

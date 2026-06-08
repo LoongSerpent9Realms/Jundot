@@ -2,10 +2,10 @@
 /*  display_server_wayland.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -91,11 +91,11 @@ String DisplayServerWayland::_get_app_id_from_context(DisplayServerEnums::Contex
 
 	switch (p_context) {
 		case DisplayServerEnums::CONTEXT_EDITOR: {
-			app_id = "org.godotengine.Editor";
+			app_id = "org.jundotengine.Editor";
 		} break;
 
 		case DisplayServerEnums::CONTEXT_PROJECTMAN: {
-			app_id = "org.godotengine.ProjectManager";
+			app_id = "org.jundotengine.ProjectManager";
 		} break;
 
 		case DisplayServerEnums::CONTEXT_ENGINE:
@@ -104,7 +104,7 @@ String DisplayServerWayland::_get_app_id_from_context(DisplayServerEnums::Contex
 			if (config_name.length() != 0) {
 				app_id = config_name;
 			} else {
-				app_id = "org.godotengine.Godot";
+				app_id = "org.jundotengine.Jundot";
 			}
 		}
 	}
@@ -842,7 +842,7 @@ DisplayServerEnums::WindowID DisplayServerWayland::create_sub_window(DisplayServ
 	// can only know once we show it.
 	wd.rect = p_rect;
 
-	wd.title = "Godot";
+	wd.title = "Jundot";
 	wd.parent_id = p_transient_parent;
 	return id;
 }
@@ -1752,22 +1752,22 @@ bool DisplayServerWayland::get_swap_cancel_ok() {
 Error DisplayServerWayland::embed_process(DisplayServerEnums::WindowID p_window, ProcessID p_pid, const Rect2i &p_rect, bool p_visible, bool p_grab_focus) {
 	MutexLock mutex_lock(wayland_thread.mutex);
 
-	struct godot_embedding_compositor *ec = wayland_thread.get_embedding_compositor();
+	struct jundot_embedding_compositor *ec = wayland_thread.get_embedding_compositor();
 	ERR_FAIL_NULL_V_MSG(ec, ERR_BUG, "Missing embedded compositor interface");
 
-	struct WaylandThread::EmbeddingCompositorState *ecs = WaylandThread::godot_embedding_compositor_get_state(ec);
+	struct WaylandThread::EmbeddingCompositorState *ecs = WaylandThread::jundot_embedding_compositor_get_state(ec);
 	ERR_FAIL_NULL_V(ecs, ERR_BUG);
 
 	if (!ecs->mapped_clients.has(p_pid)) {
 		return ERR_DOES_NOT_EXIST;
 	}
 
-	struct godot_embedded_client *embedded_client = ecs->mapped_clients[p_pid];
-	WaylandThread::EmbeddedClientState *client_data = (WaylandThread::EmbeddedClientState *)godot_embedded_client_get_user_data(embedded_client);
+	struct jundot_embedded_client *embedded_client = ecs->mapped_clients[p_pid];
+	WaylandThread::EmbeddedClientState *client_data = (WaylandThread::EmbeddedClientState *)jundot_embedded_client_get_user_data(embedded_client);
 	ERR_FAIL_NULL_V(client_data, ERR_BUG);
 
 	if (p_grab_focus) {
-		godot_embedded_client_focus_window(embedded_client);
+		jundot_embedded_client_focus_window(embedded_client);
 	}
 
 	if (p_visible) {
@@ -1783,7 +1783,7 @@ Error DisplayServerWayland::embed_process(DisplayServerEnums::WindowID p_window,
 
 		ERR_FAIL_NULL_V(toplevel, ERR_CANT_CREATE);
 
-		godot_embedded_client_set_embedded_window_parent(embedded_client, toplevel);
+		jundot_embedded_client_set_embedded_window_parent(embedded_client, toplevel);
 
 		double window_scale = WaylandThread::window_state_get_scale_factor(ws);
 
@@ -1793,9 +1793,9 @@ Error DisplayServerWayland::embed_process(DisplayServerEnums::WindowID p_window,
 
 		print_verbose(vformat("Scaling embedded rect down by %f from %s to %s.", window_scale, p_rect, scaled_rect));
 
-		godot_embedded_client_set_embedded_window_rect(embedded_client, scaled_rect.position.x, scaled_rect.position.y, scaled_rect.size.width, scaled_rect.size.height);
+		jundot_embedded_client_set_embedded_window_rect(embedded_client, scaled_rect.position.x, scaled_rect.position.y, scaled_rect.size.width, scaled_rect.size.height);
 	} else {
-		godot_embedded_client_set_embedded_window_parent(embedded_client, nullptr);
+		jundot_embedded_client_set_embedded_window_parent(embedded_client, nullptr);
 	}
 
 	return OK;
@@ -1804,21 +1804,21 @@ Error DisplayServerWayland::embed_process(DisplayServerEnums::WindowID p_window,
 Error DisplayServerWayland::request_close_embedded_process(ProcessID p_pid) {
 	MutexLock mutex_lock(wayland_thread.mutex);
 
-	struct godot_embedding_compositor *ec = wayland_thread.get_embedding_compositor();
+	struct jundot_embedding_compositor *ec = wayland_thread.get_embedding_compositor();
 	ERR_FAIL_NULL_V_MSG(ec, ERR_BUG, "Missing embedded compositor interface");
 
-	struct WaylandThread::EmbeddingCompositorState *ecs = WaylandThread::godot_embedding_compositor_get_state(ec);
+	struct WaylandThread::EmbeddingCompositorState *ecs = WaylandThread::jundot_embedding_compositor_get_state(ec);
 	ERR_FAIL_NULL_V(ecs, ERR_BUG);
 
 	if (!ecs->mapped_clients.has(p_pid)) {
 		return ERR_DOES_NOT_EXIST;
 	}
 
-	struct godot_embedded_client *embedded_client = ecs->mapped_clients[p_pid];
-	WaylandThread::EmbeddedClientState *client_data = (WaylandThread::EmbeddedClientState *)godot_embedded_client_get_user_data(embedded_client);
+	struct jundot_embedded_client *embedded_client = ecs->mapped_clients[p_pid];
+	WaylandThread::EmbeddedClientState *client_data = (WaylandThread::EmbeddedClientState *)jundot_embedded_client_get_user_data(embedded_client);
 	ERR_FAIL_NULL_V(client_data, ERR_BUG);
 
-	godot_embedded_client_embedded_window_request_close(embedded_client);
+	jundot_embedded_client_embedded_window_request_close(embedded_client);
 	return OK;
 }
 
@@ -2412,7 +2412,7 @@ DisplayServerWayland::DisplayServerWayland(const String &p_rendering_driver, Dis
 
 			if (prime_idx) {
 				print_line(vformat("Found discrete GPU, setting DRI_PRIME=%d to use it.", prime_idx));
-				print_line("Note: Set DRI_PRIME=0 in the environment to disable Godot from using the discrete GPU.");
+				print_line("Note: Set DRI_PRIME=0 in the environment to disable Jundot from using the discrete GPU.");
 				setenv("DRI_PRIME", itos(prime_idx).utf8().ptr(), 1);
 			}
 		}
@@ -2489,7 +2489,7 @@ DisplayServerWayland::DisplayServerWayland(const String &p_rendering_driver, Dis
 	wd.flags = p_flags;
 	wd.vsync_mode = p_vsync_mode;
 	wd.rect.size = p_resolution;
-	wd.title = "Godot";
+	wd.title = "Jundot";
 
 	if (!AccessibilityServer::get_singleton()->window_create(wd.id, nullptr)) {
 		if (OS::get_singleton()->is_stdout_verbose()) {

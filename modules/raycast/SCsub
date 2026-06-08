@@ -81,7 +81,7 @@ if env["builtin_embree"]:
     env_thirdparty.add_source_files(thirdparty_obj, thirdparty_sources)
 
     # Set x86 CPU instruction sets to use when building Embree's own intrinsics.
-    # Keep this in sync with Godot's main SConstruct file.
+    # Keep this in sync with Jundot's main SConstruct file.
     # This is only needed on MSVC, as GCC/Clang will set those defines automatically
     # according to compiler instruction set flags.
     if env["arch"] != "x86_64" or env.msvc:
@@ -115,7 +115,7 @@ if env["builtin_embree"]:
     env.modules_sources += thirdparty_obj
 
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

@@ -2,10 +2,10 @@
 /*  foundation_helpers.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -49,36 +49,36 @@ namespace conv {
 
 #ifdef __OBJC__
 /**
- * Converts a Godot String to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot String to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NSString *to_nsstring(const String &p_str);
 /**
- * Converts a Godot String to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot String to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NSString *to_nsstring(Span<char> p_str);
 /**
- * Converts a Godot CharString to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot CharString to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NSString *to_nsstring(const CharString &p_str);
 /**
- * Converts an NSString to a Godot String without allocating intermediate buffers.
+ * Converts an NSString to a Jundot String without allocating intermediate buffers.
  * */
 String to_string(NSString *p_str);
 #else
 /**
- * Converts a Godot String to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot String to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NS::String *to_nsstring(const String &p_str);
 /**
- * Converts a Godot String to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot String to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NS::String *to_nsstring(Span<char> p_str);
 /**
- * Converts a Godot CharString to an NSString without allocating an intermediate UTF-8 buffer.
+ * Converts a Jundot CharString to an NSString without allocating an intermediate UTF-8 buffer.
  * */
 NS::String *to_nsstring(const CharString &p_str);
 /**
- * Converts an NSString to a Godot String without allocating intermediate buffers.
+ * Converts an NSString to a Jundot String without allocating intermediate buffers.
  * */
 String to_string(NS::String *p_str);
 

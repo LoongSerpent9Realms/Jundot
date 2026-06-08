@@ -4,7 +4,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 public static class I18N
 {
@@ -116,6 +116,7 @@ public static class I18N
             ["Check.InstallSCons"] = "自动安装 SCons",
             ["Check.CleanDir"] = "构建前清理目录",
             ["Check.AutoVersion"] = "构建成功后自动更新版本号（patch +1）",
+            ["Check.GenManifest"] = "生成更新清单 (update-manifest.json) —— 用于线上热更新系统",
 
             // Buttons
             ["Button.Browse"] = "浏览...",
@@ -160,10 +161,10 @@ public static class I18N
             ["Lang.ru"] = "Русский (ru)",
 
             // Misc
-            ["Title"] = "Godot 打包器",
+            ["Title"] = "Jundot 打包器",
             ["Menu.Settings"] = "设置 (&S)",
             ["Menu.Language"] = "界面语言",
-            ["Dialog.SelectRepo"] = "选择 Godot 仓库根目录",
+            ["Dialog.SelectRepo"] = "选择 Jundot 仓库根目录",
             ["Dialog.SelectOutput"] = "选择输出目录",
             ["Dialog.SelectLog"] = "选择日志目录",
             ["Confirm.Delete"] = "删除构建:\n\n{0}\n\n将删除打包目录、zip 和日志。\nbin/ 中的 exe 将保留。\n\n确认继续？",
@@ -204,6 +205,20 @@ public static class I18N
             // Language names
             ["Lang.zh_CN"] = "中文",
             ["Lang.en"]    = "English",
+
+            // ── Update ─────────────────────────────────────────
+            ["Update.Checking"] = "正在检查更新...",
+            ["Update.NoUpdate"] = "当前已是最新版本。",
+            ["Update.Available"] = "发现新版本！",
+            ["Update.NewVersion"] = "新版本 {0} 已发布（当前版本 {1}）。\n是否立即下载并安装？",
+            ["Update.Downloading"] = "正在下载更新 ({0}%)...",
+            ["Update.Installing"] = "正在准备安装...",
+            ["Update.InstallingDesc"] = "下载完成，即将关闭并自动安装更新。\n应用程序将在安装完成后自动重启。",
+            ["Update.Failed"] = "更新检测失败: {0}",
+            ["Update.Error"] = "更新出错",
+            ["Update.Title"] = "自动更新",
+            ["Update.ConfirmInstall"] = "安装更新",
+            ["Update.DownloadFailed"] = "下载更新失败: {0}",
         };
 
         var opts = new JsonSerializerOptions { WriteIndented = true };
@@ -248,6 +263,7 @@ public static class I18N
             ["Check.InstallSCons"] = "Auto-install SCons",
             ["Check.CleanDir"] = "Clean before build",
             ["Check.AutoVersion"] = "Auto-increment version (patch +1) on success",
+            ["Check.GenManifest"] = "Generate update manifest (update-manifest.json) — for online hot-update system",
 
             // Buttons
             ["Button.Browse"] = "Browse...",
@@ -292,10 +308,10 @@ public static class I18N
             ["Lang.ru"] = "Русский (ru)",
 
             // Misc
-            ["Title"] = "Godot Package Builder",
+            ["Title"] = "Jundot Package Builder",
             ["Menu.Settings"] = "&Settings",
             ["Menu.Language"] = "UI Language",
-            ["Dialog.SelectRepo"] = "Select Godot Repo Root",
+            ["Dialog.SelectRepo"] = "Select Jundot Repo Root",
             ["Dialog.SelectOutput"] = "Select Output Directory",
             ["Dialog.SelectLog"] = "Select Log Directory",
             ["Confirm.Delete"] = "Delete build:\n\n{0}\n\nThis will remove the package folder, zip, and logs.\nThe bin/ exe will be kept.\n\nContinue?",
@@ -336,6 +352,20 @@ public static class I18N
             // Language names
             ["Lang.zh_CN"] = "中文",
             ["Lang.en"]    = "English",
+
+            // ── Update ─────────────────────────────────────────
+            ["Update.Checking"] = "Checking for updates...",
+            ["Update.NoUpdate"] = "You are running the latest version.",
+            ["Update.Available"] = "New version available!",
+            ["Update.NewVersion"] = "Version {0} is available (current: {1}).\nDownload and install now?",
+            ["Update.Downloading"] = "Downloading update ({0}%)...",
+            ["Update.Installing"] = "Preparing to install...",
+            ["Update.InstallingDesc"] = "Download complete. The application will now close to install the update.\nIt will restart automatically once the update is installed.",
+            ["Update.Failed"] = "Update check failed: {0}",
+            ["Update.Error"] = "Update Error",
+            ["Update.Title"] = "Auto Update",
+            ["Update.ConfirmInstall"] = "Install Update",
+            ["Update.DownloadFailed"] = "Download failed: {0}",
         };
 
         var opts = new JsonSerializerOptions { WriteIndented = true };

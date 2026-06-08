@@ -2,10 +2,10 @@
 /*  display_server_apple_embedded.mm                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -36,9 +36,9 @@
 #include "core/os/os.h"
 #import "drivers/apple_embedded/app_delegate_service.h"
 #import "drivers/apple_embedded/apple_embedded.h"
-#import "drivers/apple_embedded/godot_keyboard_input_view.h"
-#import "drivers/apple_embedded/godot_view_apple_embedded.h"
-#import "drivers/apple_embedded/godot_view_controller.h"
+#import "drivers/apple_embedded/jundot_keyboard_input_view.h"
+#import "drivers/apple_embedded/jundot_view_apple_embedded.h"
+#import "drivers/apple_embedded/jundot_view_controller.h"
 #import "drivers/apple_embedded/key_mapping_apple_embedded.h"
 #import "drivers/apple_embedded/os_apple_embedded.h"
 #import "drivers/apple_embedded/tts_apple_embedded.h"
@@ -77,16 +77,16 @@ DisplayServerAppleEmbedded::DisplayServerAppleEmbedded(const String &p_rendering
 		RenderingContextDriverVulkanAppleEmbedded::WindowPlatformData vulkan;
 #endif
 #ifdef METAL_ENABLED
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 		// Eliminate "RenderingContextDriverMetal is only available on iOS 14.0 or newer".
 		RenderingContextDriverMetal::WindowPlatformData metal;
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 #endif
 	} wpd;
 
 #if defined(VULKAN_ENABLED)
 	if (rendering_driver == "vulkan") {
-		layer = [GDTAppDelegateService.viewController.godotView initializeRenderingForDriver:@"vulkan"];
+		layer = [GDTAppDelegateService.viewController.jundotView initializeRenderingForDriver:@"vulkan"];
 		if (!layer) {
 			ERR_FAIL_MSG("Failed to create iOS Vulkan rendering layer.");
 		}
@@ -97,7 +97,7 @@ DisplayServerAppleEmbedded::DisplayServerAppleEmbedded(const String &p_rendering
 #ifdef METAL_ENABLED
 	if (rendering_driver == "metal") {
 		if (@available(iOS 14.0, *)) {
-			layer = [GDTAppDelegateService.viewController.godotView initializeRenderingForDriver:@"metal"];
+			layer = [GDTAppDelegateService.viewController.jundotView initializeRenderingForDriver:@"metal"];
 			wpd.metal.layer = (__bridge CA::MetalLayer *)layer;
 			rendering_context = memnew(RenderingContextDriverMetal);
 		} else {
@@ -158,7 +158,7 @@ DisplayServerAppleEmbedded::DisplayServerAppleEmbedded(const String &p_rendering
 
 #if defined(GLES3_ENABLED)
 	if (rendering_driver == "opengl3") {
-		CALayer *layer = [GDTAppDelegateService.viewController.godotView initializeRenderingForDriver:@"opengl3"];
+		CALayer *layer = [GDTAppDelegateService.viewController.jundotView initializeRenderingForDriver:@"opengl3"];
 
 		if (!layer) {
 			ERR_FAIL_MSG("Failed to create iOS OpenGLES rendering layer.");
@@ -481,7 +481,7 @@ void DisplayServerAppleEmbedded::emit_system_theme_changed() {
 
 Rect2i DisplayServerAppleEmbedded::get_display_safe_area() const {
 	UIEdgeInsets insets = UIEdgeInsetsZero;
-	UIView *view = GDTAppDelegateService.viewController.godotView;
+	UIView *view = GDTAppDelegateService.viewController.jundotView;
 	if ([view respondsToSelector:@selector(safeAreaInsets)]) {
 		insets = [view safeAreaInsets];
 	}
@@ -512,7 +512,7 @@ Size2i DisplayServerAppleEmbedded::screen_get_size(int p_screen) const {
 	int screen_count = get_screen_count();
 	ERR_FAIL_INDEX_V(p_screen, screen_count, Size2i());
 
-	CALayer *layer = GDTAppDelegateService.viewController.godotView.renderingLayer;
+	CALayer *layer = GDTAppDelegateService.viewController.jundotView.renderingLayer;
 
 	if (!layer) {
 		return Size2i();
@@ -549,7 +549,7 @@ int64_t DisplayServerAppleEmbedded::window_get_native_handle(DisplayServerEnums:
 			return (int64_t)GDTAppDelegateService.viewController;
 		}
 		case DisplayServerEnums::WINDOW_VIEW: {
-			return (int64_t)GDTAppDelegateService.viewController.godotView;
+			return (int64_t)GDTAppDelegateService.viewController.jundotView;
 		}
 		default: {
 			return 0;

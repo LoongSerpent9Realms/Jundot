@@ -2,10 +2,10 @@
 /*  translation_server.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -778,9 +778,9 @@ TranslationServer::TranslationServer() {
 	main_domain.instantiate();
 
 #ifdef TOOLS_ENABLED
-	editor_domain = get_or_add_domain("godot.editor");
-	property_domain = get_or_add_domain("godot.properties");
-	doc_domain = get_or_add_domain("godot.documentation");
+	editor_domain = get_or_add_domain("jundot.editor");
+	property_domain = get_or_add_domain("jundot.properties");
+	doc_domain = get_or_add_domain("jundot.documentation");
 #endif // TOOLS_ENABLED
 
 	init_locale_info();

@@ -2,10 +2,10 @@
 /*  gltf_state.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -38,7 +38,7 @@
 void GLTFState::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_used_extension", "extension_name", "required"), &GLTFState::add_used_extension);
 	ClassDB::bind_method(D_METHOD("append_data_to_buffers", "data", "deduplication"), &GLTFState::append_data_to_buffers);
-	ClassDB::bind_method(D_METHOD("append_gltf_node", "gltf_node", "godot_scene_node", "parent_node_index"), &GLTFState::append_gltf_node);
+	ClassDB::bind_method(D_METHOD("append_gltf_node", "gltf_node", "jundot_scene_node", "parent_node_index"), &GLTFState::append_gltf_node);
 
 	ClassDB::bind_method(D_METHOD("get_json"), &GLTFState::get_json);
 	ClassDB::bind_method(D_METHOD("set_json", "json"), &GLTFState::set_json);
@@ -144,7 +144,7 @@ void GLTFState::_bind_methods() {
 	BIND_ENUM_CONSTANT(HANDLE_BINARY_IMAGE_MODE_EMBED_AS_UNCOMPRESSED);
 
 #ifndef DISABLE_DEPRECATED
-	// Deprecated non-type-safe versions for backward compatibility, remove in Godot 5.0.
+	// Deprecated non-type-safe versions for backward compatibility, remove in Jundot 5.0.
 	ClassDB::bind_method(D_METHOD("get_handle_binary_image"), &GLTFState::get_handle_binary_image);
 	ClassDB::bind_method(D_METHOD("set_handle_binary_image", "method"), &GLTFState::set_handle_binary_image);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "handle_binary_image", PROPERTY_HINT_ENUM, "Discard All Textures,Extract Textures,Embed as Basis Universal,Embed as Uncompressed", PROPERTY_USAGE_INTERNAL), "set_handle_binary_image", "get_handle_binary_image"); // enum as int
@@ -479,11 +479,11 @@ GLTFBufferViewIndex GLTFState::append_data_to_buffers(const Vector<uint8_t> &p_d
 	return new_index;
 }
 
-GLTFNodeIndex GLTFState::append_gltf_node(Ref<GLTFNode> p_gltf_node, Node *p_godot_scene_node, GLTFNodeIndex p_parent_node_index) {
+GLTFNodeIndex GLTFState::append_gltf_node(Ref<GLTFNode> p_gltf_node, Node *p_jundot_scene_node, GLTFNodeIndex p_parent_node_index) {
 	p_gltf_node->set_parent(p_parent_node_index);
 	const GLTFNodeIndex new_index = nodes.size();
 	nodes.append(p_gltf_node);
-	scene_nodes.insert(new_index, p_godot_scene_node);
+	scene_nodes.insert(new_index, p_jundot_scene_node);
 	if (p_parent_node_index == -1) {
 		root_nodes.append(new_index);
 	} else if (p_parent_node_index < new_index) {

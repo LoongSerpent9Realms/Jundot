@@ -2,10 +2,10 @@
 /*  jolt_separation_ray_shape_3d.cpp                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -38,7 +38,7 @@ JPH::ShapeRefC JoltSeparationRayShape3D::_build() const {
 
 	const JoltCustomRayShapeSettings shape_settings(length, slide_on_slope);
 	const JPH::ShapeSettings::ShapeResult shape_result = shape_settings.Create();
-	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics separation ray shape with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_godot(shape_result.GetError()), _owners_to_string()));
+	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics separation ray shape with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_jundot(shape_result.GetError()), _owners_to_string()));
 
 	return shape_result.Get();
 }

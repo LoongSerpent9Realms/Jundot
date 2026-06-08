@@ -2,10 +2,10 @@
 /*  editor_file_system.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -57,7 +57,7 @@ EditorFileSystem *EditorFileSystem::singleton = nullptr;
 int EditorFileSystem::nb_files_total = 0;
 EditorFileSystem::ScannedDirectory *EditorFileSystem::first_scan_root_dir = nullptr;
 
-//the name is the version, to keep compatibility with different versions of Godot
+//the name is the version, to keep compatibility with different versions of Jundot
 #define CACHE_FILE_NAME "filesystem_cache10"
 
 int EditorFileSystemDirectory::find_file_index(const String &p_file) const {
@@ -570,7 +570,7 @@ void EditorFileSystem::_thread_func(void *_userdata) {
 bool EditorFileSystem::_is_test_for_reimport_needed(const String &p_path, uint64_t p_last_modification_time, uint64_t p_modification_time, uint64_t p_last_import_modification_time, uint64_t p_import_modification_time, const Vector<String> &p_import_dest_paths) {
 	// The idea here is to trust the cache. If the last modification times in the cache correspond
 	// to the last modification times of the files on disk, it means the files have not changed since
-	// the last import, and the files in .godot/imported (p_import_dest_paths) should all be valid.
+	// the last import, and the files in .jundot/imported (p_import_dest_paths) should all be valid.
 	if (p_last_modification_time != p_modification_time) {
 		return true;
 	}
@@ -1583,7 +1583,7 @@ void EditorFileSystem::_scan_fs_changes(EditorFileSystemDirectory *p_dir, ScanPr
 			// Check here if file must be imported or not.
 			// Same logic as in _process_file_system, the last modifications dates
 			// needs to be trusted to prevent reading all the .import files and the md5
-			// each time the user switch back to Godot.
+			// each time the user switch back to Jundot.
 			uint64_t mt = FileAccess::get_modified_time(path);
 			uint64_t import_mt = FileAccess::get_modified_time(path + ".import");
 			if (_is_test_for_reimport_needed(path, p_dir->files[i]->modified_time, mt, p_dir->files[i]->import_modified_time, import_mt, p_dir->files[i]->import_dest_paths)) {
@@ -3479,10 +3479,10 @@ bool EditorFileSystem::_should_skip_directory(const String &p_path) {
 		return true;
 	}
 
-	if (FileAccess::exists(p_path.path_join("project.godot"))) {
+	if (FileAccess::exists(p_path.path_join("project.jundot"))) {
 		// Skip if another project inside this.
 		if (EditorFileSystem::get_singleton() == nullptr || EditorFileSystem::get_singleton()->first_scan) {
-			WARN_PRINT_ONCE(vformat("Detected another project.godot at %s. The folder will be ignored.", p_path));
+			WARN_PRINT_ONCE(vformat("Detected another project.jundot at %s. The folder will be ignored.", p_path));
 		}
 		return true;
 	}

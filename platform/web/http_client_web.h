@@ -2,10 +2,10 @@
 /*  http_client_web.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -37,19 +37,19 @@ extern "C" {
 #endif
 
 typedef enum {
-	GODOT_JS_FETCH_STATE_REQUESTING = 0,
-	GODOT_JS_FETCH_STATE_BODY = 1,
-	GODOT_JS_FETCH_STATE_DONE = 2,
-	GODOT_JS_FETCH_STATE_ERROR = -1,
-} godot_js_fetch_state_t;
+	JUNDOT_JS_FETCH_STATE_REQUESTING = 0,
+	JUNDOT_JS_FETCH_STATE_BODY = 1,
+	JUNDOT_JS_FETCH_STATE_DONE = 2,
+	JUNDOT_JS_FETCH_STATE_ERROR = -1,
+} jundot_js_fetch_state_t;
 
-extern int godot_js_fetch_create(const char *p_method, const char *p_url, const char **p_headers, int p_headers_len, const uint8_t *p_body, int p_body_len);
-extern int godot_js_fetch_read_headers(int p_id, void (*parse_callback)(int p_size, const char **p_headers, void *p_ref), void *p_ref);
-extern int godot_js_fetch_read_chunk(int p_id, uint8_t *p_buf, int p_buf_size);
-extern void godot_js_fetch_free(int p_id);
-extern godot_js_fetch_state_t godot_js_fetch_state_get(int p_id);
-extern int godot_js_fetch_http_status_get(int p_id);
-extern int godot_js_fetch_is_chunked(int p_id);
+extern int jundot_js_fetch_create(const char *p_method, const char *p_url, const char **p_headers, int p_headers_len, const uint8_t *p_body, int p_body_len);
+extern int jundot_js_fetch_read_headers(int p_id, void (*parse_callback)(int p_size, const char **p_headers, void *p_ref), void *p_ref);
+extern int jundot_js_fetch_read_chunk(int p_id, uint8_t *p_buf, int p_buf_size);
+extern void jundot_js_fetch_free(int p_id);
+extern jundot_js_fetch_state_t jundot_js_fetch_state_get(int p_id);
+extern int jundot_js_fetch_http_status_get(int p_id);
+extern int jundot_js_fetch_is_chunked(int p_id);
 
 #ifdef __cplusplus
 }

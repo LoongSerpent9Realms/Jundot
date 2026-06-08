@@ -2,10 +2,10 @@
 /*  gltf_skin.h                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -70,13 +70,13 @@ private:
 	GLTFSkeletonIndex skeleton = -1;
 
 	// A mapping from the joint indices (in the order of joints_original) to the
-	// Godot Skeleton's bone_indices
+	// Jundot Skeleton's bone_indices
 	HashMap<int, int> joint_i_to_bone_i;
 	HashMap<int, StringName> joint_i_to_name;
 
 	// The Actual Skin that will be created as a mapping between the IBM's of
 	// this skin to the generated skeleton for the mesh instances.
-	Ref<Skin> godot_skin;
+	Ref<Skin> jundot_skin;
 
 protected:
 	static void _bind_methods();
@@ -109,8 +109,8 @@ public:
 	Dictionary get_joint_i_to_name();
 	void set_joint_i_to_name(const Dictionary &p_joint_i_to_name);
 
-	Ref<Skin> get_godot_skin();
-	void set_godot_skin(const Ref<Skin> &p_godot_skin);
+	Ref<Skin> get_jundot_skin();
+	void set_jundot_skin(const Ref<Skin> &p_jundot_skin);
 
 	Dictionary to_dictionary();
 	Error from_dictionary(const Dictionary &dict);

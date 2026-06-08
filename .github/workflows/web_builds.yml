@@ -48,24 +48,24 @@ jobs:
         run: |
           emcc -v
 
-      - name: Restore Godot build cache
-        uses: ./.github/actions/godot-cache-restore
+      - name: Restore Jundot build cache
+        uses: ./.github/actions/jundot-cache-restore
         with:
           cache-name: ${{ matrix.cache-name }}
         continue-on-error: true
 
       - name: Setup Python and SCons
-        uses: ./.github/actions/godot-deps
+        uses: ./.github/actions/jundot-deps
 
       - name: Compilation
-        uses: ./.github/actions/godot-build
+        uses: ./.github/actions/jundot-build
         with:
           scons-flags: ${{ env.SCONS_FLAGS }} ${{ matrix.scons-flags }}
           platform: web
           target: ${{ matrix.target }}
 
-      - name: Save Godot build cache
-        uses: ./.github/actions/godot-cache-save
+      - name: Save Jundot build cache
+        uses: ./.github/actions/jundot-cache-save
         with:
           cache-name: ${{ matrix.cache-name }}
         continue-on-error: true

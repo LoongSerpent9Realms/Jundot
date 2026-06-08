@@ -2,10 +2,10 @@
 /*  main.mm                                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -31,7 +31,7 @@
 #import "os_visionos.h"
 
 #include "core/profiling/profiling.h"
-#import "drivers/apple_embedded/godot_app_delegate.h"
+#import "drivers/apple_embedded/jundot_app_delegate.h"
 #import "drivers/apple_embedded/main_utilities.h"
 #include "main/main.h"
 
@@ -52,7 +52,7 @@ int apple_embedded_main(int argc, char **argv) {
 	char *fargv[64];
 	argc = process_args(argc, argv, fargv);
 
-	godot_init_profiler();
+	jundot_init_profiler();
 
 	Error err = Main::setup(fargv[0], argc - 1, &fargv[1], false);
 
@@ -70,6 +70,6 @@ int apple_embedded_main(int argc, char **argv) {
 
 void apple_embedded_finish() {
 	Main::cleanup();
-	godot_cleanup_profiler();
+	jundot_cleanup_profiler();
 	delete os;
 }

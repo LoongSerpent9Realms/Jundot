@@ -1,7 +1,7 @@
-# Hebrew translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Hebrew translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Daniel <lorddaniel09@gmail.com>, 2018.
 # Ben Golan <golanben4@gmail.com>, 2017.
 # Luc Stepniewski <lior@gradstein.info>, 2017.
@@ -46,12 +46,12 @@
 # IgnitedIce <bendahansh@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-04-16 02:09+0000\n"
 "Last-Translator: IgnitedIce <bendahansh@gmail.com>\n"
-"Language-Team: Hebrew <https://hosted.weblate.org/projects/godot-engine/godot/"
+"Language-Team: Hebrew <https://hosted.weblate.org/projects/jundot-engine/jundot/"
 "he/>\n"
 "Language: he\n"
 "MIME-Version: 1.0\n"
@@ -3006,14 +3006,14 @@ msgstr "שימוש בקווים נטויים בשמות תיקיות יצור ת
 msgid "Folder name is valid."
 msgstr "שם התיקייה תקין."
 
-msgid "Godot Engine contributors"
+msgid "Jundot Engine contributors"
 msgstr "מתנדבי מנוע גודו"
 
 msgid "Double-click to open in browser."
 msgstr "לחיצה כפולה לפתיחה בדפדפן."
 
-msgid "Thanks from the Godot community!"
-msgstr "תודות מקהילת Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "תודות מקהילת Jundot!"
 
 msgid "Authors"
 msgstr "יוצרים"
@@ -3025,12 +3025,12 @@ msgid "Third-party Licenses"
 msgstr "רשיונות צד שלישי"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"מנוע Godot מסתמך על מספר ספריות צד־שלישי חופשיות ובקוד פתוח, כולן תואמות את "
+"מנוע Jundot מסתמך על מספר ספריות צד־שלישי חופשיות ובקוד פתוח, כולן תואמות את "
 "דרישות רישיון MIT של המנוע. לפניכם רשימה ממצה של כל רכיבי הצד־השלישי במנוע עם "
 "הצהרות זכויות היוצרים ותנאי הרישיון שלהם."
 
@@ -3228,12 +3228,12 @@ msgid "Language:"
 msgstr "שפה:"
 
 msgid ""
-"You are about to create a Godot project in a non-empty folder.\n"
+"You are about to create a Jundot project in a non-empty folder.\n"
 "The entire contents of this folder will be imported as project resources!\n"
 "\n"
 "Are you sure you wish to continue?"
 msgstr ""
-"את/ה עומד/ת ליצור פרויקט Godot בתיקייה שאינה ריקה.\n"
+"את/ה עומד/ת ליצור פרויקט Jundot בתיקייה שאינה ריקה.\n"
 "כל תוכן התיקייה הזו ייובא כמשאבי פרויקט!\n"
 "\n"
 "האם את/ה בטוח/ה שברצונך להמשיך?"
@@ -3307,23 +3307,23 @@ msgstr "בחירת תיקייה לסריקה"
 
 msgid ""
 "This option will perform full project conversion, updating scenes, resources "
-"and scripts from Godot 3 to work in Godot 4.\n"
+"and scripts from Jundot 3 to work in Jundot 4.\n"
 "\n"
 "Note that this is a best-effort conversion, i.e. it makes upgrading the "
 "project easier, but it will not open out-of-the-box and will still require "
 "manual adjustments.\n"
 "\n"
 "IMPORTANT: Make sure to backup your project before converting, as this "
-"operation makes it impossible to open it in older versions of Godot."
+"operation makes it impossible to open it in older versions of Jundot."
 msgstr ""
-"אפשרות זו תבצע המרה מלאה של הפרויקט, ותעדכן סצנות, משאבים וסקריפטים מ-Godot 3 "
-"כדי שיעבדו ב-Godot 4.\n"
+"אפשרות זו תבצע המרה מלאה של הפרויקט, ותעדכן סצנות, משאבים וסקריפטים מ-Jundot 3 "
+"כדי שיעבדו ב-Jundot 4.\n"
 "\n"
 "שימו לב שזוהי המרה במאמץ הטוב ביותר, כלומר - היא מקלה על שדרוג הפרויקט, אך "
 "הוא לא יפתח מיד בסיום ההמרה ועדיין ידרוש התאמות ידניות.\n"
 "\n"
 "חשוב: ודאו שאתם מגבים את הפרויקט לפני ההמרה, מכיוון שפעולה זו אינה מאפשרת "
-"לפתוח אותו בגרסאות קודמות של Godot."
+"לפתוח אותו בגרסאות קודמות של Jundot."
 
 msgid "Error"
 msgstr "שגיאה"
@@ -4246,8 +4246,8 @@ msgstr "צור או ייבא פרופיל כדי לערוך מחלקות ומא�
 msgid "New profile name:"
 msgstr "שם פרופיל חדש:"
 
-msgid "Godot Feature Profile"
-msgstr "פרופיל התכונות של Godot"
+msgid "Jundot Feature Profile"
+msgstr "פרופיל התכונות של Jundot"
 
 msgid "Import Profile(s)"
 msgstr "ייבוא פרופיל(ים)"

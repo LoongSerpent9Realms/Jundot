@@ -2,10 +2,10 @@
 /*  script_language_extension.h                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -696,7 +696,7 @@ public:
 
 	GDExtensionScriptInstanceDataPtr instance = nullptr;
 
-	GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wignored-qualifiers") // There should not be warnings on explicit casts.
+	JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wignored-qualifiers") // There should not be warnings on explicit casts.
 
 	virtual bool set(const StringName &p_name, const Variant &p_value) override {
 		if (native_info->set_func) {
@@ -946,5 +946,5 @@ public:
 #endif // DISABLE_DEPRECATED
 	}
 
-	GODOT_GCC_WARNING_POP
+	JUNDOT_GCC_WARNING_POP
 };

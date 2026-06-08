@@ -217,7 +217,7 @@ def configure(env: "SConsEnvironment"):
     if not has_swappy:
         print_warning(
             f"Swappy Frame Pacing not detected! It is strongly recommended you run `python {os.path.join('misc', 'scripts', 'install_swappy_android.py')}` to download and install Swappy before compiling.\n"
-            + "Without Swappy, Godot apps on Android will inevitably suffer stutter and struggle to keep a consistent framerate. Although Swappy cannot guarantee your app will be stutter-free, not having Swappy will guarantee there will be stutter even on the best phones and the most simple of scenes."
+            + "Without Swappy, Jundot apps on Android will inevitably suffer stutter and struggle to keep a consistent framerate. Although Swappy cannot guarantee your app will be stutter-free, not having Swappy will guarantee there will be stutter even on the best phones and the most simple of scenes."
         )
         if env["swappy"]:
             print_error("Use build option `swappy=no` to ignore missing Swappy dependency and build without it.")
@@ -250,7 +250,7 @@ def configure(env: "SConsEnvironment"):
 
     env.Append(LINKFLAGS=["-Wl,--gc-sections", "-Wl,--no-undefined", "-Wl,-z,now"])
     env.Append(LINKFLAGS=["-Wl,--build-id"])
-    env.Append(LINKFLAGS=["-Wl,-soname,libgodot_android.so"])
+    env.Append(LINKFLAGS=["-Wl,-soname,libjundot_android.so"])
 
     env.Prepend(CPPPATH=["#platform/android"])
     env.Append(CPPDEFINES=["ANDROID_ENABLED", "UNIX_ENABLED"])

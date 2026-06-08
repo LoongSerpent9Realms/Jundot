@@ -1,7 +1,7 @@
-# Romanian translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Romanian translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Calin Sopterean <csopterean@gmail.com>, 2018.
 # Filip <filipanton@tutanota.com>, 2018, 2020.
 # Nitroretro <nitroretro@protonmail.com>, 2018.
@@ -27,7 +27,7 @@
 # RaresX22 <raresadv22@gmail.com>, 2023.
 # omoNattie <omonattie@gmail.com>, 2023.
 # Alexandra Moroz <allemoroz14@gmail.com>, 2023.
-# Alin Andrei Bălașa <alin.andrei.balasa+godotweblate@gmail.com>, 2023.
+# Alin Andrei Bălașa <alin.andrei.balasa+jundotweblate@gmail.com>, 2023.
 # Cătălin George Feștilă <catalinfest@gmail.com>, 2023.
 # Vasile Milea <milea.vasile959@gmail.com>, 2023.
 # Saft Octavian <saftoctavian@gmail.com>, 2024, 2025.
@@ -47,13 +47,13 @@
 # robbpaun <robbpaun@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-21 19:11+0000\n"
 "Last-Translator: robbpaun <robbpaun@gmail.com>\n"
-"Language-Team: Romanian <https://hosted.weblate.org/projects/godot-engine/"
-"godot/ro/>\n"
+"Language-Team: Romanian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/ro/>\n"
 "Language: ro\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2692,8 +2692,8 @@ msgstr "Exportă Managerul de Șabloane"
 msgid "Download from:"
 msgstr "Descărcați din:"
 
-msgid "Godot Export Templates"
-msgstr "Șabloane de export Godot"
+msgid "Jundot Export Templates"
+msgstr "Șabloane de export Jundot"
 
 msgid "ZIP File"
 msgstr "Fișiere ZIP"
@@ -2849,11 +2849,11 @@ msgstr "Sponsori Aur"
 msgid "Silver Sponsors"
 msgstr "Sponsori de argint"
 
-msgid "Godot Engine contributors"
-msgstr "Contribuabili Motor Godot"
+msgid "Jundot Engine contributors"
+msgstr "Contribuabili Motor Jundot"
 
-msgid "Thanks from the Godot community!"
-msgstr "Mulțumesc din partea comunităţii Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "Mulțumesc din partea comunităţii Jundot!"
 
 msgid "Authors"
 msgstr "Autori"
@@ -2865,12 +2865,12 @@ msgid "Third-party Licenses"
 msgstr "Licenţe Thirdparty"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Motorul Godot se bazează pe un număr de biblioteci thirdparty gratis și "
+"Motorul Jundot se bazează pe un număr de biblioteci thirdparty gratis și "
 "opensource, toate compatibile cu termenii licenţei MIT ai lui. Mai jos este o "
 "listă exhaustivă a tuturor acestor componente de thirdparty cu declaraţiile "
 "de autor respective şi termenii licenței."
@@ -3967,8 +3967,8 @@ msgstr "'%s' nu poate fi deschis. Fișierul ar putea fi modificat sau șters."
 msgid "Online Docs"
 msgstr "Documentație Online"
 
-msgid "Open Godot online documentation."
-msgstr "Deschideți documentația online Godot."
+msgid "Open Jundot online documentation."
+msgstr "Deschideți documentația online Jundot."
 
 msgid "Open..."
 msgstr "Deschide..."
@@ -4161,7 +4161,7 @@ msgstr ""
 msgid "New profile name:"
 msgstr "Nume de profil nou:"
 
-msgid "Godot Feature Profile"
+msgid "Jundot Feature Profile"
 msgstr "Administrează Șabloanele de Export"
 
 msgid "Import Profile(s)"

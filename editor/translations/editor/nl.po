@@ -1,7 +1,7 @@
-# Dutch translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Dutch translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # aelspire <aelspire@gmail.com>, 2017.
 # Aram Nap <xyphex.aram@gmail.com>, 2017.
 # Arjan219 <arjannugteren1@gmail.com>, 2017-2018, 2020.
@@ -55,7 +55,7 @@
 # naan <xlightfox@hotmail.com>, 2021.
 # Tim Visee <tim+weblate@visee.me>, 2022.
 # Ferhat Geçdoğan <ferhatgectao@gmail.com>, 2022.
-# Rémi Verschelde <remi@godotengine.org>, 2022.
+# Rémi Verschelde <remi@jundotengine.org>, 2022.
 # Wouter <mysticaldev@hotmail.com>, 2022.
 # voylin <0voylin0@gmail.com>, 2022.
 # Gert-dev <qnyasgjhapqyuhoibr@kiabws.com>, 2022.
@@ -94,12 +94,12 @@
 # Flying Piano <flyingpiano27@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-02-08 06:09+0000\n"
 "Last-Translator: Flying Piano <flyingpiano27@gmail.com>\n"
-"Language-Team: Dutch <https://hosted.weblate.org/projects/godot-engine/godot/"
+"Language-Team: Dutch <https://hosted.weblate.org/projects/jundot-engine/jundot/"
 "nl/>\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -3465,8 +3465,8 @@ msgstr "Open het %s-paneel."
 msgid "Focus on the %s dock."
 msgstr "Focus naar het %s-paneel."
 
-msgid "%s - Godot Engine"
-msgstr "%s - Godot Engine"
+msgid "%s - Jundot Engine"
+msgstr "%s - Jundot Engine"
 
 msgid "Move this dock right one tab."
 msgstr "Beweeg dit paneel een tab naar rechts."
@@ -3830,7 +3830,7 @@ msgid "History of recently edited objects."
 msgstr "Geschiedenis van recent bewerkte objecten."
 
 msgid "Open documentation for this object."
-msgstr "Open Godot online documentatie."
+msgstr "Open Jundot online documentatie."
 
 msgid "Open Documentation"
 msgstr "Documentatie openen"
@@ -4130,10 +4130,10 @@ msgstr "Bestand '%s' of een van de afhankelijkheden ontbreekt."
 
 msgid ""
 "File '%s' is saved in a format that is newer than the formats supported by "
-"this version of Godot, so it can't be opened."
+"this version of Jundot, so it can't be opened."
 msgstr ""
 "Bestand \"%s\" is in een bestandsformaat opgeslagen dat nieuwer is dan de "
-"bestandsformaten die ondersteund worden door deze versie van Godot, dus kan "
+"bestandsformaten die ondersteund worden door deze versie van Jundot, dus kan "
 "het niet opgeslagen worden."
 
 msgid "Error while loading file '%s'."
@@ -4646,11 +4646,11 @@ msgstr "Stel een functie voor"
 msgid "Send Docs Feedback"
 msgstr "Stuur documentatie­feedback"
 
-msgid "About Godot..."
-msgstr "Over Godot…"
+msgid "About Jundot..."
+msgstr "Over Jundot…"
 
-msgid "Support Godot Development"
-msgstr "Steun Godot-ontwikkeling"
+msgid "Support Jundot Development"
+msgstr "Steun Jundot-ontwikkeling"
 
 msgid "Open Script Editor"
 msgstr "Script­bewerker openen"
@@ -4823,8 +4823,8 @@ msgstr "Downloaden van:"
 msgid "Select Template File"
 msgstr "Selecteer sjabloonbestand"
 
-msgid "Godot Export Templates"
-msgstr "Godot Export Templates"
+msgid "Jundot Export Templates"
+msgstr "Jundot Export Templates"
 
 msgid "Export templates for this platform are missing:"
 msgstr "Vermiste Exportsjablonen voor dit platform:"
@@ -4953,19 +4953,19 @@ msgstr "Exporteer PCK/Zip..."
 
 msgid ""
 "Export the project resources as a PCK or ZIP package. This is not a playable "
-"build, only the project data without a Godot executable."
+"build, only the project data without a Jundot executable."
 msgstr ""
 "Exporteer de project resources als een PCK of ZIP pakket. Dit is geen "
-"uitvoerbare build, alleen de project data zonder Godot executable."
+"uitvoerbare build, alleen de project data zonder Jundot executable."
 
 msgid "Export Project..."
 msgstr "Exporteer project..."
 
 msgid ""
-"Export the project as a playable build (Godot executable and project data) "
+"Export the project as a playable build (Jundot executable and project data) "
 "for the selected preset."
 msgstr ""
-"Exporteer het project als een speelbare build (Godot ecxecutable en project "
+"Exporteer het project als een speelbare build (Jundot ecxecutable en project "
 "data) voor de geselecteerde voorinstelling."
 
 msgid "Export All"
@@ -5255,8 +5255,8 @@ msgstr "Platina Leden"
 msgid "Gold Members"
 msgstr "Gouden Leden"
 
-msgid "Thank you for choosing Godot Engine!"
-msgstr "Bedankt dat je voor Godot Engine gekozen hebt!"
+msgid "Thank you for choosing Jundot Engine!"
+msgstr "Bedankt dat je voor Jundot Engine gekozen hebt!"
 
 msgid "Name cannot be empty."
 msgstr "Naam kan niet leeg zijn."
@@ -5307,14 +5307,14 @@ msgstr "Basispad: %s."
 msgid "Folder name is valid."
 msgstr "Mapnaam is ongeldig."
 
-msgid "Godot Engine contributors"
-msgstr "Bijdragers aan Godot Engine"
+msgid "Jundot Engine contributors"
+msgstr "Bijdragers aan Jundot Engine"
 
 msgid "Double-click to open in browser."
 msgstr "Dubbelklik om in een browser te openen."
 
-msgid "Thanks from the Godot community!"
-msgstr "Bedankt van de Godot-gemeenschap!"
+msgid "Thanks from the Jundot community!"
+msgstr "Bedankt van de Jundot-gemeenschap!"
 
 msgid "Authors"
 msgstr "Auteurs"
@@ -5326,12 +5326,12 @@ msgid "Third-party Licenses"
 msgstr "Licenties van derden"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot Engine maakt gebruik van een aantal gratis en open-source bibliotheken, "
+"Jundot Engine maakt gebruik van een aantal gratis en open-source bibliotheken, "
 "ontwikkeld door derden, die compatibel zijn met de MIT-licentie. Wat volgt is "
 "een uitputtende lijst van alle componenten van derde partijen met hun "
 "respectievelijke copyrightberichten en licentietermen."
@@ -5842,8 +5842,8 @@ msgid "It would be a good idea to name your project."
 msgstr "Het zou een goed idee zijn om uw project een naam te geven."
 
 msgid ""
-"Invalid \".zip\" project file; it doesn't contain a \"project.godot\" file."
-msgstr "Ongeldig '.zip' projectbestand, bevat geen 'project.godot' bestand."
+"Invalid \".zip\" project file; it doesn't contain a \"project.jundot\" file."
+msgstr "Ongeldig '.zip' projectbestand, bevat geen 'project.jundot' bestand."
 
 msgid "The path specified doesn't exist."
 msgstr "Dit pad bestaat niet."
@@ -5851,8 +5851,8 @@ msgstr "Dit pad bestaat niet."
 msgid "New Game Project"
 msgstr "Nieuw spelproject"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "Kan project.godot niet in projectpad maken."
+msgid "Couldn't create project.jundot in project path."
+msgstr "Kan project.jundot niet in projectpad maken."
 
 msgid "Error opening package file, not in ZIP format."
 msgstr "Fout bij het openen van het pakketbestand, geen zip-formaat."
@@ -8067,8 +8067,8 @@ msgstr "Thema Opslaan Als..."
 msgid "Online Docs"
 msgstr "Online Documentatie"
 
-msgid "Open Godot online documentation."
-msgstr "Open Godot online documentatie."
+msgid "Open Jundot online documentation."
+msgstr "Open Jundot online documentatie."
 
 msgid "%s Class Reference"
 msgstr "%s Klassereferentie"
@@ -8392,14 +8392,14 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "Fysica-server (2D)"
 
-msgid "Godot Physics (2D)"
-msgstr "Godot Physics (2D)"
+msgid "Jundot Physics (2D)"
+msgstr "Jundot Physics (2D)"
 
 msgid "Physics Server (3D)"
 msgstr "Fysica-server (3D)"
 
-msgid "Godot Physics (3D)"
-msgstr "Godot Physics (3D)"
+msgid "Jundot Physics (3D)"
+msgstr "Jundot Physics (3D)"
 
 msgid "Jolt Physics"
 msgstr "Jolt Physics"
@@ -8447,11 +8447,11 @@ msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr ""
 "OpenGL-backend (indien uitgeschakeld is de RenderingDevice-backend vereist)."
 
-msgid "Godot Physics backend (2D)."
-msgstr "Godot Physics-backend (2D)."
+msgid "Jundot Physics backend (2D)."
+msgstr "Jundot Physics-backend (2D)."
 
-msgid "Godot Physics backend (3D)."
-msgstr "Godot Physics-backend (3D)."
+msgid "Jundot Physics backend (3D)."
+msgstr "Jundot Physics-backend (3D)."
 
 msgid "Jolt Physics backend (3D only)."
 msgstr "Jolt Physics-backend (alleen voor 3D)."
@@ -8721,8 +8721,8 @@ msgstr ""
 msgid "New profile name:"
 msgstr "Nieuwe profielnaam:"
 
-msgid "Godot Feature Profile"
-msgstr "Godot-eigenschappenprofiel"
+msgid "Jundot Feature Profile"
+msgstr "Jundot-eigenschappenprofiel"
 
 msgid "Import Profile(s)"
 msgstr "Profiel(en) importeren"
@@ -8856,8 +8856,8 @@ msgstr "Wijzig Action Deadzone"
 msgid "Erase Input Action"
 msgstr "Verwijder Input Actie"
 
-msgid "Project Settings (project.godot)"
-msgstr "Projectinstellingen (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Projectinstellingen (project.jundot)"
 
 msgid "Input Map"
 msgstr "Invoertoewijzing"
@@ -9803,11 +9803,11 @@ msgstr ""
 "en 'y''."
 
 msgid ""
-"Custom Godot Shader Language expression, with custom amount of input and "
+"Custom Jundot Shader Language expression, with custom amount of input and "
 "output ports. This is a direct injection of code into the vertex/fragment/"
 "light function, do not use it to write the function declarations inside."
 msgstr ""
-"Aangepaste Godot Shader Language expressie, met aangepast aantal in- en "
+"Aangepaste Jundot Shader Language expressie, met aangepast aantal in- en "
 "uitvoerpoorten. Dit is een directe injectie van code in de vertex/fragment/"
 "light functie, niet gebruiken om functie declaraties in te schrijven."
 

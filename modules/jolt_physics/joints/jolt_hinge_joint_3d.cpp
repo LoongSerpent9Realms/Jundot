@@ -2,10 +2,10 @@
 /*  jolt_hinge_joint_3d.cpp                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -121,7 +121,7 @@ void JoltHingeJoint3D::_update_motor_velocity() {
 	}
 
 	if (JPH::HingeConstraint *constraint = static_cast<JPH::HingeConstraint *>(jolt_ref.GetPtr())) {
-		// We flip the direction since Jolt is CCW but Godot is CW.
+		// We flip the direction since Jolt is CCW but Jundot is CW.
 		constraint->SetTargetAngularVelocity((float)-motor_target_speed);
 	}
 }
@@ -192,7 +192,7 @@ double JoltHingeJoint3D::get_param(Parameter p_param) const {
 			return motor_target_speed;
 		}
 		case PhysicsServer3D::HINGE_JOINT_MOTOR_MAX_IMPULSE: {
-			// With Godot using max impulse instead of max torque we don't have much choice but to calculate this and hope the timestep doesn't change.
+			// With Jundot using max impulse instead of max torque we don't have much choice but to calculate this and hope the timestep doesn't change.
 			return motor_max_torque * estimate_physics_step();
 		}
 		default: {
@@ -236,7 +236,7 @@ void JoltHingeJoint3D::set_param(Parameter p_param, double p_value) {
 			_motor_speed_changed();
 		} break;
 		case PhysicsServer3D::HINGE_JOINT_MOTOR_MAX_IMPULSE: {
-			// With Godot using max impulse instead of max torque we don't have much choice but to calculate this and hope the timestep doesn't change.
+			// With Jundot using max impulse instead of max torque we don't have much choice but to calculate this and hope the timestep doesn't change.
 			motor_max_torque = p_value / estimate_physics_step();
 			_motor_limit_changed();
 		} break;

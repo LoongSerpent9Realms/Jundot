@@ -22,7 +22,7 @@
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// Forward declarations to avoid conflicts with Godot types (String, Object, Error)
+// Forward declarations to avoid conflicts with Jundot types (String, Object, Error)
 namespace NS {
 class Array;
 class Dictionary;

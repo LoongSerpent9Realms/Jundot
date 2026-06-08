@@ -2,10 +2,10 @@
 /*  shader_baker_export_plugin.cpp                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -112,10 +112,10 @@ bool ShaderBakerExportPlugin::_begin_customize_resources(const Ref<EditorExportP
 	tasks_cancelled = false;
 
 	StringBuilder to_hash;
-	to_hash.append("[GodotVersionNumber]");
-	to_hash.append(GODOT_VERSION_NUMBER);
-	to_hash.append("[GodotVersionHash]");
-	to_hash.append(GODOT_VERSION_HASH);
+	to_hash.append("[JundotVersionNumber]");
+	to_hash.append(JUNDOT_VERSION_NUMBER);
+	to_hash.append("[JundotVersionHash]");
+	to_hash.append(JUNDOT_VERSION_HASH);
 	to_hash.append("[Renderer]");
 	to_hash.append(shader_cache_renderer_name);
 	customization_configuration_hash = to_hash.as_string().hash64();

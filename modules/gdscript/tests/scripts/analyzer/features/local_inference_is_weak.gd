@@ -1,4 +1,4 @@
-# https://github.com/godotengine/godot/issues/41064
+# https://github.com/jundotengine/jundot/issues/41064
 var x = true
 
 func test():

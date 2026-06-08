@@ -41,7 +41,7 @@ if env["builtin_miniupnpc"] and env["platform"] != "web":
     env.modules_sources += thirdparty_obj
 
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

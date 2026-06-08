@@ -1,7 +1,7 @@
-# Italian translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Italian translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Alessio Corridori <alessiocorridori@hotmail.com>, 2018.
 # Dario Bonfanti <bonfi.96@hotmail.it>, 2016-2017.
 # Dario D'Ambra <legione0@gmail.com>, 2017.
@@ -105,13 +105,13 @@
 # Gianmarco Cavallo <cavallogianmarco@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-23 08:11+0000\n"
 "Last-Translator: Gianmarco Cavallo <cavallogianmarco@gmail.com>\n"
-"Language-Team: Italian <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/it/>\n"
+"Language-Team: Italian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/it/>\n"
 "Language: it\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3787,8 +3787,8 @@ msgstr "Traccia sempre gli stack di chiamate"
 msgid "Always Track Local Variables"
 msgstr "Traccia sempre le variabili locali"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Rinominato in Godot 4 (suggerimento)"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Rinominato in Jundot 4 (suggerimento)"
 
 msgid "Unassigned Variable"
 msgstr "Variabile non assegnata"
@@ -4174,11 +4174,11 @@ msgstr "Luce"
 msgid "Visible"
 msgstr "Visibile"
 
-msgid "glTF to Godot Expression"
-msgstr "Espressione da glTF a Godot"
+msgid "glTF to Jundot Expression"
+msgstr "Espressione da glTF a Jundot"
 
-msgid "Godot to glTF Expression"
-msgstr "Espressione da Godot a glTF"
+msgid "Jundot to glTF Expression"
+msgstr "Espressione da Jundot a glTF"
 
 msgid "Node Paths"
 msgstr "Percorsi dei nodi"
@@ -4198,8 +4198,8 @@ msgstr "Articolazioni"
 msgid "Roots"
 msgstr "Radici"
 
-msgid "Godot Bone Node"
-msgstr "Nodo d'osso di Godot"
+msgid "Jundot Bone Node"
+msgstr "Nodo d'osso di Jundot"
 
 msgid "Skin Root"
 msgstr "Radice della Skin"
@@ -4210,8 +4210,8 @@ msgstr "Articolazioni originali"
 msgid "Non Joints"
 msgstr "Non articolazioni"
 
-msgid "Godot Skin"
-msgstr "Skin Godot"
+msgid "Jundot Skin"
+msgstr "Skin Jundot"
 
 msgid "Src Image"
 msgstr "Immagine sorgente"
@@ -5509,8 +5509,8 @@ msgstr "Icona 512 x 512"
 msgid "Emscripten Pool Size"
 msgstr "Dimensione di pool di Emscripten"
 
-msgid "Godot Pool Size"
-msgstr "Dimensione di pool di Godot"
+msgid "Jundot Pool Size"
+msgstr "Dimensione di pool di Jundot"
 
 msgid "Windows"
 msgstr "Windows"

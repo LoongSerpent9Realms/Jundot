@@ -2,10 +2,10 @@
 /*  wayland_embedder.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -43,7 +43,7 @@
 #include "protocol/cursor_shape.gen.h"
 #include "protocol/fifo_v1.gen.h"
 #include "protocol/fractional_scale.gen.h"
-#include "protocol/godot_embedding_compositor.gen.h"
+#include "protocol/jundot_embedding_compositor.gen.h"
 #include "protocol/idle_inhibit.gen.h"
 #include "protocol/linux_dmabuf_v1.gen.h"
 #include "protocol/linux_drm_syncobj_v1.gen.h"
@@ -473,8 +473,8 @@ class WaylandEmbedder {
 		&wp_pointer_warp_v1_interface,
 
 		// Our custom things.
-		&godot_embedding_compositor_interface,
-		&godot_embedded_client_interface,
+		&jundot_embedding_compositor_interface,
+		&jundot_embedded_client_interface,
 	};
 
 	// These interfaces will not be reported to embedded clients. This includes
@@ -486,7 +486,7 @@ class WaylandEmbedder {
 			&zxdg_exporter_v1_interface,
 			&zxdg_exporter_v2_interface,
 			&xdg_toplevel_icon_manager_v1_interface,
-			&godot_embedding_compositor_interface,
+			&jundot_embedding_compositor_interface,
 	});
 
 	static constexpr uint32_t INVALID_ID = 0;
@@ -520,7 +520,7 @@ class WaylandEmbedder {
 	HashMap<uint32_t, RegistryGlobalInfo> registry_globals;
 	uint32_t registry_globals_counter = 0;
 
-	uint32_t godot_embedding_compositor_name = 0;
+	uint32_t jundot_embedding_compositor_name = 0;
 
 	LocalVector<uint32_t> wl_seat_names;
 

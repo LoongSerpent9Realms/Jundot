@@ -2,10 +2,10 @@
 /*  jolt_body_3d.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -149,8 +149,8 @@ void JoltBody3D::_integrate_forces(float p_step) {
 
 	JPH::MotionProperties &motion_properties = *jolt_body->GetMotionPropertiesUnchecked();
 
-	// Jolt applies damping differently from Godot Physics, where Godot Physics applies damping before integrating
-	// forces whereas Jolt does it after integrating forces. The way Godot Physics does it seems to yield more
+	// Jolt applies damping differently from Jundot Physics, where Jundot Physics applies damping before integrating
+	// forces whereas Jolt does it after integrating forces. The way Jundot Physics does it seems to yield more
 	// consistent results across different update frequencies when using high (>1) damping values, so we apply the
 	// damping ourselves instead, before any force integration happens.
 	JPH::Vec3 linear_velocity = motion_properties.GetLinearVelocity();
@@ -288,7 +288,7 @@ void JoltBody3D::_update_environmental_properties() {
 	total_linear_damp = 0.0f;
 	total_angular_damp = 0.0f;
 
-	const Vector3 position = to_godot(jolt_body->GetPosition());
+	const Vector3 position = to_jundot(jolt_body->GetPosition());
 
 	bool gravity_done = false;
 	bool linear_damp_done = linear_damp_mode == PhysicsServer3D::BODY_DAMP_MODE_REPLACE;
@@ -708,7 +708,7 @@ Basis JoltBody3D::get_principal_inertia_axes() const {
 		return Basis();
 	}
 
-	return to_godot(jolt_body->GetRotation() * jolt_body->GetMotionPropertiesUnchecked()->GetInertiaRotation());
+	return to_jundot(jolt_body->GetRotation() * jolt_body->GetMotionPropertiesUnchecked()->GetInertiaRotation());
 }
 
 Vector3 JoltBody3D::get_inverse_inertia() const {
@@ -718,7 +718,7 @@ Vector3 JoltBody3D::get_inverse_inertia() const {
 		return Vector3();
 	}
 
-	return to_godot(jolt_body->GetMotionPropertiesUnchecked()->GetLocalSpaceInverseInertia().GetDiagonal3());
+	return to_jundot(jolt_body->GetMotionPropertiesUnchecked()->GetLocalSpaceInverseInertia().GetDiagonal3());
 }
 
 Basis JoltBody3D::get_inverse_inertia_tensor() const {
@@ -728,7 +728,7 @@ Basis JoltBody3D::get_inverse_inertia_tensor() const {
 		return Basis();
 	}
 
-	return to_godot(jolt_body->GetInverseInertia()).basis;
+	return to_jundot(jolt_body->GetInverseInertia()).basis;
 }
 
 void JoltBody3D::set_linear_velocity(const Vector3 &p_velocity) {
@@ -763,7 +763,7 @@ void JoltBody3D::set_axis_velocity(const Vector3 &p_axis_velocity) {
 	const Vector3 axis = p_axis_velocity.normalized();
 
 	if (!in_space()) {
-		Vector3 linear_velocity = to_godot(jolt_settings->mLinearVelocity);
+		Vector3 linear_velocity = to_jundot(jolt_settings->mLinearVelocity);
 		linear_velocity -= axis * axis.dot(linear_velocity);
 		linear_velocity += p_axis_velocity;
 		jolt_settings->mLinearVelocity = to_jolt(linear_velocity);
@@ -783,9 +783,9 @@ Vector3 JoltBody3D::get_velocity_at_position(const Vector3 &p_position) const {
 	}
 
 	const JPH::MotionProperties &motion_properties = *jolt_body->GetMotionPropertiesUnchecked();
-	const Vector3 total_linear_velocity = to_godot(motion_properties.GetLinearVelocity()) + linear_surface_velocity;
-	const Vector3 total_angular_velocity = to_godot(motion_properties.GetAngularVelocity()) + angular_surface_velocity;
-	const Vector3 com_to_pos = p_position - to_godot(jolt_body->GetCenterOfMassPosition());
+	const Vector3 total_linear_velocity = to_jundot(motion_properties.GetLinearVelocity()) + linear_surface_velocity;
+	const Vector3 total_angular_velocity = to_jundot(motion_properties.GetAngularVelocity()) + angular_surface_velocity;
+	const Vector3 com_to_pos = p_position - to_jundot(jolt_body->GetCenterOfMassPosition());
 
 	return total_linear_velocity + total_angular_velocity.cross(com_to_pos);
 }

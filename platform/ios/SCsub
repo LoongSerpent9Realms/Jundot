@@ -11,7 +11,7 @@ ios_lib = [
     "device_metrics.mm",
     "display_layer_ios.mm",
     "display_server_ios.mm",
-    "godot_view_ios.mm",
+    "jundot_view_ios.mm",
     "main_ios.mm",
     "os_ios.mm",
 ]
@@ -26,7 +26,7 @@ if "LIBS_EXTERNAL" in env_ios:
     env_ios.Depends(ios_lib, env_ios["LIBS_EXTERNAL"])
 
 combine_command = env_ios.CommandNoCache(
-    "#bin/libgodot" + env_ios["LIBSUFFIX"], [ios_lib] + env_ios["LIBS"], env.Run(combine_libs_apple_embedded)
+    "#bin/libjundot" + env_ios["LIBSUFFIX"], [ios_lib] + env_ios["LIBS"], env.Run(combine_libs_apple_embedded)
 )
 
 if env["generate_bundle"]:

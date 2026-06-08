@@ -1,7 +1,7 @@
-# Swedish translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Swedish translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # bergmarklund <davemcgroin@gmail.com>, 2017, 2018.
 # Christoffer Sundbom <christoffer_karlsson@live.se>, 2017, 2021.
 # Jakob Sinclair <sinclair.jakob@mailbox.org>, 2018.
@@ -38,13 +38,13 @@
 # "A Thousand Ships (she/her)" <over999ships@gmail.com>, 2025.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-02-18 18:10+0000\n"
 "Last-Translator: Lasse Edsvik <lasse@lasseedsvik.se>\n"
-"Language-Team: Swedish <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/sv/>\n"
+"Language-Team: Swedish <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/sv/>\n"
 "Language: sv\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3848,8 +3848,8 @@ msgstr "Spåra alltid anropsstackar"
 msgid "Always Track Local Variables"
 msgstr "Spåra alltid lokala variabler"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Omdöpt i Godot 4‑hint"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Omdöpt i Jundot 4‑hint"
 
 msgid "Unassigned Variable"
 msgstr "Oassignerad variabel"
@@ -4241,11 +4241,11 @@ msgstr "Ljus"
 msgid "Visible"
 msgstr "Synlig"
 
-msgid "glTF to Godot Expression"
-msgstr "glTF‑ till Godot‑uttryck"
+msgid "glTF to Jundot Expression"
+msgstr "glTF‑ till Jundot‑uttryck"
 
-msgid "Godot to glTF Expression"
-msgstr "Godot‑ till glTF‑uttryck"
+msgid "Jundot to glTF Expression"
+msgstr "Jundot‑ till glTF‑uttryck"
 
 msgid "Node Paths"
 msgstr "Nodvägar"
@@ -4265,8 +4265,8 @@ msgstr "Leder"
 msgid "Roots"
 msgstr "Rötter"
 
-msgid "Godot Bone Node"
-msgstr "Godot‑bennod"
+msgid "Jundot Bone Node"
+msgstr "Jundot‑bennod"
 
 msgid "Skin Root"
 msgstr "Skin‑rot"
@@ -4277,8 +4277,8 @@ msgstr "Ursprungliga leder"
 msgid "Non Joints"
 msgstr "Icke‑leder"
 
-msgid "Godot Skin"
-msgstr "Godot‑skin"
+msgid "Jundot Skin"
+msgstr "Jundot‑skin"
 
 msgid "Src Image"
 msgstr "Källbild"
@@ -5627,8 +5627,8 @@ msgstr "Ikon 512 X 512"
 msgid "Emscripten Pool Size"
 msgstr "Emscripten‑poolstorlek"
 
-msgid "Godot Pool Size"
-msgstr "Godot‑poolstorlek"
+msgid "Jundot Pool Size"
+msgstr "Jundot‑poolstorlek"
 
 msgid "Windows"
 msgstr "Fönster"

@@ -43,8 +43,8 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-build-fixes.patch` ([GH-81197](https://github.com/godotengine/godot/pull/81197))
-- `0002-godot-fsr2-options.patch` ([GH-81197](https://github.com/godotengine/godot/pull/81197))
+- `0001-build-fixes.patch` ([GH-81197](https://github.com/jundotengine/jundot/pull/81197))
+- `0002-jundot-fsr2-options.patch` ([GH-81197](https://github.com/jundotengine/jundot/pull/81197))
 
 
 ## angle
@@ -85,12 +85,12 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-external-zstd-pr344.patch` ([GH-73441](https://github.com/godotengine/godot/pull/73441))
-- `0002-external-tinyexr.patch` ([GH-97582](https://github.com/godotengine/godot/pull/97582))
-- `0003-remove-tinydds-qoi.patch` ([GH-97582](https://github.com/godotengine/godot/pull/97582))
-- `0004-clang-warning-exclude.patch` ([GH-111346](https://github.com/godotengine/godot/pull/111346))
-- `0005-unused-typedef.patch` ([GH-111445](https://github.com/godotengine/godot/pull/111445))
-- `0006-explicit-includes.patch` ([GH-111557](https://github.com/godotengine/godot/pull/111557))
+- `0001-external-zstd-pr344.patch` ([GH-73441](https://github.com/jundotengine/jundot/pull/73441))
+- `0002-external-tinyexr.patch` ([GH-97582](https://github.com/jundotengine/jundot/pull/97582))
+- `0003-remove-tinydds-qoi.patch` ([GH-97582](https://github.com/jundotengine/jundot/pull/97582))
+- `0004-clang-warning-exclude.patch` ([GH-111346](https://github.com/jundotengine/jundot/pull/111346))
+- `0005-unused-typedef.patch` ([GH-111445](https://github.com/jundotengine/jundot/pull/111445))
+- `0006-explicit-includes.patch` ([GH-111557](https://github.com/jundotengine/jundot/pull/111557))
 
 
 ## brotli
@@ -130,8 +130,8 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-disable-exceptions.patch` ([GH-80796](https://github.com/godotengine/godot/pull/80796))
-- `0002-llvm-21-header.patch` ([GH-113850](https://github.com/godotengine/godot/pull/113850))
+- `0001-disable-exceptions.patch` ([GH-80796](https://github.com/jundotengine/jundot/pull/80796))
+- `0002-llvm-21-header.patch` ([GH-113850](https://github.com/jundotengine/jundot/pull/113850))
 
 
 ## cvtt
@@ -147,7 +147,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-revert-bc6h-reorg.patch` ([GH-73715](https://github.com/godotengine/godot/pull/73715))
+- `0001-revert-bc6h-reorg.patch` ([GH-73715](https://github.com/jundotengine/jundot/pull/73715))
 
 
 ## d3d12ma
@@ -164,7 +164,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-mingw-support.patch` ([GH-83452](https://github.com/godotengine/godot/pull/83452))
+- `0001-mingw-support.patch` ([GH-83452](https://github.com/jundotengine/jundot/pull/83452))
 
 
 ## directx_headers
@@ -181,7 +181,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-win7-8-dynamic-load.patch` ([GH-88496](https://github.com/godotengine/godot/pull/88496))
+- `0001-win7-8-dynamic-load.patch` ([GH-88496](https://github.com/jundotengine/jundot/pull/88496))
 
 
 ## doctest
@@ -197,7 +197,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-ciso646-version.patch` ([GH-105913](https://github.com/godotengine/godot/pull/105913))
+- `0001-ciso646-version.patch` ([GH-105913](https://github.com/jundotengine/jundot/pull/105913))
 
 
 ## dr_libs
@@ -211,7 +211,7 @@ Files extracted from upstream source:
 - `dr_mp3.h`
 - `LICENSE`
 
-`dr_bridge.h` is a Godot file and should be preserved on updates.
+`dr_bridge.h` is a Jundot file and should be preserved on updates.
 
 
 ## embree
@@ -222,21 +222,21 @@ Files extracted from upstream source:
 
 Files extracted from upstream:
 
-- All `.cpp` files listed in `modules/raycast/godot_update_embree.py`
-- All header files in the directories listed in `modules/raycast/godot_update_embree.py`
-- All config files listed in `modules/raycast/godot_update_embree.py`
+- All `.cpp` files listed in `modules/raycast/jundot_update_embree.py`
+- All header files in the directories listed in `modules/raycast/jundot_update_embree.py`
+- All config files listed in `modules/raycast/jundot_update_embree.py`
 - `LICENSE.txt`
 
 Patches:
 
-- `0001-disable-exceptions.patch` ([GH-48050](https://github.com/godotengine/godot/pull/48050))
-- `0002-godot-config.patch` ([GH-88783](https://github.com/godotengine/godot/pull/88783))
-- `0003-emscripten-nthreads.patch` ([GH-69799](https://github.com/godotengine/godot/pull/69799))
-- `0004-mingw-no-cpuidex.patch` ([GH-92488](https://github.com/godotengine/godot/pull/92488))
-- `0005-mingw-llvm-arm64.patch` ([GH-93364](https://github.com/godotengine/godot/pull/93364))
-- `0006-explicit-includes.patch` ([GH-111557](https://github.com/godotengine/godot/pull/111557))
+- `0001-disable-exceptions.patch` ([GH-48050](https://github.com/jundotengine/jundot/pull/48050))
+- `0002-jundot-config.patch` ([GH-88783](https://github.com/jundotengine/jundot/pull/88783))
+- `0003-emscripten-nthreads.patch` ([GH-69799](https://github.com/jundotengine/jundot/pull/69799))
+- `0004-mingw-no-cpuidex.patch` ([GH-92488](https://github.com/jundotengine/jundot/pull/92488))
+- `0005-mingw-llvm-arm64.patch` ([GH-93364](https://github.com/jundotengine/jundot/pull/93364))
+- `0006-explicit-includes.patch` ([GH-111557](https://github.com/jundotengine/jundot/pull/111557))
 
-The `modules/raycast/godot_update_embree.py` script can be used to pull the
+The `modules/raycast/jundot_update_embree.py` script can be used to pull the
 relevant files from the latest Embree release and apply patches automatically.
 
 
@@ -251,12 +251,12 @@ Files extracted from upstream source:
 - All `.c` files in the main directory (except `unix.c` and `win32.c`)
 - The `include/enet/` folder as `enet/` (except `unix.h` and `win32.h`)
 - `LICENSE` file
-- Added 3 files `enet_godot.cpp`, `enet/enet_godot.h`, and `enet/enet_godot_ext.h`,
-  providing ENet socket implementation using Godot classes, allowing IPv6 and DTLS.
+- Added 3 files `enet_jundot.cpp`, `enet/enet_jundot.h`, and `enet/enet_jundot_ext.h`,
+  providing ENet socket implementation using Jundot classes, allowing IPv6 and DTLS.
 
 Patches:
 
-- `0001-godot-socket.patch` ([GH-7985](https://github.com/godotengine/godot/pull/7985))
+- `0001-jundot-socket.patch` ([GH-7985](https://github.com/jundotengine/jundot/pull/7985))
 
 Important: Building against a system wide ENet is possible, but will limit its
 functionality to IPv4 only and no DTLS. We recommend against it.
@@ -280,7 +280,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-remove-bc7enc.patch` ([GH-101362](https://github.com/godotengine/godot/pull/101362))
+- `0001-remove-bc7enc.patch` ([GH-101362](https://github.com/jundotengine/jundot/pull/101362))
 
 
 ## fonts
@@ -381,7 +381,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-fix-warnings.patch` ([GH-111679](https://github.com/godotengine/godot/pull/111679))
+- `0001-fix-warnings.patch` ([GH-111679](https://github.com/jundotengine/jundot/pull/111679))
 
 ## glad
 
@@ -407,8 +407,8 @@ to regenerate the files with a new version of the web instance.
 
 Patches:
 
-- `0001-enable-both-gl-and-gles.patch` ([GH-72831](https://github.com/godotengine/godot/pull/72831))
-- `0002-revert-egl_static-removal.patch` ([GH-107312](https://github.com/godotengine/godot/pull/107312))
+- `0001-enable-both-gl-and-gles.patch` ([GH-72831](https://github.com/jundotengine/jundot/pull/72831))
+- `0002-revert-egl_static-removal.patch` ([GH-107312](https://github.com/jundotengine/jundot/pull/107312))
 
 
 ## glslang
@@ -434,8 +434,8 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-apple-disable-absolute-paths.patch` ([GH-92010](https://github.com/godotengine/godot/pull/92010))
-- `0002-apple-m1-msaa-fix.patch` ([GH-115893](https://github.com/godotengine/godot/issues/115893))
+- `0001-apple-disable-absolute-paths.patch` ([GH-92010](https://github.com/jundotengine/jundot/pull/92010))
+- `0002-apple-m1-msaa-fix.patch` ([GH-115893](https://github.com/jundotengine/jundot/issues/115893))
 
 
 ## graphite
@@ -463,7 +463,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-godot-changes.patch` ([GH-98750](https://github.com/godotengine/godot/pull/98750))
+- `0001-jundot-changes.patch` ([GH-98750](https://github.com/jundotengine/jundot/pull/98750))
 
 
 ## harfbuzz
@@ -495,7 +495,7 @@ Files extracted from upstream source:
 
 Files generated from upstream source:
 
-- The `icudt_godot.dat` built with the provided `godot_data.json` config file (see
+- The `icudt_jundot.dat` built with the provided `jundot_data.json` config file (see
   https://github.com/unicode-org/icu/blob/master/docs/userguide/icu_data/buildtool.md
   for instructions).
 
@@ -503,9 +503,9 @@ Files generated from upstream source:
   (replace `data` subfolder from the main source archive)
 2. Build ICU with default options: `./runConfigureICU {PLATFORM} && make`
 3. Reconfigure ICU with custom data config:
-   `ICU_DATA_FILTER_FILE={GODOT_SOURCE}/thirdparty/icu4c/godot_data.json ./runConfigureICU {PLATFORM} --with-data-packaging=common`
+   `ICU_DATA_FILTER_FILE={JUNDOT_SOURCE}/thirdparty/icu4c/jundot_data.json ./runConfigureICU {PLATFORM} --with-data-packaging=common`
 4. Delete `data/out` folder and rebuild data: `cd data && rm -rf ./out && make`
-5. Copy `source/data/out/icudt{ICU_VERSION}l.dat` to the `{GODOT_SOURCE}/thirdparty/icu4c/icudt_godot.dat`
+5. Copy `source/data/out/icudt{ICU_VERSION}l.dat` to the `{JUNDOT_SOURCE}/thirdparty/icu4c/icudt_jundot.dat`
 
 
 ## jolt_physics
@@ -544,7 +544,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-big-files-support.patch` ([GH-100281](https://github.com/godotengine/godot/pull/100281))
+- `0001-big-files-support.patch` ([GH-100281](https://github.com/jundotengine/jundot/pull/100281))
 
 
 ## libjpeg-turbo
@@ -562,10 +562,10 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-cmake-generated-headers.patch` ([GH-104347](https://github.com/godotengine/godot/pull/104347))
+- `0001-cmake-generated-headers.patch` ([GH-104347](https://github.com/jundotengine/jundot/pull/104347))
   * Compare with CMake-generated headers to bump version and added potential new config values.
-- `0002-disable-16bitlossless.patch` ([GH-104347](https://github.com/godotengine/godot/pull/104347))
-- `0003-remove-bmp-ppm-support.patch` ([GH-104347](https://github.com/godotengine/godot/pull/104347))
+- `0002-disable-16bitlossless.patch` ([GH-104347](https://github.com/jundotengine/jundot/pull/104347))
+- `0003-remove-bmp-ppm-support.patch` ([GH-104347](https://github.com/jundotengine/jundot/pull/104347))
 
 
 ## libktx
@@ -587,9 +587,9 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-external-basisu.patch` ([GH-76572](https://github.com/godotengine/godot/pull/76572))
-- `0002-disable-astc-block-ext.patch` ([GH-76572](https://github.com/godotengine/godot/pull/76572))
-- `0003-basisu-1.60.patch` ([GH-103968](https://github.com/godotengine/godot/pull/103968))
+- `0001-external-basisu.patch` ([GH-76572](https://github.com/jundotengine/jundot/pull/76572))
+- `0002-disable-astc-block-ext.patch` ([GH-76572](https://github.com/jundotengine/jundot/pull/76572))
+- `0003-basisu-1.60.patch` ([GH-103968](https://github.com/jundotengine/jundot/pull/103968))
 
 
 ## libogg
@@ -658,9 +658,9 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-msvc-node-debug-rename.patch` ([GH-75769](https://github.com/godotengine/godot/pull/75769))
-- `0002-msvc-arm64-fpstrict.patch` ([GH-94655](https://github.com/godotengine/godot/pull/94655))
-- `0003-clang-cl-sse2-sse41-avx2.patch` ([GH-92316](https://github.com/godotengine/godot/pull/92316))
+- `0001-msvc-node-debug-rename.patch` ([GH-75769](https://github.com/jundotengine/jundot/pull/75769))
+- `0002-msvc-arm64-fpstrict.patch` ([GH-94655](https://github.com/jundotengine/jundot/pull/94655))
+- `0003-clang-cl-sse2-sse41-avx2.patch` ([GH-92316](https://github.com/jundotengine/jundot/pull/92316))
 
 
 ## linuxbsd_headers
@@ -695,14 +695,14 @@ File extracted from upstream release tarball:
   - Except `bignum_mod.c`, `block_cipher.c`, `ecp_curves_new.c`, `lmots.c`,
     `lms.c`
 - The `LICENSE` file (edited to keep only the Apache 2.0 variant)
-- Added 2 files `godot_core_mbedtls_platform.c` and `godot_core_mbedtls_config.h`
+- Added 2 files `jundot_core_mbedtls_platform.c` and `jundot_core_mbedtls_config.h`
   providing configuration for light bundling with core
-- Added 2 files `godot_module_mbedtls_config.h` and `threading_alt.h`
+- Added 2 files `jundot_module_mbedtls_config.h` and `threading_alt.h`
   to customize the build configuration when bundling the full library
 
 Patches:
 
-- `0001-msvc-2019-psa-redeclaration.patch` ([GH-90535](https://github.com/godotengine/godot/pull/90535))
+- `0001-msvc-2019-psa-redeclaration.patch` ([GH-90535](https://github.com/jundotengine/jundot/pull/90535))
 
 
 ## metal-cpp
@@ -746,9 +746,9 @@ Files extracted from upstream repository:
 
 Patches:
 
-- `0001-disable-exceptions.patch` ([GH-85039](https://github.com/godotengine/godot/pull/85039))
-- `0002-clang-std-replacements-leak.patch` ([GH-85208](https://github.com/godotengine/godot/pull/85208))
-- `0003-explicit-includes.patch` ([GH-111557](https://github.com/godotengine/godot/pull/111557))
+- `0001-disable-exceptions.patch` ([GH-85039](https://github.com/jundotengine/jundot/pull/85039))
+- `0002-clang-std-replacements-leak.patch` ([GH-85208](https://github.com/jundotengine/jundot/pull/85208))
+- `0003-explicit-includes.patch` ([GH-111557](https://github.com/jundotengine/jundot/pull/111557))
 
 
 ## miniupnpc
@@ -764,7 +764,7 @@ Files extracted from upstream source:
 - Remove the following test or sample files:
   `listdevices.c,minihttptestserver.c,miniupnpcmodule.c,upnpc.c,upnperrors.*,test*`
 - `LICENSE`
-- `src/miniupnpcstrings.h` was created manually for Godot (it is usually generated
+- `src/miniupnpcstrings.h` was created manually for Jundot (it is usually generated
   by CMake). Bump the version number for miniupnpc in that file when upgrading.
 
 
@@ -782,12 +782,12 @@ Files extracted from the upstream source:
 
 Patches:
 
-- `0001-godot-seek.patch` ([GH-10428](https://github.com/godotengine/godot/pull/10428))
+- `0001-jundot-seek.patch` ([GH-10428](https://github.com/jundotengine/jundot/pull/10428))
 
 
 ## misc
 
-Collection of single-file libraries used in Godot components.
+Collection of single-file libraries used in Jundot components.
 
 - `bcdec.h`
   * Upstream: https://github.com/iOrange/bcdec
@@ -806,13 +806,13 @@ Collection of single-file libraries used in Godot components.
   * Version: 1.1.0 (f7af54b56518aa659e1cf9fb103c0b6e36a833d9, 2023)
   * License: MIT
   * Patches:
-    - `FastNoiseLite-0001-namespace-warnings.patch` ([GH-88526](https://github.com/godotengine/godot/pull/88526))
+    - `FastNoiseLite-0001-namespace-warnings.patch` ([GH-88526](https://github.com/jundotengine/jundot/pull/88526))
 - `ifaddrs-android.{cc,h}`
   * Upstream: https://chromium.googlesource.com/external/webrtc/stable/talk/+/master/base/ifaddrs-android.h
   * Version: git (5976650443d68ccfadf1dea24999ee459dd2819d, 2013)
   * License: BSD-3-Clause
   * Patches:
-    - `ifaddrs-android-0001-complete-struct.patch` ([GH-34101](https://github.com/godotengine/godot/pull/34101))
+    - `ifaddrs-android-0001-complete-struct.patch` ([GH-34101](https://github.com/jundotengine/jundot/pull/34101))
 - `mikktspace.{c,h}`
   * Upstream: https://archive.blender.org/wiki/index.php/Dev:Shading/Tangent_Space_Normal_Maps/
   * Version: 1.0 (2011)
@@ -840,8 +840,8 @@ Collection of single-file libraries used in Godot components.
   * Version: git (7bdffb428b2b19ad1c43aa44c714dcc104177e84, 2021)
   * License: MIT
   * Patches:
-    - `polypartition-0001-godot-types.patch` (2185c018f)
-    - `polypartition-0002-shadow-warning.patch` ([GH-66808](https://github.com/godotengine/godot/pull/66808))
+    - `polypartition-0001-jundot-types.patch` (2185c018f)
+    - `polypartition-0002-shadow-warning.patch` ([GH-66808](https://github.com/jundotengine/jundot/pull/66808))
 - `qoa.{c,h}`
   * Upstream: https://github.com/phoboslab/qoa
   * Version: git (ae07b57deb98127a5b40916cb57775823d7437d2, 2025)
@@ -857,7 +857,7 @@ Collection of single-file libraries used in Godot components.
   * License: BSD-3-Clause
   * Modifications: License included in header.
   * Patches:
-    - `smaz-0001-write-string-warning.patch` ([GH-8572](https://github.com/godotengine/godot/pull/8572))
+    - `smaz-0001-write-string-warning.patch` ([GH-8572](https://github.com/jundotengine/jundot/pull/8572))
 - `smolv.{cpp,h}`
   * Upstream: https://github.com/aras-p/smol-v
   * Version: git (9dd54c379ac29fa148cb1b829bb939ba7381d8f4, 2024)
@@ -886,7 +886,7 @@ Files extracted from the upstream source:
 
 Patches:
 
-- `0001-remove-unused-save-features.patch` ([GH-113965](https://github.com/godotengine/godot/issues/113965))
+- `0001-remove-unused-save-features.patch` ([GH-113965](https://github.com/jundotengine/jundot/issues/113965))
 
 
 ## openxr
@@ -981,10 +981,10 @@ Files extracted from upstream source:
 - All `.cpp` and `.h` files in the `src/` folder except for `Export.h` and `RVO.h`
 - `LICENSE`
 
-Important: Nearly all files have Godot-made changes and renames
+Important: Nearly all files have Jundot-made changes and renames
 to make the 2D and 3D rvo libraries compatible with each other
 and solve conflicts and also enrich the feature set originally
-proposed by these libraries and better integrate them with Godot.
+proposed by these libraries and better integrate them with Jundot.
 
 
 ## smaa
@@ -1012,14 +1012,14 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-remove-unnecessary-subsystems.patch` ([GH-106218](https://github.com/godotengine/godot/pull/106218))
-- `0003-std-include.patch` ([GH-108144](https://github.com/godotengine/godot/pull/108144))
-- `0004-errno-include.patch` ([GH-108354](https://github.com/godotengine/godot/pull/108354))
-- `0005-fix-libudev-dbus.patch` ([GH-108373](https://github.com/godotengine/godot/pull/108373))
-- `0006-fix-cs-environ.patch` ([GH-109283](https://github.com/godotengine/godot/pull/109283))
-- `0007-shield-duplicate-macos.patch` ([GH-115510](https://github.com/godotengine/godot/pull/115510))
-- `0008-fix-linux-joycon-serial-num.patch` ([GH-113873](https://github.com/godotengine/godot/pull/113873))
-- `0009-update-device-blocklist.patch` ([GH-119403](https://github.com/godotengine/godot/pull/119403))
+- `0001-remove-unnecessary-subsystems.patch` ([GH-106218](https://github.com/jundotengine/jundot/pull/106218))
+- `0003-std-include.patch` ([GH-108144](https://github.com/jundotengine/jundot/pull/108144))
+- `0004-errno-include.patch` ([GH-108354](https://github.com/jundotengine/jundot/pull/108354))
+- `0005-fix-libudev-dbus.patch` ([GH-108373](https://github.com/jundotengine/jundot/pull/108373))
+- `0006-fix-cs-environ.patch` ([GH-109283](https://github.com/jundotengine/jundot/pull/109283))
+- `0007-shield-duplicate-macos.patch` ([GH-115510](https://github.com/jundotengine/jundot/pull/115510))
+- `0008-fix-linux-joycon-serial-num.patch` ([GH-113873](https://github.com/jundotengine/jundot/pull/113873))
+- `0009-update-device-blocklist.patch` ([GH-119403](https://github.com/jundotengine/jundot/pull/119403))
 
 
 ## spirv-cross
@@ -1066,13 +1066,13 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-zero-size-for-sc-sized-arrays.patch` ([GH-94985](https://github.com/godotengine/godot/pull/94985))
-- `0002-spirv-headers.patch` ([GH-111452](https://github.com/godotengine/godot/pull/111452))
+- `0001-zero-size-for-sc-sized-arrays.patch` ([GH-94985](https://github.com/jundotengine/jundot/pull/94985))
+- `0002-spirv-headers.patch` ([GH-111452](https://github.com/jundotengine/jundot/pull/111452))
 
 
 ## swappy-frame-pacing
 
-- Upstream: https://android.googlesource.com/platform/frameworks/opt/gamesdk/ via https://github.com/godotengine/godot-swappy
+- Upstream: https://android.googlesource.com/platform/frameworks/opt/gamesdk/ via https://github.com/jundotengine/jundot-swappy
 - Version: git (1198bb06b041e2df5d42cc5cf18fac81fcefa03f, 2025)
 - License: Apache 2.0
 
@@ -1096,7 +1096,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-let-delete-be-delete.patch` ([GH-116024](https://github.com/godotengine/godot/pull/116024))
+- `0001-let-delete-be-delete.patch` ([GH-116024](https://github.com/jundotengine/jundot/pull/116024))
 
 
 ## tinyexr
@@ -1114,7 +1114,7 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-external-zlib.patch` ([GH-55115](https://github.com/godotengine/godot/pull/55115))
+- `0001-external-zlib.patch` ([GH-55115](https://github.com/jundotengine/jundot/pull/55115))
 
 
 ## ufbx
@@ -1142,12 +1142,12 @@ Files extracted from upstream source:
 
 Patches:
 
-- `0001-bullet-namespace.patch` ([GH-27929](https://github.com/godotengine/godot/pull/27929))
-- `0002-fpermissive-fix.patch` ([GH-27929](https://github.com/godotengine/godot/pull/27929))
-- `0003-fix-musl-build.patch` ([GH-34250](https://github.com/godotengine/godot/pull/34250))
-- `0004-fix-msvc-arm-build.patch` ([GH-34331](https://github.com/godotengine/godot/pull/34331))
-- `0005-fix-scale-calculation.patch` ([GH-38506](https://github.com/godotengine/godot/pull/38506))
-- `0006-gcc13-include-fix.patch` ([GH-77949](https://github.com/godotengine/godot/pull/77949))
+- `0001-bullet-namespace.patch` ([GH-27929](https://github.com/jundotengine/jundot/pull/27929))
+- `0002-fpermissive-fix.patch` ([GH-27929](https://github.com/jundotengine/jundot/pull/27929))
+- `0003-fix-musl-build.patch` ([GH-34250](https://github.com/jundotengine/jundot/pull/34250))
+- `0004-fix-msvc-arm-build.patch` ([GH-34331](https://github.com/jundotengine/jundot/pull/34331))
+- `0005-fix-scale-calculation.patch` ([GH-38506](https://github.com/jundotengine/jundot/pull/38506))
+- `0006-gcc13-include-fix.patch` ([GH-77949](https://github.com/jundotengine/jundot/pull/77949))
 
 
 ## volk
@@ -1191,13 +1191,13 @@ SDK release: https://github.com/KhronosGroup/Vulkan-Utility-Libraries/blob/main/
 
 `vk_mem_alloc.h` is taken from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 Version: 3.3.0 (1d8f600fd424278486eade7ed3e877c99f0846b1, 2025)
-`vk_mem_alloc.cpp` is a Godot file and should be preserved on updates.
+`vk_mem_alloc.cpp` is a Jundot file and should be preserved on updates.
 
 Patches:
 
-- `0001-VKEnumStringHelper-godot-vulkan.patch` ([GH-97510](https://github.com/godotengine/godot/pull/97510))
-- `0002-VMA-godot-vulkan.patch` ([GH-97510](https://github.com/godotengine/godot/pull/97510))
-- `0003-VMA-add-vmaCalculateLazilyAllocatedBytes.patch` ([GH-99257](https://github.com/godotengine/godot/pull/99257))
+- `0001-VKEnumStringHelper-jundot-vulkan.patch` ([GH-97510](https://github.com/jundotengine/jundot/pull/97510))
+- `0002-VMA-jundot-vulkan.patch` ([GH-97510](https://github.com/jundotengine/jundot/pull/97510))
+- `0003-VMA-add-vmaCalculateLazilyAllocatedBytes.patch` ([GH-99257](https://github.com/jundotengine/jundot/pull/99257))
 
 
 ## wayland
@@ -1267,14 +1267,14 @@ The following files are extracted from thirdparty sources:
 File extracted from upstream release tarball:
 
 - Run `cmake .` to generate `config.h` and `wslayver.h`
-  Contents might need tweaking for Godot, review diff
+  Contents might need tweaking for Jundot, review diff
 - All `.c` and `.h` files from `lib/`
 - All `.h` in `lib/includes/wslay/` as `wslay/`
 - `COPYING`
 
 Patches:
 
-- `0001-msvc-build-fix.patch` ([GH-30263](https://github.com/godotengine/godot/pull/30263))
+- `0001-msvc-build-fix.patch` ([GH-30263](https://github.com/jundotengine/jundot/pull/30263))
 
 
 ## xatlas

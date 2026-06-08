@@ -2,11 +2,11 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 /// <summary>
-/// Configuration for a Godot build + package run.
-/// Mirrors the parameters of scripts/package-godot.ps1.
+/// Configuration for a Jundot build + package run.
+/// Mirrors the parameters of scripts/package-jundot.ps1.
 /// </summary>
 public class BuildConfig
 {
@@ -16,7 +16,7 @@ public class BuildConfig
     public string Arch         { get; set; } = "x86_64";          // x86_64 | x86_32 | arm64
 
     // ── Paths ───────────────────────────────────────────────────
-    public string RepoRoot     { get; set; } = "";                // Godot source root (auto-detected if empty)
+    public string RepoRoot     { get; set; } = "";                // Jundot source root (auto-detected if empty)
     public string OutputDir    { get; set; } = "artifacts/packages";
     public string LogDir       { get; set; } = "artifacts/logs";
 
@@ -45,6 +45,9 @@ public class BuildConfig
 
     /// <summary>After a successful build + package, auto-increment the patch number in version.py.</summary>
     public bool AutoUpdateVersion { get; set; } = false;
+
+    /// <summary>Generate update-manifest.json after packaging (for online hot-update system).</summary>
+    public bool GenerateUpdateManifest { get; set; } = true;
 }
 
 /// <summary>
@@ -57,7 +60,7 @@ public class BuildProgressEventArgs : EventArgs
 }
 
 /// <summary>
-/// Core build engine — translates scripts/package-godot.ps1 logic into C#.
+/// Core build engine — translates scripts/package-jundot.ps1 logic into C#.
 /// </summary>
 public class BuildEngine
 {
@@ -105,8 +108,8 @@ public class BuildEngine
             ResolvePaths();
 
             // ── 2. Read version ─────────────────────────────
-            _version = GetGodotVersion();
-            Report($"Godot version: {_version}", "info");
+            _version = GetJundotVersion();
+            Report($"Jundot version: {_version}", "info");
 
             // ── 3. Generate package name ────────────────────
             _packageName = BuildPackageName();
@@ -129,7 +132,7 @@ public class BuildEngine
                 await CheckMonoToolsAsync();
 
                 Report("", "step");
-                Report("Building Godot", "step");
+                Report("Building Jundot", "step");
                 await BuildAsync();
             }
             else
@@ -152,10 +155,14 @@ public class BuildEngine
             if (_cfg.AutoUpdateVersion)
             {
                 var newVer = UpdateVersionFile();
+                Report($"Version auto-updated for next build: {_version} -> {newVer}", "success");
                 Report($"Version auto-updated: {_version} → {newVer}", "success");
             }
 
             // ── 8. Record build history ─────────────────────
+            if (!_cfg.AutoUpdateVersion)
+                Report("Auto-update version is disabled; version.py was not changed.", "info");
+
             SaveBuildRecord();
 
             return true;
@@ -200,12 +207,12 @@ public class BuildEngine
             }
 
             _repoRoot = dir ?? throw new Exception(
-                "SConstruct not found. Set RepoRoot to the Godot source tree, " +
-                "or place this tool inside the Godot source tree.");
+                "SConstruct not found. Set RepoRoot to the Jundot source tree, " +
+                "or place this tool inside the Jundot source tree.");
         }
 
         if (!File.Exists(Path.Combine(_repoRoot, "SConstruct")))
-            throw new Exception($"SConstruct not found at {_repoRoot}. Is this the Godot source tree?");
+            throw new Exception($"SConstruct not found at {_repoRoot}. Is this the Jundot source tree?");
 
         Report($"Repo root: {_repoRoot}", "info");
     }
@@ -217,14 +224,14 @@ public class BuildEngine
 
         var monoPart = _cfg.Mono ? "-mono" : "";
         var ts = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        return $"godot-{_version}-{_cfg.PlatformName}-{_cfg.Target}-{_cfg.Arch}{monoPart}-{ts}";
+        return $"jundot-{_version}-{_cfg.PlatformName}-{_cfg.Target}-{_cfg.Arch}{monoPart}-{ts}";
     }
 
     // ═══════════════════════════════════════════════════════════════
     //  VERSION
     // ═══════════════════════════════════════════════════════════════
 
-    private string GetGodotVersion()
+    private string GetJundotVersion()
     {
         var vf = Path.Combine(_repoRoot, "version.py");
         if (!File.Exists(vf))
@@ -265,21 +272,12 @@ public class BuildEngine
 
         for (int i = 0; i < lines.Count; i++)
         {
-            var m = Regex.Match(lines[i], @"^(\s*patch\s*=\s*)(\d+)(.*)$");
+            var m = Regex.Match(lines[i], @"^(\s*patch(?:\s*:\s*[A-Za-z_][A-Za-z0-9_\.\[\]]*)?\s*=\s*)([""']?)(\d+)(\2)(.*)$");
             if (m.Success)
             {
-                var oldPatch = int.Parse(m.Groups[2].Value);
+                var oldPatch = int.Parse(m.Groups[3].Value);
                 newPatch = oldPatch + 1;
-                lines[i] = $"{m.Groups[1].Value}{newPatch}{m.Groups[3].Value}";
-                break;
-            }
-            // Also try bare "patch = N" without type hint
-            var m2 = Regex.Match(lines[i], @"^(\s*patch\s*=\s*""?)(\d+)(""?.*)$");
-            if (m2.Success)
-            {
-                var oldPatch = int.Parse(m2.Groups[2].Value);
-                newPatch = oldPatch + 1;
-                lines[i] = $"{m2.Groups[1].Value}{newPatch}{m2.Groups[3].Value}";
+                lines[i] = $"{m.Groups[1].Value}{m.Groups[2].Value}{newPatch}{m.Groups[4].Value}{m.Groups[5].Value}";
                 break;
             }
         }
@@ -291,7 +289,7 @@ public class BuildEngine
         File.WriteAllLines(vf, lines, System.Text.Encoding.UTF8);
 
         // Re-read new version
-        return GetGodotVersion();
+        return GetJundotVersion();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -445,7 +443,7 @@ public class BuildEngine
         }
 
         PrintWindowsCompilerHelp();
-        throw new Exception("Windows C++ compiler is required before building Godot.");
+        throw new Exception("Windows C++ compiler is required before building Jundot.");
     }
 
     private void PrintWindowsCompilerHelp()
@@ -819,7 +817,7 @@ Install one of these toolchains, then run this tool again:
             if (msvcVersion == "14.5")
             {
                 Report($"Detected Visual Studio 2026 / MSVC {Environment.GetEnvironmentVariable("VCToolsVersion")}; using msvc_version=14.5.", "warning");
-                Report("Godot requires SCons 4.10.1+ for Visual Studio 2026.", "warning");
+                Report("Jundot requires SCons 4.10.1+ for Visual Studio 2026.", "warning");
             }
         }
 
@@ -850,7 +848,12 @@ Install one of these toolchains, then run this tool again:
         }
 
         // Optional Windows deps
-        if (_cfg.PlatformName == "windows" && !_cfg.EnableWindowsOptionalDeps)
+        if (_cfg.PlatformName == "windows" && _cfg.EnableWindowsOptionalDeps)
+        {
+            Report("Checking Windows optional dependencies", "step");
+            await InstallWindowsOptionalDepsAsync();
+        }
+        else if (_cfg.PlatformName == "windows" && !_cfg.EnableWindowsOptionalDeps)
         {
             AddIfMissing(buildArgs, "d3d12", "no");
             AddIfMissing(buildArgs, "accesskit", "no");
@@ -908,7 +911,7 @@ Install one of these toolchains, then run this tool again:
         if (monoProducts.Count == 0)
             throw new Exception($"Mono build completed but no Mono executable matched '{pattern}' in {binDir}.");
 
-        var monoExe = SelectGodotExecutable(monoProducts)!;
+        var monoExe = SelectJundotExecutable(monoProducts)!;
         Report($"Using Mono executable: {monoExe.FullName}", "info");
 
         // Generate mono glue
@@ -920,8 +923,57 @@ Install one of these toolchains, then run this tool again:
         var asmLog = Path.Combine(_logRoot, $"{_packageName}-mono-assemblies.log");
         await RunAndReportInDirAsync(_pythonPath, _repoRoot, asmLog,
             new[] { "./modules/mono/build_scripts/build_assemblies.py",
-            "--godot-output-dir=./bin",
-            $"--godot-platform={_cfg.PlatformName}" });
+            "--jundot-output-dir=./bin",
+            $"--jundot-platform={_cfg.PlatformName}" });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  WINDOWS OPTIONAL DEPENDENCIES
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// When EnableWindowsOptionalDeps is true, auto-detect whether the
+    /// accesskit and d3d12 SDKs are installed. If they are missing,
+    /// automatically run the corresponding install scripts.
+    /// </summary>
+    private async Task InstallWindowsOptionalDepsAsync()
+    {
+        var localAppData = Environment.GetEnvironmentVariable("LOCALAPPDATA")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "AppData", "Local");
+        var depsFolder = Path.Combine(localAppData, "Jundot", "build_deps");
+
+        // ── AccessKit ────────────────────────────────────────
+        var accesskitFolder = Path.Combine(depsFolder, "accesskit");
+        if (!Directory.Exists(accesskitFolder))
+        {
+            Report("AccessKit SDK not found. Installing...", "warning");
+            var script = Path.Combine(_repoRoot, "misc", "scripts", "install_accesskit.py");
+            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, new[] { script });
+            Report("AccessKit SDK installed successfully.", "success");
+        }
+        else
+        {
+            Report("AccessKit SDK already installed.", "info");
+        }
+
+        // ── D3D12 SDK ────────────────────────────────────────
+        // Check for mesa-* directories (e.g. mesa-x86_64-msvc)
+        string[] mesaDirs;
+        try { mesaDirs = Directory.GetDirectories(depsFolder, "mesa-*"); }
+        catch (DirectoryNotFoundException) { mesaDirs = Array.Empty<string>(); }
+        var agilitySdkFolder = Path.Combine(depsFolder, "agility_sdk");
+
+        if (mesaDirs.Length == 0 || !Directory.Exists(agilitySdkFolder))
+        {
+            Report("D3D12 SDK not found. Installing...", "warning");
+            var script = Path.Combine(_repoRoot, "misc", "scripts", "install_d3d12_sdk_windows.py");
+            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, new[] { script });
+            Report("D3D12 SDK installed successfully.", "success");
+        }
+        else
+        {
+            Report("D3D12 SDK already installed.", "info");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -958,15 +1010,15 @@ Install one of these toolchains, then run this tool again:
             Report($"  Copied: {product.Name}", "output");
         }
 
-        // Mono: copy GodotSharp
+        // Mono: copy JundotSharp
         if (_cfg.Mono)
         {
-            var godotSharpDir = Path.Combine(binDir, "GodotSharp");
-            if (!Directory.Exists(godotSharpDir))
-                throw new Exception("Mono package requires GodotSharp/ in bin/. Build assemblies may have failed.");
+            var jundotSharpDir = Path.Combine(binDir, "JundotSharp");
+            if (!Directory.Exists(jundotSharpDir))
+                throw new Exception("Mono package requires JundotSharp/ in bin/. Build assemblies may have failed.");
 
-            CopyDirectory(godotSharpDir, Path.Combine(_stagingDir, "GodotSharp"));
-            Report("  Copied: GodotSharp/", "output");
+            CopyDirectory(jundotSharpDir, Path.Combine(_stagingDir, "JundotSharp"));
+            Report("  Copied: JundotSharp/", "output");
         }
 
         await CopyPackageBuilderAsync();
@@ -994,7 +1046,7 @@ Install one of these toolchains, then run this tool again:
         lines.Add("");
         lines.Add("Files:");
         lines.AddRange(products.Select(p => $"  {p.Name}"));
-        if (_cfg.Mono) lines.Add("  GodotSharp/");
+        if (_cfg.Mono) lines.Add("  JundotSharp/");
         if (_cfg.PlatformName == "windows" && _cfg.Target == "editor") lines.Add("  Tools/PackageBuilder/");
 
         File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);
@@ -1005,6 +1057,22 @@ Install one of these toolchains, then run this tool again:
             File.Delete(_zipPath);
 
         System.IO.Compression.ZipFile.CreateFromDirectory(_stagingDir, _zipPath);
+
+        // ── Generate update manifest for hot-update system ─────
+        if (_cfg.GenerateUpdateManifest)
+        {
+            Report("Generating update manifest (update-manifest.json)", "step");
+            var updateManifestPath = ManifestGenerator.Generate(_cfg, _version, _packageName, _zipPath, _stagingDir, _repoRoot);
+            if (updateManifestPath != null)
+            {
+                Report($"  Manifest written: {updateManifestPath}", "success");
+                Report($"  Manifest also at: {Path.Combine(_packageRoot, $"{_packageName}-manifest.json")}", "info");
+            }
+            else
+            {
+                Report("  Warning: Manifest generation failed (see debug output)", "warning");
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1055,16 +1123,16 @@ Install one of these toolchains, then run this tool again:
         if (_cfg.PlatformName == "windows")
         {
             if (monoBuild)
-                return $"^godot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?\\.exe$";
-            return $"^godot\\.{platform}\\.{target}\\.{arch}(?!.*\\.mono)(\\..+)?\\.exe$";
+                return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?\\.exe$";
+            return $"^jundot\\.{platform}\\.{target}\\.{arch}(?!.*\\.mono)(\\..+)?\\.exe$";
         }
 
         if (monoBuild)
-            return $"^godot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?$";
-        return $"^godot\\.{platform}\\.{target}\\.{arch}(\\..+)?$";
+            return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?$";
+        return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..+)?$";
     }
 
-    private static FileInfo SelectGodotExecutable(List<FileInfo> products)
+    private static FileInfo SelectJundotExecutable(List<FileInfo> products)
     {
         var consoleExe = products.FirstOrDefault(f => f.Name.Contains(".console.exe"));
         return consoleExe ?? products.First();
@@ -1340,7 +1408,7 @@ Install one of these toolchains, then run this tool again:
     }
 
     /// <summary>
-    /// Write editor settings to pre-set the UI language in the built Godot editor.
+    /// Write editor settings to pre-set the UI language in the built Jundot editor.
     /// Creates _sc_ (self-contained mode marker) and editor_data/editor_settings-4.tres
     /// both in bin/ and in the staging package directory.
     /// </summary>

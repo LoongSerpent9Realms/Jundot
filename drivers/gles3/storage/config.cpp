@@ -2,10 +2,10 @@
 /*  config.cpp                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -240,7 +240,7 @@ Config::Config() {
 		String driver_version = gl_version.get_slice("V@", 1).get_slicec(' ', 0);
 		if (driver_version.is_valid_float() && driver_version.to_float() >= 331.0) {
 			//TODO: also 'GPUParticles'?
-			//https://github.com/godotengine/godot/issues/92662#issuecomment-2161199477
+			//https://github.com/jundotengine/jundot/issues/92662#issuecomment-2161199477
 			//disable_particles_workaround = false;
 		}
 	} else if (rendering_device_name.contains("PowerVR")) {

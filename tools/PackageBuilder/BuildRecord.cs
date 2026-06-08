@@ -1,9 +1,9 @@
 using System.Text.Json;
 
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 /// <summary>
-/// Represents a single Godot build record — persisted to .build-history.json
+/// Represents a single Jundot build record — persisted to .build-history.json
 /// and displayed in the Builds tab.
 /// </summary>
 public class BuildRecord

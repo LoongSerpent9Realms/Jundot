@@ -2,10 +2,10 @@
 /*  register_types.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -41,7 +41,7 @@ CSharpLanguage *script_language_cs = nullptr;
 Ref<ResourceFormatLoaderCSharpScript> resource_loader_cs;
 Ref<ResourceFormatSaverCSharpScript> resource_saver_cs;
 
-MonoBind::GodotSharp *_godotsharp = nullptr;
+MonoBind::JundotSharp *_jundotsharp = nullptr;
 
 void initialize_mono_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -50,7 +50,7 @@ void initialize_mono_module(ModuleInitializationLevel p_level) {
 
 	GDREGISTER_CLASS(CSharpScript);
 
-	_godotsharp = memnew(MonoBind::GodotSharp);
+	_jundotsharp = memnew(MonoBind::JundotSharp);
 
 	script_language_cs = memnew(CSharpLanguage);
 	script_language_cs->set_language_index(ScriptServer::get_language_count());
@@ -82,7 +82,7 @@ void uninitialize_mono_module(ModuleInitializationLevel p_level) {
 		resource_saver_cs.unref();
 	}
 
-	if (_godotsharp) {
-		memdelete(_godotsharp);
+	if (_jundotsharp) {
+		memdelete(_jundotsharp);
 	}
 }

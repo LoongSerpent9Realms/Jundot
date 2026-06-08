@@ -72,7 +72,7 @@ if env["profiler"]:
             # 62 is the maximum supported callstack depth reported by the tracy docs.
             env_tracy.Append(CPPDEFINES=[("TRACY_CALLSTACK", 62)])
         if env["profiler_track_memory"]:
-            env_tracy.Append(CPPDEFINES=["GODOT_PROFILER_TRACK_MEMORY"])
+            env_tracy.Append(CPPDEFINES=["JUNDOT_PROFILER_TRACK_MEMORY"])
         if env["profiler_record_on_demand"]:
             env_tracy.Append(CPPDEFINES=["TRACY_ON_DEMAND"])
         env_tracy.disable_warnings()

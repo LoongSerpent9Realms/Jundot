@@ -60,7 +60,7 @@ inline constexpr const unsigned char search_tex_png[] = {{
 env.CommandNoCache("smaa_search_tex.gen.h", "#thirdparty/smaa/SearchTex.png", env.Run(searchtex_builder))
 
 # This flag doesn't actually control anything GCC specific in FSR2. It determines
-# if symbols should be exported, which is not required for Godot.
+# if symbols should be exported, which is not required for Jundot.
 env_effects.Append(CPPDEFINES=["FFX_GCC"])
 
 env_thirdparty = env_effects.Clone()
@@ -68,7 +68,7 @@ env_thirdparty.disable_warnings()
 env_thirdparty.add_source_files(thirdparty_obj, thirdparty_sources)
 env.servers_sources += thirdparty_obj
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

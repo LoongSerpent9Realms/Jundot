@@ -2,10 +2,10 @@
 /*  rendering_device_driver_metal3.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -97,7 +97,7 @@ Error RenderingDeviceDriverMetal::_create_device() {
 
 	device_queue = NS::TransferPtr(device->newCommandQueue());
 	ERR_FAIL_NULL_V(device_queue.get(), ERR_CANT_CREATE);
-	device_queue->setLabel(MTLSTR("Godot Main Command Queue"));
+	device_queue->setLabel(MTLSTR("Jundot Main Command Queue"));
 
 	return OK;
 }
@@ -108,7 +108,7 @@ Error RenderingDeviceDriverMetal::initialize(uint32_t p_device_index, uint32_t p
 
 	// Barriers are still experimental in Metal 3, so they are disabled by default
 	// and can only be enabled via an environment variable.
-	bool barriers_enabled = OS::get_singleton()->get_environment("GODOT_MTL_FORCE_BARRIERS") == "1";
+	bool barriers_enabled = OS::get_singleton()->get_environment("JUNDOT_MTL_FORCE_BARRIERS") == "1";
 	if (__builtin_available(macos 26.0, ios 26.0, tvos 26.0, visionos 26.0, *)) {
 		if (barriers_enabled) {
 			print_line("Metal 3: Resource barriers enabled.");

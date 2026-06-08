@@ -2,10 +2,10 @@
 /*  gdextension_special_compat_hashes.h                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -39,7 +39,7 @@
 class Array;
 
 // Note: In most situations, compatibility methods should be registered via ClassDB::bind_compatibility_method().
-//       This class is only meant to be used in exceptional circumstances, for example, when Godot's hashing
+//       This class is only meant to be used in exceptional circumstances, for example, when Jundot's hashing
 //       algorithm changes and registering compatibility methods for all affect methods would be onerous.
 
 class GDExtensionSpecialCompatHashes {

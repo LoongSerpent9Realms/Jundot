@@ -2,10 +2,10 @@
 /*  metal3_objects.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1602,7 +1602,7 @@ void DirectEncoder::set(MTL::SamplerState **p_samplers, NS::Range p_range) {
 	}
 }
 
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability-new")
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability-new")
 
 void MDCommandBuffer::_bind_uniforms_argument_buffers(MDUniformSet *p_set, MDShader *p_shader, uint32_t p_set_index, uint32_t p_dynamic_offsets) {
 	DEV_ASSERT(p_shader->uses_argument_buffers);
@@ -1803,4 +1803,4 @@ void MDCommandBuffer::_bind_uniforms_argument_buffers_compute(MDUniformSet *p_se
 	}
 }
 
-GODOT_CLANG_WARNING_POP
+JUNDOT_CLANG_WARNING_POP

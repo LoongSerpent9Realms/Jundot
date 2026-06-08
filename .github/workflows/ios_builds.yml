@@ -23,22 +23,22 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Restore Godot build cache
-        uses: ./.github/actions/godot-cache-restore
+      - name: Restore Jundot build cache
+        uses: ./.github/actions/jundot-cache-restore
         continue-on-error: true
 
       - name: Setup Python and SCons
-        uses: ./.github/actions/godot-deps
+        uses: ./.github/actions/jundot-deps
 
       - name: Compilation (arm64)
-        uses: ./.github/actions/godot-build
+        uses: ./.github/actions/jundot-build
         with:
           scons-flags: ${{ env.SCONS_FLAGS }}
           platform: ios
           target: template_release
 
-      - name: Save Godot build cache
-        uses: ./.github/actions/godot-cache-save
+      - name: Save Jundot build cache
+        uses: ./.github/actions/jundot-cache-save
         continue-on-error: true
 
       - name: Upload artifact

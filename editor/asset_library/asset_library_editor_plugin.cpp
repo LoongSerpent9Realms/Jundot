@@ -2,10 +2,10 @@
 /*  asset_library_editor_plugin.cpp                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -127,7 +127,7 @@ void EditorAssetLibraryItem::_asset_clicked() {
 }
 
 void EditorAssetLibraryItem::_author_clicked() {
-	OS::get_singleton()->shell_open("https://store.godotengine.org/publisher/" + author_id.uri_encode() + "/");
+	OS::get_singleton()->shell_open("https://store.jundotengine.org/publisher/" + author_id.uri_encode() + "/");
 }
 
 void EditorAssetLibraryItem::_license_clicked() {
@@ -1454,9 +1454,9 @@ void EditorAssetLibrary::_search(int p_page) {
 	args += "&type=" + String(templates_only ? "1" : "0");
 	args += "&sort=" + String(sort_key[sort->get_selected()]);
 
-	args += "&compatibility=" + itos(GODOT_VERSION_MAJOR) + "." + itos(GODOT_VERSION_MINOR);
-	if (GODOT_VERSION_PATCH > 0) {
-		args += "." + itos(GODOT_VERSION_PATCH);
+	args += "&compatibility=" + itos(JUNDOT_VERSION_MAJOR) + "." + itos(JUNDOT_VERSION_MINOR);
+	if (JUNDOT_VERSION_PATCH > 0) {
+		args += "." + itos(JUNDOT_VERSION_PATCH);
 	}
 
 	int license_count = licenses->get_item_count();
@@ -1778,7 +1778,7 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 					// This is typically because the version number changed recently
 					// and no assets compatible with the new version have been published yet.
 					_set_library_message(
-							vformat(TTR("No results compatible with %s %s."), String(GODOT_VERSION_SHORT_NAME).capitalize(), String(GODOT_VERSION_BRANCH)));
+							vformat(TTR("No results compatible with %s %s."), String(JUNDOT_VERSION_SHORT_NAME).capitalize(), String(JUNDOT_VERSION_BRANCH)));
 				}
 			} else {
 				library_message_box->hide();
@@ -1910,7 +1910,7 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 				return;
 			}
 
-			LocalVector<int> engine_version = { GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR, GODOT_VERSION_PATCH };
+			LocalVector<int> engine_version = { JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR, JUNDOT_VERSION_PATCH };
 			Array arr = dt;
 			// Iterate backwards, so the newer releases are added first.
 			for (int i = arr.size() - 1; i >= 0; i--) {
@@ -1919,12 +1919,12 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 				ERR_FAIL_COND(!d.has("download_url"));
 				ERR_FAIL_COND(!d.has("version"));
 				ERR_FAIL_COND(!d.has("stable"));
-				ERR_FAIL_COND(!d.has("min_godot_version"));
-				ERR_FAIL_COND(!d.has("max_godot_version"));
+				ERR_FAIL_COND(!d.has("min_jundot_version"));
+				ERR_FAIL_COND(!d.has("max_jundot_version"));
 				ERR_FAIL_COND(!d.has("changes_bbcode"));
 
-				if (d["min_godot_version"].get_type() != Variant::NIL) {
-					Vector<String> compat_version = String(d["min_godot_version"]).split(".", false);
+				if (d["min_jundot_version"].get_type() != Variant::NIL) {
+					Vector<String> compat_version = String(d["min_jundot_version"]).split(".", false);
 					compat_version.resize_initialized(3);
 
 					bool is_compat = true;
@@ -1938,12 +1938,12 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 						}
 					}
 					if (!is_compat) {
-						continue; // This release is for an older version of Godot.
+						continue; // This release is for an older version of Jundot.
 					}
 				}
 
-				if (d["max_godot_version"].get_type() != Variant::NIL) {
-					Vector<String> compat_version = String(d["max_godot_version"]).split(".", false);
+				if (d["max_jundot_version"].get_type() != Variant::NIL) {
+					Vector<String> compat_version = String(d["max_jundot_version"]).split(".", false);
 					compat_version.resize_initialized(3);
 
 					bool is_compat = true;
@@ -1957,7 +1957,7 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 						}
 					}
 					if (!is_compat) {
-						continue; // This release is for a newer version of Godot.
+						continue; // This release is for a newer version of Jundot.
 					}
 				}
 

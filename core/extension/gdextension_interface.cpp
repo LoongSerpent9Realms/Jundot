@@ -2,10 +2,10 @@
 /*  gdextension_interface.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -240,24 +240,24 @@ GDExtensionInterfaceFunctionPtr gdextension_get_proc_address(const char *p_name)
 }
 
 #ifndef DISABLE_DEPRECATED
-static void gdextension_get_godot_version(GDExtensionGodotVersion *r_godot_version) {
-	r_godot_version->major = GODOT_VERSION_MAJOR;
-	r_godot_version->minor = GODOT_VERSION_MINOR;
-	r_godot_version->patch = GODOT_VERSION_PATCH;
-	r_godot_version->string = GODOT_VERSION_FULL_NAME;
+static void gdextension_get_jundot_version(GDExtensionJundotVersion *r_jundot_version) {
+	r_jundot_version->major = JUNDOT_VERSION_MAJOR;
+	r_jundot_version->minor = JUNDOT_VERSION_MINOR;
+	r_jundot_version->patch = JUNDOT_VERSION_PATCH;
+	r_jundot_version->string = JUNDOT_VERSION_FULL_NAME;
 }
 #endif
 
-static void gdextension_get_godot_version2(GDExtensionGodotVersion2 *r_godot_version) {
-	r_godot_version->major = GODOT_VERSION_MAJOR;
-	r_godot_version->minor = GODOT_VERSION_MINOR;
-	r_godot_version->patch = GODOT_VERSION_PATCH;
-	r_godot_version->hex = GODOT_VERSION_HEX;
-	r_godot_version->status = GODOT_VERSION_STATUS;
-	r_godot_version->build = GODOT_VERSION_BUILD;
-	r_godot_version->hash = GODOT_VERSION_HASH;
-	r_godot_version->timestamp = GODOT_VERSION_TIMESTAMP;
-	r_godot_version->string = GODOT_VERSION_FULL_NAME;
+static void gdextension_get_jundot_version2(GDExtensionJundotVersion2 *r_jundot_version) {
+	r_jundot_version->major = JUNDOT_VERSION_MAJOR;
+	r_jundot_version->minor = JUNDOT_VERSION_MINOR;
+	r_jundot_version->patch = JUNDOT_VERSION_PATCH;
+	r_jundot_version->hex = JUNDOT_VERSION_HEX;
+	r_jundot_version->status = JUNDOT_VERSION_STATUS;
+	r_jundot_version->build = JUNDOT_VERSION_BUILD;
+	r_jundot_version->hash = JUNDOT_VERSION_HASH;
+	r_jundot_version->timestamp = JUNDOT_VERSION_TIMESTAMP;
+	r_jundot_version->string = JUNDOT_VERSION_FULL_NAME;
 }
 
 // Memory Functions
@@ -1710,9 +1710,9 @@ static void gdextension_editor_help_load_xml_from_utf8_chars(const char *p_data)
 
 void gdextension_setup_interface() {
 #ifndef DISABLE_DEPRECATED
-	REGISTER_INTERFACE_FUNC(get_godot_version);
+	REGISTER_INTERFACE_FUNC(get_jundot_version);
 #endif // DISABLE_DEPRECATED
-	REGISTER_INTERFACE_FUNC(get_godot_version2);
+	REGISTER_INTERFACE_FUNC(get_jundot_version2);
 #ifndef DISABLE_DEPRECATED
 	REGISTER_INTERFACE_FUNC(mem_alloc);
 	REGISTER_INTERFACE_FUNC(mem_realloc);

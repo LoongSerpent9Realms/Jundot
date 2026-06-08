@@ -2,10 +2,10 @@
 /*  jolt_height_map_shape_3d.cpp                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -79,7 +79,7 @@ JPH::ShapeRefC JoltHeightMapShape3D::_build_height_field() const {
 	const float offset_x = (float)-quad_count_x / 2.0f;
 	const float offset_y = (float)-quad_count_y / 2.0f;
 
-	// Jolt triangulates the height map differently from how Godot Physics does it, so we mirror the shape along the
+	// Jolt triangulates the height map differently from how Jundot Physics does it, so we mirror the shape along the
 	// Z-axis to get the desired triangulation and reverse the rows to undo the mirroring.
 
 	LocalVector<float> heights_rev;
@@ -97,7 +97,7 @@ JPH::ShapeRefC JoltHeightMapShape3D::_build_height_field() const {
 		for (int x = 0; x < width; ++x) {
 			const real_t height = row[x];
 
-			// Godot has undocumented (accidental?) support for holes by passing NaN as the height value, whereas Jolt
+			// Jundot has undocumented (accidental?) support for holes by passing NaN as the height value, whereas Jolt
 			// uses `FLT_MAX` instead, so we translate any NaN to `FLT_MAX` in order to be drop-in compatible.
 			row_rev[x] = Math::is_nan(height) ? FLT_MAX : (float)height;
 		}
@@ -109,7 +109,7 @@ JPH::ShapeRefC JoltHeightMapShape3D::_build_height_field() const {
 	shape_settings.mActiveEdgeCosThresholdAngle = JoltProjectSettings::active_edge_threshold_cos;
 
 	const JPH::ShapeSettings::ShapeResult shape_result = shape_settings.Create();
-	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics height map shape with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_godot(shape_result.GetError()), _owners_to_string()));
+	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics height map shape with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_jundot(shape_result.GetError()), _owners_to_string()));
 
 	return with_scale(shape_result.Get(), Vector3(1, 1, -1));
 }
@@ -163,7 +163,7 @@ JPH::ShapeRefC JoltHeightMapShape3D::_build_mesh() const {
 	shape_settings.mActiveEdgeCosThresholdAngle = JoltProjectSettings::active_edge_threshold_cos;
 
 	const JPH::ShapeSettings::ShapeResult shape_result = shape_settings.Create();
-	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics height map shape (as polygon) with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_godot(shape_result.GetError()), _owners_to_string()));
+	ERR_FAIL_COND_V_MSG(shape_result.HasError(), nullptr, vformat("Failed to build Jolt Physics height map shape (as polygon) with %s. It returned the following error: '%s'. This shape belongs to %s.", to_string(), to_jundot(shape_result.GetError()), _owners_to_string()));
 
 	return shape_result.Get();
 }

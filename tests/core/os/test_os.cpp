@@ -2,10 +2,10 @@
 /*  test_os.cpp                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -181,7 +181,7 @@ TEST_CASE("[OS] Execute") {
 	const Error err = OS::get_singleton()->execute("cmd", arguments, nullptr, &exit_code);
 	CHECK_MESSAGE(
 			err == OK,
-			"(Running the command `cmd /C \"dir > NUL\"` returns the expected Godot error code (OK).");
+			"(Running the command `cmd /C \"dir > NUL\"` returns the expected Jundot error code (OK).");
 	CHECK_MESSAGE(
 			exit_code == 0,
 			"Running the command `cmd /C \"dir > NUL\"` returns a zero (successful) exit code.");
@@ -193,7 +193,7 @@ TEST_CASE("[OS] Execute") {
 	const Error err = OS::get_singleton()->execute("sh", arguments, nullptr, &exit_code);
 	CHECK_MESSAGE(
 			err == OK,
-			"(Running the command `sh -c \"ls > /dev/null\"` returns the expected Godot error code (OK).");
+			"(Running the command `sh -c \"ls > /dev/null\"` returns the expected Jundot error code (OK).");
 	CHECK_MESSAGE(
 			exit_code == 0,
 			"Running the command `sh -c \"ls > /dev/null\"` returns a zero (successful) exit code.");

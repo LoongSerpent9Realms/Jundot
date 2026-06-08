@@ -2,10 +2,10 @@
 /*  display_server.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -2136,10 +2136,10 @@ bool DisplayServer::is_rendering_device_supported() {
 #endif
 #ifdef METAL_ENABLED
 	if (rcd == nullptr) {
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 		// Eliminate "RenderingContextDriverMetal is only available on iOS 14.0 or newer".
 		rcd = memnew(RenderingContextDriverMetal);
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 	}
 #endif
 
@@ -2218,10 +2218,10 @@ bool DisplayServer::can_create_rendering_device() {
 #endif
 #ifdef METAL_ENABLED
 	if (rcd == nullptr) {
-		GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+		JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 		// Eliminate "RenderingContextDriverMetal is only available on iOS 14.0 or newer".
 		rcd = memnew(RenderingContextDriverMetal);
-		GODOT_CLANG_WARNING_POP
+		JUNDOT_CLANG_WARNING_POP
 	}
 #endif
 

@@ -2,10 +2,10 @@
 /*  skeleton_modification_2d_physicalbones.cpp                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -39,7 +39,7 @@ bool SkeletonModification2DPhysicalBones::_set(const StringName &p_path, const V
 	String path = p_path;
 
 #ifdef TOOLS_ENABLED
-	// Exposes a way to fetch the PhysicalBone2D nodes from the Godot editor.
+	// Exposes a way to fetch the PhysicalBone2D nodes from the Jundot editor.
 	if (is_setup) {
 		if (Engine::get_singleton()->is_editor_hint()) {
 			if (path.begins_with("fetch_bones")) {

@@ -2,10 +2,10 @@
 /*  project_manager.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -49,6 +49,8 @@ class ProjectList;
 class QuickSettingsDialog;
 class RichTextLabel;
 class TabContainer;
+class UpdateDialog;
+class UpdateManager;
 class VBoxContainer;
 
 class ProjectManager : public Control {
@@ -131,6 +133,15 @@ class ProjectManager : public Control {
 
 	void _show_quick_settings();
 	void _restart_confirmed();
+
+	// ── Hot-update system ───────────────────────────────────
+
+	UpdateDialog *update_dialog = nullptr;
+	UpdateManager *update_manager = nullptr;
+
+	void _on_update_download_requested(const String &p_version, const String &p_url);
+	void _on_update_now_requested();
+	void _on_skip_version_requested();
 
 	// Project list.
 

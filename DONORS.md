@@ -1,22 +1,22 @@
-# Donors to the Godot Engine project
+# Donors to the Jundot Engine project
 
-Godot Engine is a non-profit project developed by a community of voluntary
+Jundot Engine is a non-profit project developed by a community of voluntary
 contributors, as well as occasional paid contributors thanks to the financial
 support of generous donors.
 
 The ways to donate to the project, as well as details on how the funds are
-used, are described on [Godot's website](https://fund.godotengine.org).
+used, are described on [Jundot's website](https://fund.jundotengine.org).
 
 The following is a list of the current monthly donors, who will have their
-generous deed immortalized in the next stable release of Godot Engine.
+generous deed immortalized in the next stable release of Jundot Engine.
 
 ## Patrons
 
-    Scorewarrior <https://scwr.gg/godot>
+    Scorewarrior <https://scwr.gg/jundot>
 
 ## Platinum sponsors
 
-    JetBrains <https://www.jetbrains.com/lp/rider-godot/>
+    JetBrains <https://www.jetbrains.com/lp/rider-jundot/>
     V-Sekai <https://github.com/V-Sekai>
     W4 Games <https://w4games.com/>
 
@@ -40,7 +40,7 @@ generous deed immortalized in the next stable release of Godot Engine.
     Null <https://null.com/>
     Playful Studios <https://playfulstudios.com/>
     Re-Logic <https://re-logic.com/>
-    Sentry <https://sentry.io/welcome/?utm_source=godotengine&utm_medium=paid-community&utm_campaign=gaming-fy26q3-evergreen&utm_content=static-ad-godot-eng-sponsor-trysentry>
+    Sentry <https://sentry.io/welcome/?utm_source=jundotengine&utm_medium=paid-community&utm_campaign=gaming-fy26q3-evergreen&utm_content=static-ad-jundot-eng-sponsor-trysentry>
 
 ## Diamond members
 

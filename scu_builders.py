@@ -268,7 +268,7 @@ def generate_scu_files(max_includes_per_scu):
 
     # check we are running from the correct folder
     if folder_not_found("core") or folder_not_found("platform") or folder_not_found("scene"):
-        raise RuntimeError("scu_builders.py must be run from the godot folder.")
+        raise RuntimeError("scu_builders.py must be run from the jundot folder.")
         return
 
     process_folder(["core"])
@@ -346,9 +346,9 @@ def generate_scu_files(max_includes_per_scu):
     process_folder(["modules/gltf/editor"])
     process_folder(["modules/gltf/extensions"])
     process_folder(["modules/gltf/extensions/physics"])
-    process_folder(["modules/godot_physics_2d"])
-    process_folder(["modules/godot_physics_3d"])
-    process_folder(["modules/godot_physics_3d/joints"])
+    process_folder(["modules/jundot_physics_2d"])
+    process_folder(["modules/jundot_physics_3d"])
+    process_folder(["modules/jundot_physics_3d/joints"])
     process_folder(["modules/gridmap"])
     process_folder(["modules/interactive_music"])
     process_folder(["modules/jolt_physics"])

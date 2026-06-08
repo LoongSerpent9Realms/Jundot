@@ -106,7 +106,7 @@
 			If [code]true[/code], the dock appears in the [b]Editor &gt; Editor Docks[/b] menu and can be closed. Non-global docks can still be closed using [method close] or when [member closable] is [code]true[/code].
 		</member>
 		<member name="icon_name" type="StringName" setter="set_icon_name" getter="get_icon_name" default="&amp;&quot;&quot;">
-			The icon for the dock, as a name from the [code]EditorIcons[/code] theme type in the editor theme. You can find the list of available icons [url=https://godot-editor-icons.github.io/]here[/url].
+			The icon for the dock, as a name from the [code]EditorIcons[/code] theme type in the editor theme. You can find the list of available icons [url=https://jundot-editor-icons.github.io/]here[/url].
 		</member>
 		<member name="layout_key" type="String" setter="set_layout_key" getter="get_layout_key" default="&quot;&quot;">
 			The key representing this dock in the editor's layout file. If empty, the dock's displayed name will be used instead.

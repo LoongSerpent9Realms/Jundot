@@ -68,8 +68,8 @@ def get_build_version(short):
         v += ".%d" % version.patch
     status = version.status
     if not short:
-        if os.getenv("GODOT_VERSION_STATUS") is not None:
-            status = str(os.getenv("GODOT_VERSION_STATUS"))
+        if os.getenv("JUNDOT_VERSION_STATUS") is not None:
+            status = str(os.getenv("JUNDOT_VERSION_STATUS"))
         v += ".%s.%s" % (status, name)
     return v
 
@@ -182,13 +182,13 @@ def lipo_and_copy_apple_embedded(
     # env.extra_suffix contains ".simulator" when building for simulator,
     # but it's undesired when calling lipo()
     extra_suffix = env.extra_suffix.replace(".simulator", "")
-    rel_target_bin = lipo(bin_dir + "/libgodot" + module_prefix + "." + rel_prefix, extra_suffix + ".a")
-    dbg_target_bin = lipo(bin_dir + "/libgodot" + module_prefix + "." + dbg_prefix, extra_suffix + ".a")
+    rel_target_bin = lipo(bin_dir + "/libjundot" + module_prefix + "." + rel_prefix, extra_suffix + ".a")
+    dbg_target_bin = lipo(bin_dir + "/libjundot" + module_prefix + "." + dbg_prefix, extra_suffix + ".a")
     rel_target_bin_sim = lipo(
-        bin_dir + "/libgodot" + module_prefix + "." + rel_prefix, ".simulator" + extra_suffix + ".a"
+        bin_dir + "/libjundot" + module_prefix + "." + rel_prefix, ".simulator" + extra_suffix + ".a"
     )
     dbg_target_bin_sim = lipo(
-        bin_dir + "/libgodot" + module_prefix + "." + dbg_prefix, ".simulator" + extra_suffix + ".a"
+        bin_dir + "/libjundot" + module_prefix + "." + dbg_prefix, ".simulator" + extra_suffix + ".a"
     )
     # Assemble Xcode project bundle.
     if rel_target_bin != "":
@@ -196,13 +196,13 @@ def lipo_and_copy_apple_embedded(
         shutil.copy(
             rel_target_bin,
             app_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + "."
             + platform
             + ".release.xcframework/"
             + framework_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + ".a",
         )
@@ -211,13 +211,13 @@ def lipo_and_copy_apple_embedded(
         shutil.copy(
             dbg_target_bin,
             app_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + "."
             + platform
             + ".debug.xcframework/"
             + framework_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + ".a",
         )
@@ -226,13 +226,13 @@ def lipo_and_copy_apple_embedded(
         shutil.copy(
             rel_target_bin_sim,
             app_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + "."
             + platform
             + ".release.xcframework/"
             + framework_dir_sim
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + ".a",
         )
@@ -241,13 +241,13 @@ def lipo_and_copy_apple_embedded(
         shutil.copy(
             dbg_target_bin_sim,
             app_dir
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + "."
             + platform
             + ".debug.xcframework/"
             + framework_dir_sim
-            + "/libgodot"
+            + "/libjundot"
             + module_prefix
             + ".a",
         )
@@ -256,7 +256,7 @@ def lipo_and_copy_apple_embedded(
 def generate_bundle_apple_embedded(platform, framework_dir, framework_dir_sim, use_mkv, target, source, env):
     # Template bundle.
     extra_suffix = env.extra_suffix.replace(".simulator", "")
-    app_prefix = "godot." + platform
+    app_prefix = "jundot." + platform
     rel_prefix = platform + "." + "template_release"
     dbg_prefix = platform + "." + "template_debug"
     if env.dev_build:
@@ -283,7 +283,7 @@ def generate_bundle_apple_embedded(platform, framework_dir, framework_dir_sim, u
 
     # Remove other platform xcframeworks
     for entry in os.listdir(app_dir):
-        if (entry.startswith("libgodot.") or entry.startswith("libgodot_")) and entry.endswith(".xcframework"):
+        if (entry.startswith("libjundot.") or entry.startswith("libjundot_")) and entry.endswith(".xcframework"):
             parts = entry.split(".")
             if len(parts) >= 3 and parts[1] != platform:
                 full_path = os.path.join(app_dir, entry)
@@ -354,7 +354,7 @@ def setup_swift_builder(env, apple_platform, sdk_path, current_path, bridging_he
         "6",
         "-parse-as-library",
         "-module-name",
-        "godot_swift_module",
+        "jundot_swift_module",
         "-I./",  # Pass the current directory as the header root so bridging headers can include files from any point of the hierarchy
     ]
 

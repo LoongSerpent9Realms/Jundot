@@ -2,10 +2,10 @@
 /*  text_server_adv.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -51,8 +51,8 @@
 // Thirdparty headers.
 
 #ifdef MODULE_MSDFGEN_ENABLED
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
-GODOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides class member".
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
+JUNDOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides class member".
 
 #include <core/EdgeHolder.h>
 #include <core/ShapeDistanceFinder.h>
@@ -60,8 +60,8 @@ GODOT_MSVC_WARNING_PUSH_AND_IGNORE(4458) // "Declaration of 'identifier' hides c
 #include <core/edge-selectors.h>
 #include <msdfgen.h>
 
-GODOT_GCC_WARNING_POP
-GODOT_MSVC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
+JUNDOT_MSVC_WARNING_POP
 #endif
 
 #ifdef MODULE_SVG_ENABLED
@@ -430,7 +430,7 @@ bool TextServerAdvanced::_load_support_data(const String &p_filename) {
 #else
 	if (!icu_data_loaded) {
 		UErrorCode err = U_ZERO_ERROR;
-		String filename = (p_filename.is_empty()) ? String("res://icudt_godot.dat") : p_filename;
+		String filename = (p_filename.is_empty()) ? String("res://icudt_jundot.dat") : p_filename;
 		if (FileAccess::exists(filename)) {
 			Ref<FileAccess> f = FileAccess::open(filename, FileAccess::READ);
 			if (f.is_null()) {
@@ -458,11 +458,11 @@ bool TextServerAdvanced::_load_support_data(const String &p_filename) {
 }
 
 String TextServerAdvanced::_get_support_data_filename() const {
-	return String("icudt_godot.dat");
+	return String("icudt_jundot.dat");
 }
 
 String TextServerAdvanced::_get_support_data_info() const {
-	return String("ICU break iteration data (\"icudt_godot.dat\").");
+	return String("ICU break iteration data (\"icudt_jundot.dat\").");
 }
 
 bool TextServerAdvanced::_save_support_data(const String &p_filename) const {

@@ -1,9 +1,9 @@
-﻿short_name = "godot"
-name = "Godot Engine"
+﻿short_name = "jundot"
+name = "Jundot Engine"
 major = 1
 minor = 7
-patch = 0
+patch = 2
 status = "beta"
 module_config = ""
-website = "https://godotengine.org"
+website = "https://jundotengine.org"
 docs = "latest"

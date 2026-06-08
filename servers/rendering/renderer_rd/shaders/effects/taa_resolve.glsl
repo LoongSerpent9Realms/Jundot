@@ -21,7 +21,7 @@
 // File changes (yyyy-mm-dd)
 // 2025-11-05: Jakub Brzyski: Added dynamic variance, base variance value adjusted to reduce ghosting
 // 2022-05-06: Panos Karabelas: first commit
-// 2020-12-05: Joan Fons: convert to Vulkan and Godot
+// 2020-12-05: Joan Fons: convert to Vulkan and Jundot
 ///////////////////////////////////////////////////////////////////////////////////
 
 #[compute]

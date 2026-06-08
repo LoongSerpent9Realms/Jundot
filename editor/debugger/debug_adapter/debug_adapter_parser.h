@@ -2,10 +2,10 @@
 /*  debug_adapter_parser.h                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -82,7 +82,7 @@ public:
 	Dictionary req_next(const Dictionary &p_params) const;
 	Dictionary req_stepIn(const Dictionary &p_params) const;
 	Dictionary req_evaluate(const Dictionary &p_params) const;
-	Dictionary req_godot_put_msg(const Dictionary &p_params) const;
+	Dictionary req_jundot_put_msg(const Dictionary &p_params) const;
 
 	// Internal requests
 	Vector<String> _extract_play_arguments(const Dictionary &p_args) const;

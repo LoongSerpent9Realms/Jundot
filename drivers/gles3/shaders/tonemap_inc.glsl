@@ -81,7 +81,7 @@ vec3 tonemap_aces(vec3 color) {
 	return color_tonemapped / tonemapper_params.x;
 }
 
-// allenwp tonemapping curve; developed for use in the Godot game engine.
+// allenwp tonemapping curve; developed for use in the Jundot game engine.
 // Source and details: https://allenwp.com/blog/2025/05/29/allenwp-tonemapping-curve/
 // Input must be a non-negative linear scene value.
 vec3 allenwp_curve(vec3 x) {
@@ -133,7 +133,7 @@ vec3 tonemap_agx(vec3 color) {
 	// matrices will not perform well with non-Rec. 709 output (more testing with
 	// future wide-gamut displays is be needed).
 	// See this comment from the author on the decisions made to create the matrices:
-	// https://github.com/godotengine/godot-proposals/issues/12317#issuecomment-2835824250
+	// https://github.com/jundotengine/jundot-proposals/issues/12317#issuecomment-2835824250
 
 	// Combined Rec. 709 to Rec. 2020 and Blender AgX inset matrices:
 	const mat3 rec709_to_rec2020_agx_inset_matrix = mat3(

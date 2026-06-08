@@ -2,10 +2,10 @@
 /*  fixed_vector.h                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -33,7 +33,7 @@
 #include "core/os/memory.h"
 #include "core/templates/span.h"
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Warray-bounds")
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Warray-bounds")
 
 /**
  * A high performance Vector of fixed capacity.
@@ -205,4 +205,4 @@ public:
 	_FORCE_INLINE_ constexpr const T *end() const { return ptr() + _size; }
 };
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP

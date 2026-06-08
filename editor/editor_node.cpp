@@ -2,10 +2,10 @@
 /*  editor_node.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -377,7 +377,7 @@ void EditorNode::_update_title() {
 		// Display the "modified" mark before anything else so that it can always be seen in the OS task bar.
 		title = vformat("(*) %s", title);
 	}
-	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + GODOT_VERSION_NAME);
+	DisplayServer::get_singleton()->window_set_title(title + String(" - ") + JUNDOT_VERSION_NAME);
 	if (project_title) {
 		project_title->set_text(title);
 	}
@@ -747,8 +747,8 @@ void EditorNode::_update_theme(bool p_skip_creation) {
 
 		help_menu->set_item_icon(help_menu->get_item_index(HELP_SEARCH), get_editor_theme_native_menu_icon(SNAME("HelpSearch"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
 		help_menu->set_item_icon(help_menu->get_item_index(HELP_COPY_SYSTEM_INFO), get_editor_theme_native_menu_icon(SNAME("ActionCopy"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
-		help_menu->set_item_icon(help_menu->get_item_index(HELP_ABOUT), get_editor_theme_native_menu_icon(SNAME("Godot"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
-		help_menu->set_item_icon(help_menu->get_item_index(HELP_SUPPORT_GODOT_DEVELOPMENT), get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
+		help_menu->set_item_icon(help_menu->get_item_index(HELP_ABOUT), get_editor_theme_native_menu_icon(SNAME("Jundot"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
+		help_menu->set_item_icon(help_menu->get_item_index(HELP_SUPPORT_JUNDOT_DEVELOPMENT), get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
 
 		_update_renderer_color();
 	}
@@ -1014,9 +1014,9 @@ void EditorNode::_notification(int p_what) {
 
 			// Save the project after opening to mark it as last modified, except in headless mode.
 			// Also use this opportunity to ensure default settings are applied to new projects created from the command line
-			// using `touch project.godot`.
+			// using `touch project.jundot`.
 			if (DisplayServer::get_singleton()->window_can_draw()) {
-				const String project_settings_path = ProjectSettings::get_singleton()->get_resource_path().path_join("project.godot");
+				const String project_settings_path = ProjectSettings::get_singleton()->get_resource_path().path_join("project.jundot");
 				// Check the file's size in bytes as an optimization. If it's under 10 bytes, the file is assumed to be empty.
 				if (FileAccess::get_size(project_settings_path) < 10) {
 					const HashMap<String, Variant> initial_settings = get_initial_settings();
@@ -1577,10 +1577,10 @@ void EditorNode::_scan_external_changes() {
 		}
 	}
 
-	String project_settings_path = ProjectSettings::get_singleton()->get_resource_path().path_join("project.godot");
+	String project_settings_path = ProjectSettings::get_singleton()->get_resource_path().path_join("project.jundot");
 	if (FileAccess::get_modified_time(project_settings_path) > ProjectSettings::get_singleton()->get_last_saved_time()) {
 		TreeItem *ti = disk_changed_list->create_item(r);
-		ti->set_text(0, "project.godot");
+		ti->set_text(0, "project.jundot");
 		need_reload = true;
 		disk_changed_project = true;
 	}
@@ -2106,7 +2106,7 @@ void EditorNode::_dialog_display_load_error(String p_file, Error p_error) {
 				show_accept(vformat(TTR("Missing file '%s' or one of its dependencies."), p_file.get_file()), TTR("OK"));
 			} break;
 			case ERR_FILE_UNRECOGNIZED: {
-				show_accept(vformat(TTR("File '%s' is saved in a format that is newer than the formats supported by this version of Godot, so it can't be opened."), p_file.get_file()), TTR("OK"));
+				show_accept(vformat(TTR("File '%s' is saved in a format that is newer than the formats supported by this version of Jundot, so it can't be opened."), p_file.get_file()), TTR("OK"));
 			} break;
 			default: {
 				show_accept(vformat(TTR("Error while loading file '%s'."), p_file.get_file()), TTR("OK"));
@@ -3922,32 +3922,32 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 			command_palette->open_popup();
 		} break;
 		case HELP_DOCS: {
-			OS::get_singleton()->shell_open(GODOT_VERSION_DOCS_URL "/");
+			OS::get_singleton()->shell_open(JUNDOT_VERSION_DOCS_URL "/");
 		} break;
 		case HELP_FORUM: {
-			OS::get_singleton()->shell_open("https://forum.godotengine.org/");
+			OS::get_singleton()->shell_open("https://forum.jundotengine.org/");
 		} break;
 		case HELP_REPORT_A_BUG: {
-			OS::get_singleton()->shell_open("https://github.com/godotengine/godot/issues");
+			OS::get_singleton()->shell_open("https://github.com/jundotengine/jundot/issues");
 		} break;
 		case HELP_COPY_SYSTEM_INFO: {
 			String info = _get_system_info();
 			DisplayServer::get_singleton()->clipboard_set(info);
 		} break;
 		case HELP_SUGGEST_A_FEATURE: {
-			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-proposals#readme");
+			OS::get_singleton()->shell_open("https://github.com/jundotengine/jundot-proposals#readme");
 		} break;
 		case HELP_SEND_DOCS_FEEDBACK: {
-			OS::get_singleton()->shell_open("https://github.com/godotengine/godot-docs/issues");
+			OS::get_singleton()->shell_open("https://github.com/jundotengine/jundot-docs/issues");
 		} break;
 		case HELP_COMMUNITY: {
-			OS::get_singleton()->shell_open("https://godotengine.org/community");
+			OS::get_singleton()->shell_open("https://jundotengine.org/community");
 		} break;
 		case HELP_ABOUT: {
 			about->popup_centered(Size2(780, 500) * EDSCALE);
 		} break;
-		case HELP_SUPPORT_GODOT_DEVELOPMENT: {
-			OS::get_singleton()->shell_open("https://fund.godotengine.org/?ref=help_menu");
+		case HELP_SUPPORT_JUNDOT_DEVELOPMENT: {
+			OS::get_singleton()->shell_open("https://fund.jundotengine.org/?ref=help_menu");
 		} break;
 	}
 }
@@ -4097,8 +4097,8 @@ void EditorNode::_check_system_theme_changed() {
 
 		help_menu->set_item_icon(help_menu->get_item_index(HELP_SEARCH), get_editor_theme_native_menu_icon(SNAME("HelpSearch"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
 		help_menu->set_item_icon(help_menu->get_item_index(HELP_COPY_SYSTEM_INFO), get_editor_theme_native_menu_icon(SNAME("ActionCopy"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
-		help_menu->set_item_icon(help_menu->get_item_index(HELP_ABOUT), get_editor_theme_native_menu_icon(SNAME("Godot"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
-		help_menu->set_item_icon(help_menu->get_item_index(HELP_SUPPORT_GODOT_DEVELOPMENT), get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
+		help_menu->set_item_icon(help_menu->get_item_index(HELP_ABOUT), get_editor_theme_native_menu_icon(SNAME("Jundot"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
+		help_menu->set_item_icon(help_menu->get_item_index(HELP_SUPPORT_JUNDOT_DEVELOPMENT), get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode));
 		editor_dock_manager->update_docks_menu();
 	}
 }
@@ -6008,11 +6008,11 @@ String EditorNode::_get_system_info() const {
 	}
 	const String distribution_version = OS::get_singleton()->get_version_alias();
 
-	String godot_version = "Godot v" + String(GODOT_VERSION_FULL_CONFIG);
-	if (String(GODOT_VERSION_BUILD) != "official") {
-		String hash = String(GODOT_VERSION_HASH);
+	String jundot_version = "Jundot v" + String(JUNDOT_VERSION_FULL_CONFIG);
+	if (String(JUNDOT_VERSION_BUILD) != "official") {
+		String hash = String(JUNDOT_VERSION_HASH);
 		hash = hash.is_empty() ? String("unknown") : vformat("(%s)", hash.left(9));
-		godot_version += " " + hash;
+		jundot_version += " " + hash;
 	}
 
 	String display_session_type;
@@ -6098,7 +6098,7 @@ String EditorNode::_get_system_info() const {
 
 	// Join info.
 	Vector<String> info;
-	info.push_back(godot_version);
+	info.push_back(jundot_version);
 	String distribution_display_session_type = distribution_name;
 	if (!distribution_version.is_empty()) {
 		distribution_display_session_type += " " + distribution_version;
@@ -7008,11 +7008,11 @@ Dictionary EditorNode::drag_files_and_dirs(const Vector<String> &p_paths, Contro
 }
 
 bool EditorNode::_is_ai_package_builder_enabled() const {
-	if (!OS::get_singleton()->has_environment("GODOT_AI_PACKAGE_BUILDER")) {
+	if (!OS::get_singleton()->has_environment("JUNDOT_AI_PACKAGE_BUILDER")) {
 		return false;
 	}
 
-	const String value = OS::get_singleton()->get_environment("GODOT_AI_PACKAGE_BUILDER").to_lower();
+	const String value = OS::get_singleton()->get_environment("JUNDOT_AI_PACKAGE_BUILDER").to_lower();
 	return value == "1" || value == "true" || value == "yes" || value == "on";
 }
 
@@ -7024,11 +7024,11 @@ void EditorNode::_open_ai_package_builder() {
 
 	const String editor_dir = OS::get_singleton()->get_executable_path().get_base_dir();
 	Vector<String> candidates;
-	candidates.push_back(editor_dir.path_join("Tools").path_join("PackageBuilder").path_join("GodotPackageBuilder.exe"));
-	candidates.push_back(editor_dir.path_join("tools").path_join("PackageBuilder").path_join("GodotPackageBuilder.exe"));
-	candidates.push_back(editor_dir.path_join("GodotPackageBuilder.exe"));
-	candidates.push_back(editor_dir.get_base_dir().path_join("tools").path_join("PackageBuilder").path_join("bin").path_join("Debug").path_join("net8.0-windows").path_join("GodotPackageBuilder.exe"));
-	candidates.push_back(ProjectSettings::get_singleton()->globalize_path("res://tools/PackageBuilder/bin/Debug/net8.0-windows/GodotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.path_join("Tools").path_join("PackageBuilder").path_join("JundotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.path_join("tools").path_join("PackageBuilder").path_join("JundotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.path_join("JundotPackageBuilder.exe"));
+	candidates.push_back(editor_dir.get_base_dir().path_join("tools").path_join("PackageBuilder").path_join("bin").path_join("Debug").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe"));
+	candidates.push_back(ProjectSettings::get_singleton()->globalize_path("res://tools/PackageBuilder/bin/Debug/net8.0-windows/JundotPackageBuilder.exe"));
 
 	String package_builder_path;
 	for (const String &candidate : candidates) {
@@ -7039,7 +7039,7 @@ void EditorNode::_open_ai_package_builder() {
 	}
 
 	if (package_builder_path.is_empty()) {
-		show_warning(TTR("GodotPackageBuilder.exe was not found next to the editor."));
+		show_warning(TTR("JundotPackageBuilder.exe was not found next to the editor."));
 		return;
 	}
 
@@ -7048,7 +7048,7 @@ void EditorNode::_open_ai_package_builder() {
 	ProcessID pid = 0;
 	const Error err = OS::get_singleton()->create_process(package_builder_path, args, &pid, false);
 	if (err != OK) {
-		show_warning(vformat(TTR("Failed to start GodotPackageBuilder.exe. Error: %s"), itos(err)));
+		show_warning(vformat(TTR("Failed to start JundotPackageBuilder.exe. Error: %s"), itos(err)));
 	}
 }
 
@@ -7718,7 +7718,7 @@ bool EditorNode::call_build() {
 
 	for (int i = 0; i < build_callback_count && builds_successful; i++) {
 		if (!build_callbacks[i]()) {
-			ERR_PRINT("A Godot Engine build callback failed.");
+			ERR_PRINT("A Jundot Engine build callback failed.");
 			builds_successful = false;
 		}
 	}
@@ -8225,12 +8225,12 @@ void EditorNode::_build_help_menu() {
 #ifdef MACOS_ENABLED
 	if (menu_type != MENU_TYPE_GLOBAL) {
 		// On macOS "About" option is in the "app" menu.
-		help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Godot"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/about"), HELP_ABOUT);
+		help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Jundot"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/about"), HELP_ABOUT);
 	}
 #else
-	help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Godot"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/about"), HELP_ABOUT);
+	help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Jundot"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/about"), HELP_ABOUT);
 #endif
-	help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/support_development"), HELP_SUPPORT_GODOT_DEVELOPMENT);
+	help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("Heart"), menu_type == MENU_TYPE_GLOBAL, dark_mode), ED_GET_SHORTCUT("editor/support_development"), HELP_SUPPORT_JUNDOT_DEVELOPMENT);
 }
 
 void EditorNode::_add_to_main_menu(const String &p_name, PopupMenu *p_menu) {
@@ -8391,8 +8391,8 @@ void EditorNode::notify_settings_overrides_changed() {
 }
 
 // Returns the list of project settings to add to new projects. This is used by the
-// project manager creation dialog, but also applies to empty `project.godot` files
-// to cover the command line workflow of creating projects using `touch project.godot`.
+// project manager creation dialog, but also applies to empty `project.jundot` files
+// to cover the command line workflow of creating projects using `touch project.jundot`.
 //
 // This is used to set better defaults for new projects without affecting existing projects.
 // Keep the list alphabetically sorted.
@@ -9045,8 +9045,8 @@ EditorNode::EditorNode() {
 	ED_SHORTCUT_AND_COMMAND("editor/report_a_bug", TTRC("Report a Bug"));
 	ED_SHORTCUT_AND_COMMAND("editor/suggest_a_feature", TTRC("Suggest a Feature"));
 	ED_SHORTCUT_AND_COMMAND("editor/send_docs_feedback", TTRC("Send Docs Feedback"));
-	ED_SHORTCUT_AND_COMMAND("editor/about", TTRC("About Godot..."));
-	ED_SHORTCUT_AND_COMMAND("editor/support_development", TTRC("Support Godot Development"));
+	ED_SHORTCUT_AND_COMMAND("editor/about", TTRC("About Jundot..."));
+	ED_SHORTCUT_AND_COMMAND("editor/support_development", TTRC("Support Jundot Development"));
 
 	// Use the Ctrl modifier so F2 can be used to rename nodes in the scene tree dock.
 	ED_SHORTCUT_AND_COMMAND("editor/editor_2d", TTRC("Open 2D Workspace"), KeyModifierMask::CTRL | Key::F1);
@@ -9406,7 +9406,7 @@ EditorNode::EditorNode() {
 
 	disk_changed = memnew(ConfirmationDialog);
 	{
-		disk_changed->set_title(TTR("Files have been modified outside Godot"));
+		disk_changed->set_title(TTR("Files have been modified outside Jundot"));
 
 		VBoxContainer *vbc = memnew(VBoxContainer);
 		disk_changed->add_child(vbc);
@@ -9435,7 +9435,7 @@ EditorNode::EditorNode() {
 	gui_base->add_child(disk_changed);
 
 	project_data_missing = memnew(ConfirmationDialog);
-	project_data_missing->set_text(TTRC("Project data folder (.godot) is missing. Please restart editor."));
+	project_data_missing->set_text(TTRC("Project data folder (.jundot) is missing. Please restart editor."));
 	project_data_missing->connect(SceneStringName(confirmed), callable_mp(this, &EditorNode::restart_editor).bind(false));
 	project_data_missing->set_ok_button_text(TTRC("Restart"));
 

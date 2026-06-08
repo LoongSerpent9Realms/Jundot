@@ -2,10 +2,10 @@
 /*  variant_internal.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -556,7 +556,7 @@ public:
 		ERR_FAIL_V(nullptr);
 	}
 
-	// Used internally in GDExtension and Godot's binding system when converting to Variant
+	// Used internally in GDExtension and Jundot's binding system when converting to Variant
 	// from values that may include RequiredParam<T> or RequiredResult<T>.
 	template <typename T>
 	_FORCE_INLINE_ static Variant make(const T &v) {

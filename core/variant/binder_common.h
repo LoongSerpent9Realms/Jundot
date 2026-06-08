@@ -2,10 +2,10 @@
 /*  binder_common.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -434,7 +434,7 @@ void call_with_validated_object_instance_args_static_retc(T *base, R (*p_method)
 
 // GCC raises "parameter 'p_args' set but not used" when P = {},
 // it's not clever enough to treat other P values as making this branch valid.
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wunused-but-set-parameter")
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wunused-but-set-parameter")
 
 template <typename Q>
 void call_get_argument_type_helper(int p_arg, int &index, Variant::Type &type) {
@@ -476,7 +476,7 @@ void call_get_argument_type_info(int p_arg, PropertyInfo &info) {
 
 #ifdef DEBUG_ENABLED
 template <typename Q>
-void call_get_argument_metadata_helper(int p_arg, int &index, GodotTypeInfo::Metadata &md) {
+void call_get_argument_metadata_helper(int p_arg, int &index, JundotTypeInfo::Metadata &md) {
 	if (p_arg == index) {
 		md = GetTypeInfo<Q>::METADATA;
 	}
@@ -484,8 +484,8 @@ void call_get_argument_metadata_helper(int p_arg, int &index, GodotTypeInfo::Met
 }
 
 template <typename... P>
-GodotTypeInfo::Metadata call_get_argument_metadata(int p_arg) {
-	GodotTypeInfo::Metadata md = GodotTypeInfo::METADATA_NONE;
+JundotTypeInfo::Metadata call_get_argument_metadata(int p_arg) {
+	JundotTypeInfo::Metadata md = JundotTypeInfo::METADATA_NONE;
 
 	int index = 0;
 	// I think rocket science is simpler than modern C++.
@@ -775,4 +775,4 @@ void call_with_variant_args_static_dv(void (*p_method)(P...), const Variant **p_
 	call_with_variant_args_static(p_method, args, r_error, BuildIndexSequence<sizeof...(P)>{});
 }
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP

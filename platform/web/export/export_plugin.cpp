@@ -2,10 +2,10 @@
 /*  export_plugin.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -78,7 +78,7 @@ Error EditorExportPlatformWeb::_extract_template(const String &p_template, const
 		}
 
 		// Skip service worker and offline page if not exporting pwa.
-		if (!pwa && (file == "godot.service.worker.js" || file == "godot.offline.html")) {
+		if (!pwa && (file == "jundot.service.worker.js" || file == "jundot.offline.html")) {
 			continue;
 		}
 		Vector<uint8_t> data;
@@ -90,7 +90,7 @@ Error EditorExportPlatformWeb::_extract_template(const String &p_template, const
 		unzCloseCurrentFile(pkg);
 
 		//write
-		String dst = p_dir.path_join(file.replace("godot", p_name));
+		String dst = p_dir.path_join(file.replace("jundot", p_name));
 		Ref<FileAccess> f = FileAccess::open(dst, FileAccess::WRITE);
 		if (f.is_null()) {
 			add_message(EXPORT_MESSAGE_ERROR, TTR("Prepare Templates"), vformat(TTR("Could not write file: \"%s\"."), dst));
@@ -153,7 +153,7 @@ void EditorExportPlatformWeb::_fix_html(Vector<uint8_t> &p_html, const Ref<Edito
 	config["fileSizes"] = p_file_sizes;
 	config["ensureCrossOriginIsolationHeaders"] = (bool)p_preset->get("progressive_web_app/ensure_cross_origin_isolation_headers");
 
-	config["godotPoolSize"] = p_preset->get("threads/godot_pool_size");
+	config["jundotPoolSize"] = p_preset->get("threads/jundot_pool_size");
 	config["emscriptenPoolSize"] = p_preset->get("threads/emscripten_pool_size");
 
 	String head_include;
@@ -170,24 +170,24 @@ void EditorExportPlatformWeb::_fix_html(Vector<uint8_t> &p_html, const Ref<Edito
 	const String str_config = Variant(config).to_json_string();
 	const String custom_head_include = p_preset->get("html/head_include");
 	HashMap<String, String> replaces;
-	replaces["$GODOT_URL"] = p_name + ".js";
-	replaces["$GODOT_PROJECT_NAME"] = get_project_setting(p_preset, "application/config/name");
-	replaces["$GODOT_HEAD_INCLUDE"] = head_include + custom_head_include;
-	replaces["$GODOT_CONFIG"] = str_config;
-	replaces["$GODOT_SPLASH_COLOR"] = "#" + Color(get_project_setting(p_preset, "application/boot_splash/bg_color")).to_html(false);
+	replaces["$JUNDOT_URL"] = p_name + ".js";
+	replaces["$JUNDOT_PROJECT_NAME"] = get_project_setting(p_preset, "application/config/name");
+	replaces["$JUNDOT_HEAD_INCLUDE"] = head_include + custom_head_include;
+	replaces["$JUNDOT_CONFIG"] = str_config;
+	replaces["$JUNDOT_SPLASH_COLOR"] = "#" + Color(get_project_setting(p_preset, "application/boot_splash/bg_color")).to_html(false);
 
-	Vector<String> godot_splash_classes;
-	godot_splash_classes.push_back("show-image--" + String(get_project_setting(p_preset, "application/boot_splash/show_image")));
+	Vector<String> jundot_splash_classes;
+	jundot_splash_classes.push_back("show-image--" + String(get_project_setting(p_preset, "application/boot_splash/show_image")));
 	RSE::SplashStretchMode boot_splash_stretch_mode = get_project_setting(p_preset, "application/boot_splash/stretch_mode");
-	godot_splash_classes.push_back("fullsize--" + String(((boot_splash_stretch_mode != RSE::SplashStretchMode::SPLASH_STRETCH_MODE_DISABLED) ? "true" : "false")));
-	godot_splash_classes.push_back("use-filter--" + String(get_project_setting(p_preset, "application/boot_splash/use_filter")));
-	replaces["$GODOT_SPLASH_CLASSES"] = String(" ").join(godot_splash_classes);
-	replaces["$GODOT_SPLASH"] = p_name + ".png";
+	jundot_splash_classes.push_back("fullsize--" + String(((boot_splash_stretch_mode != RSE::SplashStretchMode::SPLASH_STRETCH_MODE_DISABLED) ? "true" : "false")));
+	jundot_splash_classes.push_back("use-filter--" + String(get_project_setting(p_preset, "application/boot_splash/use_filter")));
+	replaces["$JUNDOT_SPLASH_CLASSES"] = String(" ").join(jundot_splash_classes);
+	replaces["$JUNDOT_SPLASH"] = p_name + ".png";
 
 	if (p_preset->get("variant/thread_support")) {
-		replaces["$GODOT_THREADS_ENABLED"] = "true";
+		replaces["$JUNDOT_THREADS_ENABLED"] = "true";
 	} else {
-		replaces["$GODOT_THREADS_ENABLED"] = "false";
+		replaces["$JUNDOT_THREADS_ENABLED"] = "false";
 	}
 
 	_replace_strings(replaces, p_html);
@@ -229,7 +229,7 @@ Error EditorExportPlatformWeb::_add_manifest_icon(const Ref<EditorExportPreset> 
 Error EditorExportPlatformWeb::_build_pwa(const Ref<EditorExportPreset> &p_preset, const String p_path, const Vector<SharedObject> &p_shared_objects) {
 	String proj_name = get_project_setting(p_preset, "application/config/name");
 	if (proj_name.is_empty()) {
-		proj_name = "Godot Game";
+		proj_name = "Jundot Game";
 	}
 
 	// Service worker
@@ -238,10 +238,10 @@ Error EditorExportPlatformWeb::_build_pwa(const Ref<EditorExportPreset> &p_prese
 	bool extensions = (bool)p_preset->get("variant/extensions_support");
 	bool ensure_crossorigin_isolation_headers = (bool)p_preset->get("progressive_web_app/ensure_cross_origin_isolation_headers");
 	HashMap<String, String> replaces;
-	replaces["___GODOT_VERSION___"] = String::num_int64(OS::get_singleton()->get_unix_time()) + "|" + String::num_int64(OS::get_singleton()->get_ticks_usec());
-	replaces["___GODOT_NAME___"] = proj_name.substr(0, 16);
-	replaces["___GODOT_OFFLINE_PAGE___"] = name + ".offline.html";
-	replaces["___GODOT_ENSURE_CROSSORIGIN_ISOLATION_HEADERS___"] = ensure_crossorigin_isolation_headers ? "true" : "false";
+	replaces["___JUNDOT_VERSION___"] = String::num_int64(OS::get_singleton()->get_unix_time()) + "|" + String::num_int64(OS::get_singleton()->get_ticks_usec());
+	replaces["___JUNDOT_NAME___"] = proj_name.substr(0, 16);
+	replaces["___JUNDOT_OFFLINE_PAGE___"] = name + ".offline.html";
+	replaces["___JUNDOT_ENSURE_CROSSORIGIN_ISOLATION_HEADERS___"] = ensure_crossorigin_isolation_headers ? "true" : "false";
 
 	// Files cached during worker install.
 	Array cache_files = {
@@ -256,7 +256,7 @@ Error EditorExportPlatformWeb::_build_pwa(const Ref<EditorExportPreset> &p_prese
 
 	cache_files.push_back(name + ".audio.worklet.js");
 	cache_files.push_back(name + ".audio.position.worklet.js");
-	replaces["___GODOT_CACHE___"] = Variant(cache_files).to_json_string();
+	replaces["___JUNDOT_CACHE___"] = Variant(cache_files).to_json_string();
 
 	// Heavy files that are cached on demand.
 	Array opt_cache_files = {
@@ -269,7 +269,7 @@ Error EditorExportPlatformWeb::_build_pwa(const Ref<EditorExportPreset> &p_prese
 			opt_cache_files.push_back(p_shared_objects[i].path.get_file());
 		}
 	}
-	replaces["___GODOT_OPT_CACHE___"] = Variant(opt_cache_files).to_json_string();
+	replaces["___JUNDOT_OPT_CACHE___"] = Variant(opt_cache_files).to_json_string();
 
 	const String sw_path = dir.path_join(name + ".service.worker.js");
 	Vector<uint8_t> sw;
@@ -393,7 +393,7 @@ void EditorExportPlatformWeb::get_export_options(List<ExportOption> *r_options) 
 	r_options->push_back(ExportOption(PropertyInfo(Variant::COLOR, "progressive_web_app/background_color", PROPERTY_HINT_COLOR_NO_ALPHA), Color()));
 
 	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/emscripten_pool_size"), 8));
-	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/godot_pool_size"), 4));
+	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "threads/jundot_pool_size"), 4));
 }
 
 bool EditorExportPlatformWeb::get_export_option_visibility(const EditorExportPreset *p_preset, const String &p_option) const {
@@ -402,7 +402,7 @@ bool EditorExportPlatformWeb::get_export_option_visibility(const EditorExportPre
 		return advanced_options_enabled;
 	}
 
-	if (p_option == "threads/godot_pool_size" || p_option == "threads/emscripten_pool_size") {
+	if (p_option == "threads/jundot_pool_size" || p_option == "threads/emscripten_pool_size") {
 		return p_preset->get("variant/thread_support").operator bool();
 	}
 
@@ -424,7 +424,7 @@ Ref<Texture2D> EditorExportPlatformWeb::get_logo() const {
 bool EditorExportPlatformWeb::has_valid_export_configuration(const Ref<EditorExportPreset> &p_preset, String &r_error, bool &r_missing_templates, bool p_debug) const {
 #ifdef MODULE_MONO_ENABLED
 	// Don't check for additional errors, as this particular error cannot be resolved.
-	r_error += TTR("Exporting to Web is currently not supported in Godot 4 when using C#/.NET. Use Godot 3 to target Web with C#/Mono instead.") + "\n";
+	r_error += TTR("Exporting to Web is currently not supported in Jundot 4 when using C#/.NET. Use Jundot 3 to target Web with C#/Mono instead.") + "\n";
 	r_error += TTR("If this project does not use C#, use a non-C# editor build to export the project.") + "\n";
 	return false;
 #else

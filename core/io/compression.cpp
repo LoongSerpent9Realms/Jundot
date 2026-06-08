@@ -2,10 +2,10 @@
 /*  compression.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -154,7 +154,7 @@ int64_t Compression::decompress(uint8_t *p_dst, int64_t p_dst_max_size, const ui
 			ERR_FAIL_COND_V(res != BROTLI_DECODER_RESULT_SUCCESS, -1);
 			return ret_size;
 #else
-			ERR_FAIL_V_MSG(-1, "Godot was compiled without brotli support.");
+			ERR_FAIL_V_MSG(-1, "Jundot was compiled without brotli support.");
 #endif
 		} break;
 		case MODE_FASTLZ: {
@@ -287,7 +287,7 @@ int Compression::decompress_dynamic(Vector<uint8_t> *p_dst_vect, int64_t p_max_d
 		BrotliDecoderDestroyInstance(state);
 		return Z_OK;
 #else
-		ERR_FAIL_V_MSG(Z_ERRNO, "Godot was compiled without brotli support.");
+		ERR_FAIL_V_MSG(Z_ERRNO, "Jundot was compiled without brotli support.");
 #endif
 	} else {
 		// This function only supports GZip and Deflate.

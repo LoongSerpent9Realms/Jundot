@@ -2,10 +2,10 @@
 /*  export_template_manager.cpp                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -70,7 +70,7 @@ void ExportTemplateManager::_request_mirrors() {
 	// (which always have a number following their status, e.g. "alpha1").
 	// Therefore, don't display download-related features when using a development version
 	// (whose builds aren't numbered).
-	if (!strcmp(GODOT_VERSION_STATUS, "dev") || !strcmp(GODOT_VERSION_STATUS, "beta") || !strcmp(GODOT_VERSION_STATUS, "rc")) {
+	if (!strcmp(JUNDOT_VERSION_STATUS, "dev") || !strcmp(JUNDOT_VERSION_STATUS, "beta") || !strcmp(JUNDOT_VERSION_STATUS, "rc")) {
 		_set_empty_mirror_list();
 		mirrors_list->set_tooltip_text(TTRC("Official export templates aren't available for development builds."));
 #ifdef REAL_T_IS_DOUBLE
@@ -85,7 +85,7 @@ void ExportTemplateManager::_request_mirrors() {
 	}
 
 	if (mirrors_list->get_tooltip_text().is_empty()) {
-		const String mirrors_metadata_url = vformat("https://godotengine.org/mirrorlist/%s.json", GODOT_VERSION_FULL_CONFIG);
+		const String mirrors_metadata_url = vformat("https://jundotengine.org/mirrorlist/%s.json", JUNDOT_VERSION_FULL_CONFIG);
 		mirrors_requester->request(mirrors_metadata_url);
 	}
 }
@@ -198,7 +198,7 @@ void ExportTemplateManager::_delete_confirmed() {
 	_delete_file(item_to_delete);
 
 	const String selected_version = version_list->get_item_text(version_list->get_current());
-	if (selected_version != GODOT_VERSION_FULL_CONFIG) {
+	if (selected_version != JUNDOT_VERSION_FULL_CONFIG) {
 		// Deleting all installed templates removes the version from list.
 		_update_version_list();
 	}
@@ -497,7 +497,7 @@ void ExportTemplateManager::_initialize_template_data() {
 		TemplateInfo info;
 		info.name = TTR("ICU Data");
 		info.description = TTRC("Line breaking dictionaries for TextServer, used by certain languages.");
-		info.file_list = { "icudt_godot.dat" };
+		info.file_list = { "icudt_jundot.dat" };
 		template_data[TemplateID::ICU_DATA] = info;
 	}
 
@@ -558,7 +558,7 @@ void ExportTemplateManager::_initialize_template_data() {
 	}
 
 	// Template directory status.
-	DirAccess::make_dir_recursive_absolute(_get_template_folder_path(GODOT_VERSION_FULL_CONFIG));
+	DirAccess::make_dir_recursive_absolute(_get_template_folder_path(JUNDOT_VERSION_FULL_CONFIG));
 	_update_version_list();
 }
 
@@ -574,7 +574,7 @@ void ExportTemplateManager::_update_version_list() {
 
 	int current_version_id = -1;
 	for (const String &dir : templates_dir->get_directories()) {
-		if (dir == GODOT_VERSION_FULL_CONFIG) {
+		if (dir == JUNDOT_VERSION_FULL_CONFIG) {
 			version_list->add_item(dir);
 			version_list->set_item_custom_fg_color(-1, theme_cache.current_version_color);
 			current_version_id = version_list->get_item_count() - 1;
@@ -613,7 +613,7 @@ void ExportTemplateManager::_update_template_tree() {
 	Ref<DirAccess> template_directory = DirAccess::open(_get_template_folder_path(selected_version));
 	ERR_FAIL_COND(template_directory.is_null());
 
-	bool is_current_version = (selected_version == GODOT_VERSION_FULL_CONFIG);
+	bool is_current_version = (selected_version == JUNDOT_VERSION_FULL_CONFIG);
 	HashMap<TemplateID, LocalVector<String>> installed_template_files;
 
 	for (const KeyValue<PlatformID, PlatformInfo> &KV : platform_map) {
@@ -645,7 +645,7 @@ void ExportTemplateManager::_fill_template_tree(Tree *p_tree, const HashMap<Temp
 
 	if (is_available_tree && !p_is_current_version) {
 		TreeItem *nodownloadsforyou = platform_parent->create_child();
-		nodownloadsforyou->set_text(0, TTR("Downloads are only available for the current Godot version."));
+		nodownloadsforyou->set_text(0, TTR("Downloads are only available for the current Jundot version."));
 		nodownloadsforyou->set_custom_color(0, get_theme_color(SNAME("font_disabled_color"), EditorStringName(Editor)));
 		return;
 	}
@@ -835,7 +835,7 @@ void ExportTemplateManager::_update_install_button() {
 		} else if (mirrors_empty) {
 			install_button->set_tooltip_text(TTRC("No mirrors available for download."));
 		} else {
-			install_button->set_tooltip_text(TTRC("Downloads are only available for the current Godot version."));
+			install_button->set_tooltip_text(TTRC("Downloads are only available for the current Jundot version."));
 		}
 	} else {
 		install_button->set_tooltip_text(String());
@@ -844,7 +844,7 @@ void ExportTemplateManager::_update_install_button() {
 
 bool ExportTemplateManager::_can_download_templates() {
 	const String selected_version = version_list->get_item_text(version_list->get_current());
-	return !mirrors_empty && _is_online() && selected_version == GODOT_VERSION_FULL_CONFIG;
+	return !mirrors_empty && _is_online() && selected_version == JUNDOT_VERSION_FULL_CONFIG;
 }
 
 void ExportTemplateManager::_update_folding_cache(TreeItem *p_item) {
@@ -1398,19 +1398,19 @@ String ExportTemplateManager::get_android_source_zip(const Ref<EditorExportPrese
 		}
 	}
 
-	const String templates_dir = EditorPaths::get_singleton()->get_export_templates_dir().path_join(GODOT_VERSION_FULL_CONFIG);
+	const String templates_dir = EditorPaths::get_singleton()->get_export_templates_dir().path_join(JUNDOT_VERSION_FULL_CONFIG);
 	return templates_dir.path_join("android_source.zip");
 }
 
 String ExportTemplateManager::get_android_template_identifier(const Ref<EditorExportPreset> &p_preset) {
-	// The template identifier is the Godot version for the default template, and the full path plus md5 hash for custom templates.
+	// The template identifier is the Jundot version for the default template, and the full path plus md5 hash for custom templates.
 	if (p_preset.is_valid()) {
 		String android_source_zip = p_preset->get("gradle_build/android_source_template");
 		if (!android_source_zip.is_empty()) {
 			return android_source_zip + String(" [") + FileAccess::get_md5(android_source_zip) + String("]");
 		}
 	}
-	return GODOT_VERSION_FULL_CONFIG;
+	return JUNDOT_VERSION_FULL_CONFIG;
 }
 
 bool ExportTemplateManager::is_android_template_installed(const Ref<EditorExportPreset> &p_preset) {
@@ -1590,7 +1590,7 @@ ExportTemplateManager::ExportTemplateManager() {
 	tpz_selection_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
 	tpz_selection_dialog->set_file_mode(FileDialog::FILE_MODE_OPEN_FILE);
 	tpz_selection_dialog->set_current_dir(EDITOR_DEF("_export_template_download_directory", ""));
-	tpz_selection_dialog->add_filter("*.tpz", TTRC("Godot Export Templates"));
+	tpz_selection_dialog->add_filter("*.tpz", TTRC("Jundot Export Templates"));
 	tpz_selection_dialog->connect("file_selected", callable_mp(this, &ExportTemplateManager::_tpz_file_selected));
 	add_child(tpz_selection_dialog);
 
@@ -1603,12 +1603,12 @@ ExportTemplateManager::ExportTemplateManager() {
 	VBoxContainer *side_vb = memnew(VBoxContainer);
 	main_split->add_child(side_vb);
 
-	Label *version_header = memnew(Label(TTRC("Godot Version")));
+	Label *version_header = memnew(Label(TTRC("Jundot Version")));
 	version_header->set_theme_type_variation("HeaderSmall");
 	side_vb->add_child(version_header);
 
 	version_list = memnew(ItemList);
-	version_list->set_accessibility_name(TTRC("Godot Version List"));
+	version_list->set_accessibility_name(TTRC("Jundot Version List"));
 	version_list->set_theme_type_variation("ItemListSecondary");
 	version_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	side_vb->add_child(version_list);
@@ -1691,7 +1691,7 @@ ExportTemplateManager::ExportTemplateManager() {
 	mirrors_requester->connect("request_completed", callable_mp(this, &ExportTemplateManager::_mirrors_request_completed));
 	add_child(mirrors_requester);
 
-	const String template_directory = _get_template_folder_path(GODOT_VERSION_FULL_CONFIG);
+	const String template_directory = _get_template_folder_path(JUNDOT_VERSION_FULL_CONFIG);
 	for (int i = 0; i < 5; i++) {
 		TemplateDownloader *downloader = memnew(TemplateDownloader(template_directory));
 		downloader->set_use_threads(true);
@@ -1906,7 +1906,7 @@ void TemplateDownloader::_request_completed(int p_result, int p_response_code, c
 				int err = UNZ_OK;
 
 				// Locate and open the file.
-				err = godot_unzip_locate_file(uzf, file_info.name, true);
+				err = jundot_unzip_locate_file(uzf, file_info.name, true);
 				if (err != UNZ_OK) {
 					_download_failed(TTR("File does not exist in ZIP archive."));
 					return;

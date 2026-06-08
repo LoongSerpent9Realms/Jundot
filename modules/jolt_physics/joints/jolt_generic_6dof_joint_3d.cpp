@@ -2,10 +2,10 @@
 /*  jolt_generic_6dof_joint_3d.cpp                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -133,7 +133,7 @@ void JoltGeneric6DOFJoint3D::_update_motor_velocity(int p_axis) {
 				(float)motor_speed[AXIS_LINEAR_Y],
 				(float)motor_speed[AXIS_LINEAR_Z]));
 	} else {
-		// We flip the direction since Jolt is CCW but Godot is CW.
+		// We flip the direction since Jolt is CCW but Jundot is CW.
 		constraint->SetTargetAngularVelocityCS(JPH::Vec3(
 				(float)-motor_speed[AXIS_ANGULAR_X],
 				(float)-motor_speed[AXIS_ANGULAR_Y],
@@ -197,7 +197,7 @@ void JoltGeneric6DOFJoint3D::_update_spring_equilibrium(int p_axis) {
 
 		constraint->SetTargetPositionCS(to_jolt(target_position));
 	} else {
-		// We flip the direction since Jolt is CCW but Godot is CW.
+		// We flip the direction since Jolt is CCW but Jundot is CW.
 		const Basis target_orientation = Basis::from_euler(
 				Vector3((float)-spring_equilibrium[AXIS_ANGULAR_X],
 						(float)-spring_equilibrium[AXIS_ANGULAR_Y],

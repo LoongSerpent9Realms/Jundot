@@ -2,10 +2,10 @@
 /*  jolt_soft_body_3d.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -188,21 +188,21 @@ JPH::SoftBodySharedSettings *JoltSoftBody3D::_create_shared_settings() {
 	// of the constraints a bit.
 	pin_vertices(*this, pinned_vertices, mesh_to_physics, physics_vertices);
 
-	// Since Godot's stiffness is input as a coefficient between 0 and 1, and Jolt uses actual stiffness for its
+	// Since Jundot's stiffness is input as a coefficient between 0 and 1, and Jolt uses actual stiffness for its
 	// edge constraints, we must map one to the other.
 	//
-	// Godot uses classic PBD edge constraints, which have a stiffness parameter k that is used in the position correction formula as follows:
+	// Jundot uses classic PBD edge constraints, which have a stiffness parameter k that is used in the position correction formula as follows:
 	// delta_x1 = -k * w1 / (w1 + w2) * (l - l0) / l * (x2 - x1)
 	// where k is the stiffness, w1 and w2 are the inverse masses of the two vertices, l is the current length of the edge = |x2 - x1|, l0 is the rest length of the edge, and x1 and x2 are the vertex positions.
 	//
-	// Note that the actual formula used in Godot physics seems to use an approximation of this which avoids calculating the square root:
+	// Note that the actual formula used in Jundot physics seems to use an approximation of this which avoids calculating the square root:
 	// delta_x1 = -k * w1 / (w1 + w2) * (l^2 - l0^2) / (l^2 + l0^2) * (x2 - x1)
 	//
 	// Jolt uses XPBD which goes as follows:
 	// delta_x1 = -w1 / (w1 + w2 + compliance / dt^2) * (l - l0) / l * (x2 - x1)
 	// where compliance is the inverse of stiffness and dt is the timestep.
 	//
-	// We can derive Jolt's compliance from Godot's stiffness by evaluating:
+	// We can derive Jolt's compliance from Jundot's stiffness by evaluating:
 	// k * w1 / (w1 + w2) = w1 / (w1 + w2 + compliance / dt^2)
 	// which simplifies to:
 	// compliance = dt^2 * (1 / k - 1) * (w1 + w2)
@@ -231,7 +231,7 @@ JPH::SoftBodySharedSettings *JoltSoftBody3D::_create_shared_settings() {
 
 void JoltSoftBody3D::_apply_environmental_forces(float p_step) {
 	// Get approximation of the center of the soft body.
-	Vector3 com_position = to_godot(jolt_body->GetCenterOfMassPosition());
+	Vector3 com_position = to_jundot(jolt_body->GetCenterOfMassPosition());
 
 	// Calculate gravity and which areas affect the soft body through wind.
 	bool gravity_done = false;
@@ -267,9 +267,9 @@ void JoltSoftBody3D::_apply_environmental_forces(float p_step) {
 			JPH::SoftBodyVertex &physics_vertex2 = physics_vertices[physics_face.mVertex[2]];
 
 			// Calculate the triangle centroid.
-			Vector3 v0 = to_godot(physics_vertex0.mPosition);
-			Vector3 v1 = to_godot(physics_vertex1.mPosition);
-			Vector3 v2 = to_godot(physics_vertex2.mPosition);
+			Vector3 v0 = to_jundot(physics_vertex0.mPosition);
+			Vector3 v1 = to_jundot(physics_vertex1.mPosition);
+			Vector3 v2 = to_jundot(physics_vertex2.mPosition);
 			Vector3 centroid = com_position + (v0 + v1 + v2) * real_t(1.0 / 3.0);
 
 			// Calculate the triangle normal.
@@ -640,12 +640,12 @@ void JoltSoftBody3D::set_linear_damping(float p_damping) {
 }
 
 float JoltSoftBody3D::get_drag() const {
-	// Drag is not a thing in Jolt, and not supported by Godot Physics either.
+	// Drag is not a thing in Jolt, and not supported by Jundot Physics either.
 	return 0.0f;
 }
 
 void JoltSoftBody3D::set_drag(float p_drag) {
-	// Drag is not a thing in Jolt, and not supported by Godot Physics either.
+	// Drag is not a thing in Jolt, and not supported by Jundot Physics either.
 }
 
 Variant JoltSoftBody3D::get_state(PhysicsServer3D::BodyState p_state) const {
@@ -727,7 +727,7 @@ void JoltSoftBody3D::set_transform(const Transform3D &p_transform) {
 
 AABB JoltSoftBody3D::get_bounds() const {
 	ERR_FAIL_COND_V_MSG(!in_space(), AABB(), vformat("Failed to retrieve world bounds of '%s'. Doing so without a physics space is not supported when using Jolt Physics. If this relates to a node, try adding the node to a scene tree first.", to_string()));
-	return to_godot(jolt_body->GetWorldSpaceBounds());
+	return to_jundot(jolt_body->GetWorldSpaceBounds());
 }
 
 void JoltSoftBody3D::update_rendering_server(PhysicsServer3DRenderingServerHandler *p_rendering_server_handler) {
@@ -760,9 +760,9 @@ void JoltSoftBody3D::update_rendering_server(PhysicsServer3DRenderingServerHandl
 		const uint32_t i1 = physics_face.mVertex[1];
 		const uint32_t i2 = physics_face.mVertex[0];
 
-		const Vector3 v0 = to_godot(physics_vertices[i0].mPosition);
-		const Vector3 v1 = to_godot(physics_vertices[i1].mPosition);
-		const Vector3 v2 = to_godot(physics_vertices[i2].mPosition);
+		const Vector3 v0 = to_jundot(physics_vertices[i0].mPosition);
+		const Vector3 v1 = to_jundot(physics_vertices[i1].mPosition);
+		const Vector3 v2 = to_jundot(physics_vertices[i2].mPosition);
 
 		const Vector3 normal = (v2 - v0).cross(v1 - v0).normalized();
 
@@ -786,7 +786,7 @@ void JoltSoftBody3D::update_rendering_server(PhysicsServer3DRenderingServerHandl
 	for (int i = 0; i < mesh_vertex_count; ++i) {
 		const int physics_index = mesh_to_physics[i];
 		if (physics_index >= 0) {
-			const Vector3 vertex = to_godot(body_position + physics_vertices[(size_t)physics_index].mPosition);
+			const Vector3 vertex = to_jundot(body_position + physics_vertices[(size_t)physics_index].mPosition);
 			const Vector3 normal = normals[(uint32_t)physics_index];
 
 			p_rendering_server_handler->set_vertex(i, vertex);
@@ -808,7 +808,7 @@ Vector3 JoltSoftBody3D::get_vertex_position(int p_index) {
 	const JPH::Array<JPH::SoftBodyVertex> &physics_vertices = motion_properties.GetVertices();
 	const JPH::SoftBodyVertex &physics_vertex = physics_vertices[physics_index];
 
-	return to_godot(jolt_body->GetCenterOfMassPosition() + physics_vertex.mPosition);
+	return to_jundot(jolt_body->GetCenterOfMassPosition() + physics_vertex.mPosition);
 }
 
 void JoltSoftBody3D::set_vertex_position(int p_index, const Vector3 &p_position) {

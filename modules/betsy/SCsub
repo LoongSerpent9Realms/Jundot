@@ -15,5 +15,5 @@ env_betsy.GLSL_HEADER("rgb_to_rgba.glsl")
 
 env_betsy.Depends(Glob("*.glsl.gen.h"), ["#glsl_builders.py"])
 
-# Godot source files
+# Jundot source files
 env_betsy.add_source_files(env.modules_sources, "*.cpp")

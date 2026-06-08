@@ -2,10 +2,10 @@
 /*  typedefs.h                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -268,61 +268,61 @@ inline constexpr bool is_zero_constructible_v = is_zero_constructible<T>::value;
 
 // Warning suppression helper macros.
 #if defined(__clang__)
-#define GODOT_CLANG_PRAGMA(m_content) _Pragma(#m_content)
-#define GODOT_CLANG_WARNING_PUSH GODOT_CLANG_PRAGMA(clang diagnostic push)
-#define GODOT_CLANG_WARNING_IGNORE(m_warning) GODOT_CLANG_PRAGMA(clang diagnostic ignored m_warning)
-#define GODOT_CLANG_WARNING_POP GODOT_CLANG_PRAGMA(clang diagnostic pop)
-#define GODOT_CLANG_WARNING_PUSH_AND_IGNORE(m_warning) GODOT_CLANG_WARNING_PUSH GODOT_CLANG_WARNING_IGNORE(m_warning)
+#define JUNDOT_CLANG_PRAGMA(m_content) _Pragma(#m_content)
+#define JUNDOT_CLANG_WARNING_PUSH JUNDOT_CLANG_PRAGMA(clang diagnostic push)
+#define JUNDOT_CLANG_WARNING_IGNORE(m_warning) JUNDOT_CLANG_PRAGMA(clang diagnostic ignored m_warning)
+#define JUNDOT_CLANG_WARNING_POP JUNDOT_CLANG_PRAGMA(clang diagnostic pop)
+#define JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE(m_warning) JUNDOT_CLANG_WARNING_PUSH JUNDOT_CLANG_WARNING_IGNORE(m_warning)
 #else
-#define GODOT_CLANG_PRAGMA(m_content)
-#define GODOT_CLANG_WARNING_PUSH
-#define GODOT_CLANG_WARNING_IGNORE(m_warning)
-#define GODOT_CLANG_WARNING_POP
-#define GODOT_CLANG_WARNING_PUSH_AND_IGNORE(m_warning)
+#define JUNDOT_CLANG_PRAGMA(m_content)
+#define JUNDOT_CLANG_WARNING_PUSH
+#define JUNDOT_CLANG_WARNING_IGNORE(m_warning)
+#define JUNDOT_CLANG_WARNING_POP
+#define JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE(m_warning)
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__)
-#define GODOT_GCC_PRAGMA(m_content) _Pragma(#m_content)
-#define GODOT_GCC_WARNING_PUSH GODOT_GCC_PRAGMA(GCC diagnostic push)
-#define GODOT_GCC_WARNING_IGNORE(m_warning) GODOT_GCC_PRAGMA(GCC diagnostic ignored m_warning)
-#define GODOT_GCC_WARNING_POP GODOT_GCC_PRAGMA(GCC diagnostic pop)
-#define GODOT_GCC_WARNING_PUSH_AND_IGNORE(m_warning) GODOT_GCC_WARNING_PUSH GODOT_GCC_WARNING_IGNORE(m_warning)
+#define JUNDOT_GCC_PRAGMA(m_content) _Pragma(#m_content)
+#define JUNDOT_GCC_WARNING_PUSH JUNDOT_GCC_PRAGMA(GCC diagnostic push)
+#define JUNDOT_GCC_WARNING_IGNORE(m_warning) JUNDOT_GCC_PRAGMA(GCC diagnostic ignored m_warning)
+#define JUNDOT_GCC_WARNING_POP JUNDOT_GCC_PRAGMA(GCC diagnostic pop)
+#define JUNDOT_GCC_WARNING_PUSH_AND_IGNORE(m_warning) JUNDOT_GCC_WARNING_PUSH JUNDOT_GCC_WARNING_IGNORE(m_warning)
 #else
-#define GODOT_GCC_PRAGMA(m_content)
-#define GODOT_GCC_WARNING_PUSH
-#define GODOT_GCC_WARNING_IGNORE(m_warning)
-#define GODOT_GCC_WARNING_POP
-#define GODOT_GCC_WARNING_PUSH_AND_IGNORE(m_warning)
+#define JUNDOT_GCC_PRAGMA(m_content)
+#define JUNDOT_GCC_WARNING_PUSH
+#define JUNDOT_GCC_WARNING_IGNORE(m_warning)
+#define JUNDOT_GCC_WARNING_POP
+#define JUNDOT_GCC_WARNING_PUSH_AND_IGNORE(m_warning)
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#define GODOT_MSVC_PRAGMA(m_command) __pragma(m_command)
-#define GODOT_MSVC_WARNING_PUSH GODOT_MSVC_PRAGMA(warning(push))
-#define GODOT_MSVC_WARNING_IGNORE(m_warning) GODOT_MSVC_PRAGMA(warning(disable : m_warning))
-#define GODOT_MSVC_WARNING_POP GODOT_MSVC_PRAGMA(warning(pop))
-#define GODOT_MSVC_WARNING_PUSH_AND_IGNORE(m_warning) GODOT_MSVC_WARNING_PUSH GODOT_MSVC_WARNING_IGNORE(m_warning)
+#define JUNDOT_MSVC_PRAGMA(m_command) __pragma(m_command)
+#define JUNDOT_MSVC_WARNING_PUSH JUNDOT_MSVC_PRAGMA(warning(push))
+#define JUNDOT_MSVC_WARNING_IGNORE(m_warning) JUNDOT_MSVC_PRAGMA(warning(disable : m_warning))
+#define JUNDOT_MSVC_WARNING_POP JUNDOT_MSVC_PRAGMA(warning(pop))
+#define JUNDOT_MSVC_WARNING_PUSH_AND_IGNORE(m_warning) JUNDOT_MSVC_WARNING_PUSH JUNDOT_MSVC_WARNING_IGNORE(m_warning)
 #else
-#define GODOT_MSVC_PRAGMA(m_command)
-#define GODOT_MSVC_WARNING_PUSH
-#define GODOT_MSVC_WARNING_IGNORE(m_warning)
-#define GODOT_MSVC_WARNING_POP
-#define GODOT_MSVC_WARNING_PUSH_AND_IGNORE(m_warning)
+#define JUNDOT_MSVC_PRAGMA(m_command)
+#define JUNDOT_MSVC_WARNING_PUSH
+#define JUNDOT_MSVC_WARNING_IGNORE(m_warning)
+#define JUNDOT_MSVC_WARNING_POP
+#define JUNDOT_MSVC_WARNING_PUSH_AND_IGNORE(m_warning)
 #endif
 
 // Deprecation warning suppression helper macros.
 #if defined(__clang__)
-#define GODOT_PUSH_IGNORE_DEPRECATION() GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
-#define GODOT_POP_IGNORE_DEPRECATION() GODOT_CLANG_WARNING_POP
+#define JUNDOT_PUSH_IGNORE_DEPRECATION() JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
+#define JUNDOT_POP_IGNORE_DEPRECATION() JUNDOT_CLANG_WARNING_POP
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__)
-#define GODOT_PUSH_IGNORE_DEPRECATION() GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
-#define GODOT_POP_IGNORE_DEPRECATION() GODOT_GCC_WARNING_POP
+#define JUNDOT_PUSH_IGNORE_DEPRECATION() JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations")
+#define JUNDOT_POP_IGNORE_DEPRECATION() JUNDOT_GCC_WARNING_POP
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#define GODOT_PUSH_IGNORE_DEPRECATION() GODOT_MSVC_WARNING_PUSH_AND_IGNORE(4996)
-#define GODOT_POP_IGNORE_DEPRECATION() GODOT_MSVC_WARNING_POP
+#define JUNDOT_PUSH_IGNORE_DEPRECATION() JUNDOT_MSVC_WARNING_PUSH_AND_IGNORE(4996)
+#define JUNDOT_POP_IGNORE_DEPRECATION() JUNDOT_MSVC_WARNING_POP
 #endif
 
 template <typename T, typename = void>

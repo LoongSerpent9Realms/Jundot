@@ -2,10 +2,10 @@
 /*  snapshot_collector.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -116,7 +116,7 @@ void SnapshotCollector::snapshot_objects(Array *p_arr, Dictionary &p_snapshot_co
 	p_snapshot_context["mem_usage"] = Memory::get_mem_usage();
 	p_snapshot_context["mem_max_usage"] = Memory::get_mem_max_usage();
 	p_snapshot_context["timestamp"] = Time::get_singleton()->get_unix_time_from_system();
-	p_snapshot_context["game_version"] = get_godot_version_string();
+	p_snapshot_context["game_version"] = get_jundot_version_string();
 	p_arr->push_back(p_snapshot_context);
 	for (SnapshotDataTransportObject &debug_data : debugger_objects) {
 		debug_data.serialize(*p_arr);
@@ -168,10 +168,10 @@ Error SnapshotCollector::parse_message(void *p_user, const String &p_msg, const 
 	return OK;
 }
 
-String SnapshotCollector::get_godot_version_string() {
-	String hash = String(GODOT_VERSION_HASH);
+String SnapshotCollector::get_jundot_version_string() {
+	String hash = String(JUNDOT_VERSION_HASH);
 	if (hash.length() != 0) {
 		hash = " " + vformat("[%s]", hash.left(9));
 	}
-	return "v" GODOT_VERSION_FULL_BUILD + hash;
+	return "v" JUNDOT_VERSION_FULL_BUILD + hash;
 }

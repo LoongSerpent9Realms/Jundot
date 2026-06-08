@@ -1,4 +1,4 @@
-// Use of FP16 in Godot is done explicitly through the types half and hvec.
+// Use of FP16 in Jundot is done explicitly through the types half and hvec.
 // The extensions must be supported by the system to use this shader.
 //
 // If EXPLICIT_FP16 is not defined, all operations will use full precision

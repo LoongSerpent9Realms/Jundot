@@ -2,10 +2,10 @@
 /*  project_list.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -297,26 +297,26 @@ void ProjectListItemControl::set_unsupported_features(PackedStringArray p_featur
 				}
 
 				version_match_type = VersionMatchType::PROJECT_USES_SAME;
-				if (project_version_major > GODOT_VERSION_MAJOR) {
+				if (project_version_major > JUNDOT_VERSION_MAJOR) {
 					version_match_type = VersionMatchType::PROJECT_USES_NEWER_MAJOR;
-				} else if (project_version_major < GODOT_VERSION_MAJOR) {
+				} else if (project_version_major < JUNDOT_VERSION_MAJOR) {
 					version_match_type = VersionMatchType::PROJECT_USES_OLDER_MAJOR;
 				} else {
 					// Project is same major version.
 					// Is it the same minor version, or an upgrade or downgrade?
-					if (project_version_minor > GODOT_VERSION_MINOR) {
+					if (project_version_minor > JUNDOT_VERSION_MINOR) {
 						version_match_type = VersionMatchType::PROJECT_USES_NEWER_MINOR;
-					} else if (project_version_minor < GODOT_VERSION_MINOR) {
+					} else if (project_version_minor < JUNDOT_VERSION_MINOR) {
 						version_match_type = VersionMatchType::PROJECT_USES_OLDER_MINOR;
 					}
 				}
 
 				if (version_match_type != VersionMatchType::PROJECT_USES_SAME) {
-					String project_version_tooltip_text = TTR("This project was last edited in a different Godot version: ") + p_features[i] + "\n";
+					String project_version_tooltip_text = TTR("This project was last edited in a different Jundot version: ") + p_features[i] + "\n";
 					if (version_match_type == VersionMatchType::PROJECT_USES_OLDER_MAJOR || version_match_type == VersionMatchType::PROJECT_USES_OLDER_MINOR) {
-						project_version_tooltip_text += vformat(TTR("Opening it will upgrade it to Godot %s.%s."), GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR) + "\n";
+						project_version_tooltip_text += vformat(TTR("Opening it will upgrade it to Jundot %s.%s."), JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR) + "\n";
 					} else if (version_match_type == VersionMatchType::PROJECT_USES_NEWER_MAJOR || version_match_type == VersionMatchType::PROJECT_USES_NEWER_MINOR) {
-						project_version_tooltip_text += vformat(TTR("Opening it will downgrade it to Godot %s.%s."), GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR) + "\n";
+						project_version_tooltip_text += vformat(TTR("Opening it will downgrade it to Jundot %s.%s."), JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR) + "\n";
 						project_version_tooltip_text += TTR("Downgrading projects is not recommended.") + "\n";
 					}
 					project_different_version->set_focus_mode(FOCUS_ACCESSIBILITY);
@@ -328,8 +328,8 @@ void ProjectListItemControl::set_unsupported_features(PackedStringArray p_featur
 			} else {
 				if (p_features[i] == "3.x") {
 					version_match_type = VersionMatchType::PROJECT_USES_OLDER_MAJOR;
-					String project_version_tooltip_text = TTR("This project was last edited in a different Godot version: ") + p_features[i] + "\n";
-					project_version_tooltip_text += vformat(TTR("Opening it will upgrade it to Godot %s.%s."), GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR) + "\n";
+					String project_version_tooltip_text = TTR("This project was last edited in a different Jundot version: ") + p_features[i] + "\n";
+					project_version_tooltip_text += vformat(TTR("Opening it will upgrade it to Jundot %s.%s."), JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR) + "\n";
 					project_different_version->set_focus_mode(FOCUS_ACCESSIBILITY);
 					project_different_version->set_tooltip_text(project_version_tooltip_text);
 					project_different_version->show();
@@ -343,13 +343,13 @@ void ProjectListItemControl::set_unsupported_features(PackedStringArray p_featur
 			i--;
 		}
 
-		// This is actually triggered when the project.godot file's config_version
+		// This is actually triggered when the project.jundot file's config_version
 		// is less than 4, so perhaps it'd be more accurate to say the engine configuration
 		// file's version is not supported...? If the config/features array includes
 		// a proper version number, it will be displayed alongside the "unknown version"
 		// warning otherwise.
 		if (unknown_version) {
-			tooltip_text += TTR("This project uses an unknown version of Godot.") + "\n";
+			tooltip_text += TTR("This project uses an unknown version of Jundot.") + "\n";
 		}
 		if (p_features.size() > 0) {
 			String unsupported_features_str = String(", ").join(p_features);
@@ -688,7 +688,7 @@ void ProjectList::_migrate_config() {
 	EditorSettings::get_singleton()->get_property_list(&properties);
 
 	for (const PropertyInfo &E : properties) {
-		// This is actually something like "projects/C:::Documents::Godot::Projects::MyGame"
+		// This is actually something like "projects/C:::Documents::Jundot::Projects::MyGame"
 		String property_key = E.name;
 		if (!property_key.begins_with("projects/")) {
 			continue;
@@ -716,7 +716,7 @@ void ProjectList::save_config() {
 // Load project data from p_property_key and return it in a ProjectList::Item.
 // p_favorite is passed directly into the Item.
 ProjectList::Item ProjectList::load_project_data(const String &p_path, bool p_favorite) {
-	String conf = p_path.path_join("project.godot");
+	String conf = p_path.path_join("project.jundot");
 	bool grayed = false;
 	bool missing = false;
 	bool recovery_mode = false;
@@ -736,7 +736,7 @@ ProjectList::Item ProjectList::load_project_data(const String &p_path, bool p_fa
 	}
 
 	if (config_version > ProjectSettings::CONFIG_VERSION) {
-		// Comes from an incompatible (more recent) Godot version, gray it out.
+		// Comes from an incompatible (more recent) Jundot version, gray it out.
 		grayed = true;
 	}
 
@@ -747,7 +747,7 @@ ProjectList::Item ProjectList::load_project_data(const String &p_path, bool p_fa
 	String icon = cf->get_value("application", "config/icon", "");
 	if (icon.begins_with("uid://")) {
 		Error err;
-		Ref<FileAccess> file = FileAccess::open(p_path.path_join(".godot/uid_cache.bin"), FileAccess::READ, &err);
+		Ref<FileAccess> file = FileAccess::open(p_path.path_join(".jundot/uid_cache.bin"), FileAccess::READ, &err);
 		if (err == OK) {
 			icon = ResourceUID::get_path_from_cache(file, icon);
 			if (icon.is_empty()) {
@@ -783,7 +783,7 @@ ProjectList::Item ProjectList::load_project_data(const String &p_path, bool p_fa
 	uint64_t last_edited = 0;
 	if (cf_err == OK) {
 		// The modification date marks the date the project was last edited.
-		// This is because the `project.godot` file will always be modified
+		// This is because the `project.jundot` file will always be modified
 		// when editing a project (but not when running it).
 		last_edited = FileAccess::get_modified_time(conf);
 
@@ -816,10 +816,10 @@ ProjectList::Item ProjectList::load_project_data(const String &p_path, bool p_fa
 			}
 			user_dir = custom_dir;
 		} else {
-			user_dir = OS::get_singleton()->get_godot_dir_name().path_join("app_userdata").path_join(appname);
+			user_dir = OS::get_singleton()->get_jundot_dir_name().path_join("app_userdata").path_join(appname);
 		}
 	} else {
-		user_dir = OS::get_singleton()->get_godot_dir_name().path_join("app_userdata").path_join("[unnamed project]");
+		user_dir = OS::get_singleton()->get_jundot_dir_name().path_join("app_userdata").path_join("[unnamed project]");
 	}
 
 	String recovery_mode_lock_file = OS::get_singleton()->get_user_data_dir(user_dir).path_join(".recovery_mode_lock");
@@ -1028,7 +1028,7 @@ void ProjectList::_scan_folder_recursive(const String &p_path, List<String> *r_p
 
 		if (da->current_is_dir() && n[0] != '.') {
 			_scan_folder_recursive(da->get_current_dir().path_join(n), r_projects, p_scan_active);
-		} else if (n == "project.godot") {
+		} else if (n == "project.jundot") {
 			r_projects->push_back(da->get_current_dir());
 		}
 		n = da->get_next();
@@ -1601,7 +1601,7 @@ void ProjectList::_global_menu_open_project(const Variant &p_tag) {
 	int idx = (int)p_tag;
 
 	if (idx >= 0 && idx < _projects.size()) {
-		String conf = _projects[idx].path.path_join("project.godot");
+		String conf = _projects[idx].path.path_join("project.jundot");
 		List<String> args;
 		args.push_back(conf);
 		OS::get_singleton()->create_instance(args);

@@ -1,7 +1,7 @@
-# Estonian translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Estonian translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Jens <arrkiin@gmail.com>, 2019.
 # Mattias Aabmets <mattias.aabmets@gmail.com>, 2019.
 # StReef <streef.gtx@gmail.com>, 2020, 2021.
@@ -15,12 +15,12 @@
 # "A Thousand Ships (she/her)" <over999ships@gmail.com>, 2025.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "PO-Revision-Date: 2025-10-13 10:08+0000\n"
 "Last-Translator: \"A Thousand Ships (she/her)\" <over999ships@gmail.com>\n"
-"Language-Team: Estonian <https://hosted.weblate.org/projects/godot-engine/"
-"godot/et/>\n"
+"Language-Team: Estonian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/et/>\n"
 "Language: et\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8-bit\n"
@@ -1706,8 +1706,8 @@ msgstr "See liige on märgitud aegunuks."
 msgid "This member is marked as experimental."
 msgstr "See liige on märgitud eksperimentaalseks."
 
-msgid "%s - Godot Engine"
-msgstr "%s - Godot Engine"
+msgid "%s - Jundot Engine"
+msgstr "%s - Jundot Engine"
 
 msgid "Dock Position"
 msgstr "Doki asukoht"
@@ -2596,8 +2596,8 @@ msgstr "Funktsionaalsuse Soovitamine"
 msgid "Send Docs Feedback"
 msgstr "Saada dokumentatsioonide tagasiside"
 
-msgid "Support Godot Development"
-msgstr "Toeta Godot'i Arendamist"
+msgid "Support Jundot Development"
+msgstr "Toeta Jundot'i Arendamist"
 
 msgid "Open Script Editor"
 msgstr "Ava Skripti Redaktor"
@@ -2766,8 +2766,8 @@ msgstr "Ava Veebibrauseris"
 msgid "Select Template File"
 msgstr "Valige Malli Fail"
 
-msgid "Godot Export Templates"
-msgstr "Godoti Ekspordi mallid"
+msgid "Jundot Export Templates"
+msgstr "Jundoti Ekspordi mallid"
 
 msgid "Invalid Encryption Key (must be 64 hexadecimal characters long)"
 msgstr "Kehtetu krüpteerimisvõti (peab olema 64 hexadecimal karakterit pikk)"
@@ -2855,8 +2855,8 @@ msgstr "Ekspordi Eraldiseisva Serverina"
 msgid "Export Mode:"
 msgstr "Ekspordirežiim:"
 
-msgid "Godot Project Pack"
-msgstr "Godoti Projekti Pakk"
+msgid "Jundot Project Pack"
+msgstr "Jundoti Projekti Pakk"
 
 msgid "Features"
 msgstr "Funktsionaalsused"
@@ -3108,11 +3108,11 @@ msgstr "Kaldkriipsude kasutamine kaustanimedes loob alamkaustad rekursiivselt."
 msgid "Folder name is valid."
 msgstr "Kausta nimi on kehtiv."
 
-msgid "Godot Engine contributors"
-msgstr "Godot mängumootori panustajad"
+msgid "Jundot Engine contributors"
+msgstr "Jundot mängumootori panustajad"
 
-msgid "Thanks from the Godot community!"
-msgstr "Suur tänu Godot kogukonnalt!"
+msgid "Thanks from the Jundot community!"
+msgstr "Suur tänu Jundot kogukonnalt!"
 
 msgid "Authors"
 msgstr "Autorid"
@@ -3124,12 +3124,12 @@ msgid "Third-party Licenses"
 msgstr "Kolmanda osapoole litsents"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot mängumootor tugineb mitmetele kolmandate osapoolte tasuta ja avatud "
+"Jundot mängumootor tugineb mitmetele kolmandate osapoolte tasuta ja avatud "
 "lähtekoodiga teekidele, mis kõik on kooskõlas MIT-litsentsi tingimustega. "
 "Järgnev on kõigi selliste kolmandate osapoolte komponentide täielik loetelu "
 "koos vastavate autoriõiguste avalduste ja litsentsitingimustega."
@@ -3763,8 +3763,8 @@ msgstr "Hea mõte oleks oma Projektile nimi panna."
 msgid "New Game Project"
 msgstr "Uus Mängu Projekt"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "Projekti kaustas ei saanud faili project.godot luua."
+msgid "Couldn't create project.jundot in project path."
+msgstr "Projekti kaustas ei saanud faili project.jundot luua."
 
 msgid "Rename Project"
 msgstr "Nimeta Projekt ümber"
@@ -6995,8 +6995,8 @@ msgstr "Salvesta teema kui..."
 msgid "Online Docs"
 msgstr "Veebidokumentatsioonid"
 
-msgid "Open Godot online documentation."
-msgstr "Ava Godot Interneti Dokumentatisoon."
+msgid "Open Jundot online documentation."
+msgstr "Ava Jundot Interneti Dokumentatisoon."
 
 msgid "Unsaved file."
 msgstr "Salvestamata fail."
@@ -7383,8 +7383,8 @@ msgstr ""
 msgid "New profile name:"
 msgstr "Uus profiilinimi:"
 
-msgid "Godot Feature Profile"
-msgstr "Godoti funktsiooniprofiil"
+msgid "Jundot Feature Profile"
+msgstr "Jundoti funktsiooniprofiil"
 
 msgid "Import Profile(s)"
 msgstr "Impordi profiil(id)"
@@ -7467,8 +7467,8 @@ msgstr "Kustuta Üksus"
 msgid "Add Input Action"
 msgstr "Lisa Sisend Tegevus"
 
-msgid "Project Settings (project.godot)"
-msgstr "Projekti sätted (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Projekti sätted (project.jundot)"
 
 msgid "Input Map"
 msgstr "Sisendikaart"

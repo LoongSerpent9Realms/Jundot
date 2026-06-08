@@ -2,10 +2,10 @@
 /*  game_view_plugin.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -976,7 +976,7 @@ void GameView::_update_game_window_size_label() {
 
 void GameView::_update_embed_window_size() {
 	if (paused) {
-		// When paused, Godot does not re-render. As a result, resizing the game window to a larger size
+		// When paused, Jundot does not re-render. As a result, resizing the game window to a larger size
 		// causes artifacts and flickering. However, resizing to a smaller size seems fine.
 		// To prevent artifacts and flickering, we will force the game window to maintain its size.
 		// Using the same technique as SIZE_MODE_FIXED, the embedded process control will
@@ -1747,7 +1747,7 @@ void GameViewPluginBase::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 #ifndef ANDROID_ENABLED
-			window_wrapper->set_window_title(vformat(TTR("%s - Godot Engine"), TTR("Game Workspace")));
+			window_wrapper->set_window_title(vformat(TTR("%s - Jundot Engine"), TTR("Game Workspace")));
 #endif
 		} break;
 		case NOTIFICATION_ENTER_TREE: {

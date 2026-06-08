@@ -2,10 +2,10 @@
 /*  register_editor_types.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -36,6 +36,10 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
+#include "editor/ai/ai_chat_service.h"
+#include "editor/ai/ai_chat_panel.h"
+#include "editor/ai/ai_config_panel.h"
+#include "editor/ai/ai_editor_plugin.h"
 #include "editor/animation/animation_tree_editor_plugin.h"
 #include "editor/audio/audio_stream_editor_plugin.h"
 #include "editor/audio/audio_stream_randomizer_editor_plugin.h"
@@ -136,6 +140,7 @@
 #include "editor/shader/shader_editor_plugin.h"
 #include "editor/shader/shader_file_editor_plugin.h"
 #include "editor/translations/editor_translation_parser.h"
+#include "editor/update/update_manager.h"
 #include "editor/version_control/editor_vcs_interface.h"
 #include "servers/rendering/rendering_server.h"
 
@@ -204,6 +209,10 @@ void register_editor_types() {
 	GDREGISTER_VIRTUAL_CLASS(EditorCommandPalette);
 	GDREGISTER_CLASS(EditorDebuggerPlugin);
 	GDREGISTER_ABSTRACT_CLASS(EditorDebuggerSession);
+	GDREGISTER_CLASS(AIChatService);
+	GDREGISTER_CLASS(AIChatPanel);
+	GDREGISTER_CLASS(AIConfigPanel);
+	GDREGISTER_CLASS(UpdateManager);
 
 	// Required to document import options in the class reference.
 	GDREGISTER_CLASS(ResourceImporterBitMap);
@@ -222,6 +231,7 @@ void register_editor_types() {
 	GDREGISTER_CLASS(ResourceImporterWAV);
 
 	// This list is alphabetized, and plugins that depend on Node2D are in their own section below.
+	EditorPlugins::add_by_type<AIEditorPlugin>();
 	EditorPlugins::add_by_type<AnimationTreeEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamEditorPlugin>();
 	EditorPlugins::add_by_type<AudioStreamRandomizerEditorPlugin>();
@@ -311,6 +321,9 @@ void register_editor_types() {
 
 	GLOBAL_DEF("editor/version_control/plugin_name", "");
 	GLOBAL_DEF("editor/version_control/autoload_on_startup", false);
+
+	// Register update system settings (manifest URL, etc.)
+	register_update_settings();
 
 	EditorInterface::create();
 	Engine::Singleton ei_singleton = Engine::Singleton("EditorInterface", EditorInterface::get_singleton());

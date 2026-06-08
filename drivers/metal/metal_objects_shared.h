@@ -2,10 +2,10 @@
 /*  metal_objects_shared.h                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -520,7 +520,7 @@ _FORCE_INLINE_ static bool operator==(MTL::Size p_a, MTL::Size p_b) {
 
 #pragma mark - Pipeline Stage Conversion
 
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunguarded-availability")
 
 _FORCE_INLINE_ static MTL::Stages convert_src_pipeline_stages_to_metal(BitField<RDD::PipelineStageBits> p_stages) {
 	p_stages.clear_flag(RDD::PIPELINE_STAGE_TOP_OF_PIPE_BIT);
@@ -600,7 +600,7 @@ _FORCE_INLINE_ static MTL::Stages convert_dst_pipeline_stages_to_metal(BitField<
 	return mtlStages;
 }
 
-GODOT_CLANG_WARNING_POP
+JUNDOT_CLANG_WARNING_POP
 
 #pragma mark - Command Buffer Base
 

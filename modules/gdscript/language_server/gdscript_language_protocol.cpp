@@ -2,10 +2,10 @@
 /*  gdscript_language_protocol.cpp                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #include "gdscript_language_protocol.h"
 
-#include "godot_lsp.h"
+#include "jundot_lsp.h"
 
 #include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
@@ -215,7 +215,7 @@ Variant GDScriptLanguageProtocol::initialize(const Dictionary &p_params) {
 	LSP::InitializeResult ret;
 
 	{
-		// Warn if the workspace root does not match with the project that is currently open in Godot,
+		// Warn if the workspace root does not match with the project that is currently open in Jundot,
 		// since it might lead to unexpected behavior, like wrong warnings about duplicate class names.
 
 		String root;
@@ -230,7 +230,7 @@ Variant GDScriptLanguageProtocol::initialize(const Dictionary &p_params) {
 		if (ProjectSettings::get_singleton()->localize_path(root) != "res://") {
 			LSP::ShowMessageParams params{
 				LSP::MessageType::Warning,
-				"The GDScript Language Server might not work correctly with other projects than the one opened in Godot."
+				"The GDScript Language Server might not work correctly with other projects than the one opened in Jundot."
 			};
 			notify_client("window/showMessage", params.to_json());
 		}
@@ -280,11 +280,11 @@ Variant GDScriptLanguageProtocol::initialize(const Dictionary &p_params) {
 }
 
 void GDScriptLanguageProtocol::initialized(const Variant &p_params) {
-	LSP::GodotCapabilities capabilities;
+	LSP::JundotCapabilities capabilities;
 
 	DocTools *doc = EditorHelp::get_doc_data();
 	for (const KeyValue<String, DocData::ClassDoc> &E : doc->class_list) {
-		LSP::GodotNativeClassInfo gdclass;
+		LSP::JundotNativeClassInfo gdclass;
 		gdclass.name = E.value.name;
 		gdclass.class_doc = &(E.value);
 		if (ClassDB::ClassInfo *ptr = ClassDB::classes.getptr(StringName(E.value.name))) {
@@ -569,7 +569,7 @@ Array GDScriptLanguageProtocol::lsp_completion(const Dictionary &p_params) {
 			}
 
 			if (option.text_edit.is_set()) {
-				GodotRange range(GodotPosition(option.text_edit.start_line, option.text_edit.start_column), GodotPosition(option.text_edit.end_line, option.text_edit.end_column));
+				JundotRange range(JundotPosition(option.text_edit.start_line, option.text_edit.start_column), JundotPosition(option.text_edit.end_line, option.text_edit.end_column));
 				item.textEdit.newText = option.text_edit.new_text;
 				item.textEdit.range = range.to_lsp();
 			}

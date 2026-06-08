@@ -2,10 +2,10 @@
 /*  openxr_d3d12_extension.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -177,7 +177,7 @@ bool OpenXRD3D12Extension::get_swapchain_image_data(XrSwapchain p_swapchain, int
 	switch (p_swapchain_format) {
 		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
 			// Even though this is an sRGB framebuffer format we're using UNORM here.
-			// The reason here is because Godot does a linear to sRGB conversion while
+			// The reason here is because Jundot does a linear to sRGB conversion while
 			// with the sRGB format, this conversion would be doubled by the hardware.
 			// This also means we're reading the values as is for our preview on screen.
 			// The OpenXR runtime however is still treating this as an sRGB format and

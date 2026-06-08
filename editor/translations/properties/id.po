@@ -1,7 +1,7 @@
-# Indonesian translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Indonesian translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Abdul Aziz Muslim Alqudsy <abdul.aziz.muslim.alqudsy@gmail.com>, 2016.
 # Andevid Dynmyn <doyan4forum@gmail.com>, 2016.
 # Andinawan Asa <asaandinawan@gmail.com>, 2016.
@@ -63,13 +63,13 @@
 # Arif Budiman <arifpedia@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-26 03:27+0000\n"
 "Last-Translator: Arif Budiman <arifpedia@gmail.com>\n"
-"Language-Team: Indonesian <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/id/>\n"
+"Language-Team: Indonesian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/id/>\n"
 "Language: id\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3777,8 +3777,8 @@ msgstr "Tumpukan Panggilan Maks"
 msgid "Always Track Local Variables"
 msgstr "Selalu Lacak Variabel Lokal"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "Petunjuk Diganti Nama di Godot 4"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "Petunjuk Diganti Nama di Jundot 4"
 
 msgid "Unassigned Variable"
 msgstr "Variabel Belum Diinisialisasi"
@@ -4131,11 +4131,11 @@ msgstr "Cahaya"
 msgid "Visible"
 msgstr "Terlihat"
 
-msgid "glTF to Godot Expression"
-msgstr "Ekspresi glTF ke Godot"
+msgid "glTF to Jundot Expression"
+msgstr "Ekspresi glTF ke Jundot"
 
-msgid "Godot to glTF Expression"
-msgstr "Ekspresi Godot ke glTF"
+msgid "Jundot to glTF Expression"
+msgstr "Ekspresi Jundot ke glTF"
 
 msgid "Object Model Type"
 msgstr "Jenis Model Objek"
@@ -4152,8 +4152,8 @@ msgstr "Sendi"
 msgid "Roots"
 msgstr "Root"
 
-msgid "Godot Bone Node"
-msgstr "Node Tulang Godot"
+msgid "Jundot Bone Node"
+msgstr "Node Tulang Jundot"
 
 msgid "Skin Root"
 msgstr "Root Skin"
@@ -4164,8 +4164,8 @@ msgstr "Sendi Asli"
 msgid "Non Joints"
 msgstr "Non Sendi"
 
-msgid "Godot Skin"
-msgstr "Skin Godot"
+msgid "Jundot Skin"
+msgstr "Skin Jundot"
 
 msgid "Src Image"
 msgstr "Gambar Sumber"
@@ -5439,8 +5439,8 @@ msgstr "Ikon 512 X 512"
 msgid "Emscripten Pool Size"
 msgstr "Ukuran Pool Emscripten"
 
-msgid "Godot Pool Size"
-msgstr "Ukuran Pool Godot"
+msgid "Jundot Pool Size"
+msgstr "Ukuran Pool Jundot"
 
 msgid "signtool"
 msgstr "signtool"

@@ -208,7 +208,7 @@ def get_opts():
     # Dependencies folder.
     deps_folder = os.getenv("LOCALAPPDATA")
     if deps_folder:
-        deps_folder = os.path.join(deps_folder, "Godot", "build_deps")
+        deps_folder = os.path.join(deps_folder, "Jundot", "build_deps")
     else:
         # Cross-compiling, the deps install script puts things in `bin`.
         # Getting an absolute path to it is a bit hacky in Python.
@@ -497,7 +497,7 @@ def configure_msvc(env: "SConsEnvironment"):
                 "The screen reader support driver requires dependencies to be installed.\n"
                 f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_accesskit.py')}`.\n"
                 "See the documentation for more information:\n"
-                "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                 "Alternatively, disable this driver by compiling with `accesskit=no` explicitly."
             )
             env["accesskit"] = False
@@ -554,7 +554,7 @@ def configure_msvc(env: "SConsEnvironment"):
                     "The ANGLE rendering driver requires dependencies to be installed.\n"
                     f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_angle.py')}`.\n"
                     "See the documentation for more information:\n"
-                    "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                    "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                     "Alternatively, disable this driver by compiling with `angle=no` explicitly."
                 )
                 env["angle"] = False
@@ -589,7 +589,7 @@ def configure_msvc(env: "SConsEnvironment"):
             env.AppendUnique(LINKFLAGS=["/LTCG"])
         env.AppendUnique(ARFLAGS=["/LTCG"])
 
-    env.Append(LINKFLAGS=["/NATVIS:platform\\windows\\godot.natvis"])
+    env.Append(LINKFLAGS=["/NATVIS:platform\\windows\\jundot.natvis"])
 
     if env["use_asan"]:
         env.AppendUnique(LINKFLAGS=["/STACK:" + str(STACK_SIZE_SANITIZERS)])
@@ -877,7 +877,7 @@ def configure_mingw(env: "SConsEnvironment"):
                         "The WinRT/OneCore API requires dependencies to be installed.\n"
                         f"You can install them by installing `cppwinrt` MSYS2 package or by running `python {os.path.join('misc', 'scripts', 'install_winrt.py')}`.\n"
                         "See the documentation for more information:\n"
-                        "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                        "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                         "Alternatively, disable this driver by compiling with `winrt=no` explicitly."
                     )
                 env["winrt"] = False
@@ -886,7 +886,7 @@ def configure_mingw(env: "SConsEnvironment"):
                     "The WinRT/OneCore API requires dependencies to be installed.\n"
                     f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_winrt.py')}`.\n"
                     "See the documentation for more information:\n"
-                    "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                    "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                     "Alternatively, disable this driver by compiling with `winrt=no` explicitly."
                 )
                 env["winrt"] = False
@@ -926,7 +926,7 @@ def configure_mingw(env: "SConsEnvironment"):
                 "The screen reader support driver requires dependencies to be installed.\n"
                 f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_accesskit.py')}`.\n"
                 "See the documentation for more information:\n"
-                "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                 "Alternatively, disable this driver by compiling with `accesskit=no` explicitly."
             )
             env["accesskit"] = False
@@ -993,7 +993,7 @@ def configure_mingw(env: "SConsEnvironment"):
                     "The ANGLE rendering driver requires dependencies to be installed.\n"
                     f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_angle.py')}`.\n"
                     "See the documentation for more information:\n"
-                    "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+                    "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
                     "Alternatively, disable this driver by compiling with `angle=no` explicitly."
                 )
                 env["angle"] = False
@@ -1053,7 +1053,7 @@ def check_d3d12_installed(env, suffix):
             "The Direct3D 12 rendering driver requires dependencies to be installed.\n"
             f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_d3d12_sdk_windows.py')}`.\n"
             "See the documentation for more information:\n"
-            "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
+            "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html\n"
             "Alternatively, disable this driver by compiling with `d3d12=no` explicitly."
         )
         sys.exit(255)

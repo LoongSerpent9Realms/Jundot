@@ -2,10 +2,10 @@
 /*  display_server_macos.h                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -47,11 +47,11 @@
 #undef BitMap
 #undef FontVariation
 
-@class GodotWindow;
-@class GodotContentView;
-@class GodotWindowDelegate;
-@class GodotButtonView;
-@class GodotProgressView;
+@class JundotWindow;
+@class JundotContentView;
+@class JundotWindowDelegate;
+@class JundotButtonView;
+@class JundotProgressView;
 
 class InputEvent;
 class InputEventWithModifiers;
@@ -86,10 +86,10 @@ public:
 	};
 
 	struct WindowData {
-		GodotWindowDelegate *window_delegate;
-		GodotWindow *window_object;
-		GodotContentView *window_view;
-		GodotButtonView *window_button_view;
+		JundotWindowDelegate *window_delegate;
+		JundotWindow *window_object;
+		JundotContentView *window_view;
+		JundotButtonView *window_button_view;
 
 		Vector<Vector2> mpath;
 
@@ -147,7 +147,7 @@ public:
 	List<DisplayServerEnums::WindowID> popup_list;
 	uint64_t time_since_popup = 0;
 
-	GodotProgressView *dock_progress = nullptr;
+	JundotProgressView *dock_progress = nullptr;
 
 private:
 	id screen_observer = nil;

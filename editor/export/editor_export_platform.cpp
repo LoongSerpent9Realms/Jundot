@@ -2,10 +2,10 @@
 /*  editor_export_platform.cpp                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -595,7 +595,7 @@ Ref<Texture2D> EditorExportPlatform::get_option_icon(int p_index) const {
 }
 
 String EditorExportPlatform::find_export_template(const String &template_file_name, String *err) const {
-	String current_version = GODOT_VERSION_FULL_CONFIG;
+	String current_version = JUNDOT_VERSION_FULL_CONFIG;
 	String template_path = EditorPaths::get_singleton()->get_export_templates_dir().path_join(current_version).path_join(template_file_name);
 
 	if (FileAccess::exists(template_path)) {
@@ -1209,7 +1209,7 @@ Dictionary EditorExportPlatform::get_internal_export_files(const Ref<EditorExpor
 						export_ok = true;
 					}
 				} else {
-					String current_version = GODOT_VERSION_FULL_CONFIG;
+					String current_version = JUNDOT_VERSION_FULL_CONFIG;
 					String template_path = EditorPaths::get_singleton()->get_export_templates_dir().path_join(current_version);
 					if (p_debug && p_preset->has("custom_template/debug") && p_preset->get("custom_template/debug") != "") {
 						template_path = p_preset->get("custom_template/debug").operator String().get_base_dir();
@@ -1985,7 +1985,7 @@ void EditorExportPlatform::zip_folder_recursive(zipFile &p_zip, const String &p_
 
 			zip_fileinfo zipfi;
 			zipfi.tmz_date.tm_year = dt.year;
-			zipfi.tmz_date.tm_mon = dt.month - 1; // Note: "tm" month range - 0..11, Godot month range - 1..12, https://www.cplusplus.com/reference/ctime/tm/
+			zipfi.tmz_date.tm_mon = dt.month - 1; // Note: "tm" month range - 0..11, Jundot month range - 1..12, https://www.cplusplus.com/reference/ctime/tm/
 			zipfi.tmz_date.tm_mday = dt.day;
 			zipfi.tmz_date.tm_hour = dt.hour;
 			zipfi.tmz_date.tm_min = dt.minute;
@@ -2029,7 +2029,7 @@ void EditorExportPlatform::zip_folder_recursive(zipFile &p_zip, const String &p_
 
 			zip_fileinfo zipfi;
 			zipfi.tmz_date.tm_year = dt.year;
-			zipfi.tmz_date.tm_mon = dt.month - 1; // Note: "tm" month range - 0..11, Godot month range - 1..12, https://www.cplusplus.com/reference/ctime/tm/
+			zipfi.tmz_date.tm_mon = dt.month - 1; // Note: "tm" month range - 0..11, Jundot month range - 1..12, https://www.cplusplus.com/reference/ctime/tm/
 			zipfi.tmz_date.tm_mday = dt.day;
 			zipfi.tmz_date.tm_hour = dt.hour;
 			zipfi.tmz_date.tm_min = dt.minute;
@@ -2177,9 +2177,9 @@ Dictionary EditorExportPlatform::_save_zip_patch(const Ref<EditorExportPreset> &
 bool EditorExportPlatform::_store_header(Ref<FileAccess> p_fd, bool p_enc, bool p_sparse, uint64_t &r_file_base_ofs, uint64_t &r_dir_base_ofs, const String &p_salt) {
 	p_fd->store_32(PACK_HEADER_MAGIC);
 	p_fd->store_32(PACK_FORMAT_VERSION);
-	p_fd->store_32(GODOT_VERSION_MAJOR);
-	p_fd->store_32(GODOT_VERSION_MINOR);
-	p_fd->store_32(GODOT_VERSION_PATCH);
+	p_fd->store_32(JUNDOT_VERSION_MAJOR);
+	p_fd->store_32(JUNDOT_VERSION_MINOR);
+	p_fd->store_32(JUNDOT_VERSION_PATCH);
 
 	uint32_t pack_flags = PACK_REL_FILEBASE;
 	if (p_enc) {

@@ -2,10 +2,10 @@
 /*  pck_packer.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -93,9 +93,9 @@ Error PCKPacker::pck_start(const String &p_pck_path, int p_alignment, const Stri
 
 	file->store_32(PACK_HEADER_MAGIC);
 	file->store_32(PACK_FORMAT_VERSION);
-	file->store_32(GODOT_VERSION_MAJOR);
-	file->store_32(GODOT_VERSION_MINOR);
-	file->store_32(GODOT_VERSION_PATCH);
+	file->store_32(JUNDOT_VERSION_MAJOR);
+	file->store_32(JUNDOT_VERSION_MINOR);
+	file->store_32(JUNDOT_VERSION_PATCH);
 
 	uint32_t pack_flags = PACK_REL_FILEBASE;
 	if (enc_dir) {

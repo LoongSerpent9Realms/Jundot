@@ -2,10 +2,10 @@
 /*  gradle_export_util.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -34,10 +34,10 @@
 #include "editor/export/editor_export_platform.h"
 #include "servers/display/display_server_enums.h"
 
-const String GODOT_PROJECT_NAME_XML_STRING = R"(<?xml version="1.0" encoding="utf-8"?>
+const String JUNDOT_PROJECT_NAME_XML_STRING = R"(<?xml version="1.0" encoding="utf-8"?>
 <!--WARNING: THIS FILE WILL BE OVERWRITTEN AT BUILD TIME-->
 <resources>
-	<string name="godot_project_name_string">%s</string>
+	<string name="jundot_project_name_string">%s</string>
 </resources>
 )";
 
@@ -55,7 +55,7 @@ static const int APP_CATEGORY_VIDEO = 8;
 static const int APP_CATEGORY_UNDEFINED = 9;
 
 // Supported XR modes.
-// This should match the entries in 'platform/android/java/lib/src/main/java/org/godotengine/godot/xr/XRMode.java'
+// This should match the entries in 'platform/android/java/lib/src/main/java/org/jundotengine/jundot/xr/XRMode.java'
 static const int XR_MODE_REGULAR = 0;
 static const int XR_MODE_OPENXR = 1;
 

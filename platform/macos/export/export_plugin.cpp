@@ -2,10 +2,10 @@
 /*  export_plugin.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1024,7 +1024,7 @@ Error EditorExportPlatformMacOS::_export_liquid_glass_icon(const Ref<EditorExpor
 }
 
 /**
- * If we're running the macOS version of the Godot editor we'll:
+ * If we're running the macOS version of the Jundot editor we'll:
  * - export our application bundle to a temporary folder
  * - attempt to code sign it
  * - and then wrap it up in a DMG
@@ -1667,7 +1667,7 @@ Error EditorExportPlatformMacOS::export_project(const Ref<EditorExportPreset> &p
 	int ret = unzGoToFirstFile(src_pkg_zip);
 
 	String architecture = p_preset->get("binary_format/architecture");
-	String binary_to_use = "godot_macos_" + String(p_debug ? "debug" : "release") + "." + architecture;
+	String binary_to_use = "jundot_macos_" + String(p_debug ? "debug" : "release") + "." + architecture;
 
 	String pkg_name;
 	if (String(get_project_setting(p_preset, "application/config/name")) != "") {
@@ -1779,7 +1779,7 @@ Error EditorExportPlatformMacOS::export_project(const Ref<EditorExportPreset> &p
 
 	const String project_name = get_project_setting(p_preset, "application/config/name");
 	const Dictionary appnames = get_project_setting(p_preset, "application/config/name_localized");
-	const StringName domain_name = "godot.project_name_localization";
+	const StringName domain_name = "jundot.project_name_localization";
 	Ref<TranslationDomain> domain = TranslationServer::get_singleton()->get_or_add_domain(domain_name);
 	TranslationServer::get_singleton()->load_project_translations(domain);
 	const Vector<String> locales = domain->get_loaded_locales();
@@ -1979,7 +1979,7 @@ Error EditorExportPlatformMacOS::export_project(const Ref<EditorExportPreset> &p
 			_fix_privacy_manifest(p_preset, data);
 		}
 
-		if (file.begins_with("Contents/MacOS/godot_")) {
+		if (file.begins_with("Contents/MacOS/jundot_")) {
 			if (file != "Contents/MacOS/" + binary_to_use) {
 				ret = unzGoToNextFile(src_pkg_zip);
 				continue; // skip

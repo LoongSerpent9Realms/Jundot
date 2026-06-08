@@ -101,7 +101,7 @@ if env["builtin_zlib"]:
     env.Prepend(CPPPATH=[thirdparty_zlib_dir])
     if env.dev_build:
         env_thirdparty.Append(CPPDEFINES=["ZLIB_DEBUG"])
-        # Affects headers so it should also be defined for Godot code
+        # Affects headers so it should also be defined for Jundot code
         env.Append(CPPDEFINES=["ZLIB_DEBUG"])
 
     env_thirdparty.add_source_files(thirdparty_obj, thirdparty_zlib_sources)
@@ -165,7 +165,7 @@ if env["builtin_zstd"]:
 env.core_sources += thirdparty_obj
 
 
-# Godot source files
+# Jundot source files
 env.add_source_files(env.core_sources, "*.cpp")
 
 # Generate disabled classes
@@ -190,7 +190,7 @@ env.add_source_files(env.core_sources, gen_hash)
 encryption_key = os.environ.get("SCRIPT_AES256_ENCRYPTION_KEY")
 if encryption_key:
     print(
-        "\n*** IMPORTANT: Compiling Godot with custom `SCRIPT_AES256_ENCRYPTION_KEY` set as environment variable."
+        "\n*** IMPORTANT: Compiling Jundot with custom `SCRIPT_AES256_ENCRYPTION_KEY` set as environment variable."
         "\n*** Make sure to use templates compiled with this key when exporting a project with encryption.\n"
     )
 gen_encrypt = env.CommandNoCache(

@@ -2,10 +2,10 @@
 /*  display_server_android.h                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -46,7 +46,7 @@ class DisplayServerAndroid : public DisplayServer {
 	String rendering_driver;
 
 	// https://developer.android.com/reference/android/view/PointerIcon
-	// mapping between Godot's cursor shape to Android's'
+	// mapping between Jundot's cursor shape to Android's'
 	int android_cursors[DisplayServerEnums::CURSOR_MAX] = {
 		1000, //DisplayServerEnums::CURSOR_ARROW
 		1008, //DisplayServerEnums::CURSOR_IBEAM

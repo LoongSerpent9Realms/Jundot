@@ -32,7 +32,7 @@ def get_opts():
     # Dependencies folder.
     deps_folder = os.getenv("LOCALAPPDATA")
     if deps_folder:
-        deps_folder = os.path.join(deps_folder, "Godot", "build_deps")
+        deps_folder = os.path.join(deps_folder, "Jundot", "build_deps")
     else:
         # Cross-compiling, the deps install script puts things in `bin`.
         # Getting an absolute path to it is a bit hacky in Python.
@@ -49,7 +49,7 @@ def get_opts():
         EnumVariable("linker", "Linker program", "default", ["default", "bfd", "gold", "lld", "mold"], ignorecase=2),
         BoolVariable("use_llvm", "Use the LLVM compiler", False),
         BoolVariable("use_static_cpp", "Link libgcc and libstdc++ statically for better portability", True),
-        BoolVariable("use_coverage", "Test Godot coverage", False),
+        BoolVariable("use_coverage", "Test Jundot coverage", False),
         BoolVariable("use_ubsan", "Use LLVM/GCC compiler undefined behavior sanitizer (UBSAN)", False),
         BoolVariable("use_asan", "Use LLVM/GCC compiler address sanitizer (ASAN)", False),
         BoolVariable("use_lsan", "Use LLVM/GCC compiler leak sanitizer (LSAN)", False),
@@ -269,7 +269,7 @@ def configure(env: "SConsEnvironment"):
     if not env["builtin_enet"]:
         env.ParseConfig("pkg-config libenet --cflags --libs")
         print_warning(
-            "System-provided ENet has its functionality limited to IPv4 only and no DTLS support, unless patched for Godot."
+            "System-provided ENet has its functionality limited to IPv4 only and no DTLS support, unless patched for Jundot."
         )
 
     if not env["builtin_zstd"]:
@@ -531,7 +531,7 @@ def configure(env: "SConsEnvironment"):
                 "The screen reader support driver requires dependencies to be installed.\n"
                 f"You can install them by running `python {os.path.join('misc', 'scripts', 'install_accesskit.py')}`.\n"
                 "See the documentation for more information:\n"
-                "\thttps://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_linuxbsd.html\n"
+                "\thttps://docs.jundotengine.org/en/latest/engine_details/development/compiling/compiling_for_linuxbsd.html\n"
                 "Alternatively, disable this driver by compiling with `accesskit=no` explicitly."
             )
             env["accesskit"] = False

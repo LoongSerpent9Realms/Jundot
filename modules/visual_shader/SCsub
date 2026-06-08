@@ -4,7 +4,7 @@ from misc.utility.scons_hints import *
 Import("env")
 Import("env_modules")
 
-env_modules.Append(CPPDEFINES=["GODOT_MODULE"])
+env_modules.Append(CPPDEFINES=["JUNDOT_MODULE"])
 
 env_visual_shader = env_modules.Clone()
 

@@ -2,10 +2,10 @@
 /*  gltf_skeleton.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -40,18 +40,18 @@ void GLTFSkeleton::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_joints", "joints"), &GLTFSkeleton::set_joints);
 	ClassDB::bind_method(D_METHOD("get_roots"), &GLTFSkeleton::get_roots);
 	ClassDB::bind_method(D_METHOD("set_roots", "roots"), &GLTFSkeleton::set_roots);
-	ClassDB::bind_method(D_METHOD("get_godot_skeleton"), &GLTFSkeleton::get_godot_skeleton);
+	ClassDB::bind_method(D_METHOD("get_jundot_skeleton"), &GLTFSkeleton::get_jundot_skeleton);
 	ClassDB::bind_method(D_METHOD("get_unique_names"), &GLTFSkeleton::get_unique_names);
 	ClassDB::bind_method(D_METHOD("set_unique_names", "unique_names"), &GLTFSkeleton::set_unique_names);
-	ClassDB::bind_method(D_METHOD("get_godot_bone_node"), &GLTFSkeleton::get_godot_bone_node);
-	ClassDB::bind_method(D_METHOD("set_godot_bone_node", "godot_bone_node"), &GLTFSkeleton::set_godot_bone_node);
+	ClassDB::bind_method(D_METHOD("get_jundot_bone_node"), &GLTFSkeleton::get_jundot_bone_node);
+	ClassDB::bind_method(D_METHOD("set_jundot_bone_node", "jundot_bone_node"), &GLTFSkeleton::set_jundot_bone_node);
 	ClassDB::bind_method(D_METHOD("get_bone_attachment_count"), &GLTFSkeleton::get_bone_attachment_count);
 	ClassDB::bind_method(D_METHOD("get_bone_attachment", "idx"), &GLTFSkeleton::get_bone_attachment);
 
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "joints"), "set_joints", "get_joints"); // Vector<GLTFNodeIndex>
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "roots"), "set_roots", "get_roots"); // Vector<GLTFNodeIndex>
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "unique_names", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_INTERNAL | PROPERTY_USAGE_EDITOR), "set_unique_names", "get_unique_names"); // Set<String>
-	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "godot_bone_node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_INTERNAL | PROPERTY_USAGE_EDITOR), "set_godot_bone_node", "get_godot_bone_node"); // RBMap<int32_t,
+	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "jundot_bone_node", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_STORAGE | PROPERTY_USAGE_INTERNAL | PROPERTY_USAGE_EDITOR), "set_jundot_bone_node", "get_jundot_bone_node"); // RBMap<int32_t,
 }
 
 Vector<GLTFNodeIndex> GLTFSkeleton::get_joints() {
@@ -70,8 +70,8 @@ void GLTFSkeleton::set_roots(const Vector<GLTFNodeIndex> &p_roots) {
 	roots = Vector<GLTFNodeIndex>(p_roots);
 }
 
-Skeleton3D *GLTFSkeleton::get_godot_skeleton() {
-	return godot_skeleton;
+Skeleton3D *GLTFSkeleton::get_jundot_skeleton() {
+	return jundot_skeleton;
 }
 
 TypedArray<String> GLTFSkeleton::get_unique_names() {
@@ -82,12 +82,12 @@ void GLTFSkeleton::set_unique_names(const TypedArray<String> &p_unique_names) {
 	GLTFTemplateConvert::set_from_array(unique_names, p_unique_names);
 }
 
-Dictionary GLTFSkeleton::get_godot_bone_node() {
-	return GLTFTemplateConvert::to_dictionary(godot_bone_node);
+Dictionary GLTFSkeleton::get_jundot_bone_node() {
+	return GLTFTemplateConvert::to_dictionary(jundot_bone_node);
 }
 
-void GLTFSkeleton::set_godot_bone_node(const Dictionary &p_indict) {
-	GLTFTemplateConvert::set_from_dictionary(godot_bone_node, p_indict);
+void GLTFSkeleton::set_jundot_bone_node(const Dictionary &p_indict) {
+	GLTFTemplateConvert::set_from_dictionary(jundot_bone_node, p_indict);
 }
 
 BoneAttachment3D *GLTFSkeleton::get_bone_attachment(int idx) {

@@ -1,7 +1,7 @@
-# Bulgarian translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Bulgarian translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Bojidar Marinov <bojidar.marinov.bg@gmail.com>, 2016.
 # Иван Пенев (Адмирал АнимЕ) <aeternus.arcis@gmail.com>, 2016-2017.
 # Любомир Василев <lyubomirv@abv.bg>, 2018, 2020.
@@ -31,13 +31,13 @@
 # bruvzg <bruvzg13@proton.me>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-02-21 13:09+0000\n"
 "Last-Translator: bruvzg <bruvzg13@proton.me>\n"
-"Language-Team: Bulgarian <https://hosted.weblate.org/projects/godot-engine/"
-"godot/bg/>\n"
+"Language-Team: Bulgarian <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/bg/>\n"
 "Language: bg\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1045,7 +1045,7 @@ msgid ""
 "The file you selected is an imported scene from a 3D model such as glTF or "
 "FBX.\n"
 "\n"
-"In Godot, 3D models can be imported as either scenes or animation libraries, "
+"In Jundot, 3D models can be imported as either scenes or animation libraries, "
 "which is why they show up here.\n"
 "\n"
 "If you want to use animations from this 3D model, open the Advanced Import "
@@ -1055,7 +1055,7 @@ msgid ""
 msgstr ""
 "Избраният файл е импортирана сцена от 3D модел като glTF или FBX. \n"
 "\n"
-"В Godot 3D моделите могат да се импортират като сцени или библиотеки с "
+"В Jundot 3D моделите могат да се импортират като сцени или библиотеки с "
 "анимации, затова се показват тук. \n"
 "\n"
 "Ако искате да използвате анимации от този 3D модел, отворете диалоговия "
@@ -3140,8 +3140,8 @@ msgstr "Отваряне в уеб браузъра"
 msgid "Select Template File"
 msgstr "Избор на шаблонен файл"
 
-msgid "Godot Export Templates"
-msgstr "Шаблони за изнасяне на Godot"
+msgid "Jundot Export Templates"
+msgstr "Шаблони за изнасяне на Jundot"
 
 msgid "Invalid Encryption Key (must be 64 hexadecimal characters long)"
 msgstr ""
@@ -3199,8 +3199,8 @@ msgstr "Коригиране"
 msgid "Base Packs:"
 msgstr "Базови Пакети:"
 
-msgid "Godot Project Pack"
-msgstr "Проектен пакет на Godot"
+msgid "Jundot Project Pack"
+msgstr "Проектен пакет на Jundot"
 
 msgid "Encryption"
 msgstr "Шифроване"
@@ -3363,8 +3363,8 @@ msgstr "Основатели на проекта"
 msgid "Lead Developer"
 msgstr "Главен разработчик"
 
-msgid "Thanks from the Godot community!"
-msgstr "Благодарности от общността на Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "Благодарности от общността на Jundot!"
 
 msgid "Authors"
 msgstr "Автори"
@@ -3640,9 +3640,9 @@ msgid "It would be a good idea to name your project."
 msgstr "Няма да е лошо да дадете име на проекта си."
 
 msgid ""
-"Invalid \".zip\" project file; it doesn't contain a \"project.godot\" file."
+"Invalid \".zip\" project file; it doesn't contain a \"project.jundot\" file."
 msgstr ""
-"Неправилен проектен файл „.zip“. В него не се съдържа файл „project.godot“."
+"Неправилен проектен файл „.zip“. В него не се съдържа файл „project.jundot“."
 
 msgid "The path specified doesn't exist."
 msgstr "Посоченият път не съществува."
@@ -3677,8 +3677,8 @@ msgstr "Име на Проекта"
 msgid "Project Path"
 msgstr "Път на Проекта"
 
-msgid "This project was last edited in a different Godot version: "
-msgstr "Проектът е последно модифициран в друга версия на Godot: "
+msgid "This project was last edited in a different Jundot version: "
+msgstr "Проектът е последно модифициран в друга версия на Jundot: "
 
 msgid "Toggle Favorite"
 msgstr "Превключване на любимите"
@@ -5352,8 +5352,8 @@ msgstr "Внасяне на тема"
 msgid "Save Theme As..."
 msgstr "Запазване на темата като..."
 
-msgid "Open Godot online documentation."
-msgstr "Отваряне на документацията на Godot в Интернет."
+msgid "Open Jundot online documentation."
+msgstr "Отваряне на документацията на Jundot в Интернет."
 
 msgid "Find Next"
 msgstr "Търсене напред"
@@ -5695,8 +5695,8 @@ msgstr "Добавяне на настройка в проекта"
 msgid "Delete Item"
 msgstr "Изтриване на елемента"
 
-msgid "Project Settings (project.godot)"
-msgstr "Настройки на проекта (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Настройки на проекта (project.jundot)"
 
 msgid "Plugins"
 msgstr "Приставки"

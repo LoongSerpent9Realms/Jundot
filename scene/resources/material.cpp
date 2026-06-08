@@ -2,10 +2,10 @@
 /*  material.cpp                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -738,7 +738,7 @@ void BaseMaterial3D::_update_shader() {
 
 	// Add a comment to describe the shader origin (useful when converting to ShaderMaterial).
 	String code = vformat(
-			"// NOTE: Shader automatically converted from " GODOT_VERSION_NAME " " GODOT_VERSION_FULL_CONFIG "'s %s.\n\n",
+			"// NOTE: Shader automatically converted from " JUNDOT_VERSION_NAME " " JUNDOT_VERSION_FULL_CONFIG "'s %s.\n\n",
 			orm ? "ORMMaterial3D" : "StandardMaterial3D");
 
 	// Define shader type and render mode based on property values.
@@ -4093,7 +4093,7 @@ bool StandardMaterial3D::_set(const StringName &p_name, const Variant &p_value) 
 			idx++;
 		}
 
-		WARN_PRINT("Godot 3.x SpatialMaterial remapped parameter not found: " + String(p_name));
+		WARN_PRINT("Jundot 3.x SpatialMaterial remapped parameter not found: " + String(p_name));
 		return true;
 	}
 }

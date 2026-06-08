@@ -1711,7 +1711,7 @@
 		<method name="get_video_adapter_api_version" qualifiers="const">
 			<return type="String" />
 			<description>
-				Returns the version of the graphics video adapter [i]currently in use[/i] (e.g. "1.2.189" for Vulkan, "3.3.0 NVIDIA 510.60.02" for OpenGL). This version may be different from the actual latest version supported by the hardware, as Godot may not always request the latest version. See also [method OS.get_video_adapter_driver_info].
+				Returns the version of the graphics video adapter [i]currently in use[/i] (e.g. "1.2.189" for Vulkan, "3.3.0 NVIDIA 510.60.02" for OpenGL). This version may be different from the actual latest version supported by the hardware, as Jundot may not always request the latest version. See also [method OS.get_video_adapter_driver_info].
 				[b]Note:[/b] When running a headless or server binary, this function returns an empty string.
 			</description>
 		</method>
@@ -1818,7 +1818,7 @@
 				Returns [code]true[/code] if changes have been made to the RenderingServer's data. [method force_draw] is usually called if this happens.
 			</description>
 		</method>
-		<method name="has_feature" qualifiers="const" deprecated="This method has not been used since Godot 3.0.">
+		<method name="has_feature" qualifiers="const" deprecated="This method has not been used since Jundot 3.0.">
 			<return type="bool" />
 			<param index="0" name="feature" type="int" enum="RenderingServer.Features" />
 			<description>
@@ -3497,7 +3497,7 @@
 				Sets the render reflection mask for this reflection probe. Only instances with a matching layer will have reflections applied from this probe. Equivalent to [member ReflectionProbe.reflection_mask].
 			</description>
 		</method>
-		<method name="reflection_probe_set_resolution" deprecated="This method has not done anything since Godot 3.">
+		<method name="reflection_probe_set_resolution" deprecated="This method has not done anything since Jundot 3.">
 			<return type="void" />
 			<param index="0" name="probe" type="RID" />
 			<param index="1" name="resolution" type="int" />
@@ -3810,7 +3810,7 @@
 				Creates a 2-dimensional texture and adds it to the RenderingServer. It can be accessed with the RID that is returned. This RID will be used in all [code]texture_2d_*[/code] RenderingServer functions.
 				Once finished with your RID, you will want to free the RID using the RenderingServer's [method free_rid] method.
 				[b]Note:[/b] The equivalent resource is [Texture2D].
-				[b]Note:[/b] Not to be confused with [method RenderingDevice.texture_create], which creates the graphics API's own texture type as opposed to the Godot-specific [Texture2D] resource.
+				[b]Note:[/b] Not to be confused with [method RenderingDevice.texture_create], which creates the graphics API's own texture type as opposed to the Jundot-specific [Texture2D] resource.
 			</description>
 		</method>
 		<method name="texture_2d_get" qualifiers="const">
@@ -3917,7 +3917,7 @@
 			<param index="6" name="layers" type="int" default="1" />
 			<param index="7" name="layered_type" type="int" enum="RenderingServer.TextureLayeredType" default="0" />
 			<description>
-				Creates a texture based on a native handle that was created outside of Godot's renderer.
+				Creates a texture based on a native handle that was created outside of Jundot's renderer.
 				[b]Note:[/b] If using only the rendering device renderer, it's recommend to use [method RenderingDevice.texture_create_from_extension] together with [method RenderingServer.texture_rd_create], rather than this method. This way, the texture's format and usage can be controlled more effectively.
 			</description>
 		</method>
@@ -3993,14 +3993,14 @@
 				[param srgb] should be [code]true[/code] when the texture uses nonlinear sRGB encoding and [code]false[/code] when the texture uses linear encoding.
 			</description>
 		</method>
-		<method name="texture_proxy_create" deprecated="ProxyTexture was removed in Godot 4.">
+		<method name="texture_proxy_create" deprecated="ProxyTexture was removed in Jundot 4.">
 			<return type="RID" />
 			<param index="0" name="base" type="RID" />
 			<description>
 				This method does nothing and always returns an invalid [RID].
 			</description>
 		</method>
-		<method name="texture_proxy_update" deprecated="ProxyTexture was removed in Godot 4.">
+		<method name="texture_proxy_update" deprecated="ProxyTexture was removed in Jundot 4.">
 			<return type="void" />
 			<param index="0" name="texture" type="RID" />
 			<param index="1" name="proxy_to" type="RID" />
@@ -5759,7 +5759,7 @@
 		</constant>
 		<constant name="ENV_TONE_MAPPER_ACES" value="3" enum="EnvironmentToneMapper">
 			Uses a high-contrast film-like tonemapping curve and desaturates bright values for a more realistic appearance. Slightly slower than [constant ENV_TONE_MAPPER_FILMIC].
-			[b]Note:[/b] This tonemapping operator is called "ACES Fitted" in Godot 3.x.
+			[b]Note:[/b] This tonemapping operator is called "ACES Fitted" in Jundot 3.x.
 			[b]Note:[/b] This tonemapper does not support HDR output because it produces output in the SDR range. It is recommended to use a different tonemapper when rendering to an HDR screen.
 		</constant>
 		<constant name="ENV_TONE_MAPPER_AGX" value="4" enum="EnvironmentToneMapper">
@@ -6272,9 +6272,9 @@
 		<constant name="SPLASH_STRETCH_MODE_IGNORE" value="5" enum="SplashStretchMode">
 			Stretches the image to cover the entire screen but doesn't preserve aspect ratio.
 		</constant>
-		<constant name="FEATURE_SHADERS" value="0" enum="Features" deprecated="This constant has not been used since Godot 3.0.">
+		<constant name="FEATURE_SHADERS" value="0" enum="Features" deprecated="This constant has not been used since Jundot 3.0.">
 		</constant>
-		<constant name="FEATURE_MULTITHREADED" value="1" enum="Features" deprecated="This constant has not been used since Godot 3.0.">
+		<constant name="FEATURE_MULTITHREADED" value="1" enum="Features" deprecated="This constant has not been used since Jundot 3.0.">
 		</constant>
 	</constants>
 </class>

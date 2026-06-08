@@ -1,4 +1,4 @@
-# https://github.com/godotengine/godot/issues/73273
+# https://github.com/jundotengine/jundot/issues/73273
 
 func not_called():
     var v

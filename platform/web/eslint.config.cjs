@@ -7,7 +7,7 @@ const pluginReference = require('eslint-plugin-html');
 const stylistic = require('@stylistic/eslint-plugin');
 
 if (process && process.env && process.env.npm_command && !fs.existsSync('./platform/web/eslint.config.cjs')) {
-	throw Error('eslint must be run from the Godot project root folder');
+	throw Error('eslint must be run from the Jundot project root folder');
 }
 
 const emscriptenGlobals = {
@@ -133,7 +133,7 @@ module.exports = [
 			globals: {
 				...globals.browser,
 				'Features': true,
-				'Godot': true,
+				'Jundot': true,
 				'InternalConfig': true,
 				'Preloader': true,
 			},
@@ -152,13 +152,13 @@ module.exports = [
 			globals: {
 				...globals.browser,
 				...emscriptenGlobals,
-				'GodotConfig': true,
-				'GodotEventListeners': true,
-				'GodotFS': true,
-				'GodotOS': true,
-				'GodotAudio': true,
-				'GodotInput': true,
-				'GodotRuntime': true,
+				'JundotConfig': true,
+				'JundotEventListeners': true,
+				'JundotFS': true,
+				'JundotOS': true,
+				'JundotAudio': true,
+				'JundotInput': true,
+				'JundotRuntime': true,
 				'IDHandler': true,
 				'XRWebGLLayer': true,
 			},
@@ -171,9 +171,9 @@ module.exports = [
 		languageOptions: {
 			globals: {
 				...globals.browser,
-				'___GODOT_CACHE___': true,
-				'___GODOT_ENSURE_CROSSORIGIN_ISOLATION_HEADERS___': true,
-				'___GODOT_OPT_CACHE___': true,
+				'___JUNDOT_CACHE___': true,
+				'___JUNDOT_ENSURE_CROSSORIGIN_ISOLATION_HEADERS___': true,
+				'___JUNDOT_OPT_CACHE___': true,
 			},
 		},
 	},
@@ -190,10 +190,10 @@ module.exports = [
 			globals: {
 				...globals.browser,
 				'Engine': true,
-				'$GODOT_CONFIG': true,
-				'$GODOT_PROJECT_NAME': true,
-				'$GODOT_THREADS_ENABLED': true,
-				'___GODOT_THREADS_ENABLED___': true,
+				'$JUNDOT_CONFIG': true,
+				'$JUNDOT_PROJECT_NAME': true,
+				'$JUNDOT_THREADS_ENABLED': true,
+				'___JUNDOT_THREADS_ENABLED___': true,
 			},
 		},
 		rules: {

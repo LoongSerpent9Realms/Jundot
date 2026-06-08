@@ -2,10 +2,10 @@
 /*  type_info.h                                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -37,7 +37,7 @@
 
 #include <type_traits>
 
-namespace GodotTypeInfo {
+namespace JundotTypeInfo {
 enum Metadata {
 	METADATA_NONE,
 	METADATA_INT_IS_INT8,
@@ -71,7 +71,7 @@ struct GetTypeInfo<T, std::enable_if_t<!std::is_same_v<T, GetSimpleTypeT<T>>>> :
 	template <> \
 	struct GetTypeInfo<m_type> { \
 		static const Variant::Type VARIANT_TYPE = m_var_type; \
-		static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE; \
+		static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(VARIANT_TYPE, String()); \
 		} \
@@ -81,25 +81,25 @@ struct GetTypeInfo<T, std::enable_if_t<!std::is_same_v<T, GetSimpleTypeT<T>>>> :
 	template <> \
 	struct GetTypeInfo<m_type> { \
 		static const Variant::Type VARIANT_TYPE = m_var_type; \
-		static const GodotTypeInfo::Metadata METADATA = m_metadata; \
+		static const JundotTypeInfo::Metadata METADATA = m_metadata; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(VARIANT_TYPE, String()); \
 		} \
 	};
 
 MAKE_TYPE_INFO(bool, Variant::BOOL)
-MAKE_TYPE_INFO_WITH_META(uint8_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_UINT8)
-MAKE_TYPE_INFO_WITH_META(int8_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_INT8)
-MAKE_TYPE_INFO_WITH_META(uint16_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_UINT16)
-MAKE_TYPE_INFO_WITH_META(int16_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_INT16)
-MAKE_TYPE_INFO_WITH_META(uint32_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_UINT32)
-MAKE_TYPE_INFO_WITH_META(int32_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_INT32)
-MAKE_TYPE_INFO_WITH_META(uint64_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_UINT64)
-MAKE_TYPE_INFO_WITH_META(int64_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_INT64)
-MAKE_TYPE_INFO_WITH_META(char16_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_CHAR16)
-MAKE_TYPE_INFO_WITH_META(char32_t, Variant::INT, GodotTypeInfo::METADATA_INT_IS_CHAR32)
-MAKE_TYPE_INFO_WITH_META(float, Variant::FLOAT, GodotTypeInfo::METADATA_REAL_IS_FLOAT)
-MAKE_TYPE_INFO_WITH_META(double, Variant::FLOAT, GodotTypeInfo::METADATA_REAL_IS_DOUBLE)
+MAKE_TYPE_INFO_WITH_META(uint8_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_UINT8)
+MAKE_TYPE_INFO_WITH_META(int8_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_INT8)
+MAKE_TYPE_INFO_WITH_META(uint16_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_UINT16)
+MAKE_TYPE_INFO_WITH_META(int16_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_INT16)
+MAKE_TYPE_INFO_WITH_META(uint32_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_UINT32)
+MAKE_TYPE_INFO_WITH_META(int32_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_INT32)
+MAKE_TYPE_INFO_WITH_META(uint64_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_UINT64)
+MAKE_TYPE_INFO_WITH_META(int64_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_INT64)
+MAKE_TYPE_INFO_WITH_META(char16_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_CHAR16)
+MAKE_TYPE_INFO_WITH_META(char32_t, Variant::INT, JundotTypeInfo::METADATA_INT_IS_CHAR32)
+MAKE_TYPE_INFO_WITH_META(float, Variant::FLOAT, JundotTypeInfo::METADATA_REAL_IS_FLOAT)
+MAKE_TYPE_INFO_WITH_META(double, Variant::FLOAT, JundotTypeInfo::METADATA_REAL_IS_DOUBLE)
 
 MAKE_TYPE_INFO(String, Variant::STRING)
 MAKE_TYPE_INFO(Vector2, Variant::VECTOR2)
@@ -142,7 +142,7 @@ MAKE_TYPE_INFO(IPAddress, Variant::STRING)
 template <>
 struct GetTypeInfo<ObjectID> {
 	static const Variant::Type VARIANT_TYPE = Variant::INT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_INT_IS_UINT64;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_INT_IS_UINT64;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_INT_IS_OBJECTID);
 	}
@@ -152,7 +152,7 @@ struct GetTypeInfo<ObjectID> {
 template <>
 struct GetTypeInfo<Variant> {
 	static const Variant::Type VARIANT_TYPE = Variant::NIL;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::NIL, String(), PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_NIL_IS_VARIANT);
 	}
@@ -162,7 +162,7 @@ struct GetTypeInfo<Variant> {
 	template <> \
 	struct GetTypeInfo<m_template<m_type>> { \
 		static const Variant::Type VARIANT_TYPE = m_var_type; \
-		static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE; \
+		static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(VARIANT_TYPE, String()); \
 		} \
@@ -177,7 +177,7 @@ MAKE_TEMPLATE_TYPE_INFO(Vector, StringName, Variant::PACKED_STRING_ARRAY)
 template <typename T>
 struct GetTypeInfo<T *, std::enable_if_t<std::is_base_of_v<Object, T>>> {
 	static const Variant::Type VARIANT_TYPE = Variant::OBJECT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(StringName(T::get_class_static()));
 	}
@@ -186,7 +186,7 @@ struct GetTypeInfo<T *, std::enable_if_t<std::is_base_of_v<Object, T>>> {
 template <typename T>
 struct GetTypeInfo<Ref<T>> {
 	static const Variant::Type VARIANT_TYPE = Variant::OBJECT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::OBJECT, String(), PROPERTY_HINT_RESOURCE_TYPE, T::get_class_static());
@@ -202,7 +202,7 @@ class RequiredResult;
 template <typename T>
 struct GetTypeInfo<RequiredParam<T>, std::enable_if_t<std::is_base_of_v<Object, T>>> {
 	static const Variant::Type VARIANT_TYPE = Variant::OBJECT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_OBJECT_IS_REQUIRED;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_OBJECT_IS_REQUIRED;
 
 	template <typename U = T, std::enable_if_t<std::is_base_of_v<RefCounted, U>, int> = 0>
 	static inline PropertyInfo get_class_info() {
@@ -218,7 +218,7 @@ struct GetTypeInfo<RequiredParam<T>, std::enable_if_t<std::is_base_of_v<Object, 
 template <typename T>
 struct GetTypeInfo<RequiredResult<T>, std::enable_if_t<std::is_base_of_v<Object, T>>> {
 	static const Variant::Type VARIANT_TYPE = Variant::OBJECT;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_OBJECT_IS_REQUIRED;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_OBJECT_IS_REQUIRED;
 
 	template <typename U = T, std::enable_if_t<std::is_base_of_v<RefCounted, U>, int> = 0>
 	static inline PropertyInfo get_class_info() {
@@ -231,7 +231,7 @@ struct GetTypeInfo<RequiredResult<T>, std::enable_if_t<std::is_base_of_v<Object,
 	}
 };
 
-namespace GodotTypeInfo {
+namespace JundotTypeInfo {
 namespace Internal {
 inline String enum_qualified_name_to_class_info_name(const String &p_qualified_name) {
 	Vector<String> parts = p_qualified_name.split("::", false);
@@ -242,16 +242,16 @@ inline String enum_qualified_name_to_class_info_name(const String &p_qualified_n
 	return parts[parts.size() - 2] + "." + parts[parts.size() - 1];
 }
 } // namespace Internal
-} // namespace GodotTypeInfo
+} // namespace JundotTypeInfo
 
 #define MAKE_ENUM_TYPE_INFO(m_enum, m_bound_name) \
 	template <> \
 	struct GetTypeInfo<m_enum> { \
 		static const Variant::Type VARIANT_TYPE = Variant::INT; \
-		static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE; \
+		static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_ENUM, \
-					GodotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
+					JundotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
 		} \
 	};
 
@@ -268,19 +268,19 @@ inline StringName __constant_get_enum_value_name(const char *p_name) {
 	template <> \
 	struct GetTypeInfo<m_enum> { \
 		static const Variant::Type VARIANT_TYPE = Variant::INT; \
-		static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE; \
+		static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_BITFIELD, \
-					GodotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
+					JundotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
 		} \
 	}; \
 	template <> \
 	struct GetTypeInfo<BitField<m_enum>> { \
 		static const Variant::Type VARIANT_TYPE = Variant::INT; \
-		static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE; \
+		static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE; \
 		static inline PropertyInfo get_class_info() { \
 			return PropertyInfo(Variant::INT, String(), PROPERTY_HINT_NONE, String(), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_CLASS_IS_BITFIELD, \
-					GodotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
+					JundotTypeInfo::Internal::enum_qualified_name_to_class_info_name(String(#m_bound_name))); \
 		} \
 	};
 
@@ -307,7 +307,7 @@ struct ZeroInitializer {
 	}
 };
 
-namespace GodotTypeInfo {
+namespace JundotTypeInfo {
 namespace Internal {
 
 template <typename T>
@@ -340,23 +340,23 @@ const String get_variant_type_identifier() {
 }
 
 } //namespace Internal
-} //namespace GodotTypeInfo
+} //namespace JundotTypeInfo
 
 template <typename T>
 struct GetTypeInfo<TypedArray<T>> {
 	static const Variant::Type VARIANT_TYPE = Variant::ARRAY;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
-		return PropertyInfo(Variant::ARRAY, String(), PROPERTY_HINT_ARRAY_TYPE, GodotTypeInfo::Internal::get_variant_type_identifier<T>());
+		return PropertyInfo(Variant::ARRAY, String(), PROPERTY_HINT_ARRAY_TYPE, JundotTypeInfo::Internal::get_variant_type_identifier<T>());
 	}
 };
 
 template <typename K, typename V>
 struct GetTypeInfo<TypedDictionary<K, V>> {
 	static const Variant::Type VARIANT_TYPE = Variant::DICTIONARY;
-	static const GodotTypeInfo::Metadata METADATA = GodotTypeInfo::METADATA_NONE;
+	static const JundotTypeInfo::Metadata METADATA = JundotTypeInfo::METADATA_NONE;
 	static inline PropertyInfo get_class_info() {
 		return PropertyInfo(Variant::DICTIONARY, String(), PROPERTY_HINT_DICTIONARY_TYPE,
-				vformat("%s;%s", GodotTypeInfo::Internal::get_variant_type_identifier<K>(), GodotTypeInfo::Internal::get_variant_type_identifier<V>()));
+				vformat("%s;%s", JundotTypeInfo::Internal::get_variant_type_identifier<K>(), JundotTypeInfo::Internal::get_variant_type_identifier<V>()));
 	}
 };

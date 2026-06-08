@@ -1,7 +1,7 @@
-# Bengali translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Bengali translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Abu Md. Maruf Sarker <maruf.webdev@gmail.com>, 2016-2017.
 # Abdullah Zubair <abdullahzubair109@gmail.com>, 2017.
 # Tahmid Karim <tahmidk15@gmail.com>, 2016.
@@ -22,13 +22,13 @@
 # Shaon Biswas <shaonbiswasjhumabiswas@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-12 13:11+0000\n"
 "Last-Translator: Shaon Biswas <shaonbiswasjhumabiswas@gmail.com>\n"
-"Language-Team: Bengali <https://hosted.weblate.org/projects/godot-engine/"
-"godot/bn/>\n"
+"Language-Team: Bengali <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/bn/>\n"
 "Language: bn\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2588,8 +2588,8 @@ msgstr "সাহায্য অনুসন্ধান করুন…"
 msgid "Online Documentation"
 msgstr "অনলাইন ডকুমেন্টেশন"
 
-msgid "About Godot..."
-msgstr "Godot সম্পর্কে…"
+msgid "About Jundot..."
+msgstr "Jundot সম্পর্কে…"
 
 msgid "Project"
 msgstr "প্রজেক্ট"
@@ -2960,11 +2960,11 @@ msgstr "একই নামের ফোল্ডার রয়েছে।"
 msgid "Folder name is valid."
 msgstr "ফোল্ডার নামটি গ্রহণযোগ্য।"
 
-msgid "Godot Engine contributors"
-msgstr "Godot Engine কন্ট্রিবিউটরস"
+msgid "Jundot Engine contributors"
+msgstr "Jundot Engine কন্ট্রিবিউটরস"
 
-msgid "Thanks from the Godot community!"
-msgstr "Godot কমিউনিটি হতে আপনাকে ধন্যবাদ!"
+msgid "Thanks from the Jundot community!"
+msgstr "Jundot কমিউনিটি হতে আপনাকে ধন্যবাদ!"
 
 msgid "Authors"
 msgstr "লেখক"
@@ -3235,9 +3235,9 @@ msgid "Valid project found at path."
 msgstr "পাথ এ বৈধ প্রকল্প পাওয়া গেছে।"
 
 msgid ""
-"Please choose a \"project.godot\", a directory with one, or a \".zip\" file."
+"Please choose a \"project.jundot\", a directory with one, or a \".zip\" file."
 msgstr ""
-"অনুগ্রহ করে একটি \"project.godot\", একটি সহ একটি ডিরেক্টরি বা একটি \".zip\" ফাইল "
+"অনুগ্রহ করে একটি \"project.jundot\", একটি সহ একটি ডিরেক্টরি বা একটি \".zip\" ফাইল "
 "চয়ন করুন।"
 
 msgid ""
@@ -4796,8 +4796,8 @@ msgstr "থিম ইম্পোর্ট করুন"
 msgid "Save Theme As..."
 msgstr "থিম এইরূপে সংরক্ষণ করুন..."
 
-msgid "Open '%s' in Godot online documentation."
-msgstr "Godot অনলাইন ডকুমেন্টেশনে '%s' খুলুন।"
+msgid "Open '%s' in Jundot online documentation."
+msgstr "Jundot অনলাইন ডকুমেন্টেশনে '%s' খুলুন।"
 
 msgid "%s Class Reference"
 msgstr "%s ক্লাস রেফারেন্স"

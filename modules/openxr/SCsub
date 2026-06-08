@@ -90,7 +90,7 @@ if env["builtin_openxr"]:
     env.modules_sources += thirdparty_obj
 
 
-# Godot source files.
+# Jundot source files.
 
 module_obj = []
 

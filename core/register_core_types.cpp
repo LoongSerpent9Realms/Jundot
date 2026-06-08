@@ -2,10 +2,10 @@
 /*  register_core_types.cpp                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -41,7 +41,7 @@
 #include "core/extension/gdextension.h"
 #include "core/extension/gdextension_manager.h"
 #include "core/extension/gdextension_resource_format.h"
-#include "core/extension/godot_instance.h"
+#include "core/extension/jundot_instance.h"
 #include "core/input/input.h"
 #include "core/input/input_map.h"
 #include "core/input/shortcut.h"
@@ -294,7 +294,7 @@ void register_core_types() {
 
 	GDREGISTER_CLASS(GDExtension);
 
-	GDREGISTER_ABSTRACT_CLASS(GodotInstance);
+	GDREGISTER_ABSTRACT_CLASS(JundotInstance);
 
 	GDREGISTER_ABSTRACT_CLASS(GDExtensionManager);
 

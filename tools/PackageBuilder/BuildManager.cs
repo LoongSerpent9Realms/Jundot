@@ -1,10 +1,10 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 /// <summary>
-/// Discovers, tracks, and manages Godot builds across bin/ and artifacts/.
+/// Discovers, tracks, and manages Jundot builds across bin/ and artifacts/.
 /// Maintains a persistent history in artifacts/packages/.build-history.json.
 /// </summary>
 public class BuildManager
@@ -131,7 +131,7 @@ public class BuildManager
         var records = new List<BuildRecord>();
         var seenKeys = new HashSet<string>(); // dedupe by platform+target+arch+mono
 
-        foreach (var exePath in Directory.GetFiles(_binDir, "godot.*.exe"))
+        foreach (var exePath in Directory.GetFiles(_binDir, "jundot.*.exe"))
         {
             var fileName = Path.GetFileName(exePath);
 
@@ -164,7 +164,7 @@ public class BuildManager
                 record.BuildLogPath = bestLog;
 
                 var logName = Path.GetFileNameWithoutExtension(bestLog);
-                var versionMatch = Regex.Match(logName, @"^godot-([^-]+)-");
+                var versionMatch = Regex.Match(logName, @"^jundot-([^-]+)-");
                 if (versionMatch.Success)
                     record.Version = versionMatch.Groups[1].Value;
 
@@ -181,7 +181,7 @@ public class BuildManager
                 record.Version = ReadVersionFromPy() ?? "?";
 
             if (string.IsNullOrEmpty(record.PackageName))
-                record.PackageName = $"godot-{record.Version}-{record.Platform}-{record.Target}-{record.Arch}";
+                record.PackageName = $"jundot-{record.Version}-{record.Platform}-{record.Target}-{record.Arch}";
 
             records.Add(record);
         }
@@ -210,12 +210,12 @@ public class BuildManager
                     case "status": status = m.Groups[2].Value; break;
                 }
             }
-            return FormatGodotVersion(major, minor, patch, status);
+            return FormatJundotVersion(major, minor, patch, status);
         }
         catch { return null; }
     }
 
-    private static string FormatGodotVersion(string major, string minor, string patch, string status)
+    private static string FormatJundotVersion(string major, string minor, string patch, string status)
     {
         var version = $"{major}.{minor}";
         if (!string.IsNullOrWhiteSpace(patch) && patch != "0")
@@ -288,7 +288,7 @@ public class BuildManager
         foreach (var logFile in Directory.GetFiles(_logsDir, "*.log"))
         {
             var name = Path.GetFileNameWithoutExtension(logFile);
-            // Log name format: godot-VERSION-PLATFORM-TARGET-ARCH[-mono]-TIMESTAMP[-build|-mono-glue|-mono-assemblies]
+            // Log name format: jundot-VERSION-PLATFORM-TARGET-ARCH[-mono]-TIMESTAMP[-build|-mono-glue|-mono-assemblies]
             if (name.Contains(platform) && name.Contains(target) && name.Contains(arch))
             {
                 var isMonoLog = name.Contains("-mono");
@@ -321,11 +321,11 @@ public class BuildManager
     }
 
     /// <summary>
-    /// Parse a Godot exe filename like:
-    ///   godot.windows.editor.x86_64.exe
-    ///   godot.windows.editor.x86_64.console.exe
-    ///   godot.windows.editor.x86_64.mono.exe
-    ///   godot.windows.editor.x86_64.mono.console.exe
+    /// Parse a Jundot exe filename like:
+    ///   jundot.windows.editor.x86_64.exe
+    ///   jundot.windows.editor.x86_64.console.exe
+    ///   jundot.windows.editor.x86_64.mono.exe
+    ///   jundot.windows.editor.x86_64.mono.console.exe
     /// </summary>
     private static (string Platform, string Target, string Arch, bool Mono)? ParseExeFileName(string fileName)
     {
@@ -334,7 +334,7 @@ public class BuildManager
         // Remove .console if present
         name = name.Replace(".console", "");
 
-        var pattern = @"^godot\.(\w+)\.(\w+)\.(\w+)(?:\.(.+))?(?:\.mono)?$";
+        var pattern = @"^jundot\.(\w+)\.(\w+)\.(\w+)(?:\.(.+))?(?:\.mono)?$";
         var match = Regex.Match(name, pattern);
         if (!match.Success) return null;
 

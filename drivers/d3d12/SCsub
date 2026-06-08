@@ -10,7 +10,7 @@ import methods
 from methods import print_error
 
 # Sync with `misc/scripts/install_d3d12_sdk_windows.py` when updating Mesa.
-# Check for latest version: https://github.com/godotengine/godot-nir-static/releases/latest
+# Check for latest version: https://github.com/jundotengine/jundot-nir-static/releases/latest
 req_version_major = 25
 req_version_minor = 3
 
@@ -42,8 +42,8 @@ elif env["use_llvm"] and os.path.exists(env["mesa_libs"] + "-" + env["arch"] + "
 elif not env["use_llvm"] and os.path.exists(env["mesa_libs"] + "-" + env["arch"] + "-gcc"):
     mesa_libs = env["mesa_libs"] + "-" + env["arch"] + "-gcc"
 
-mesa_dir = (mesa_libs + "/godot-mesa").replace("\\", "/")
-mesa_gen_dir = (mesa_libs + "/godot-mesa/generated").replace("\\", "/")
+mesa_dir = (mesa_libs + "/jundot-mesa").replace("\\", "/")
+mesa_gen_dir = (mesa_libs + "/jundot-mesa/generated").replace("\\", "/")
 mesa_absdir = Dir(mesa_dir).abspath
 mesa_gen_absdir = Dir(mesa_dir + "/generated").abspath
 
@@ -178,7 +178,7 @@ env_thirdparty.Prepend(
 env_thirdparty.add_source_files(thirdparty_obj, "#thirdparty/d3d12ma/D3D12MemAlloc.cpp")
 env.drivers_sources += thirdparty_obj
 
-# Godot source files.
+# Jundot source files.
 
 driver_obj = []
 env_d3d12_rdd.add_source_files(driver_obj, "*.cpp")

@@ -2,10 +2,10 @@
 /*  winrt_utils.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -34,13 +34,13 @@
 
 #ifdef WINRT_ENABLED
 
-GODOT_GCC_WARNING_PUSH
-GODOT_GCC_WARNING_IGNORE("-Wnon-virtual-dtor")
-GODOT_GCC_WARNING_IGNORE("-Wctor-dtor-privacy")
-GODOT_GCC_WARNING_IGNORE("-Wshadow")
-GODOT_GCC_WARNING_IGNORE("-Wstrict-aliasing")
-GODOT_CLANG_WARNING_PUSH
-GODOT_CLANG_WARNING_IGNORE("-Wnon-virtual-dtor")
+JUNDOT_GCC_WARNING_PUSH
+JUNDOT_GCC_WARNING_IGNORE("-Wnon-virtual-dtor")
+JUNDOT_GCC_WARNING_IGNORE("-Wctor-dtor-privacy")
+JUNDOT_GCC_WARNING_IGNORE("-Wshadow")
+JUNDOT_GCC_WARNING_IGNORE("-Wstrict-aliasing")
+JUNDOT_CLANG_WARNING_PUSH
+JUNDOT_CLANG_WARNING_IGNORE("-Wnon-virtual-dtor")
 
 #include <inspectable.h>
 #include <winrt/Windows.Foundation.Metadata.h>
@@ -105,8 +105,8 @@ __CRT_UUID_DECL(IDisplayInformationStaticsInterop, 0x7449121c, 0x382b, 0x4705, 0
 
 #endif // defined __MINGW32__ || defined __MINGW64__
 
-GODOT_GCC_WARNING_POP
-GODOT_CLANG_WARNING_POP
+JUNDOT_GCC_WARNING_POP
+JUNDOT_CLANG_WARNING_POP
 
 using namespace winrt::Windows::Graphics::Display;
 using namespace winrt::Windows::System;

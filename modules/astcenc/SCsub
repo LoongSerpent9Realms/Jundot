@@ -51,7 +51,7 @@ if not astc_encoder:
 env_thirdparty.add_source_files(thirdparty_obj, thirdparty_sources)
 env.modules_sources += thirdparty_obj
 
-# Godot source files
+# Jundot source files
 
 module_obj = []
 

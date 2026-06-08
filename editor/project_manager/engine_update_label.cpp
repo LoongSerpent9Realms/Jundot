@@ -2,10 +2,10 @@
 /*  engine_update_label.cpp                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,6 +30,7 @@
 
 #include "engine_update_label.h"
 
+#include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
@@ -40,13 +41,13 @@
 
 namespace {
 
-const char *GODOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Godot-Auto/releases";
-const char *GODOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Godot-Auto/releases";
+const char *JUNDOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Jundot-Auto/releases";
+const char *JUNDOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Jundot-Auto/releases";
 
 bool _split_github_release_tag(const String &p_tag, String &r_base_version, String &r_release_status) {
 	String tag = p_tag.strip_edges();
 	tag = tag.trim_prefix("refs/tags/");
-	tag = tag.trim_prefix("godot-");
+	tag = tag.trim_prefix("jundot-");
 	tag = tag.trim_prefix("v");
 
 	int separator = tag.find_char('-');
@@ -74,8 +75,8 @@ void EngineUpdateLabel::_check_update() {
 
 	PackedStringArray headers;
 	headers.push_back("Accept: application/vnd.github+json");
-	headers.push_back("User-Agent: Godot-Auto");
-	http->request(GODOT_AUTO_RELEASES_API, headers);
+	headers.push_back("User-Agent: Jundot-Auto");
+	http->request(JUNDOT_AUTO_RELEASES_API, headers);
 }
 
 void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
@@ -112,7 +113,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 
 	UpdateMode update_mode = UpdateMode(int(EDITOR_GET("network/connection/check_for_updates")));
 	if (update_mode == UpdateMode::AUTO) {
-		if (_get_version_type(GODOT_VERSION_STATUS) == VersionType::STABLE) {
+		if (_get_version_type(JUNDOT_VERSION_STATUS) == VersionType::STABLE) {
 			update_mode = UpdateMode::NEWEST_STABLE;
 		} else {
 			update_mode = UpdateMode::NEWEST_UNSTABLE;
@@ -137,7 +138,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 			Dictionary release_info;
 			release_info["name"] = release_string;
 			releases.push_back(release_info);
-			release_url = version_info.get("html_url", GODOT_AUTO_RELEASES_PAGE);
+			release_url = version_info.get("html_url", JUNDOT_AUTO_RELEASES_PAGE);
 		} else {
 			base_version_string = version_info.get("name", "");
 			releases = version_info.get("releases", Array());
@@ -150,7 +151,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 		}
 
 		int minor = version_bits[1].to_int();
-		if (version_bits[0].to_int() != GODOT_VERSION_MAJOR || minor < GODOT_VERSION_MINOR) {
+		if (version_bits[0].to_int() != JUNDOT_VERSION_MAJOR || minor < JUNDOT_VERSION_MINOR) {
 			continue;
 		}
 
@@ -159,11 +160,11 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 			patch = version_bits[2].to_int();
 		}
 
-		if (minor == GODOT_VERSION_MINOR && patch < GODOT_VERSION_PATCH) {
+		if (minor == JUNDOT_VERSION_MINOR && patch < JUNDOT_VERSION_PATCH) {
 			continue;
 		}
 
-		if (update_mode == UpdateMode::NEWEST_PATCH && minor > GODOT_VERSION_MINOR) {
+		if (update_mode == UpdateMode::NEWEST_PATCH && minor > JUNDOT_VERSION_MINOR) {
 			continue;
 		}
 
@@ -177,7 +178,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 		int release_index;
 		VersionType release_type = _get_version_type(release_string, &release_index);
 
-		if (minor > GODOT_VERSION_MINOR || patch > GODOT_VERSION_PATCH) {
+		if (minor > JUNDOT_VERSION_MINOR || patch > JUNDOT_VERSION_PATCH) {
 			if (stable_only && release_type != VersionType::STABLE) {
 				continue;
 			}
@@ -188,7 +189,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 		}
 
 		int current_version_index;
-		VersionType current_version_type = _get_version_type(GODOT_VERSION_STATUS, &current_version_index);
+		VersionType current_version_type = _get_version_type(JUNDOT_VERSION_STATUS, &current_version_index);
 
 		if (int(release_type) > int(current_version_type)) {
 			break;
@@ -329,6 +330,7 @@ void EngineUpdateLabel::_notification(int p_what) {
 
 void EngineUpdateLabel::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("offline_clicked"));
+	ADD_SIGNAL(MethodInfo("update_download_requested", PropertyInfo(Variant::STRING, "version"), PropertyInfo(Variant::STRING, "url")));
 }
 
 void EngineUpdateLabel::pressed() {
@@ -342,15 +344,47 @@ void EngineUpdateLabel::pressed() {
 		} break;
 
 		case UpdateStatus::UPDATE_AVAILABLE: {
+			// Emit signal so the project manager can show UpdateDialog.
+			// The signal handler is responsible for triggering the launcher.
 			if (available_newer_url.is_empty()) {
-				available_newer_url = String(GODOT_AUTO_RELEASES_PAGE) + "/tag/" + available_newer_version;
+				available_newer_url = String(JUNDOT_AUTO_RELEASES_PAGE) + "/tag/" + available_newer_version;
 			}
-			OS::get_singleton()->shell_open(available_newer_url);
+			emit_signal("update_download_requested", available_newer_version, available_newer_url);
 		} break;
 
 		default: {
 		}
 	}
+}
+
+void EngineUpdateLabel::_trigger_launcher_update() {
+	// Find the launcher next to the current executable
+	String exe_dir = OS::get_singleton()->get_executable_path().get_base_dir();
+	String launcher_path = exe_dir.path_join("JundotLauncher.exe");
+
+	// Also try the dev/build path
+	if (!FileAccess::exists(launcher_path)) {
+		launcher_path = exe_dir.path_join("Tools/Launcher/JundotLauncher.exe");
+	}
+
+	if (FileAccess::exists(launcher_path)) {
+		// Launch the launcher in update mode
+		List<String> args;
+		args.push_back("update");
+		args.push_back(vformat("--engine-path=\"%s\"", exe_dir));
+
+		int exitcode = -1;
+		Error err = OS::get_singleton()->execute(launcher_path, args, nullptr, &exitcode);
+		if (err == OK) {
+			return; // Launcher completed successfully
+		}
+	}
+
+	// Fallback: open GitHub Releases page in browser
+	if (available_newer_url.is_empty()) {
+		available_newer_url = String(JUNDOT_AUTO_RELEASES_PAGE) + "/tag/" + available_newer_version;
+	}
+	OS::get_singleton()->shell_open(available_newer_url);
 }
 
 EngineUpdateLabel::EngineUpdateLabel() {

@@ -2,10 +2,10 @@
 /*  test_config_file.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -49,7 +49,7 @@ TEST_CASE("[ConfigFile] Parsing well-formatted files") {
 name = "Unnamed Player"
 tagline="Waiting
 for
-Godot"
+Jundot"
 
 color =Color(   0, 0.5,1, 1) ; Inline comment
 position= Vector2(
@@ -70,7 +70,7 @@ antiAliasing = false
 			String(config_file.get_value("player", "name")) == "Unnamed Player",
 			"Reading `player/name` should return the expected value.");
 	CHECK_MESSAGE(
-			String(config_file.get_value("player", "tagline")) == "Waiting\nfor\nGodot",
+			String(config_file.get_value("player", "tagline")) == "Waiting\nfor\nJundot",
 			"Reading `player/tagline` should return the expected value.");
 	CHECK_MESSAGE(
 			Color(config_file.get_value("player", "color")).is_equal_approx(Color(0, 0.5, 1)),
@@ -98,7 +98,7 @@ TEST_CASE("[ConfigFile] Parsing malformatted file") {
 [player]
 
 name = "Unnamed Player"" ; Extraneous closing quote.
-tagline = "Waiting\nfor\nGodot"
+tagline = "Waiting\nfor\nJundot"
 
 color = Color(0, 0.5, 1) ; Missing 4th parameter.
 position = Vector2(
@@ -120,7 +120,7 @@ antialiasing = false ; Duplicate key.
 TEST_CASE("[ConfigFile] Saving file") {
 	ConfigFile config_file;
 	config_file.set_value("player", "name", "Unnamed Player");
-	config_file.set_value("player", "tagline", "Waiting\nfor\nGodot");
+	config_file.set_value("player", "tagline", "Waiting\nfor\nJundot");
 	config_file.set_value("player", "color", Color(0, 0.5, 1));
 	config_file.set_value("player", "position", Vector2(3, 4));
 	config_file.set_value("graphics", "antialiasing", true);
@@ -142,7 +142,7 @@ TEST_CASE("[ConfigFile] Saving file") {
 name="Unnamed Player"
 tagline="Waiting
 for
-Godot"
+Jundot"
 color=Color(0, 0.5, 1, 1)
 position=Vector2(3, 4)
 

@@ -2,10 +2,10 @@
 /*  test_json_native.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -119,7 +119,7 @@ TEST_CASE("[JSON][Native] Conversion between native and JSON formats") {
 	dict[0] = 1;
 	dict[0.0] = 1.0;
 
-	// Godot dictionaries preserve insertion order, so an array is used for keys/values.
+	// Jundot dictionaries preserve insertion order, so an array is used for keys/values.
 	test(dict, R"({"type":"Dictionary","args":[false,true,"i:0","i:1","f:0.0","f:1.0"]})");
 
 	TypedDictionary<int64_t, int64_t> int_int_dict;

@@ -1,4 +1,4 @@
-namespace GodotPackageBuilder;
+namespace JundotPackageBuilder;
 
 static class Program
 {
@@ -9,8 +9,8 @@ static class Program
         if (!IsAiPackageBuilderSession(args))
         {
             MessageBox.Show(
-                "Godot Package Builder is reserved for AI/developer automation sessions.",
-                "Godot Package Builder",
+                "Jundot Package Builder is reserved for AI/developer automation sessions.",
+                "Jundot Package Builder",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return;
@@ -24,7 +24,7 @@ static class Program
         if (args.Any(a => string.Equals(a, "--ai-package-builder", StringComparison.OrdinalIgnoreCase)))
             return true;
 
-        var value = Environment.GetEnvironmentVariable("GODOT_AI_PACKAGE_BUILDER") ?? "";
+        var value = Environment.GetEnvironmentVariable("JUNDOT_AI_PACKAGE_BUILDER") ?? "";
         return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
                value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
                value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||

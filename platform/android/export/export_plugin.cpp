@@ -2,10 +2,10 @@
 /*  export_plugin.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -247,7 +247,7 @@ static const String THEMED_ICON_XML_PATH = "res/mipmap-anydpi-v26/themed_icon.xm
 static const String ANDROID_SPLASH_ICON_PATH = "res/drawable/splash_icon.webp";
 static const String ANDROID_SPLASH_BRANDING_IMAGE_PATH = "res/drawable/splash_branding_image.webp";
 
-static const char *DISABLE_GODOT_SPLASH_OPTION = PNAME("splash_screen/disable_godot_boot_splash");
+static const char *DISABLE_JUNDOT_SPLASH_OPTION = PNAME("splash_screen/disable_jundot_boot_splash");
 static const char *ANDROID_SPLASH_ICON_OPTION = PNAME("splash_screen/icon");
 static const char *ANDROID_SPLASH_BACKGROUND_COLOR_OPTION = PNAME("splash_screen/background_color");
 static const char *ANDROID_SPLASH_BRANDING_IMAGE_OPTION = PNAME("splash_screen/branding_image");
@@ -515,7 +515,7 @@ String EditorExportPlatformAndroid::get_project_name(const Ref<EditorExportPrese
 	}
 
 	if (aname.is_empty()) {
-		aname = GODOT_VERSION_NAME;
+		aname = JUNDOT_VERSION_NAME;
 	}
 
 	return aname;
@@ -652,7 +652,7 @@ bool EditorExportPlatformAndroid::_should_compress_asset(const String &p_path, c
 		".rtttl", ".imy", ".xmf", ".mp4", ".m4a",
 		".m4v", ".3gp", ".3gpp", ".3g2", ".3gpp2",
 		".amr", ".awb", ".wma", ".wmv",
-		// Godot-specific:
+		// Jundot-specific:
 		".webp", // Same reasoning as .png
 		".cfb", // Don't let small config files slow-down startup
 		".scn", // Binary scenes are usually already compressed
@@ -968,7 +968,7 @@ void EditorExportPlatformAndroid::_create_editor_debug_keystore_if_needed() {
 		args.push_back("-validity");
 		args.push_back("10000");
 		args.push_back("-dname");
-		args.push_back("cn=Godot, ou=Godot Engine, o=Stichting Godot, c=NL");
+		args.push_back("cn=Jundot, ou=Jundot Engine, o=Stichting Jundot, c=NL");
 		Error error = OS::get_singleton()->execute(keytool_path, args, &output, nullptr, true);
 		print_verbose(output);
 		if (error != OK) {
@@ -1026,14 +1026,14 @@ void EditorExportPlatformAndroid::_get_manifest_info(const Ref<EditorExportPrese
 	}
 
 	MetadataInfo rendering_method_metadata = {
-		"org.godotengine.rendering.method",
+		"org.jundotengine.rendering.method",
 		p_preset->get_project_setting("rendering/renderer/rendering_method.mobile")
 	};
 	r_metadata.append(rendering_method_metadata);
 
 	MetadataInfo editor_version_metadata = {
-		"org.godotengine.editor.version",
-		String(GODOT_VERSION_FULL_CONFIG)
+		"org.jundotengine.editor.version",
+		String(JUNDOT_VERSION_FULL_CONFIG)
 	};
 	r_metadata.append(editor_version_metadata);
 }
@@ -1131,7 +1131,7 @@ void EditorExportPlatformAndroid::_fix_themes_xml(const Ref<EditorExportPreset> 
 	if (!splash_branding_image_path.is_empty()) {
 		splash_theme_attributes["android:windowSplashScreenBrandingImage"] = "@drawable/splash_branding_image";
 	}
-	splash_theme_attributes["postSplashScreenTheme"] = "@style/GodotAppMainTheme";
+	splash_theme_attributes["postSplashScreenTheme"] = "@style/JundotAppMainTheme";
 	splash_theme_attributes["android:windowIsTranslucent"] = bool_to_string(transparency_allowed);
 
 	PackedStringArray reserved_splash_keys;
@@ -1171,18 +1171,18 @@ void EditorExportPlatformAndroid::_fix_themes_xml(const Ref<EditorExportPreset> 
 	for (int i = 0; i < lines.size(); i++) {
 		String line = lines[i];
 
-		if (line.contains("<style name=\"GodotAppMainTheme\"")) {
+		if (line.contains("<style name=\"JundotAppMainTheme\"")) {
 			inside_main_theme = true;
 			new_lines.append(line);
 			continue;
 		}
-		if (line.contains("<style name=\"GodotAppSplashTheme\"")) {
+		if (line.contains("<style name=\"JundotAppSplashTheme\"")) {
 			inside_splash_theme = true;
 			new_lines.append(line);
 			continue;
 		}
 
-		// Inject GodotAppMainTheme attributes.
+		// Inject JundotAppMainTheme attributes.
 		if (inside_main_theme && line.contains("</style>")) {
 			for (const Variant &attribute : main_theme_attributes.keys()) {
 				String value = main_theme_attributes[attribute];
@@ -1194,7 +1194,7 @@ void EditorExportPlatformAndroid::_fix_themes_xml(const Ref<EditorExportPreset> 
 			continue;
 		}
 
-		// Inject GodotAppSplashTheme attributes.
+		// Inject JundotAppSplashTheme attributes.
 		if (inside_splash_theme && line.contains("</style>")) {
 			for (const Variant &attribute : splash_theme_attributes.keys()) {
 				String value = splash_theme_attributes[attribute];
@@ -1829,7 +1829,7 @@ void EditorExportPlatformAndroid::_fix_resources(const Ref<EditorExportPreset> &
 
 	const String project_name = get_project_name(p_preset, p_preset->get("package/name"));
 	const Dictionary appnames = get_project_setting(p_preset, "application/config/name_localized");
-	const StringName domain_name = "godot.project_name_localization";
+	const StringName domain_name = "jundot.project_name_localization";
 	Ref<TranslationDomain> domain = TranslationServer::get_singleton()->get_or_add_domain(domain_name);
 	TranslationServer::get_singleton()->load_project_translations(domain);
 
@@ -1839,9 +1839,9 @@ void EditorExportPlatformAndroid::_fix_resources(const Ref<EditorExportPreset> &
 
 		String str = _parse_string(&r_manifest[offset], string_flags & UTF8_FLAG);
 
-		if (str == "godot-project-name") {
+		if (str == "jundot-project-name") {
 			str = project_name;
-		} else if (str.begins_with("godot-project-name")) {
+		} else if (str.begins_with("jundot-project-name")) {
 			String lang = str.substr(str.rfind_char('-') + 1).replace_char('-', '_');
 
 			if (appnames.is_empty()) {
@@ -2128,7 +2128,7 @@ String EditorExportPlatformAndroid::get_export_option_warning(const EditorExport
 				} else {
 					int min_sdk_int = min_sdk_str.to_int();
 					if (min_sdk_int < DEFAULT_MIN_SDK_VERSION) {
-						return vformat(TTR("\"Min SDK\" cannot be lower than %d, which is the version needed by the Godot library."), DEFAULT_MIN_SDK_VERSION);
+						return vformat(TTR("\"Min SDK\" cannot be lower than %d, which is the version needed by the Jundot library."), DEFAULT_MIN_SDK_VERSION);
 					}
 				}
 			}
@@ -2267,7 +2267,7 @@ void EditorExportPlatformAndroid::get_export_options(List<ExportOption> *r_optio
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "screen/support_xlarge"), true));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::COLOR, "screen/background_color", PROPERTY_HINT_COLOR_NO_ALPHA), Color()));
 
-	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, DISABLE_GODOT_SPLASH_OPTION), false));
+	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, DISABLE_JUNDOT_SPLASH_OPTION), false));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, ANDROID_SPLASH_ICON_OPTION, PROPERTY_HINT_FILE, "*.png,*.webp,*.svg,*.xml"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, ANDROID_SPLASH_BRANDING_IMAGE_OPTION, PROPERTY_HINT_FILE, "*.png,*.webp,*.svg"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::COLOR, ANDROID_SPLASH_BACKGROUND_COLOR_OPTION, PROPERTY_HINT_COLOR_NO_ALPHA), Color()));
@@ -2303,7 +2303,7 @@ bool EditorExportPlatformAndroid::get_export_option_visibility(const EditorExpor
 			p_option == "package/show_in_app_library" ||
 			p_option == "package/show_as_launcher_app" ||
 			p_option == "gesture/swipe_to_dismiss" ||
-			p_option == DISABLE_GODOT_SPLASH_OPTION ||
+			p_option == DISABLE_JUNDOT_SPLASH_OPTION ||
 			p_option == ANDROID_SPLASH_ICON_OPTION ||
 			p_option == ANDROID_SPLASH_BACKGROUND_COLOR_OPTION ||
 			p_option == ANDROID_SPLASH_BRANDING_IMAGE_OPTION) {
@@ -2657,7 +2657,7 @@ Error EditorExportPlatformAndroid::run(const Ref<EditorExportPreset> &p_preset, 
 		print_verbose(output);
 		if (err || rv != 0 || output.contains("Error: Activity not started")) {
 			// The implicit launch failed, let's try an explicit launch by specifying the component name before giving up.
-			const String component_name = get_package_name(p_preset, package_name) + "/com.godot.game.GodotAppLauncher";
+			const String component_name = get_package_name(p_preset, package_name) + "/com.jundot.game.JundotAppLauncher";
 			print_line("Implicit launch failed... Trying explicit launch using", component_name);
 			args.erase(get_package_name(p_preset, package_name));
 			args.push_back("-n");
@@ -2902,7 +2902,7 @@ bool _validate_dotnet_tfm(const String &required_tfm, String &r_error) {
 		List<String> args;
 		args.push_back("build");
 		args.push_back(project_path);
-		args.push_back("/p:GodotTargetPlatform=android");
+		args.push_back("/p:JundotTargetPlatform=android");
 		args.push_back("--getProperty:TargetFramework");
 
 		int exitcode;
@@ -3278,9 +3278,9 @@ void EditorExportPlatformAndroid::get_command_line_flags(const Ref<EditorExportP
 	command_line_strings.push_back("--background_color");
 	command_line_strings.push_back(background_color);
 
-	bool disable_godot_splash = p_preset->get(DISABLE_GODOT_SPLASH_OPTION);
-	if (disable_godot_splash) {
-		command_line_strings.push_back("--disable_godot_splash");
+	bool disable_jundot_splash = p_preset->get(DISABLE_JUNDOT_SPLASH_OPTION);
+	if (disable_jundot_splash) {
+		command_line_strings.push_back("--disable_jundot_splash");
 	}
 
 	bool debug_opengl = p_preset->get("graphics/opengl_debug");

@@ -5,10 +5,10 @@
 
     <application>
 
-        <!-- Records the version of the Godot library -->
+        <!-- Records the version of the Jundot library -->
         <meta-data
-            android:name="org.godotengine.library.version"
-            android:value="${godotLibraryVersion}" />
+            android:name="org.jundotengine.library.version"
+            android:value="${jundotLibraryVersion}" />
 
         <activity
             android:name=".utils.ProcessPhoenix"
@@ -24,7 +24,7 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/godot_provider_paths" />
+                android:resource="@xml/jundot_provider_paths" />
         </provider>
 
     </application>

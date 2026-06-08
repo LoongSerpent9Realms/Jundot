@@ -2,10 +2,10 @@
 /*  dialog_utils_jni.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -33,6 +33,6 @@
 #include <jni.h>
 
 extern "C" {
-JNIEXPORT void JNICALL Java_org_godotengine_godot_utils_DialogUtils_dialogCallback(JNIEnv *env, jclass clazz, jint p_button_index);
-JNIEXPORT void JNICALL Java_org_godotengine_godot_utils_DialogUtils_inputDialogCallback(JNIEnv *env, jclass clazz, jstring p_text);
+JNIEXPORT void JNICALL Java_org_jundotengine_jundot_utils_DialogUtils_dialogCallback(JNIEnv *env, jclass clazz, jint p_button_index);
+JNIEXPORT void JNICALL Java_org_jundotengine_jundot_utils_DialogUtils_inputDialogCallback(JNIEnv *env, jclass clazz, jstring p_text);
 }

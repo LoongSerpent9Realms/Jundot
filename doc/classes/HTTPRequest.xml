@@ -57,7 +57,7 @@
 			// Perform a POST request. The URL below returns JSON as of writing.
 			// Note: Don't make simultaneous requests using a single HTTPRequest node.
 			// The snippet below is provided for reference only.
-			string body = Json.Stringify(new Godot.Collections.Dictionary
+			string body = Json.Stringify(new Jundot.Collections.Dictionary
 			{
 				{ "name", "Godette" }
 			});
@@ -73,10 +73,10 @@
 		{
 			var json = new Json();
 			json.Parse(body.GetStringFromUtf8());
-			var response = json.GetData().AsGodotDictionary();
+			var response = json.GetData().AsJundotDictionary();
 
 			// Will print the user agent string used by the HTTPRequest node (as recognized by httpbin.org).
-			GD.Print((response["headers"].AsGodotDictionary())["User-Agent"]);
+			GD.Print((response["headers"].AsJundotDictionary())["User-Agent"]);
 		}
 		[/csharp]
 		[/codeblocks]

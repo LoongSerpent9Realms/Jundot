@@ -2,10 +2,10 @@
 /*  packed_scene.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -399,7 +399,7 @@ Node *SceneState::instantiate(GenEditState p_edit_state) const {
 
 					if (snames[nprops[j].name] == CoreStringName(script)) {
 						//work around to avoid old script variables from disappearing, should be the proper fix to:
-						//https://github.com/godotengine/godot/issues/2958
+						//https://github.com/jundotengine/jundot/issues/2958
 
 						//store old state
 						List<Pair<StringName, Variant>> old_state;
@@ -410,7 +410,7 @@ Node *SceneState::instantiate(GenEditState p_edit_state) const {
 #ifdef TOOLS_ENABLED
 						const Ref<Script> value_as_script = props[nprops[j].value];
 						// It is possible that the user changed an existing script to abstract after it was attached to a node.
-						// When this happens, the user needs to fix it. See https://github.com/godotengine/godot/issues/109171
+						// When this happens, the user needs to fix it. See https://github.com/jundotengine/jundot/issues/109171
 						if (value_as_script.is_valid() && value_as_script->is_abstract()) {
 							const String global_class_name = value_as_script->get_global_name();
 							if (global_class_name.is_empty()) {

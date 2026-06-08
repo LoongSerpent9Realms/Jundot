@@ -2,10 +2,10 @@
 /*  gltf_document_extension.cpp                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -52,7 +52,7 @@ void GLTFDocumentExtension::_bind_methods() {
 	GDVIRTUAL_BIND(_convert_scene_node, "state", "gltf_node", "scene_node");
 	GDVIRTUAL_BIND(_export_post_convert, "state", "root");
 	GDVIRTUAL_BIND(_export_preserialize, "state");
-	GDVIRTUAL_BIND(_export_object_model_property, "state", "node_path", "godot_node", "gltf_node_index", "target_object", "target_depth");
+	GDVIRTUAL_BIND(_export_object_model_property, "state", "node_path", "jundot_node", "gltf_node_index", "target_object", "target_depth");
 	GDVIRTUAL_BIND(_get_saveable_image_formats);
 	GDVIRTUAL_BIND(_serialize_image_to_bytes, "state", "image", "image_dict", "image_format", "lossy_quality");
 	GDVIRTUAL_BIND(_save_image_at_path, "state", "image", "file_path", "image_format", "lossy_quality");
@@ -194,12 +194,12 @@ Error GLTFDocumentExtension::export_preserialize(Ref<GLTFState> p_state) {
 	return err;
 }
 
-Ref<GLTFObjectModelProperty> GLTFDocumentExtension::export_object_model_property(Ref<GLTFState> p_state, const NodePath &p_node_path, const Node *p_godot_node, GLTFNodeIndex p_gltf_node_index, const Object *p_target_object, int p_target_depth) {
+Ref<GLTFObjectModelProperty> GLTFDocumentExtension::export_object_model_property(Ref<GLTFState> p_state, const NodePath &p_node_path, const Node *p_jundot_node, GLTFNodeIndex p_gltf_node_index, const Object *p_target_object, int p_target_depth) {
 	Ref<GLTFObjectModelProperty> ret;
 	ERR_FAIL_COND_V(p_state.is_null(), ret);
-	ERR_FAIL_NULL_V(p_godot_node, ret);
+	ERR_FAIL_NULL_V(p_jundot_node, ret);
 	ERR_FAIL_NULL_V(p_target_object, ret);
-	GDVIRTUAL_CALL(_export_object_model_property, p_state, p_node_path, p_godot_node, p_gltf_node_index, p_target_object, p_target_depth, ret);
+	GDVIRTUAL_CALL(_export_object_model_property, p_state, p_node_path, p_jundot_node, p_gltf_node_index, p_target_object, p_target_depth, ret);
 	return ret;
 }
 

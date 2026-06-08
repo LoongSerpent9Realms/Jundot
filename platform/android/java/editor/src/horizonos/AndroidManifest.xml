@@ -46,7 +46,7 @@
     <application>
 
         <activity
-            android:name=".GodotEditor"
+            android:name=".JundotEditor"
             android:exported="false"
             android:screenOrientation="landscape"
             tools:node="merge"
@@ -63,7 +63,7 @@
             android:name=".ProjectManager"
             android:exported="true"
             tools:node="merge"
-            android:targetActivity=".GodotEditor">
+            android:targetActivity=".JundotEditor">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -73,7 +73,7 @@
             </intent-filter>
         </activity-alias>
         <activity
-            android:name=".GodotXRGame"
+            android:name=".JundotXRGame"
             android:exported="false"
             tools:node="merge">
             <intent-filter>

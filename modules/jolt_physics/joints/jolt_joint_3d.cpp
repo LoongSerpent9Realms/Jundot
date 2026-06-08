@@ -2,10 +2,10 @@
 /*  jolt_joint_3d.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -48,12 +48,12 @@ void JoltJoint3D::_shift_reference_frames(const Vector3 &p_linear_shift, const V
 
 	if (body_a != nullptr) {
 		origin_a *= body_a->get_scale();
-		origin_a -= to_godot(body_a->get_jolt_shape()->GetCenterOfMass());
+		origin_a -= to_jundot(body_a->get_jolt_shape()->GetCenterOfMass());
 	}
 
 	if (body_b != nullptr) {
 		origin_b *= body_b->get_scale();
-		origin_b -= to_godot(body_b->get_jolt_shape()->GetCenterOfMass());
+		origin_b -= to_jundot(body_b->get_jolt_shape()->GetCenterOfMass());
 	}
 
 	const Basis &basis_a = local_ref_a.basis;

@@ -17,7 +17,7 @@ from typing import Generator, TextIO, cast
 from misc.utility.color import print_error, print_info, print_warning
 from platform_methods import detect_arch
 
-# Get the "Godot" folder name ahead of time
+# Get the "Jundot" folder name ahead of time
 base_folder = Path(__file__).resolve().parent
 
 compiler_version_cache = None
@@ -157,8 +157,8 @@ def get_version_info(module_version_string="", silent=False):
 
     # For dev snapshots (alpha, beta, RC, etc.) we do not commit status change to Git,
     # so this define provides a way to override it without having to modify the source.
-    if os.getenv("GODOT_VERSION_STATUS") is not None:
-        version_info["status"] = str(os.getenv("GODOT_VERSION_STATUS"))
+    if os.getenv("JUNDOT_VERSION_STATUS") is not None:
+        version_info["status"] = str(os.getenv("JUNDOT_VERSION_STATUS"))
         if not silent:
             print_info(f"Using version status '{version_info['status']}', overriding the original '{version.status}'.")
 
@@ -261,11 +261,11 @@ def detect_modules(search_path, recursive=False):
 
     def is_engine(path):
         # Prevent recursively detecting modules in self and other
-        # Godot sources when using `custom_modules` build option.
+        # Jundot sources when using `custom_modules` build option.
         version_path = os.path.join(path, "version.py")
         if os.path.exists(version_path):
             with open(version_path, "r", encoding="utf-8") as f:
-                if 'short_name = "godot"' in f.read():
+                if 'short_name = "jundot"' in f.read():
                     return True
         return False
 
@@ -475,7 +475,7 @@ def detect_visual_c_compiler_version(tools_env):
     # "x86"           Native 32 bit compiler
     # "x86_amd64"     32 bit Cross Compiler for 64 bit
 
-    # There are other architectures, but Godot does not support them currently, so this function does not detect arm/amd64_arm
+    # There are other architectures, but Jundot does not support them currently, so this function does not detect arm/amd64_arm
     # and similar architectures/compilers
 
     # Set chosen compiler to "not detected"
@@ -711,8 +711,8 @@ def get_compiler_version(env):
         try:
             # FIXME: `-latest` works for most cases, but there are edge-cases where this would
             # benefit from a more nuanced search.
-            # https://github.com/godotengine/godot/pull/91069#issuecomment-2358956731
-            # https://github.com/godotengine/godot/pull/91069#issuecomment-2380836341
+            # https://github.com/jundotengine/jundot/pull/91069#issuecomment-2358956731
+            # https://github.com/jundotengine/jundot/pull/91069#issuecomment-2380836341
             args = [
                 env["VSWHERE"],
                 "-latest",
@@ -1000,7 +1000,7 @@ def dump(env):
 #
 # To generate AND build from the command line:
 #   scons vsproj=yes vsproj_gen_only=no
-def generate_vs_project(env, original_args, project_name="godot"):
+def generate_vs_project(env, original_args, project_name="jundot"):
     # Augmented glob_recursive that also fills the dirs argument with traversed directories that have content.
     def glob_recursive_2(pattern, dirs, node="."):
         from SCons import Node
@@ -1233,7 +1233,7 @@ def generate_vs_project(env, original_args, project_name="godot"):
     others_active = []
 
     get_dependencies(
-        env.File(f"#bin/godot{env['PROGSUFFIX']}"), env, extensions, headers_active, sources_active, others_active
+        env.File(f"#bin/jundot{env['PROGSUFFIX']}"), env, extensions, headers_active, sources_active, others_active
     )
 
     all_items = []
@@ -1281,7 +1281,7 @@ def generate_vs_project(env, original_args, project_name="godot"):
                 vsconf = f"{target}|{a['platform']}"
                 break
 
-        condition = "'$(GodotConfiguration)|$(GodotPlatform)'=='" + vsconf + "'"
+        condition = "'$(JundotConfiguration)|$(JundotPlatform)'=='" + vsconf + "'"
         itemlist = {}
         for item in activeItems:
             key = os.path.dirname(item).replace("\\", "_")
@@ -1294,7 +1294,7 @@ def generate_vs_project(env, original_args, project_name="godot"):
             properties.append(
                 "<ActiveProjectItemList_%s>;%s;</ActiveProjectItemList_%s>" % (x, ";".join(itemlist[x]), x)
             )
-        output = os.path.join("bin", f"godot{env['PROGSUFFIX']}")
+        output = os.path.join("bin", f"jundot{env['PROGSUFFIX']}")
 
         # The modules_enabled.gen.h header containing the defines is only generated on build, and only for the most recently built
         # platform, which means VS can't properly render code that's inside module-specific ifdefs. This adds those defines to the
@@ -1392,7 +1392,7 @@ def generate_vs_project(env, original_args, project_name="godot"):
     section1 = []
     section2 = []
     for conf in confs:
-        godot_platform = conf["platform"]
+        jundot_platform = conf["platform"]
         has_editor = "editor" in conf["targets"]
 
         # Skip any platforms that can build the editor and don't match the host platform.
@@ -1400,18 +1400,18 @@ def generate_vs_project(env, original_args, project_name="godot"):
         # When both Windows and Mac define an editor target, it's defined as platform+target+arch (windows+editor+x64 for example).
         # VS only supports two attributes, a "Configuration" and a "Platform", and we currently map our target to the Configuration
         # (i.e. editor/template_debug/template_release), and our architecture to the "Platform" (i.e. x64, arm64, etc).
-        # Those two are not enough to disambiguate multiple godot targets for different godot platforms with the same architecture,
+        # Those two are not enough to disambiguate multiple jundot targets for different jundot platforms with the same architecture,
         # i.e. editor|x64 would currently match both windows editor intel 64 and linux editor intel 64.
         #
         # TODO: More work is needed in order to support generating VS projects that unambiguously support all platform+target+arch variations.
         # The VS "Platform" has to be a known architecture that VS recognizes, so we can only play around with the "Configuration" part of the combo.
-        if has_editor and godot_platform != host_vs_configuration["platform"]:
+        if has_editor and jundot_platform != host_vs_configuration["platform"]:
             continue
 
         for p in conf["arches"]:
             sln_plat = p["platform"]
             proj_plat = sln_plat
-            godot_arch = p["architecture"]
+            jundot_arch = p["architecture"]
 
             # Redirect editor configurations for platforms that don't support the editor target to the default editor target on the
             # active host platform, so the solution has all the permutations and VS doesn't complain about missing project configurations.
@@ -1429,42 +1429,42 @@ def generate_vs_project(env, original_args, project_name="godot"):
 
                 properties += [
                     f"<PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='editor|{proj_plat}'\">",
-                    "  <GodotConfiguration>editor</GodotConfiguration>",
-                    f"  <GodotPlatform>{proj_plat}</GodotPlatform>",
+                    "  <JundotConfiguration>editor</JundotConfiguration>",
+                    f"  <JundotPlatform>{proj_plat}</JundotPlatform>",
                     "</PropertyGroup>",
                 ]
 
             for t in conf["targets"]:
-                godot_target = t
+                jundot_target = t
 
                 # Windows x86 is a special little flower that requires a project platform == Win32 but a solution platform == x86.
-                if godot_platform == "windows" and godot_target == "editor" and godot_arch == "x86_32":
+                if jundot_platform == "windows" and jundot_target == "editor" and jundot_arch == "x86_32":
                     sln_plat = "x86"
 
                 configurations += [
-                    f'<ProjectConfiguration Include="{godot_target}|{proj_plat}">',
-                    f"  <Configuration>{godot_target}</Configuration>",
+                    f'<ProjectConfiguration Include="{jundot_target}|{proj_plat}">',
+                    f"  <Configuration>{jundot_target}</Configuration>",
                     f"  <Platform>{proj_plat}</Platform>",
                     "</ProjectConfiguration>",
                 ]
 
                 properties += [
-                    f"<PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{godot_target}|{proj_plat}'\">",
-                    f"  <GodotConfiguration>{godot_target}</GodotConfiguration>",
-                    f"  <GodotPlatform>{proj_plat}</GodotPlatform>",
+                    f"<PropertyGroup Condition=\"'$(Configuration)|$(Platform)'=='{jundot_target}|{proj_plat}'\">",
+                    f"  <JundotConfiguration>{jundot_target}</JundotConfiguration>",
+                    f"  <JundotPlatform>{proj_plat}</JundotPlatform>",
                     "</PropertyGroup>",
                 ]
 
-                p = f"{project_name}.{godot_platform}.{godot_target}.{godot_arch}.generated.props"
+                p = f"{project_name}.{jundot_platform}.{jundot_target}.{jundot_arch}.generated.props"
                 imports += [
                     f'<Import Project="$(MSBuildProjectDirectory)\\{p}" Condition="Exists(\'$(MSBuildProjectDirectory)\\{p}\')"/>'
                 ]
 
-                section1 += [f"{godot_target}|{sln_plat} = {godot_target}|{sln_plat}"]
+                section1 += [f"{jundot_target}|{sln_plat} = {jundot_target}|{sln_plat}"]
 
                 section2 += [
-                    f"{{{proj_uuid}}}.{godot_target}|{sln_plat}.ActiveCfg = {godot_target}|{proj_plat}",
-                    f"{{{proj_uuid}}}.{godot_target}|{sln_plat}.Build.0 = {godot_target}|{proj_plat}",
+                    f"{{{proj_uuid}}}.{jundot_target}|{sln_plat}.ActiveCfg = {jundot_target}|{proj_plat}",
+                    f"{{{proj_uuid}}}.{jundot_target}|{sln_plat}.Build.0 = {jundot_target}|{proj_plat}",
                 ]
 
     # Add an extra import for a local user props file at the end, so users can add more overrides.
@@ -1514,10 +1514,10 @@ def generate_copyright_header(filename: str) -> str:
 /*  %s*/
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */

@@ -2,10 +2,10 @@
 /*  jolt_type_conversions.h                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -46,19 +46,19 @@
 #include <Jolt/Math/Quat.h>
 #include <Jolt/Math/Vec3.h>
 
-_FORCE_INLINE_ Vector3 to_godot(const JPH::Vec3 &p_vec) {
+_FORCE_INLINE_ Vector3 to_jundot(const JPH::Vec3 &p_vec) {
 	return Vector3((real_t)p_vec.GetX(), (real_t)p_vec.GetY(), (real_t)p_vec.GetZ());
 }
 
-_FORCE_INLINE_ Vector3 to_godot(const JPH::DVec3 &p_vec) {
+_FORCE_INLINE_ Vector3 to_jundot(const JPH::DVec3 &p_vec) {
 	return Vector3((real_t)p_vec.GetX(), (real_t)p_vec.GetY(), (real_t)p_vec.GetZ());
 }
 
-_FORCE_INLINE_ Basis to_godot(const JPH::Quat &p_quat) {
+_FORCE_INLINE_ Basis to_jundot(const JPH::Quat &p_quat) {
 	return Basis(Quaternion(p_quat.GetX(), p_quat.GetY(), p_quat.GetZ(), p_quat.GetW()));
 }
 
-_FORCE_INLINE_ Transform3D to_godot(const JPH::Mat44 &p_mat) {
+_FORCE_INLINE_ Transform3D to_jundot(const JPH::Mat44 &p_mat) {
 	return Transform3D(
 			Vector3(p_mat(0, 0), p_mat(1, 0), p_mat(2, 0)),
 			Vector3(p_mat(0, 1), p_mat(1, 1), p_mat(2, 1)),
@@ -66,7 +66,7 @@ _FORCE_INLINE_ Transform3D to_godot(const JPH::Mat44 &p_mat) {
 			Vector3(p_mat(0, 3), p_mat(1, 3), p_mat(2, 3)));
 }
 
-_FORCE_INLINE_ Color to_godot(const JPH::Color &p_color) {
+_FORCE_INLINE_ Color to_jundot(const JPH::Color &p_color) {
 	const float r = (float)p_color.r;
 	const float g = (float)p_color.g;
 	const float b = (float)p_color.b;
@@ -79,16 +79,16 @@ _FORCE_INLINE_ Color to_godot(const JPH::Color &p_color) {
 			a == 0.0f ? 0.0f : 255.0f / a);
 }
 
-_FORCE_INLINE_ String to_godot(const JPH::String &p_str) {
+_FORCE_INLINE_ String to_jundot(const JPH::String &p_str) {
 	return String::utf8(p_str.c_str(), (int)p_str.length());
 }
 
-_FORCE_INLINE_ AABB to_godot(const JPH::AABox &p_aabb) {
-	return AABB(to_godot(p_aabb.mMin), to_godot(p_aabb.mMax - p_aabb.mMin));
+_FORCE_INLINE_ AABB to_jundot(const JPH::AABox &p_aabb) {
+	return AABB(to_jundot(p_aabb.mMin), to_jundot(p_aabb.mMax - p_aabb.mMin));
 }
 
-_FORCE_INLINE_ Plane to_godot(const JPH::Plane &p_plane) {
-	return Plane(to_godot(p_plane.GetNormal()), (real_t)p_plane.GetConstant());
+_FORCE_INLINE_ Plane to_jundot(const JPH::Plane &p_plane) {
+	return Plane(to_jundot(p_plane.GetNormal()), (real_t)p_plane.GetConstant());
 }
 
 _FORCE_INLINE_ JPH::Vec3 to_jolt(const Vector3 &p_vec) {

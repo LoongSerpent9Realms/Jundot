@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-      <!-- override the PlatformToolset, which is set in the godot.vcxproj-->
+      <!-- override the PlatformToolset, which is set in the jundot.vcxproj-->
       <!-- Unknown matches to a set of conservative rules for the code analysis-->
     <PlatformToolset>Unknown</PlatformToolset>
     <LocalDebuggerCommand Condition="'$(LocalDebuggerCommand)' == ''">$(NMakeOutput)</LocalDebuggerCommand>

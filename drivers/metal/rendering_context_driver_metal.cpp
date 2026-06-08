@@ -2,10 +2,10 @@
 /*  rendering_context_driver_metal.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -47,8 +47,8 @@ os_log_t LOG_DRIVER;
 os_log_t LOG_INTERVALS;
 
 __attribute__((constructor)) static void InitializeLogging(void) {
-	LOG_DRIVER = os_log_create("org.godotengine.godot.metal", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
-	LOG_INTERVALS = os_log_create("org.godotengine.godot.metal", "events");
+	LOG_DRIVER = os_log_create("org.jundotengine.jundot.metal", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
+	LOG_INTERVALS = os_log_create("org.jundotengine.jundot.metal", "events");
 }
 
 RenderingContextDriverMetal::RenderingContextDriverMetal() {
@@ -396,7 +396,7 @@ public:
 RenderingContextDriver::SurfaceID RenderingContextDriverMetal::surface_create(const void *p_platform_data) {
 	const WindowPlatformData *wpd = (const WindowPlatformData *)(p_platform_data);
 	Surface *surface;
-	if (String v = OS::get_singleton()->get_environment("GODOT_MTL_OFF_SCREEN"); v == U"1") {
+	if (String v = OS::get_singleton()->get_environment("JUNDOT_MTL_OFF_SCREEN"); v == U"1") {
 		surface = memnew(SurfaceOffscreen(wpd->layer, metal_device));
 	} else {
 		surface = memnew(SurfaceLayer(wpd->layer, metal_device));

@@ -2,10 +2,10 @@
 /*  os_windows.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -231,7 +231,7 @@ public:
 	virtual String get_data_path() const override;
 	virtual String get_cache_path() const override;
 	virtual String get_temp_path() const override;
-	virtual String get_godot_dir_name() const override;
+	virtual String get_jundot_dir_name() const override;
 
 	virtual String get_system_dir(SystemDir p_dir, bool p_shared_storage = true) const override;
 	virtual String get_user_data_dir(const String &p_user_dir) const override;

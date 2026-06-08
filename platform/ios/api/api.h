@@ -2,10 +2,10 @@
 /*  api.h                                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -31,8 +31,8 @@
 #pragma once
 
 #if defined(IOS_ENABLED)
-extern void godot_apple_embedded_plugins_initialize();
-extern void godot_apple_embedded_plugins_deinitialize();
+extern void jundot_apple_embedded_plugins_initialize();
+extern void jundot_apple_embedded_plugins_deinitialize();
 #endif
 
 void register_ios_api();

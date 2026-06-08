@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		[EditorImportPlugin]s provide a way to extend the editor's resource import functionality. Use them to import resources from custom files or to provide alternatives to the editor's existing importers.
-		EditorImportPlugins work by associating with specific file extensions and a resource type. See [method _get_recognized_extensions] and [method _get_resource_type]. They may optionally specify some import presets that affect the import process. EditorImportPlugins are responsible for creating the resources and saving them in the [code].godot/imported[/code] directory (see [member ProjectSettings.application/config/use_hidden_project_data_directory]).
+		EditorImportPlugins work by associating with specific file extensions and a resource type. See [method _get_recognized_extensions] and [method _get_resource_type]. They may optionally specify some import presets that affect the import process. EditorImportPlugins are responsible for creating the resources and saving them in the [code].jundot/imported[/code] directory (see [member ProjectSettings.application/config/use_hidden_project_data_directory]).
 		Below is an example EditorImportPlugin that imports a [Mesh] from a file with the extension ".special" or ".spec":
 		[codeblocks]
 		[gdscript]
@@ -47,7 +47,7 @@
 			return ResourceSaver.save(mesh, filename)
 		[/gdscript]
 		[csharp]
-		using Godot;
+		using Jundot;
 
 		public partial class MySpecialPlugin : EditorImportPlugin
 		{
@@ -86,11 +86,11 @@
 				return "Default";
 			}
 
-			public override Godot.Collections.Array&lt;Godot.Collections.Dictionary&gt; _GetImportOptions(string path, int presetIndex)
+			public override Jundot.Collections.Array&lt;Jundot.Collections.Dictionary&gt; _GetImportOptions(string path, int presetIndex)
 			{
 				return
 				[
-					new Godot.Collections.Dictionary
+					new Jundot.Collections.Dictionary
 					{
 						{ "name", "myOption" },
 						{ "default_value", false },
@@ -98,7 +98,7 @@
 				];
 			}
 
-			public override Error _Import(string sourceFile, string savePath, Godot.Collections.Dictionary options, Godot.Collections.Array&lt;string&gt; platformVariants, Godot.Collections.Array&lt;string&gt; genFiles)
+			public override Error _Import(string sourceFile, string savePath, Jundot.Collections.Dictionary options, Jundot.Collections.Array&lt;string&gt; platformVariants, Jundot.Collections.Array&lt;string&gt; genFiles)
 			{
 				using var file = FileAccess.Open(sourceFile, FileAccess.ModeFlags.Read);
 				if (file.GetError() != Error.Ok)
@@ -172,7 +172,7 @@
 					return true
 				[/gdscript]
 				[csharp]
-				public override bool _GetOptionVisibility(string path, StringName optionName, Godot.Collections.Dictionary options)
+				public override bool _GetOptionVisibility(string path, StringName optionName, Jundot.Collections.Dictionary options)
 				{
 					// Only show the lossy quality setting if the compression mode is set to "Lossy".
 					if (optionName == "compress/lossy_quality" &amp;&amp; options.ContainsKey("compress/mode"))
@@ -215,13 +215,13 @@
 		<method name="_get_resource_type" qualifiers="virtual required const">
 			<return type="String" />
 			<description>
-				Gets the Godot resource type associated with this loader. e.g. [code]"Mesh"[/code] or [code]"Animation"[/code].
+				Gets the Jundot resource type associated with this loader. e.g. [code]"Mesh"[/code] or [code]"Animation"[/code].
 			</description>
 		</method>
 		<method name="_get_save_extension" qualifiers="virtual required const">
 			<return type="String" />
 			<description>
-				Gets the extension used to save this resource in the [code].godot/imported[/code] directory (see [member ProjectSettings.application/config/use_hidden_project_data_directory]).
+				Gets the extension used to save this resource in the [code].jundot/imported[/code] directory (see [member ProjectSettings.application/config/use_hidden_project_data_directory]).
 			</description>
 		</method>
 		<method name="_get_visible_name" qualifiers="virtual required const">

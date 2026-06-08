@@ -1,7 +1,7 @@
-# Japanese translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Japanese translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # akirakido <achts.y@gmail.com>, 2016-2017, 2018, 2019.
 # D_first <dntk.daisei@gmail.com>, 2017, 2018.
 # Daisuke Saito <d.saito@coriginate.com>, 2017, 2018.
@@ -66,13 +66,13 @@
 # shortsun <weekenddamehuman@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-05-19 14:03+0000\n"
 "Last-Translator: shortsun <weekenddamehuman@gmail.com>\n"
-"Language-Team: Japanese <https://hosted.weblate.org/projects/godot-engine/"
-"godot-properties/ja/>\n"
+"Language-Team: Japanese <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot-properties/ja/>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3288,7 +3288,7 @@ msgstr "ジョイント"
 msgid "Roots"
 msgstr "ルート"
 
-msgid "Godot Bone Node"
+msgid "Jundot Bone Node"
 msgstr "ボーンノード"
 
 msgid "Skin Root"

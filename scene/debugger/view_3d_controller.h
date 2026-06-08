@@ -2,10 +2,10 @@
 /*  view_3d_controller.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -69,7 +69,7 @@ public:
 	};
 
 	enum NavigationScheme {
-		NAV_SCHEME_GODOT,
+		NAV_SCHEME_JUNDOT,
 		NAV_SCHEME_MAYA,
 		NAV_SCHEME_MODO,
 		NAV_SCHEME_CUSTOM,
@@ -183,7 +183,7 @@ protected:
 private:
 	HashMap<int, Ref<Shortcut>> inputs;
 
-	NavigationScheme navigation_scheme = NAV_SCHEME_GODOT;
+	NavigationScheme navigation_scheme = NAV_SCHEME_JUNDOT;
 	ViewType view_type = VIEW_TYPE_USER;
 
 	NavigationMouseButton pan_mouse_button = NAV_MOUSE_BUTTON_MIDDLE;

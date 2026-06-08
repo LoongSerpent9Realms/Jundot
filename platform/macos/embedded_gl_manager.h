@@ -2,10 +2,10 @@
 /*  embedded_gl_manager.h                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -41,7 +41,7 @@
 #import <ApplicationServices/ApplicationServices.h>
 #import <CoreVideo/CoreVideo.h>
 
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations") // OpenGL is deprecated in macOS 10.14.
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations") // OpenGL is deprecated in macOS 10.14.
 
 typedef CGLContextObj (*CGLGetCurrentContextPtr)();
 typedef CGLError (*CGLTexImageIOSurface2DPtr)(CGLContextObj ctx, GLenum target, GLenum internal_format,
@@ -120,6 +120,6 @@ public:
 	~GLManagerEmbedded();
 };
 
-GODOT_CLANG_WARNING_PUSH
+JUNDOT_CLANG_WARNING_PUSH
 
 #endif // MACOS_ENABLED && GLES3_ENABLED

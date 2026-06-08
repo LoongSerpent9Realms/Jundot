@@ -2,10 +2,10 @@
 /*  callable_jni.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -65,7 +65,7 @@ static Callable _generate_callable(JNIEnv *p_env, jlong p_object_id, jstring p_m
 }
 
 extern "C" {
-JNIEXPORT jobject JNICALL Java_org_godotengine_godot_variant_Callable_nativeCall(JNIEnv *p_env, jclass p_clazz, jlong p_native_callable, jobjectArray p_parameters) {
+JNIEXPORT jobject JNICALL Java_org_jundotengine_jundot_variant_Callable_nativeCall(JNIEnv *p_env, jclass p_clazz, jlong p_native_callable, jobjectArray p_parameters) {
 	const Variant *callable_variant = reinterpret_cast<const Variant *>(p_native_callable);
 	ERR_FAIL_NULL_V(callable_variant, nullptr);
 	if (callable_variant->get_type() != Variant::CALLABLE) {
@@ -102,7 +102,7 @@ JNIEXPORT jobject JNICALL Java_org_godotengine_godot_variant_Callable_nativeCall
 	return ret;
 }
 
-JNIEXPORT jobject JNICALL Java_org_godotengine_godot_variant_Callable_nativeCallObject(JNIEnv *p_env, jclass p_clazz, jlong p_object_id, jstring p_method_name, jobjectArray p_parameters) {
+JNIEXPORT jobject JNICALL Java_org_jundotengine_jundot_variant_Callable_nativeCallObject(JNIEnv *p_env, jclass p_clazz, jlong p_object_id, jstring p_method_name, jobjectArray p_parameters) {
 	Callable callable = _generate_callable(p_env, p_object_id, p_method_name, p_parameters);
 	if (callable.is_valid()) {
 		Variant result = callable.call();
@@ -112,7 +112,7 @@ JNIEXPORT jobject JNICALL Java_org_godotengine_godot_variant_Callable_nativeCall
 	}
 }
 
-JNIEXPORT void JNICALL Java_org_godotengine_godot_variant_Callable_nativeCallObjectDeferred(JNIEnv *p_env, jclass p_clazz, jlong p_object_id, jstring p_method_name, jobjectArray p_parameters) {
+JNIEXPORT void JNICALL Java_org_jundotengine_jundot_variant_Callable_nativeCallObjectDeferred(JNIEnv *p_env, jclass p_clazz, jlong p_object_id, jstring p_method_name, jobjectArray p_parameters) {
 	Callable callable = _generate_callable(p_env, p_object_id, p_method_name, p_parameters);
 	if (callable.is_valid()) {
 		callable.call_deferred();
@@ -120,7 +120,7 @@ JNIEXPORT void JNICALL Java_org_godotengine_godot_variant_Callable_nativeCallObj
 }
 
 JNIEXPORT void JNICALL
-Java_org_godotengine_godot_variant_Callable_releaseNativePointer(JNIEnv *p_env, jclass clazz, jlong p_native_pointer) {
+Java_org_jundotengine_jundot_variant_Callable_releaseNativePointer(JNIEnv *p_env, jclass clazz, jlong p_native_pointer) {
 	Variant *variant = reinterpret_cast<Variant *>(p_native_pointer);
 	ERR_FAIL_NULL(variant);
 	memdelete(variant);

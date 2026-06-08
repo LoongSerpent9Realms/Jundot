@@ -2,10 +2,10 @@
 /*  gltf_animation.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -44,8 +44,8 @@ void GLTFAnimation::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "loop"), "set_loop", "get_loop"); // bool
 }
 
-GLTFAnimation::Interpolation GLTFAnimation::godot_to_gltf_interpolation(const Ref<Animation> &p_godot_animation, int32_t p_godot_anim_track_index) {
-	Animation::InterpolationType interpolation = p_godot_animation->track_get_interpolation_type(p_godot_anim_track_index);
+GLTFAnimation::Interpolation GLTFAnimation::jundot_to_gltf_interpolation(const Ref<Animation> &p_jundot_animation, int32_t p_jundot_anim_track_index) {
+	Animation::InterpolationType interpolation = p_jundot_animation->track_get_interpolation_type(p_jundot_anim_track_index);
 	switch (interpolation) {
 		case Animation::INTERPOLATION_LINEAR:
 		case Animation::INTERPOLATION_LINEAR_ANGLE:
@@ -59,7 +59,7 @@ GLTFAnimation::Interpolation GLTFAnimation::godot_to_gltf_interpolation(const Re
 	return INTERP_LINEAR;
 }
 
-Animation::InterpolationType GLTFAnimation::gltf_to_godot_interpolation(Interpolation p_gltf_interpolation) {
+Animation::InterpolationType GLTFAnimation::gltf_to_jundot_interpolation(Interpolation p_gltf_interpolation) {
 	switch (p_gltf_interpolation) {
 		case INTERP_LINEAR:
 			return Animation::INTERPOLATION_LINEAR;

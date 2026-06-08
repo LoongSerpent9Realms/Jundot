@@ -1,7 +1,7 @@
-# Galician translation of the Godot Engine editor interface.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Galician translation of the Jundot Engine editor interface.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 #
 # Andy Barcia <andybarcia4@gmail.com>, 2021.
 # PokeGalaico <abloodyfreaks@gmail.com>, 2021.
@@ -23,12 +23,12 @@
 # Sergio Souto Mourelle <sergiosoutomourelle@gmail.com>, 2025.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine editor interface\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine editor interface\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "PO-Revision-Date: 2026-05-25 14:11+0000\n"
 "Last-Translator: ninjum <ninhum@gmx.com>\n"
-"Language-Team: Galician <https://hosted.weblate.org/projects/godot-engine/"
-"godot/gl/>\n"
+"Language-Team: Galician <https://hosted.weblate.org/projects/jundot-engine/"
+"jundot/gl/>\n"
 "Language: gl\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8-bit\n"
@@ -3241,14 +3241,14 @@ msgstr "Un cartafol con ese nome xa existe."
 msgid "Folder name is valid."
 msgstr "O nome do cartafol é válido."
 
-msgid "Godot Engine contributors"
-msgstr "Colaboradores de Godot Engine"
+msgid "Jundot Engine contributors"
+msgstr "Colaboradores de Jundot Engine"
 
 msgid "Double-click to open in browser."
 msgstr "Dobre-clic para abrir no navegador."
 
-msgid "Thanks from the Godot community!"
-msgstr "Moitas grazas de parte da comunidade de Godot!"
+msgid "Thanks from the Jundot community!"
+msgstr "Moitas grazas de parte da comunidade de Jundot!"
 
 msgid "Authors"
 msgstr "Autores"
@@ -3260,12 +3260,12 @@ msgid "Third-party Licenses"
 msgstr "Licenzas de Terceiros"
 
 msgid ""
-"Godot Engine relies on a number of third-party free and open source "
+"Jundot Engine relies on a number of third-party free and open source "
 "libraries, all compatible with the terms of its MIT license. The following is "
 "an exhaustive list of all such third-party components with their respective "
 "copyright statements and license terms."
 msgstr ""
-"Godot Engine depende dun número de bibliotecas de terceiros, gratis e open "
+"Jundot Engine depende dun número de bibliotecas de terceiros, gratis e open "
 "source; todas compatibles cos termos da licenza MIT. A seguinte e unha lista "
 "exhaustiva dos devanditos compoñentes de terceiros, coas suas respectivas "
 "declaracións de copyright e termos de licenza."
@@ -3428,16 +3428,16 @@ msgid "It would be a good idea to name your project."
 msgstr "Sería unha boa idea nomear o teu proxecto."
 
 msgid ""
-"Invalid \".zip\" project file; it doesn't contain a \"project.godot\" file."
+"Invalid \".zip\" project file; it doesn't contain a \"project.jundot\" file."
 msgstr ""
 "O arquivo de proxecto '.zip' non é válido; non conteñe ningún arquivo de "
-"configuración 'project.godot'."
+"configuración 'project.jundot'."
 
 msgid "New Game Project"
 msgstr "Novo Proxecto de Xogo"
 
-msgid "Couldn't create project.godot in project path."
-msgstr "Non se pudo crear o arquivo 'project.godot' na ruta do proxecto."
+msgid "Couldn't create project.jundot in project path."
+msgstr "Non se pudo crear o arquivo 'project.jundot' na ruta do proxecto."
 
 msgid "Error opening package file, not in ZIP format."
 msgstr "Erro ao abrir o arquivo comprimido, non está en formato ZIP."
@@ -3492,24 +3492,24 @@ msgstr ""
 "Non se puido iniciar o editor."
 
 msgid ""
-"The selected project \"%s\" does not specify its supported Godot version in "
-"its configuration file (\"project.godot\").\n"
+"The selected project \"%s\" does not specify its supported Jundot version in "
+"its configuration file (\"project.jundot\").\n"
 "\n"
 "Project path: %s\n"
 "\n"
-"If you proceed with opening it, it will be converted to Godot's current "
+"If you proceed with opening it, it will be converted to Jundot's current "
 "configuration file format.\n"
 "\n"
 "Warning: You won't be able to open the project with previous versions of the "
 "engine anymore."
 msgstr ""
-"O proxecto seleccionado \"%s\" non especifica a súa versión de Godot "
-"compatible no seu ficheiro de configuración (\"project.godot\").\n"
+"O proxecto seleccionado \"%s\" non especifica a súa versión de Jundot "
+"compatible no seu ficheiro de configuración (\"project.jundot\").\n"
 "\n"
 "Ruta do proxecto: %s\n"
 "\n"
 "Se continúa coa súa apertura, converterase ao formato de ficheiro de "
-"configuración actual de Godot.\n"
+"configuración actual de Jundot.\n"
 "\n"
 "Aviso: xa non poderás abrir o proxecto con versións anteriores do motor."
 
@@ -4596,8 +4596,8 @@ msgstr "Importar Tema"
 msgid "Online Docs"
 msgstr "Documentación En Liña"
 
-msgid "Open Godot online documentation."
-msgstr "Abrir a documentación en liña de Godot."
+msgid "Open Jundot online documentation."
+msgstr "Abrir a documentación en liña de Jundot."
 
 msgid "Find Next"
 msgstr "Atopar Seguinte"
@@ -4969,14 +4969,14 @@ msgstr "Opcions adicionais:"
 msgid "New profile name:"
 msgstr "Novo nome de perfil:"
 
-msgid "Godot Feature Profile"
-msgstr "Perfil de Características de Godot"
+msgid "Jundot Feature Profile"
+msgstr "Perfil de Características de Jundot"
 
 msgid "Import Profile(s)"
 msgstr "Importar Perf(il/ís)"
 
 msgid "Manage Editor Feature Profiles"
-msgstr "Administrar Perfils de Características de Godot"
+msgstr "Administrar Perfils de Características de Jundot"
 
 msgid "Save Layout"
 msgstr "Gardar Disposición"
@@ -5014,8 +5014,8 @@ msgstr "Engadir Acción de Entrada"
 msgid "Erase Input Action"
 msgstr "Eliminar Acción de Entrada"
 
-msgid "Project Settings (project.godot)"
-msgstr "Configuración do Proxecto (project.godot)"
+msgid "Project Settings (project.jundot)"
+msgstr "Configuración do Proxecto (project.jundot)"
 
 msgid "Input Map"
 msgstr "Mapeado de Entradas"

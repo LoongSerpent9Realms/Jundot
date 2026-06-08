@@ -2,10 +2,10 @@
 /*  openxr_spatial_entities.cpp                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -525,7 +525,7 @@ Transform3D OpenXRSpatialComponentMesh3DList::get_transform(int64_t p_index) con
 Ref<Mesh> OpenXRSpatialComponentMesh3DList::get_mesh(int64_t p_index) const {
 	ERR_FAIL_INDEX_V(p_index, mesh3d_data.size(), nullptr);
 
-	// TODO implement, need to convert mesh data to Godot mesh resource
+	// TODO implement, need to convert mesh data to Jundot mesh resource
 
 	return nullptr;
 }

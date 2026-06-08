@@ -2,10 +2,10 @@
 /*  test_string.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -305,9 +305,9 @@ TEST_CASE("[String] Testing for empty string") {
 }
 
 TEST_CASE("[String] Contains") {
-	String s = "C:\\Godot\\project\\string_test.tscn";
+	String s = "C:\\Jundot\\project\\string_test.tscn";
 	CHECK(s.contains(":\\"));
-	CHECK(s.contains("Godot"));
+	CHECK(s.contains("Jundot"));
 	CHECK(s.contains(String("project\\string_test")));
 	CHECK(s.contains(String("\\string_test.tscn")));
 
@@ -318,9 +318,9 @@ TEST_CASE("[String] Contains") {
 }
 
 TEST_CASE("[String] Contains case insensitive") {
-	String s = "C:\\Godot\\project\\string_test.tscn";
-	CHECK(s.containsn("Godot"));
-	CHECK(s.containsn("godot"));
+	String s = "C:\\Jundot\\project\\string_test.tscn";
+	CHECK(s.containsn("Jundot"));
+	CHECK(s.containsn("jundot"));
 	CHECK(s.containsn(String("Project\\string_test")));
 	CHECK(s.containsn(String("\\string_Test.tscn")));
 
@@ -1610,7 +1610,7 @@ TEST_CASE("[String] Checking string is empty when it should be") {
 	if (!success) {
 		state = false;
 	}
-	String b = "Godot";
+	String b = "Jundot";
 	success = b[b.size()] == 0;
 	if (!success) {
 		state = false;
@@ -1621,7 +1621,7 @@ TEST_CASE("[String] Checking string is empty when it should be") {
 		state = false;
 	}
 
-	const String d = "Godot";
+	const String d = "Jundot";
 	success = d[d.size()] == 0;
 	if (!success) {
 		state = false;
@@ -1747,7 +1747,7 @@ TEST_CASE("[String] Count and countn functionality") {
 	s = "TestTestTest";
 	MULTICHECK_STRING_EQ(s, count, "TestTest", 1);
 
-	s = "TestGodotTestGodotTestGodot";
+	s = "TestJundotTestJundotTestJundot";
 	MULTICHECK_STRING_EQ(s, count, "Test", 3);
 
 	s = "TestTestTestTest";
@@ -1816,12 +1816,12 @@ TEST_CASE("[String] dedent") {
 }
 
 TEST_CASE("[String] Path functions") {
-	static const char *path[8] = { "C:\\Godot\\project\\test.tscn", "/Godot/project/test.xscn", "../Godot/project/test.scn", "Godot\\test.doc", "C:\\test.", "res://test", "user://test", "/.test" };
-	static const char *base_dir[8] = { "C:\\Godot\\project", "/Godot/project", "../Godot/project", "Godot", "C:\\", "res://", "user://", "/" };
-	static const char *base_name[8] = { "C:\\Godot\\project\\test", "/Godot/project/test", "../Godot/project/test", "Godot\\test", "C:\\test", "res://test", "user://test", "/" };
+	static const char *path[8] = { "C:\\Jundot\\project\\test.tscn", "/Jundot/project/test.xscn", "../Jundot/project/test.scn", "Jundot\\test.doc", "C:\\test.", "res://test", "user://test", "/.test" };
+	static const char *base_dir[8] = { "C:\\Jundot\\project", "/Jundot/project", "../Jundot/project", "Jundot", "C:\\", "res://", "user://", "/" };
+	static const char *base_name[8] = { "C:\\Jundot\\project\\test", "/Jundot/project/test", "../Jundot/project/test", "Jundot\\test", "C:\\test", "res://test", "user://test", "/" };
 	static const char *ext[8] = { "tscn", "xscn", "scn", "doc", "", "", "", "test" };
 	static const char *file[8] = { "test.tscn", "test.xscn", "test.scn", "test.doc", "test.", "test", "test", ".test" };
-	static const char *simplified[8] = { "C:/Godot/project/test.tscn", "/Godot/project/test.xscn", "../Godot/project/test.scn", "Godot/test.doc", "C:/test.", "res://test", "user://test", "/.test" };
+	static const char *simplified[8] = { "C:/Jundot/project/test.tscn", "/Jundot/project/test.xscn", "../Jundot/project/test.scn", "Jundot/test.doc", "C:/test.", "res://test", "user://test", "/.test" };
 	static const bool abs[8] = { true, true, false, false, true, true, true, true };
 
 	for (int i = 0; i < 8; i++) {
@@ -1865,8 +1865,8 @@ TEST_CASE("[String] hash") {
 }
 
 TEST_CASE("[String] uri_encode/unescape") {
-	String s = "Godot Engine:'docs'";
-	String t = "Godot%20Engine%3A%27docs%27";
+	String s = "Jundot Engine:'docs'";
+	String t = "Jundot%20Engine%3A%27docs%27";
 
 	String x1 = "T%C4%93%C5%A1t";
 	static const uint8_t u8str[] = { 0x54, 0xC4, 0x93, 0xC5, 0xA1, 0x74, 0x00 };
@@ -1996,7 +1996,7 @@ TEST_CASE("[String] Reverse") {
 }
 
 TEST_CASE("[String] SHA1/SHA256/MD5") {
-	String s = "Godot";
+	String s = "Jundot";
 	String sha1 = "a1e91f39b9fce6a9998b14bdbe2aa2b39dc2d201";
 	static uint8_t sha1_buf[20] = {
 		0xA1, 0xE9, 0x1F, 0x39, 0xB9, 0xFC, 0xE6, 0xA9, 0x99, 0x8B, 0x14, 0xBD, 0xBE, 0x2A, 0xA2, 0xB3,
@@ -2209,18 +2209,18 @@ TEST_CASE("[String][URL] Parse URL") {
 	CHECK_URL("https://www.example.com:8080/path/to/file.html#fragment", "https://", "www.example.com", 8080, "/path/to/file.html", "fragment", Error::OK);
 
 	// Valid URLs.
-	CHECK_URL("https://godotengine.org", "https://", "godotengine.org", 0, "", "", Error::OK);
-	CHECK_URL("https://godotengine.org/", "https://", "godotengine.org", 0, "/", "", Error::OK);
-	CHECK_URL("godotengine.org/", "", "godotengine.org", 0, "/", "", Error::OK);
-	CHECK_URL("HTTPS://godotengine.org/", "https://", "godotengine.org", 0, "/", "", Error::OK);
-	CHECK_URL("https://GODOTENGINE.ORG/", "https://", "godotengine.org", 0, "/", "", Error::OK);
-	CHECK_URL("http://godotengine.org", "http://", "godotengine.org", 0, "", "", Error::OK);
-	CHECK_URL("https://godotengine.org:8080", "https://", "godotengine.org", 8080, "", "", Error::OK);
-	CHECK_URL("https://godotengine.org/blog", "https://", "godotengine.org", 0, "/blog", "", Error::OK);
-	CHECK_URL("https://godotengine.org/blog/", "https://", "godotengine.org", 0, "/blog/", "", Error::OK);
-	CHECK_URL("https://docs.godotengine.org/en/stable", "https://", "docs.godotengine.org", 0, "/en/stable", "", Error::OK);
-	CHECK_URL("https://docs.godotengine.org/en/stable/", "https://", "docs.godotengine.org", 0, "/en/stable/", "", Error::OK);
-	CHECK_URL("https://me:secret@godotengine.org", "https://", "godotengine.org", 0, "", "", Error::OK);
+	CHECK_URL("https://jundotengine.org", "https://", "jundotengine.org", 0, "", "", Error::OK);
+	CHECK_URL("https://jundotengine.org/", "https://", "jundotengine.org", 0, "/", "", Error::OK);
+	CHECK_URL("jundotengine.org/", "", "jundotengine.org", 0, "/", "", Error::OK);
+	CHECK_URL("HTTPS://jundotengine.org/", "https://", "jundotengine.org", 0, "/", "", Error::OK);
+	CHECK_URL("https://JUNDOTENGINE.ORG/", "https://", "jundotengine.org", 0, "/", "", Error::OK);
+	CHECK_URL("http://jundotengine.org", "http://", "jundotengine.org", 0, "", "", Error::OK);
+	CHECK_URL("https://jundotengine.org:8080", "https://", "jundotengine.org", 8080, "", "", Error::OK);
+	CHECK_URL("https://jundotengine.org/blog", "https://", "jundotengine.org", 0, "/blog", "", Error::OK);
+	CHECK_URL("https://jundotengine.org/blog/", "https://", "jundotengine.org", 0, "/blog/", "", Error::OK);
+	CHECK_URL("https://docs.jundotengine.org/en/stable", "https://", "docs.jundotengine.org", 0, "/en/stable", "", Error::OK);
+	CHECK_URL("https://docs.jundotengine.org/en/stable/", "https://", "docs.jundotengine.org", 0, "/en/stable/", "", Error::OK);
+	CHECK_URL("https://me:secret@jundotengine.org", "https://", "jundotengine.org", 0, "", "", Error::OK);
 	CHECK_URL("https://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210]/ipv6", "https://", "fedc:ba98:7654:3210:fedc:ba98:7654:3210", 0, "/ipv6", "", Error::OK);
 
 	// Scheme vs Fragment.
@@ -2229,18 +2229,18 @@ TEST_CASE("[String][URL] Parse URL") {
 	// Invalid URLs.
 
 	// Invalid Scheme.
-	CHECK_URL("https_://godotengine.org", "", "https_", 0, "//godotengine.org", "", Error::ERR_INVALID_PARAMETER);
+	CHECK_URL("https_://jundotengine.org", "", "https_", 0, "//jundotengine.org", "", Error::ERR_INVALID_PARAMETER);
 
 	// Multiple ports.
-	CHECK_URL("https://godotengine.org:8080:433", "https://", "", 0, "", "", Error::ERR_INVALID_PARAMETER);
+	CHECK_URL("https://jundotengine.org:8080:433", "https://", "", 0, "", "", Error::ERR_INVALID_PARAMETER);
 	// Missing ] on literal IPv6.
 	CHECK_URL("https://[FEDC:BA98:7654:3210:FEDC:BA98:7654:3210/ipv6", "https://", "", 0, "/ipv6", "", Error::ERR_INVALID_PARAMETER);
 	// Missing host.
 	CHECK_URL("https:///blog", "https://", "", 0, "/blog", "", Error::ERR_INVALID_PARAMETER);
 	// Invalid ports.
-	CHECK_URL("https://godotengine.org:notaport", "https://", "godotengine.org", 0, "", "", Error::ERR_INVALID_PARAMETER);
-	CHECK_URL("https://godotengine.org:-8080", "https://", "godotengine.org", -8080, "", "", Error::ERR_INVALID_PARAMETER);
-	CHECK_URL("https://godotengine.org:88888", "https://", "godotengine.org", 88888, "", "", Error::ERR_INVALID_PARAMETER);
+	CHECK_URL("https://jundotengine.org:notaport", "https://", "jundotengine.org", 0, "", "", Error::ERR_INVALID_PARAMETER);
+	CHECK_URL("https://jundotengine.org:-8080", "https://", "jundotengine.org", -8080, "", "", Error::ERR_INVALID_PARAMETER);
+	CHECK_URL("https://jundotengine.org:88888", "https://", "jundotengine.org", 88888, "", "", Error::ERR_INVALID_PARAMETER);
 
 #undef CHECK_URL
 }

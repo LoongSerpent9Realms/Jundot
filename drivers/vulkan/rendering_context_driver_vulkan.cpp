@@ -2,10 +2,10 @@
 /*  rendering_context_driver_vulkan.cpp                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -693,8 +693,8 @@ Error RenderingContextDriverVulkan::_initialize_instance() {
 	VkApplicationInfo app_info = {};
 	app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	app_info.pApplicationName = cs.get_data();
-	app_info.pEngineName = GODOT_VERSION_NAME;
-	app_info.engineVersion = VK_MAKE_VERSION(GODOT_VERSION_MAJOR, GODOT_VERSION_MINOR, GODOT_VERSION_PATCH);
+	app_info.pEngineName = JUNDOT_VERSION_NAME;
+	app_info.engineVersion = VK_MAKE_VERSION(JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR, JUNDOT_VERSION_PATCH);
 	app_info.apiVersion = application_api_version;
 
 	TightLocalVector<const char *> enabled_layer_names;

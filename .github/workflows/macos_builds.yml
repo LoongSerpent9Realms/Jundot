@@ -22,13 +22,13 @@ jobs:
           - name: Editor (target=editor)
             cache-name: macos-editor
             target: editor
-            bin: ./bin/godot.macos.editor.universal
+            bin: ./bin/jundot.macos.editor.universal
 
           - name: Template (target=template_release)
             cache-name: macos-template
             target: template_release
             scons-flags: debug_symbols=no
-            bin: ./bin/godot.macos.template_release.universal
+            bin: ./bin/jundot.macos.template_release.universal
 
     steps:
       - name: Checkout
@@ -36,14 +36,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Restore Godot build cache
-        uses: ./.github/actions/godot-cache-restore
+      - name: Restore Jundot build cache
+        uses: ./.github/actions/jundot-cache-restore
         with:
           cache-name: ${{ matrix.cache-name }}
         continue-on-error: true
 
       - name: Setup Python and SCons
-        uses: ./.github/actions/godot-deps
+        uses: ./.github/actions/jundot-deps
 
       - name: Download pre-built ANGLE
         shell: sh
@@ -79,32 +79,32 @@ jobs:
         continue-on-error: true
 
       - name: Compilation (x86_64)
-        uses: ./.github/actions/godot-build
+        uses: ./.github/actions/jundot-build
         with:
           scons-flags: ${{ env.SCONS_FLAGS }} ${{ matrix.scons-flags }} arch=x86_64 vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }} accesskit=${{ steps.accesskit-sdk.outputs.ACCESSKIT_ENABLED }} angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
           platform: macos
           target: ${{ matrix.target }}
 
       - name: Compilation (arm64)
-        uses: ./.github/actions/godot-build
+        uses: ./.github/actions/jundot-build
         with:
           scons-flags: ${{ env.SCONS_FLAGS }} ${{ matrix.scons-flags }} arch=arm64 vulkan=${{ steps.vulkan-sdk.outputs.VULKAN_ENABLED }} accesskit=${{ steps.accesskit-sdk.outputs.ACCESSKIT_ENABLED }} angle=${{ steps.angle-sdk.outputs.ANGLE_ENABLED }}
           platform: macos
           target: ${{ matrix.target }}
 
-      - name: Save Godot build cache
-        uses: ./.github/actions/godot-cache-save
+      - name: Save Jundot build cache
+        uses: ./.github/actions/jundot-cache-save
         with:
           cache-name: ${{ matrix.cache-name }}
         continue-on-error: true
 
       - name: Prepare artifact
         run: |
-          lipo -create ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64 -output ./bin/godot.macos.${{ matrix.target }}.universal
-          rm ./bin/godot.macos.${{ matrix.target }}.x86_64 ./bin/godot.macos.${{ matrix.target }}.arm64
+          lipo -create ./bin/jundot.macos.${{ matrix.target }}.x86_64 ./bin/jundot.macos.${{ matrix.target }}.arm64 -output ./bin/jundot.macos.${{ matrix.target }}.universal
+          rm ./bin/jundot.macos.${{ matrix.target }}.x86_64 ./bin/jundot.macos.${{ matrix.target }}.arm64
           rm -rf ./bin/build_deps
-          strip bin/godot.*
-          chmod +x bin/godot.*
+          strip bin/jundot.*
+          chmod +x bin/jundot.*
 
       - name: Upload artifact
         uses: ./.github/actions/upload-artifact

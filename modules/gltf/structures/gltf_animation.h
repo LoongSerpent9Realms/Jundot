@@ -2,10 +2,10 @@
 /*  gltf_animation.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -67,8 +67,8 @@ public:
 	Dictionary additional_data;
 
 public:
-	static Interpolation godot_to_gltf_interpolation(const Ref<Animation> &p_godot_animation, int32_t p_godot_anim_track_index);
-	static Animation::InterpolationType gltf_to_godot_interpolation(Interpolation p_gltf_interpolation);
+	static Interpolation jundot_to_gltf_interpolation(const Ref<Animation> &p_jundot_animation, int32_t p_jundot_anim_track_index);
+	static Animation::InterpolationType gltf_to_jundot_interpolation(Interpolation p_gltf_interpolation);
 
 	String get_original_name();
 	void set_original_name(const String &p_name);

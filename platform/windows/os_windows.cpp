@@ -2,10 +2,10 @@
 /*  os_windows.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -310,7 +310,7 @@ void OS_Windows::initialize() {
 
 	process_map = memnew((HashMap<ProcessID, ProcessInfo>));
 
-	// Add current Godot PID to the list of known PIDs
+	// Add current Jundot PID to the list of known PIDs
 	ProcessInfo current_pi = {};
 	PROCESS_INFORMATION current_pi_pi = {};
 	current_pi.pi = current_pi_pi;
@@ -650,7 +650,7 @@ String OS_Windows::get_version_alias() const {
 			} else {
 				windows_string += "Unknown";
 			}
-			// Windows versions older than 10 cannot run Godot.
+			// Windows versions older than 10 cannot run Jundot.
 
 			return vformat("%s (build %d)", windows_string, (int64_t)fow.dwBuildNumber);
 		}
@@ -1737,7 +1737,7 @@ Vector<String> OS_Windows::get_system_fonts() const {
 	return ret;
 }
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wnon-virtual-dtor") // Silence warning due to a COM API weirdness.
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wnon-virtual-dtor") // Silence warning due to a COM API weirdness.
 
 class FallbackTextAnalysisSource : public IDWriteTextAnalysisSource {
 	LONG _cRef = 1;
@@ -1821,7 +1821,7 @@ public:
 	virtual ~FallbackTextAnalysisSource() {}
 };
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 
 String OS_Windows::_get_default_fontname(const String &p_font_name) const {
 	String font_name = p_font_name;
@@ -2347,8 +2347,8 @@ void OS_Windows::run() {
 	main_loop->initialize();
 
 	while (true) {
-		GodotProfileFrameMark;
-		GodotProfileZone("OS_Windows::run");
+		JundotProfileFrameMark;
+		JundotProfileZone("OS_Windows::run");
 		DisplayServer::get_singleton()->process_events(); // get rid of pending events
 		if (Main::iteration()) {
 			break;
@@ -2463,8 +2463,8 @@ String OS_Windows::get_temp_path() const {
 }
 
 // Get properly capitalized engine name for system paths
-String OS_Windows::get_godot_dir_name() const {
-	return String(GODOT_VERSION_SHORT_NAME).capitalize();
+String OS_Windows::get_jundot_dir_name() const {
+	return String(JUNDOT_VERSION_SHORT_NAME).capitalize();
 }
 
 String OS_Windows::get_system_dir(SystemDir p_dir, bool p_shared_storage) const {

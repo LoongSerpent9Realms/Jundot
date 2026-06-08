@@ -2,10 +2,10 @@
 /*  text_server_adv.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -48,9 +48,9 @@
 
 // Thirdparty headers.
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
 #if defined(__EMSCRIPTEN__) || (defined(__MINGW32__) && __clang_major__ >= 21)
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunnecessary-virtual-specifier")
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunnecessary-virtual-specifier")
 #endif
 
 #include <unicode/ubidi.h>
@@ -66,9 +66,9 @@ GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wunnecessary-virtual-specifier")
 #include <unicode/ustring.h>
 #include <unicode/utypes.h>
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 #if defined(__EMSCRIPTEN__) || (defined(__MINGW32__) && __clang_major__ >= 21)
-GODOT_CLANG_WARNING_POP
+JUNDOT_CLANG_WARNING_POP
 #endif
 
 #ifdef MODULE_FREETYPE_ENABLED

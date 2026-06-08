@@ -2,10 +2,10 @@
 /*  rendering_device_driver_d3d12.cpp                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -36,8 +36,8 @@
 #include "drivers/d3d12/d3d12_hooks.h"
 #include "drivers/d3d12/rendering_context_driver_d3d12.h"
 
-#include <drivers/d3d12/godot_d3d12ma.h>
-#include <drivers/d3d12/godot_nir.h>
+#include <drivers/d3d12/jundot_d3d12ma.h>
+#include <drivers/d3d12/jundot_nir.h>
 #include <dxgi1_6.h>
 
 #if !defined(_MSC_VER)
@@ -1484,9 +1484,9 @@ RDD::TextureID RenderingDeviceDriverD3D12::texture_create(const TextureFormat &p
 	}
 	tex_info->states_ptr = &tex_info->owner_info.states;
 	tex_info->format = p_format.format;
-	GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wstrict-aliasing")
+	JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wstrict-aliasing")
 	tex_info->desc = *(CD3DX12_RESOURCE_DESC *)&resource_desc;
-	GODOT_GCC_WARNING_POP
+	JUNDOT_GCC_WARNING_POP
 	tex_info->base_layer = 0;
 	tex_info->layers = resource_desc.ArraySize();
 	tex_info->base_mip = 0;
@@ -2715,7 +2715,7 @@ void RenderingDeviceDriverD3D12::_determine_swap_chain_format(SwapChain *p_swap_
 	DEV_ASSERT(p_swap_chain->surface != 0);
 
 	// Direct3D Hardware level 10 mandates support for all these formats.
-	// Godot requires at least Hardware level 11, so these formats are guaranteed to be supported.
+	// Jundot requires at least Hardware level 11, so these formats are guaranteed to be supported.
 	if (context_driver->surface_get_hdr_output_enabled(p_swap_chain->surface)) {
 		r_format = DATA_FORMAT_R16G16B16A16_SFLOAT;
 		r_color_space = COLOR_SPACE_REC709_LINEAR;

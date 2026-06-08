@@ -2,10 +2,10 @@
 /*  embedded_gl_manager.mm                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -39,7 +39,7 @@
 #import <QuartzCore/QuartzCore.h>
 #include <dlfcn.h>
 
-GODOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations") // OpenGL is deprecated in macOS 10.14.
+JUNDOT_CLANG_WARNING_PUSH_AND_IGNORE("-Wdeprecated-declarations") // OpenGL is deprecated in macOS 10.14.
 
 Error GLManagerEmbedded::create_context(GLWindow &p_win) {
 	NSOpenGLPixelFormatAttribute attributes[] = {
@@ -330,6 +330,6 @@ GLManagerEmbedded::~GLManagerEmbedded() {
 	release_current();
 }
 
-GODOT_CLANG_WARNING_POP
+JUNDOT_CLANG_WARNING_POP
 
 #endif // MACOS_ENABLED && GLES3_ENABLED

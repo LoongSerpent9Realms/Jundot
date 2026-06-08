@@ -2,10 +2,10 @@
 /*  engine.cpp                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -152,17 +152,17 @@ double Engine::get_unfrozen_time_scale() const {
 
 Dictionary Engine::get_version_info() const {
 	Dictionary dict;
-	dict["major"] = GODOT_VERSION_MAJOR;
-	dict["minor"] = GODOT_VERSION_MINOR;
-	dict["patch"] = GODOT_VERSION_PATCH;
-	dict["hex"] = GODOT_VERSION_HEX;
-	dict["status"] = GODOT_VERSION_STATUS;
-	dict["build"] = GODOT_VERSION_BUILD;
+	dict["major"] = JUNDOT_VERSION_MAJOR;
+	dict["minor"] = JUNDOT_VERSION_MINOR;
+	dict["patch"] = JUNDOT_VERSION_PATCH;
+	dict["hex"] = JUNDOT_VERSION_HEX;
+	dict["status"] = JUNDOT_VERSION_STATUS;
+	dict["build"] = JUNDOT_VERSION_BUILD;
 
-	String hash = String(GODOT_VERSION_HASH);
+	String hash = String(JUNDOT_VERSION_HASH);
 	dict["hash"] = hash.is_empty() ? String("unknown") : hash;
 
-	dict["timestamp"] = GODOT_VERSION_TIMESTAMP;
+	dict["timestamp"] = JUNDOT_VERSION_TIMESTAMP;
 
 	String stringver = String(dict["major"]) + "." + String(dict["minor"]);
 	if ((int)dict["patch"] != 0) {
@@ -245,7 +245,7 @@ Dictionary Engine::get_license_info() const {
 }
 
 String Engine::get_license_text() const {
-	return String(GODOT_LICENSE_TEXT);
+	return String(JUNDOT_LICENSE_TEXT);
 }
 
 String Engine::get_architecture_name() const {

@@ -2,10 +2,10 @@
 /*  register_types.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,7 +30,7 @@
 
 #include "register_types.h"
 
-#include "3d/godot_navigation_server_3d.h"
+#include "3d/jundot_navigation_server_3d.h"
 
 #ifndef DISABLE_DEPRECATED
 #include "3d/navigation_mesh_generator.h"
@@ -51,14 +51,14 @@
 NavigationMeshGenerator *_nav_mesh_generator = nullptr;
 #endif // DISABLE_DEPRECATED
 
-static NavigationServer3D *_createGodotNavigation3DCallback() {
-	return memnew(GodotNavigationServer3D);
+static NavigationServer3D *_createJundotNavigation3DCallback() {
+	return memnew(JundotNavigationServer3D);
 }
 
 void initialize_navigation_3d_module(ModuleInitializationLevel p_level) {
 	if (p_level == MODULE_INITIALIZATION_LEVEL_SERVERS) {
-		NavigationServer3DManager::get_singleton()->register_server("GodotNavigation3D", callable_mp_static(_createGodotNavigation3DCallback));
-		NavigationServer3DManager::get_singleton()->set_default_server("GodotNavigation3D");
+		NavigationServer3DManager::get_singleton()->register_server("JundotNavigation3D", callable_mp_static(_createJundotNavigation3DCallback));
+		NavigationServer3DManager::get_singleton()->set_default_server("JundotNavigation3D");
 
 #ifndef DISABLE_DEPRECATED
 		_nav_mesh_generator = memnew(NavigationMeshGenerator);

@@ -1,4 +1,4 @@
-// Gradle build config for Godot Engine's Android port.
+// Gradle build config for Jundot Engine's Android port.
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -14,8 +14,8 @@ allprojects {
         maven { url "https://plugins.gradle.org/m2/" }
         maven { url "https://central.sonatype.com/repository/maven-snapshots/"}
 
-        // Godot user plugins custom maven repos
-        String[] mavenRepos = getGodotPluginsMavenRepos()
+        // Jundot user plugins custom maven repos
+        String[] mavenRepos = getJundotPluginsMavenRepos()
         if (mavenRepos != null && mavenRepos.size() > 0) {
             for (String repoUrl : mavenRepos) {
                 maven {
@@ -45,17 +45,17 @@ dependencies {
 
     if (rootProject.findProject(":lib")) {
         implementation project(":lib")
-    } else if (rootProject.findProject(":godot:lib")) {
-        implementation project(":godot:lib")
+    } else if (rootProject.findProject(":jundot:lib")) {
+        implementation project(":jundot:lib")
     } else {
-        // Godot gradle build mode. In this scenario this project is the only one around and the Godot
-        // library is available through the pre-generated godot-lib.*.aar android archive files.
+        // Jundot gradle build mode. In this scenario this project is the only one around and the Jundot
+        // library is available through the pre-generated jundot-lib.*.aar android archive files.
         debugImplementation fileTree(dir: 'libs/debug', include: ['**/*.jar', '*.aar'])
         releaseImplementation fileTree(dir: 'libs/release', include: ['**/*.jar', '*.aar'])
     }
 
-    // Godot user plugins remote dependencies
-    String[] remoteDeps = getGodotPluginsRemoteBinaries()
+    // Jundot user plugins remote dependencies
+    String[] remoteDeps = getJundotPluginsRemoteBinaries()
     if (remoteDeps != null && remoteDeps.size() > 0) {
         def platformPattern = /^\s*(platform|enforcedPlatform)\s*\(\s*['"]*(\S+)['"]*\s*\)$/
         for (String dep : remoteDeps) {
@@ -80,8 +80,8 @@ dependencies {
         }
     }
 
-    // Godot user plugins local dependencies
-    String[] pluginsBinaries = getGodotPluginsLocalBinaries()
+    // Jundot user plugins local dependencies
+    String[] pluginsBinaries = getJundotPluginsLocalBinaries()
     if (pluginsBinaries != null && pluginsBinaries.size() > 0) {
         implementation files(pluginsBinaries)
     }
@@ -115,10 +115,10 @@ android {
 
     assetPacks = [":assetPackInstallTime"]
 
-    namespace = 'com.godot.game'
+    namespace = 'com.jundot.game'
 
     defaultConfig {
-        // The default ignore pattern for the 'assets' directory includes hidden files and directories which are used by Godot projects.
+        // The default ignore pattern for the 'assets' directory includes hidden files and directories which are used by Jundot projects.
         aaptOptions {
             ignoreAssetsPattern "!.svn:!.git:!.gitignore:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
         }
@@ -176,7 +176,7 @@ android {
             useLegacyPackaging shouldUseLegacyPackaging()
         }
 
-        // Always select Godot's version of libc++_shared.so in case deps have their own
+        // Always select Jundot's version of libc++_shared.so in case deps have their own
         pickFirst 'lib/x86/libc++_shared.so'
         pickFirst 'lib/x86_64/libc++_shared.so'
         pickFirst 'lib/armeabi-v7a/libc++_shared.so'
@@ -212,7 +212,7 @@ android {
 
         debug {
             // Signing and zip-aligning are skipped for prebuilt builds, but
-            // performed for Godot gradle builds.
+            // performed for Jundot gradle builds.
             zipAlignEnabled shouldZipAlign()
             if (shouldSign()) {
                 signingConfig signingConfigs.debug
@@ -223,7 +223,7 @@ android {
 
         release {
             // Signing and zip-aligning are skipped for prebuilt builds, but
-            // performed for Godot gradle builds.
+            // performed for Jundot gradle builds.
             zipAlignEnabled shouldZipAlign()
             if (shouldSign()) {
                 signingConfig signingConfigs.release
@@ -294,11 +294,11 @@ task copyAndRenameBinary(type: Copy) {
 }
 
 /**
- * Used to validate the version of the Java SDK used for the Godot gradle builds.
+ * Used to validate the version of the Java SDK used for the Jundot gradle builds.
  */
 task validateJavaVersion {
     if (!JavaVersion.current().isCompatibleWith(versions.javaVersion)) {
-        throw new GradleException("Invalid Java version ${JavaVersion.current()}. Version ${versions.javaVersion} is the minimum supported Java version for Godot gradle builds.")
+        throw new GradleException("Invalid Java version ${JavaVersion.current()}. Version ${versions.javaVersion} is the minimum supported Java version for Jundot gradle builds.")
     }
 }
 
@@ -309,7 +309,7 @@ task validateJavaVersion {
 tasks.withType( com.android.build.gradle.internal.tasks.MergeNativeLibsTask) {
     doFirst {
         externalLibNativeLibs.each { jniDir ->
-            if (jniDir.getCanonicalPath().contains("godot-openxr-") || jniDir.getCanonicalPath().contains("godotopenxr")) {
+            if (jniDir.getCanonicalPath().contains("jundot-openxr-") || jniDir.getCanonicalPath().contains("jundotopenxr")) {
                 // Delete the 'libopenxr_loader.so' files from the vendors plugin so we only use the version from the
                 // openxr loader dependency.
                 File armFile = new File(jniDir, "arm64-v8a/libopenxr_loader.so")

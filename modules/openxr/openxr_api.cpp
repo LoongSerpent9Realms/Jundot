@@ -2,10 +2,10 @@
 /*  openxr_api.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -181,7 +181,7 @@ void OpenXRAPI::OpenXRSwapChainInfo::free() {
 }
 
 bool OpenXRAPI::OpenXRSwapChainInfo::acquire(bool &p_should_render) {
-	GodotProfileZone("OpenXR: acquire swapchain");
+	JundotProfileZone("OpenXR: acquire swapchain");
 	ERR_FAIL_COND_V(image_acquired, true); // This was not released when it should be, error out and reuse...
 
 	OpenXRAPI *openxr_api = OpenXRAPI::get_singleton();
@@ -615,10 +615,10 @@ XrResult OpenXRAPI::attempt_create_instance(XrVersion p_version) {
 
 	// Attempt to create our OpenXR instance for the requested version.
 	XrApplicationInfo application_info{
-		"Godot Engine", // applicationName, if we're running a game we'll update this down below.
+		"Jundot Engine", // applicationName, if we're running a game we'll update this down below.
 		1, // applicationVersion, we don't currently have this
-		"Godot Engine", // engineName
-		GODOT_VERSION_MAJOR * 10000 + GODOT_VERSION_MINOR * 100 + GODOT_VERSION_PATCH, // engineVersion 4.0 -> 40000, 4.0.1 -> 40001, 4.1 -> 40100, etc.
+		"Jundot Engine", // engineName
+		JUNDOT_VERSION_MAJOR * 10000 + JUNDOT_VERSION_MINOR * 100 + JUNDOT_VERSION_PATCH, // engineVersion 4.0 -> 40000, 4.0.1 -> 40001, 4.1 -> 40100, etc.
 		p_version // apiVersion
 	};
 
@@ -957,9 +957,9 @@ bool OpenXRAPI::create_session() {
 		return false;
 	}
 
-	set_object_name(XR_OBJECT_TYPE_SESSION, uint64_t(session), "Main Godot OpenXR Session");
+	set_object_name(XR_OBJECT_TYPE_SESSION, uint64_t(session), "Main Jundot OpenXR Session");
 
-	begin_debug_label_region("Godot session active");
+	begin_debug_label_region("Jundot session active");
 
 	for (OpenXRExtensionWrapper *wrapper : registered_extension_wrappers) {
 		wrapper->on_session_created(session);
@@ -2073,7 +2073,7 @@ bool OpenXRAPI::poll_events() {
 				XrEventDataInstanceLossPending *event = (XrEventDataInstanceLossPending *)&runtimeEvent;
 
 				// TODO We get this event if we're about to loose our OpenXR instance.
-				// We should queue exiting Godot at this point.
+				// We should queue exiting Jundot at this point.
 
 				print_verbose(String("OpenXR EVENT: instance loss pending at ") + itos(event->lossTime));
 				return false;
@@ -2351,8 +2351,8 @@ bool OpenXRAPI::process() {
 		return false;
 	}
 
-	GodotProfileZone("OpenXRAPI::process");
-	GodotProfileZoneGroupedFirst(_profile_zone, "xrWaitFrame");
+	JundotProfileZone("OpenXRAPI::process");
+	JundotProfileZoneGroupedFirst(_profile_zone, "xrWaitFrame");
 
 	// We call xrWaitFrame as early as possible, this will allow OpenXR to get
 	// proper timing info between this point, and when we're ready to start rendering.
@@ -2393,24 +2393,24 @@ bool OpenXRAPI::process() {
 		frame_state.predictedDisplayPeriod = 0;
 	}
 
-	GodotProfileZoneGrouped(_profile_zone, "set_render_display_info");
+	JundotProfileZoneGrouped(_profile_zone, "set_render_display_info");
 	set_render_display_info(frame_state.predictedDisplayTime, frame_state.shouldRender);
 
 	// This is before setup_play_space() to ensure that it happens on the frame after
 	// the play space has been created.
 	if (unlikely(local_floor_emulation.should_reset_floor_height && !play_space_is_dirty)) {
-		GodotProfileZoneGrouped(_profile_zone, "reset_emulated_floor_height");
+		JundotProfileZoneGrouped(_profile_zone, "reset_emulated_floor_height");
 		reset_emulated_floor_height();
 		local_floor_emulation.should_reset_floor_height = false;
 	}
 
 	if (unlikely(play_space_is_dirty)) {
-		GodotProfileZoneGrouped(_profile_zone, "setup_play_space");
+		JundotProfileZoneGrouped(_profile_zone, "setup_play_space");
 		setup_play_space();
 		play_space_is_dirty = false;
 	}
 
-	GodotProfileZoneGrouped(_profile_zone, "extension wrappers on_process");
+	JundotProfileZoneGrouped(_profile_zone, "extension wrappers on_process");
 	for (OpenXRExtensionWrapper *wrapper : registered_extension_wrappers) {
 		wrapper->on_process();
 	}

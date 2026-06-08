@@ -1,7 +1,7 @@
-# Chinese (Traditional Han script) translation of the Godot Engine properties.
-# Copyright (c) 2014-present Godot Engine contributors.
+# Chinese (Traditional Han script) translation of the Jundot Engine properties.
+# Copyright (c) 2014-present Jundot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
-# This file is distributed under the same license as the Godot source code.
+# This file is distributed under the same license as the Jundot source code.
 # Allen H <w84miracle@gmail.com>, 2017.
 # Billy SU <g4691821@gmail.com>, 2018.
 # Chao Yu <casd82@gmail.com>, 2017.
@@ -54,13 +54,13 @@
 # Wei-Fu Chen <410477jimmy@gmail.com>, 2026.
 msgid ""
 msgstr ""
-"Project-Id-Version: Godot Engine properties\n"
-"Report-Msgid-Bugs-To: https://github.com/godotengine/godot\n"
+"Project-Id-Version: Jundot Engine properties\n"
+"Report-Msgid-Bugs-To: https://github.com/jundotengine/jundot\n"
 "POT-Creation-Date: \n"
 "PO-Revision-Date: 2026-01-25 00:39+0000\n"
 "Last-Translator: Wei-Fu Chen <410477jimmy@gmail.com>\n"
 "Language-Team: Chinese (Traditional Han script) <https://hosted.weblate.org/"
-"projects/godot-engine/godot-properties/zh_Hant/>\n"
+"projects/jundot-engine/jundot-properties/zh_Hant/>\n"
 "Language: zh_Hant\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3711,8 +3711,8 @@ msgstr "總是追蹤呼叫堆疊"
 msgid "Always Track Local Variables"
 msgstr "總是追蹤區域變數"
 
-msgid "Renamed in Godot 4 Hint"
-msgstr "在 Godot 4 中已重新命名提示"
+msgid "Renamed in Jundot 4 Hint"
+msgstr "在 Jundot 4 中已重新命名提示"
 
 msgid "Unassigned Variable"
 msgstr "未指派變數"
@@ -4098,11 +4098,11 @@ msgstr "燈光"
 msgid "Visible"
 msgstr "可見"
 
-msgid "glTF to Godot Expression"
-msgstr "glTF 到 Godot 表達式"
+msgid "glTF to Jundot Expression"
+msgstr "glTF 到 Jundot 表達式"
 
-msgid "Godot to glTF Expression"
-msgstr "Godot 到 glTF 運算式"
+msgid "Jundot to glTF Expression"
+msgstr "Jundot 到 glTF 運算式"
 
 msgid "Node Paths"
 msgstr "節點路徑"
@@ -4122,8 +4122,8 @@ msgstr "關節"
 msgid "Roots"
 msgstr "根"
 
-msgid "Godot Bone Node"
-msgstr "Godot 骨骼節點"
+msgid "Jundot Bone Node"
+msgstr "Jundot 骨骼節點"
 
 msgid "Skin Root"
 msgstr "蒙皮根"
@@ -4134,8 +4134,8 @@ msgstr "原關節"
 msgid "Non Joints"
 msgstr "非關節"
 
-msgid "Godot Skin"
-msgstr "Godot 外觀"
+msgid "Jundot Skin"
+msgstr "Jundot 外觀"
 
 msgid "Src Image"
 msgstr "來源圖像"
@@ -5427,8 +5427,8 @@ msgstr "圖示 512×512"
 msgid "Emscripten Pool Size"
 msgstr "Emscripten 記憶體池大小"
 
-msgid "Godot Pool Size"
-msgstr "Godot 記憶體池大小"
+msgid "Jundot Pool Size"
+msgstr "Jundot 記憶體池大小"
 
 msgid "Windows"
 msgstr "Windows"

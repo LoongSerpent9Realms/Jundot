@@ -2,10 +2,10 @@
 /*  test_logger.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -43,12 +43,12 @@ namespace TestLogger {
 constexpr int sleep_duration = 1200000;
 
 void initialize_logs() {
-	ProjectSettings::get_singleton()->set_setting("application/config/name", "godot_tests");
+	ProjectSettings::get_singleton()->set_setting("application/config/name", "jundot_tests");
 	DirAccess::make_dir_recursive_absolute(OS::get_singleton()->get_user_data_dir().path_join("logs"));
 }
 
 void cleanup_logs() {
-	ProjectSettings::get_singleton()->set_setting("application/config/name", "godot_tests");
+	ProjectSettings::get_singleton()->set_setting("application/config/name", "jundot_tests");
 	Ref<DirAccess> dir = DirAccess::open("user://logs");
 	dir->list_dir_begin();
 	String file = dir->get_next();
@@ -65,14 +65,14 @@ void cleanup_logs() {
 TEST_CASE("[Logger][RotatedFileLogger] Creates the first log file and logs on it") {
 	initialize_logs();
 
-	String waiting_for_godot = "Waiting for Godot";
-	RotatedFileLogger logger("user://logs/godot.log");
-	logger.logf("%s", "Waiting for Godot");
+	String waiting_for_jundot = "Waiting for Jundot";
+	RotatedFileLogger logger("user://logs/jundot.log");
+	logger.logf("%s", "Waiting for Jundot");
 
 	Error err = Error::OK;
-	Ref<FileAccess> log = FileAccess::open("user://logs/godot.log", FileAccess::READ, &err);
+	Ref<FileAccess> log = FileAccess::open("user://logs/jundot.log", FileAccess::READ, &err);
 	CHECK_EQ(err, Error::OK);
-	CHECK_EQ(log->get_as_text(), waiting_for_godot);
+	CHECK_EQ(log->get_as_text(), waiting_for_jundot);
 
 	cleanup_logs();
 }
@@ -82,14 +82,14 @@ void get_log_files(Vector<String> &log_files) {
 	dir->list_dir_begin();
 	String file = dir->get_next();
 	while (file != "") {
-		// Filtering godot.log because ordered_insert will put it first and should be the last.
-		if (file.match("*.log") && file != "godot.log") {
+		// Filtering jundot.log because ordered_insert will put it first and should be the last.
+		if (file.match("*.log") && file != "jundot.log") {
 			log_files.ordered_insert(file);
 		}
 		file = dir->get_next();
 	}
-	if (FileAccess::exists("user://logs/godot.log")) {
-		log_files.push_back("godot.log");
+	if (FileAccess::exists("user://logs/jundot.log")) {
+		log_files.push_back("jundot.log");
 	}
 }
 
@@ -97,14 +97,14 @@ void get_log_files(Vector<String> &log_files) {
 TEST_CASE("[Logger][RotatedFileLogger] Rotates logs files") {
 	initialize_logs();
 
-	Vector<String> all_waiting_for_godot;
+	Vector<String> all_waiting_for_jundot;
 
 	const int number_of_files = 3;
 	for (int i = 0; i < number_of_files; i++) {
-		String waiting_for_godot = "Waiting for Godot " + itos(i);
-		RotatedFileLogger logger("user://logs/godot.log", number_of_files);
-		logger.logf("%s", waiting_for_godot.ascii().get_data());
-		all_waiting_for_godot.push_back(waiting_for_godot);
+		String waiting_for_jundot = "Waiting for Jundot " + itos(i);
+		RotatedFileLogger logger("user://logs/jundot.log", number_of_files);
+		logger.logf("%s", waiting_for_jundot.ascii().get_data());
+		all_waiting_for_jundot.push_back(waiting_for_jundot);
 
 		// Required to ensure the rotation of the log file.
 		OS::get_singleton()->delay_usec(sleep_duration);
@@ -118,18 +118,18 @@ TEST_CASE("[Logger][RotatedFileLogger] Rotates logs files") {
 		Error err = Error::OK;
 		Ref<FileAccess> log_file = FileAccess::open("user://logs/" + log_files[i], FileAccess::READ, &err);
 		REQUIRE_EQ(err, Error::OK);
-		CHECK_EQ(log_file->get_as_text(), all_waiting_for_godot[i]);
+		CHECK_EQ(log_file->get_as_text(), all_waiting_for_jundot[i]);
 	}
 
 	// Required to ensure the rotation of the log file.
 	OS::get_singleton()->delay_usec(sleep_duration);
 
-	// This time the oldest log must be removed and godot.log updated.
-	String new_waiting_for_godot = "Waiting for Godot " + itos(number_of_files);
-	all_waiting_for_godot = all_waiting_for_godot.slice(1, all_waiting_for_godot.size());
-	all_waiting_for_godot.push_back(new_waiting_for_godot);
-	RotatedFileLogger logger("user://logs/godot.log", number_of_files);
-	logger.logf("%s", new_waiting_for_godot.ascii().get_data());
+	// This time the oldest log must be removed and jundot.log updated.
+	String new_waiting_for_jundot = "Waiting for Jundot " + itos(number_of_files);
+	all_waiting_for_jundot = all_waiting_for_jundot.slice(1, all_waiting_for_jundot.size());
+	all_waiting_for_jundot.push_back(new_waiting_for_jundot);
+	RotatedFileLogger logger("user://logs/jundot.log", number_of_files);
+	logger.logf("%s", new_waiting_for_jundot.ascii().get_data());
 
 	log_files.clear();
 	get_log_files(log_files);
@@ -139,7 +139,7 @@ TEST_CASE("[Logger][RotatedFileLogger] Rotates logs files") {
 		Error err = Error::OK;
 		Ref<FileAccess> log_file = FileAccess::open("user://logs/" + log_files[i], FileAccess::READ, &err);
 		REQUIRE_EQ(err, Error::OK);
-		CHECK_EQ(log_file->get_as_text(), all_waiting_for_godot[i]);
+		CHECK_EQ(log_file->get_as_text(), all_waiting_for_jundot[i]);
 	}
 
 	cleanup_logs();
@@ -149,20 +149,20 @@ TEST_CASE("[Logger][CompositeLogger] Logs the same into multiple loggers") {
 	initialize_logs();
 
 	Vector<Logger *> all_loggers;
-	all_loggers.push_back(memnew(RotatedFileLogger("user://logs/godot_logger_1.log", 1)));
-	all_loggers.push_back(memnew(RotatedFileLogger("user://logs/godot_logger_2.log", 1)));
+	all_loggers.push_back(memnew(RotatedFileLogger("user://logs/jundot_logger_1.log", 1)));
+	all_loggers.push_back(memnew(RotatedFileLogger("user://logs/jundot_logger_2.log", 1)));
 
-	String waiting_for_godot = "Waiting for Godot";
+	String waiting_for_jundot = "Waiting for Jundot";
 	CompositeLogger logger(all_loggers);
-	logger.logf("%s", "Waiting for Godot");
+	logger.logf("%s", "Waiting for Jundot");
 
 	Error err = Error::OK;
-	Ref<FileAccess> log = FileAccess::open("user://logs/godot_logger_1.log", FileAccess::READ, &err);
+	Ref<FileAccess> log = FileAccess::open("user://logs/jundot_logger_1.log", FileAccess::READ, &err);
 	CHECK_EQ(err, Error::OK);
-	CHECK_EQ(log->get_as_text(), waiting_for_godot);
-	log = FileAccess::open("user://logs/godot_logger_2.log", FileAccess::READ, &err);
+	CHECK_EQ(log->get_as_text(), waiting_for_jundot);
+	log = FileAccess::open("user://logs/jundot_logger_2.log", FileAccess::READ, &err);
 	CHECK_EQ(err, Error::OK);
-	CHECK_EQ(log->get_as_text(), waiting_for_godot);
+	CHECK_EQ(log->get_as_text(), waiting_for_jundot);
 
 	cleanup_logs();
 }

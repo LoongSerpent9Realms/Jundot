@@ -2,10 +2,10 @@
 /*  display_server_macos.mm                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -30,18 +30,18 @@
 
 #import "display_server_macos.h"
 
-#import "godot_application.h"
-#import "godot_application_delegate.h"
-#import "godot_button_view.h"
-#import "godot_content_view.h"
-#import "godot_core_cursor.h"
-#import "godot_menu_delegate.h"
-#import "godot_menu_item.h"
-#import "godot_open_save_delegate.h"
-#import "godot_progress_view.h"
-#import "godot_status_item.h"
-#import "godot_window.h"
-#import "godot_window_delegate.h"
+#import "jundot_application.h"
+#import "jundot_application_delegate.h"
+#import "jundot_button_view.h"
+#import "jundot_content_view.h"
+#import "jundot_core_cursor.h"
+#import "jundot_menu_delegate.h"
+#import "jundot_menu_item.h"
+#import "jundot_open_save_delegate.h"
+#import "jundot_progress_view.h"
+#import "jundot_status_item.h"
+#import "jundot_window.h"
+#import "jundot_window_delegate.h"
 #import "key_mapping_macos.h"
 #import "native_menu_macos.h"
 #import "os_macos.h"
@@ -67,7 +67,7 @@
 #import "editor/embedded_process_macos.h"
 #endif
 
-// Rendering drivers - include after general Godot deps as they imply system includes
+// Rendering drivers - include after general Jundot deps as they imply system includes
 // which may need precise ordering.
 
 #if defined(GLES3_ENABLED)
@@ -112,7 +112,7 @@ DisplayServerEnums::WindowID DisplayServerMacOS::_create_window(DisplayServerEnu
 	{
 		WindowData &wd = windows[id];
 
-		wd.window_delegate = [[GodotWindowDelegate alloc] initWithDisplayServer:this];
+		wd.window_delegate = [[JundotWindowDelegate alloc] initWithDisplayServer:this];
 		ERR_FAIL_NULL_V_MSG(wd.window_delegate, DisplayServerEnums::INVALID_WINDOW_ID, "Can't create a window delegate");
 		[wd.window_delegate setWindowID:id];
 
@@ -127,13 +127,13 @@ DisplayServerEnums::WindowID DisplayServerMacOS::_create_window(DisplayServerEnu
 			wpos = wpos.clamp(srect.position, srect.position + srect.size - p_rect.size / 3);
 		}
 		// macOS native y-coordinate relative to _get_screens_origin() is negative,
-		// Godot passes a positive value.
+		// Jundot passes a positive value.
 		wpos.y *= -1;
 		wpos += _get_screens_origin();
 		wpos /= scale;
 
 		// initWithContentRect uses bottom-left corner of the window’s frame as origin.
-		wd.window_object = [[GodotWindow alloc]
+		wd.window_object = [[JundotWindow alloc]
 				initWithContentRect:NSMakeRect(100, 100, MAX(1, p_rect.size.width / scale), MAX(1, p_rect.size.height / scale))
 						  styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
 							backing:NSBackingStoreBuffered
@@ -142,7 +142,7 @@ DisplayServerEnums::WindowID DisplayServerMacOS::_create_window(DisplayServerEnu
 		[wd.window_object setWindowID:id];
 		[wd.window_object setReleasedWhenClosed:NO];
 
-		wd.window_view = [[GodotContentView alloc] init];
+		wd.window_view = [[JundotContentView alloc] init];
 		if (wd.window_view == nil) {
 			windows.erase(id);
 			ERR_FAIL_V_MSG(DisplayServerEnums::INVALID_WINDOW_ID, "Can't create a window view");
@@ -397,7 +397,7 @@ Point2i DisplayServerMacOS::_get_screens_origin() const {
 	// Returns the native top-left screen coordinate of the smallest rectangle
 	// that encompasses all screens. Needed in get_screen_position(),
 	// window_get_position, and window_set_position()
-	// to convert between macOS native screen coordinates and the ones expected by Godot.
+	// to convert between macOS native screen coordinates and the ones expected by Jundot.
 
 	if (displays_arrangement_dirty) {
 		_update_displays_arrangement();
@@ -618,7 +618,7 @@ void DisplayServerMacOS::menu_callback(id p_sender) {
 		return;
 	}
 
-	GodotMenuItem *value = [p_sender representedObject];
+	JundotMenuItem *value = [p_sender representedObject];
 	if (value) {
 		if (value->callback.is_valid()) {
 			MenuCall mc;
@@ -942,7 +942,7 @@ Error DisplayServerMacOS::_file_dialog_with_options_show(const String &p_title, 
 		nswindow = windows[p_window_id].window_object;
 	}
 
-	GodotOpenSaveDelegate *panel_delegate = [[GodotOpenSaveDelegate alloc] init];
+	JundotOpenSaveDelegate *panel_delegate = [[JundotOpenSaveDelegate alloc] init];
 	if (p_root.length() > 0) {
 		[panel_delegate setRootPath:p_root];
 	}
@@ -1440,7 +1440,7 @@ Point2i DisplayServerMacOS::screen_get_position(int p_screen) const {
 
 	Point2i position = _get_native_screen_position(p_screen) - _get_screens_origin();
 	// macOS native y-coordinate relative to _get_screens_origin() is negative,
-	// Godot expects a positive value.
+	// Jundot expects a positive value.
 	position.y *= -1;
 	return position;
 }
@@ -1716,7 +1716,7 @@ void DisplayServerMacOS::show_window(DisplayServerEnums::WindowID p_id) {
 	WindowData &wd = windows[p_id];
 
 	if (p_id == DisplayServerEnums::MAIN_WINDOW_ID) {
-		[GodotApp activateApplication];
+		[JundotApp activateApplication];
 	}
 
 	popup_open(p_id);
@@ -1985,7 +1985,7 @@ Point2i DisplayServerMacOS::window_get_position(DisplayServerEnums::WindowID p_w
 	pos *= scale;
 	pos -= _get_screens_origin();
 	// macOS native y-coordinate relative to _get_screens_origin() is negative,
-	// Godot expects a positive value.
+	// Jundot expects a positive value.
 	pos.y *= -1;
 	return pos;
 }
@@ -2006,7 +2006,7 @@ Point2i DisplayServerMacOS::window_get_position_with_decorations(DisplayServerEn
 	pos *= scale;
 	pos -= _get_screens_origin();
 	// macOS native y-coordinate relative to _get_screens_origin() is negative,
-	// Godot expects a positive value.
+	// Jundot expects a positive value.
 	pos.y *= -1;
 	return pos;
 }
@@ -2023,7 +2023,7 @@ void DisplayServerMacOS::window_set_position(const Point2i &p_position, DisplayS
 
 	Point2i position = p_position;
 	// macOS native y-coordinate relative to _get_screens_origin() is negative,
-	// Godot passes a positive value.
+	// Jundot passes a positive value.
 	position.y *= -1;
 	position += _get_screens_origin();
 	position /= screen_get_max_scale();
@@ -2421,7 +2421,7 @@ void DisplayServerMacOS::window_set_custom_window_buttons(WindowData &p_wd, bool
 		[[p_wd.window_object standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
 		[[p_wd.window_object standardWindowButton:NSWindowCloseButton] setHidden:YES];
 
-		p_wd.window_button_view = [[GodotButtonView alloc] initWithFrame:NSZeroRect];
+		p_wd.window_button_view = [[JundotButtonView alloc] initWithFrame:NSZeroRect];
 		[p_wd.window_button_view initButtons:window_buttons_spacing offset:NSMakePoint(p_wd.wb_offset.x, p_wd.wb_offset.y) rtl:is_rtl];
 		[p_wd.window_view addSubview:p_wd.window_button_view];
 
@@ -2654,7 +2654,7 @@ void DisplayServerMacOS::window_set_taskbar_progress_value(float p_value, Displa
 	ERR_FAIL_COND(p_window != DisplayServerEnums::MAIN_WINDOW_ID);
 
 	if (!dock_progress) {
-		dock_progress = [[GodotProgressView alloc] init];
+		dock_progress = [[JundotProgressView alloc] init];
 		[NSApp.dockTile setContentView:dock_progress];
 	}
 
@@ -2665,7 +2665,7 @@ void DisplayServerMacOS::window_set_taskbar_progress_state(DisplayServerEnums::P
 	ERR_FAIL_COND(p_window != DisplayServerEnums::MAIN_WINDOW_ID);
 
 	if (!dock_progress) {
-		dock_progress = [[GodotProgressView alloc] init];
+		dock_progress = [[JundotProgressView alloc] init];
 		[NSApp.dockTile setContentView:dock_progress];
 	}
 
@@ -2963,7 +2963,7 @@ void DisplayServerMacOS::cursor_update_shape() {
 				[_cursor_from_selector(@selector(_windowResizeNorthWestSouthEastCursor)) set];
 				break;
 			case DisplayServerEnums::CURSOR_MOVE:
-				[[[GodotCoreCursor alloc] initWithType:GDCoreCursorWindowMove] set];
+				[[[JundotCoreCursor alloc] initWithType:GDCoreCursorWindowMove] set];
 				break;
 			case DisplayServerEnums::CURSOR_VSPLIT:
 				[[NSCursor resizeUpDownCursor] set];
@@ -3374,7 +3374,7 @@ DisplayServerEnums::IndicatorID DisplayServerMacOS::create_status_indicator(cons
 
 	NSStatusItem *item = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
 	idat.item = item;
-	idat.delegate = [[GodotStatusItemDelegate alloc] init];
+	idat.delegate = [[JundotStatusItemDelegate alloc] init];
 	[idat.delegate setCallback:p_callback];
 
 	item.button.image = nsimg;
@@ -3452,7 +3452,7 @@ Rect2 DisplayServerMacOS::status_indicator_get_rect(DisplayServerEnums::Indicato
 	rect.position *= scale;
 	rect.position -= _get_screens_origin();
 	// macOS native y-coordinate relative to _get_screens_origin() is negative,
-	// Godot expects a positive value.
+	// Jundot expects a positive value.
 	rect.position.y *= -1;
 	return rect;
 }
@@ -3590,7 +3590,7 @@ void DisplayServerMacOS::popup_open(DisplayServerEnums::WindowID p_window) {
 
 		if (was_empty && popup_list.is_empty()) {
 			// Inform OS that popup was opened, to close other native popups.
-			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.beginMenuTrackingNotification" object:@"org.godotengine.godot.popup_window"];
+			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.beginMenuTrackingNotification" object:@"org.jundotengine.jundot.popup_window"];
 		}
 		time_since_popup = OS::get_singleton()->get_ticks_msec();
 		popup_list.push_back(p_window);
@@ -3615,7 +3615,7 @@ void DisplayServerMacOS::popup_close(DisplayServerEnums::WindowID p_window) {
 	}
 	if (!was_empty && popup_list.is_empty()) {
 		// Inform OS that all popups are closed.
-		[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.godotengine.godot.popup_window"];
+		[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.jundotengine.jundot.popup_window"];
 	}
 }
 
@@ -3633,7 +3633,7 @@ bool DisplayServerMacOS::mouse_process_popups(bool p_close) {
 		}
 		if (!was_empty) {
 			// Inform OS that all popups are closed.
-			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.godotengine.godot.popup_window"];
+			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.jundotengine.jundot.popup_window"];
 		}
 	} else {
 		uint64_t delta = OS::get_singleton()->get_ticks_msec() - time_since_popup;
@@ -3665,7 +3665,7 @@ bool DisplayServerMacOS::mouse_process_popups(bool p_close) {
 		}
 		if (!was_empty && popup_list.is_empty()) {
 			// Inform OS that all popups are closed.
-			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.godotengine.godot.popup_window"];
+			[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.apple.HIToolbox.endMenuTrackingNotification" object:@"org.jundotengine.jundot.popup_window"];
 		}
 	}
 	return closed;
@@ -3701,7 +3701,7 @@ DisplayServerMacOS::DisplayServerMacOS(const String &p_rendering_driver, Display
 		nsappname = [[NSProcessInfo processInfo] processName];
 	}
 
-	menu_delegate = [[GodotMenuDelegate alloc] init];
+	menu_delegate = [[JundotMenuDelegate alloc] init];
 
 	// Setup Dock menu.
 	NSMenu *dock_menu = [[NSMenu alloc] initWithTitle:@"_dock"];

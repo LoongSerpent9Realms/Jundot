@@ -2,10 +2,10 @@
 /*  editor_scene_importer_gltf.cpp                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -90,7 +90,7 @@ void EditorSceneFormatImporterGLTF::get_import_options(const String &p_path,
 	String file_extension = p_path.get_extension().to_lower();
 	// Returns all the options when path is empty because that means it's for the Project Settings.
 	if (p_path.is_empty() || file_extension == "gltf" || file_extension == "glb") {
-		r_options->push_back(ResourceImporterScene::ImportOption(PropertyInfo(Variant::INT, "gltf/naming_version", PROPERTY_HINT_ENUM, "Godot 4.0 or 4.1,Godot 4.2 to 4.4,Godot 4.5 or later"), 2));
+		r_options->push_back(ResourceImporterScene::ImportOption(PropertyInfo(Variant::INT, "gltf/naming_version", PROPERTY_HINT_ENUM, "Jundot 4.0 or 4.1,Jundot 4.2 to 4.4,Jundot 4.5 or later"), 2));
 		r_options->push_back(ResourceImporterScene::ImportOption(PropertyInfo(Variant::INT, "gltf/embedded_image_handling", PROPERTY_HINT_ENUM, "Discard All Textures,Extract Textures,Embed as Basis Universal,Embed as Uncompressed", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), GLTFState::HANDLE_BINARY_IMAGE_MODE_EXTRACT_TEXTURES));
 		r_options->push_back(ResourceImporterScene::ImportOption(PropertyInfo(Variant::INT, "gltf/texture_map_mode", PROPERTY_HINT_ENUM, "Do Not Remap,Remap to StandardMaterial3D", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED), GLTFDocument::TEXTURE_MAP_MODE_REMAP_TO_STANDARD_MATERIAL));
 	}

@@ -2,10 +2,10 @@
 /*  rendering_device_commons.h                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -34,8 +34,8 @@
 
 #define STEPIFY(m_number, m_alignment) ((((m_number) + ((m_alignment) - 1)) / (m_alignment)) * (m_alignment))
 
-// This may one day be used in Godot for interoperability between C arrays, Vector and LocalVector.
-// (See https://github.com/godotengine/godot-proposals/issues/5144.)
+// This may one day be used in Jundot for interoperability between C arrays, Vector and LocalVector.
+// (See https://github.com/jundotengine/jundot-proposals/issues/5144.)
 template <typename T>
 class VectorView {
 	const T *_ptr = nullptr;
@@ -326,7 +326,7 @@ public:
 	// they're just an uint32_t to "tag" a GPU command. These are only used for debugging and do not
 	// (or at least shouldn't) alter the execution behavior in any way.
 	//
-	// When a GPU crashes and Godot was built in dev or debug mode; Godot will dump what commands
+	// When a GPU crashes and Jundot was built in dev or debug mode; Jundot will dump what commands
 	// were being executed and what tag they were marked with.
 	// This makes narrowing down the cause of a crash easier. Note that a GPU can be executing
 	// multiple commands at the same time. It is also useful to identify data hazards.

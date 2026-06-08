@@ -2,10 +2,10 @@
 /*  gltf_object_model_property.h                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -57,8 +57,8 @@ public:
 	};
 
 private:
-	Ref<Expression> gltf_to_godot_expr;
-	Ref<Expression> godot_to_gltf_expr;
+	Ref<Expression> gltf_to_jundot_expr;
+	Ref<Expression> jundot_to_gltf_expr;
 	TypedArray<NodePath> node_paths;
 	GLTFObjectModelType object_model_type = GLTF_OBJECT_MODEL_TYPE_UNKNOWN;
 	Vector<PackedStringArray> json_pointers;
@@ -74,11 +74,11 @@ public:
 	GLTFAccessor::GLTFAccessorType get_accessor_type() const;
 	GLTFAccessor::GLTFComponentType get_component_type(const Vector<Variant> &p_values) const;
 
-	Ref<Expression> get_gltf_to_godot_expression() const;
-	void set_gltf_to_godot_expression(const Ref<Expression> &p_gltf_to_godot_expr);
+	Ref<Expression> get_gltf_to_jundot_expression() const;
+	void set_gltf_to_jundot_expression(const Ref<Expression> &p_gltf_to_jundot_expr);
 
-	Ref<Expression> get_godot_to_gltf_expression() const;
-	void set_godot_to_gltf_expression(const Ref<Expression> &p_godot_to_gltf_expr);
+	Ref<Expression> get_jundot_to_gltf_expression() const;
+	void set_jundot_to_gltf_expression(const Ref<Expression> &p_jundot_to_gltf_expr);
 
 	TypedArray<NodePath> get_node_paths() const;
 	bool has_node_paths() const;

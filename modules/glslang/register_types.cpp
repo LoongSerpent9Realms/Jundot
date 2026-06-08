@@ -2,10 +2,10 @@
 /*  register_types.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -38,13 +38,13 @@
 #include "core/os/os.h"
 #endif
 
-GODOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
+JUNDOT_GCC_WARNING_PUSH_AND_IGNORE("-Wshadow")
 
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
-GODOT_GCC_WARNING_POP
+JUNDOT_GCC_WARNING_POP
 
 Vector<uint8_t> compile_glslang_shader(RenderingDeviceCommons::ShaderStage p_stage, const String &p_source_code, RenderingDeviceCommons::ShaderLanguageVersion p_language_version, RenderingDeviceCommons::ShaderSpirvVersion p_spirv_version, String *r_error) {
 	Vector<uint8_t> ret;
