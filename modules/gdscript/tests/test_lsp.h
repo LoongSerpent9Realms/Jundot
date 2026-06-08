@@ -2,10 +2,10 @@
 /*  test_lsp.h                                                            */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -490,10 +490,10 @@ TEST_SUITE("[Modules][GDScript][LSP][Editor]") {
 		CHECK_EQ(LSP::marked_documentation("[param delta]"), "`delta`");
 
 		// Markdown links
-		CHECK_EQ(LSP::marked_documentation("[url=https://jundotengine.org]link to Jundot Engine[/url]"),
-				"[link to Jundot Engine](https://jundotengine.org)");
-		CHECK_EQ(LSP::marked_documentation("[url]https://jundotengine.org/[/url]"),
-				"[https://jundotengine.org/](https://jundotengine.org/)");
+		CHECK_EQ(LSP::marked_documentation("[url=https://godotengine.org]link to Godot Engine[/url]"),
+				"[link to Godot Engine](https://godotengine.org)");
+		CHECK_EQ(LSP::marked_documentation("[url]https://godotengine.org/[/url]"),
+				"[https://godotengine.org/](https://godotengine.org/)");
 
 		// Code listings
 		CHECK_EQ(LSP::marked_documentation("[codeblock]\nfunc test():\n    print(\"Hello, Jundot!\")\n[/codeblock]"),
@@ -512,8 +512,8 @@ TEST_SUITE("[Modules][GDScript][LSP][Editor]") {
 
 		// We have to be careful that different patterns don't conflict with each
 		// other, especially with urls that use brackets in markdown.
-		CHECK_EQ(LSP::marked_documentation("Class [Sprite2D] with [url=https://jundotengine.org]link[/url]"),
-				"Class `Sprite2D` with [link](https://jundotengine.org)");
+		CHECK_EQ(LSP::marked_documentation("Class [Sprite2D] with [url=https://godotengine.org]link[/url]"),
+				"Class `Sprite2D` with [link](https://godotengine.org)");
 	}
 	TEST_CASE("get_symbol_name_under_position") {
 		const String code = U"we_do	suPPort Unicöde  and @annotations, numb3rs \n0nly for-continuation #comment\n@start@\na\n b \n";

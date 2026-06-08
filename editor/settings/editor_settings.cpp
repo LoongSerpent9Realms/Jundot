@@ -2,10 +2,10 @@
 /*  editor_settings.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -456,7 +456,7 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("asset_store/use_threads", true);
 
 	Dictionary default_urls;
-	default_urls["jundotengine.org (Official)"] = "https://store.jundotengine.org/api/v1";
+	default_urls["godotengine.org (Official)"] = "https://store.godotengine.org/api/v1";
 	_initial_set("asset_store/available_urls", default_urls, true);
 
 	/* Interface */

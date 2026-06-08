@@ -2,10 +2,10 @@
 /*  project_manager.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -1354,7 +1354,7 @@ void ProjectManager::_titlebar_resized() {
 }
 
 void ProjectManager::_open_donate_page() {
-	OS::get_singleton()->shell_open("https://fund.jundotengine.org/?ref=project_manager");
+	OS::get_singleton()->shell_open("https://fund.godotengine.org/?ref=project_manager");
 }
 
 // Object methods.

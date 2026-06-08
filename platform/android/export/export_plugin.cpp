@@ -2,10 +2,10 @@
 /*  export_plugin.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -968,7 +968,7 @@ void EditorExportPlatformAndroid::_create_editor_debug_keystore_if_needed() {
 		args.push_back("-validity");
 		args.push_back("10000");
 		args.push_back("-dname");
-		args.push_back("cn=Jundot, ou=Jundot Engine, o=Stichting Jundot, c=NL");
+		args.push_back("cn=Jundot, ou=Godot Engine, o=Stichting Jundot, c=NL");
 		Error error = OS::get_singleton()->execute(keytool_path, args, &output, nullptr, true);
 		print_verbose(output);
 		if (error != OK) {

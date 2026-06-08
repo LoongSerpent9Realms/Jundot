@@ -39,9 +39,28 @@ jobs:
           skip_initial_fetch: true
           files_yaml_from_source_file: .github/changed_files.yml
 
+      - name: Determine diff refs for prek
+        id: prek-refs
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FROM_REF="${{ github.event.pull_request.base.sha }}"
+            TO_REF="${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event_name }}" = "merge_group" ]; then
+            FROM_REF="${{ github.event.merge_group.base_sha }}"
+            TO_REF="${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            FROM_REF="${{ github.event.before }}"
+            TO_REF="${{ github.event.after }}"
+          else
+            # Fallback for workflow_dispatch or first push to a branch.
+            FROM_REF="HEAD~1"
+            TO_REF="HEAD"
+          fi
+          echo "from-ref=${FROM_REF}" >> "$GITHUB_OUTPUT"
+          echo "to-ref=${TO_REF}" >> "$GITHUB_OUTPUT"
+
       - name: Style checks via prek
         uses: j178/prek-action@v2
-        env:
-          CHANGED_FILES: '"${{ steps.changed-files.outputs.everything_all_changed_files }}"' # Wrap with quotes to bookend internal quote separators.
         with:
-          extra-args: --files ${{ env.CHANGED_FILES }}
+          extra-args: --from-ref ${{ steps.prek-refs.outputs.from-ref }} --to-ref ${{ steps.prek-refs.outputs.to-ref }}

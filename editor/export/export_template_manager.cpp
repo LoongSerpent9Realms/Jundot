@@ -2,10 +2,10 @@
 /*  export_template_manager.cpp                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -85,7 +85,7 @@ void ExportTemplateManager::_request_mirrors() {
 	}
 
 	if (mirrors_list->get_tooltip_text().is_empty()) {
-		const String mirrors_metadata_url = vformat("https://jundotengine.org/mirrorlist/%s.json", JUNDOT_VERSION_FULL_CONFIG);
+		const String mirrors_metadata_url = vformat("https://godotengine.org/mirrorlist/%s.json", JUNDOT_VERSION_FULL_CONFIG);
 		mirrors_requester->request(mirrors_metadata_url);
 	}
 }

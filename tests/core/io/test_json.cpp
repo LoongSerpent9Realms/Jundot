@@ -2,10 +2,10 @@
 /*  test_json.cpp                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -244,11 +244,11 @@ TEST_CASE("[JSON] Parsing arrays") {
 TEST_CASE("[JSON] Parsing objects (dictionaries)") {
 	JSON json;
 
-	json.parse(R"({"name": "Jundot Engine", "is_free": true, "bugs": null, "apples": {"red": 500, "green": 0, "blue": -20}, "empty_object": {}})");
+	json.parse(R"({"name": "Godot Engine", "is_free": true, "bugs": null, "apples": {"red": 500, "green": 0, "blue": -20}, "empty_object": {}})");
 
 	const Dictionary dictionary = json.get_data();
 	CHECK_MESSAGE(
-			dictionary["name"] == "Jundot Engine",
+			dictionary["name"] == "Godot Engine",
 			"The parsed JSON should contain the expected values.");
 	CHECK_MESSAGE(
 			dictionary["is_free"],

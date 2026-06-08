@@ -2,10 +2,10 @@
 /*  test_regex.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -192,7 +192,7 @@ TEST_CASE("[RegEx] Empty pattern") {
 }
 
 TEST_CASE("[RegEx] Complex Grouping") {
-	const String test = "https://docs.jundotengine.org/en/latest/contributing/";
+	const String test = "https://docs.godotengine.org/en/latest/contributing/";
 
 	// Ignored protocol in grouping.
 	RegEx re("^(?:https?://)([a-zA-Z]{2,4})\\.([a-zA-Z][a-zA-Z0-9_\\-]{2,64})\\.([a-zA-Z]{2,4})");
@@ -201,7 +201,7 @@ TEST_CASE("[RegEx] Complex Grouping") {
 
 	CHECK(expr->get_group_count() == 3);
 
-	CHECK(expr->get_string(0) == "https://docs.jundotengine.org");
+	CHECK(expr->get_string(0) == "https://docs.godotengine.org");
 
 	CHECK(expr->get_string(1) == "docs");
 	CHECK(expr->get_string(2) == "jundotengine");
@@ -254,7 +254,7 @@ TEST_CASE("[RegEx] Invalid end position") {
 }
 
 TEST_CASE("[RegEx] Get match string list") {
-	const String s = "Jundot Engine";
+	const String s = "Godot Engine";
 
 	RegEx re("(Go)(dot)");
 	Ref<RegExMatch> match = re.search(s);
@@ -285,7 +285,7 @@ TEST_CASE("[RegEx] Match start and end positions") {
 }
 
 TEST_CASE("[RegEx] Asterisk search all") {
-	const String s = "Jundot Engine";
+	const String s = "Godot Engine";
 
 	RegEx re("o*");
 	REQUIRE(re.is_valid());
@@ -309,7 +309,7 @@ TEST_CASE("[RegEx] Asterisk search all") {
 }
 
 TEST_CASE("[RegEx] Simple lookahead") {
-	const String s = "Jundot Engine";
+	const String s = "Godot Engine";
 
 	RegEx re("o(?=t)");
 	REQUIRE(re.is_valid());
@@ -343,7 +343,7 @@ TEST_CASE("[RegEx] Lookahead groups empty matches") {
 }
 
 TEST_CASE("[RegEx] Simple lookbehind") {
-	const String s = "Jundot Engine";
+	const String s = "Godot Engine";
 
 	RegEx re("(?<=d)o");
 	REQUIRE(re.is_valid());

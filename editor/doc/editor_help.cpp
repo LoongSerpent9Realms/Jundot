@@ -2,10 +2,10 @@
 /*  editor_help.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -76,10 +76,10 @@
 
 #include "modules/regex/regex.h"
 
-#define CONTRIBUTE_URL "https://contributing.jundotengine.org/en/latest/documentation/class_reference.html"
+#define CONTRIBUTE_URL "https://contributing.godotengine.org/en/latest/documentation/class_reference.html"
 
 #ifdef MODULE_MONO_ENABLED
-// Sync with the types mentioned in https://docs.jundotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_differences.html
+// Sync with the types mentioned in https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_differences.html
 const Vector<String> classes_with_csharp_differences = {
 	"@GlobalScope",
 	"String",

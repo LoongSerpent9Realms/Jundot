@@ -2,10 +2,10 @@
 /*  accessibility_server_accesskit.cpp                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -219,7 +219,7 @@ accesskit_tree_update *AccessibilityServerAccessKit::_accessibility_initial_tree
 	ERR_FAIL_NULL_V(wd, nullptr);
 
 	accesskit_node *win_node = accesskit_node_new(ACCESSKIT_ROLE_WINDOW);
-	accesskit_node_set_label(win_node, "Jundot Engine");
+	accesskit_node_set_label(win_node, "Godot Engine");
 	accesskit_node_set_busy(win_node);
 
 	accesskit_node_id win_id = (accesskit_node_id)wd->root_id.get_id();

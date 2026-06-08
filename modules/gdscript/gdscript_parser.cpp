@@ -2,10 +2,10 @@
 /*  gdscript_parser.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JUNDOT ENGINE                               */
-/*                        https://jundotengine.org                         */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
@@ -4180,7 +4180,7 @@ GDScriptParser::ClassDocData GDScriptParser::parse_class_doc_comment(int p_line,
 				}
 
 				if (stripped_line[begin_scan] == ':') { // No title.
-					// Syntax: ## @tutorial: https://jundotengine.org/ // The title argument is optional.
+					// Syntax: ## @tutorial: https://godotengine.org/ // The title argument is optional.
 					title = "";
 					link = stripped_line.trim_prefix("@tutorial:").strip_edges();
 				} else {
