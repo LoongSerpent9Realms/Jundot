@@ -1,5 +1,5 @@
 # Spanish (Argentina) translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Diego López <diegodario21@gmail.com>, 2017.
@@ -4761,7 +4761,7 @@ msgstr ""
 "Usar barras al nombrar rutas creará el archivo en una subcarpeta. Se crearán "
 "subcarpetas en caso de que haga falta."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Colaboradores de Jundot Engine"
 
 msgid "Double-click to open in browser."

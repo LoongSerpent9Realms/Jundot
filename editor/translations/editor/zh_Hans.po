@@ -1,5 +1,5 @@
 # Chinese (Simplified Han script) translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # 360119124 <360119124@qq.com>, 2018.
@@ -6581,7 +6581,7 @@ msgstr "基础路径：%s"
 msgid "Folder name is valid."
 msgstr "文件夹名称有效。"
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Jundot Engine 贡献者"
 
 msgid "Double-click to open in browser."

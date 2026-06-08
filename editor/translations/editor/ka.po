@@ -1,5 +1,5 @@
 # Georgian translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Giorgi Beriashvili <giorgi.beriashvili@outlook.com>, 2018.
@@ -2617,7 +2617,7 @@ msgstr "ფაილი ამ სახელით უკვე არსე�
 msgid "Folder name is valid."
 msgstr "საქაღალდის სახელი სწორია."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Jundot ძრავის ხელშემწყობები"
 
 msgid "Thanks from the Jundot community!"

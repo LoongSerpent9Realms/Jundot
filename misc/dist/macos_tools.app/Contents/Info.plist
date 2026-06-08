@@ -33,7 +33,7 @@
 	<key>NSCameraUseContinuityCameraDeviceType</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>© 2007-present Juan Linietsky, Ariel Manzur &amp; Jundot Engine contributors</string>
+	<string>© 2007-present Juan Linietsky, Ariel Manzur &amp; Godot Engine contributors</string>
 	<key>CFBundleSupportedPlatforms</key>
 	<array>
 		<string>MacOSX</string>

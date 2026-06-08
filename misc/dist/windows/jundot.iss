@@ -1,6 +1,6 @@
 #define MyAppName "Jundot Engine"
 #define MyAppVersion "4.7"
-#define MyAppPublisher "Jundot Engine contributors"
+#define MyAppPublisher "Godot Engine contributors"
 #define MyAppURL "https://jundotengine.org/"
 #define MyAppExeName "jundot.exe"
 

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProjectGuid>{92600954-25F0-4291-8E11-1FEE9FC4BE20}</ProjectGuid>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -7,12 +7,12 @@
     <PackageId>JundotTools.IdeMessaging</PackageId>
     <Version>1.1.2</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
-    <Authors>Jundot Engine contributors</Authors>
+    <Authors>Godot Engine contributors</Authors>
     <Company />
     <PackageTags>jundot</PackageTags>
     <RepositoryUrl>https://github.com/jundotengine/jundot/tree/master/modules/mono/editor/JundotTools/JundotTools.IdeMessaging</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Copyright>Copyright (c) Jundot Engine contributors</Copyright>
+    <Copyright>Copyright (c) Godot Engine contributors</Copyright>
     <Description>
 This library enables communication with the Jundot Engine editor (the version with .NET support).
 It's intended for use in IDEs/editors plugins for a better experience working with Jundot C# projects.

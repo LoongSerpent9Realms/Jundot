@@ -1,5 +1,11 @@
 # Jundot Engine
 
+Jundot Engine is a modified distribution of [Godot Engine](https://godotengine.org).
+Original Godot Engine code remains copyright (c) Godot Engine contributors and
+Juan Linietsky, Ariel Manzur. Jundot-specific modifications are copyright (c)
+Jundot contributors. See [LICENSE.txt](LICENSE.txt) and [COPYRIGHT.txt](COPYRIGHT.txt)
+for licensing and attribution details.
+
 <p align="center">
   <a href="https://godotengine.org">
     <img src="misc/logo/logo_outlined.svg" width="400" alt="Jundot Engine logo">

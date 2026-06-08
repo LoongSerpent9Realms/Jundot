@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProjectGuid>{8FBEC238-D944-4074-8548-B3B524305905}</ProjectGuid>
     <TargetFramework>net8.0</TargetFramework>
@@ -12,7 +12,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Description>Jundot C# Editor API.</Description>
-    <Authors>Jundot Engine contributors</Authors>
+    <Authors>Godot Engine contributors</Authors>
 
     <PackageId>JundotSharpEditor</PackageId>
     <Version>4.7.0</Version>
@@ -20,7 +20,7 @@
     <RepositoryUrl>https://github.com/jundotengine/jundot/tree/master/modules/mono/glue/JundotSharp/JundotSharpEditor</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Copyright>Copyright (c) Jundot Engine contributors</Copyright>
+    <Copyright>Copyright (c) Godot Engine contributors</Copyright>
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <IncludeSymbols>true</IncludeSymbols>

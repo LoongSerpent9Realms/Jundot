@@ -1,5 +1,5 @@
 # Thai translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Kaveeta Vivatchai <goodytong@gmail.com>, 2017.
@@ -3104,7 +3104,7 @@ msgstr "สมาชิกระดับไททาเนียม"
 msgid "Using slashes in folder names will create subfolders recursively."
 msgstr "การใช้เครื่องหมายทับในชื่อโฟลเดอร์จะสร้างโฟลเดอร์ย่อยขึ้นมาซ้ำๆ"
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "ผู้ช่วยพัฒนา Jundot Engine"
 
 msgid "Double-click to open in browser."

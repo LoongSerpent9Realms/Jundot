@@ -1,5 +1,5 @@
 # Polish translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # 8-bit Pixel <dawdejw@gmail.com>, 2016, 2023.
@@ -6794,7 +6794,7 @@ msgstr "Ścieżka bazowa: %s"
 msgid "Folder name is valid."
 msgstr "Nazwa folderu jest prawidłowa."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Współtwórcy Jundot Engine"
 
 msgid "Double-click to open in browser."

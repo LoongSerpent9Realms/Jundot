@@ -1,5 +1,5 @@
 # Irish translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Rónán Quill <ronan085@gmail.com>, 2019, 2020.
@@ -6790,7 +6790,7 @@ msgstr "Cosán bonn: %s"
 msgid "Folder name is valid."
 msgstr "Tá ainm an fhillteáin bailí."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Ranníocóirí Inneall Jundot"
 
 msgid "Double-click to open in browser."

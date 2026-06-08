@@ -1,5 +1,5 @@
 # Italian translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Alessio Corridori <alessiocorridori@hotmail.com>, 2018.
@@ -6850,7 +6850,7 @@ msgstr "Percorso base: %s"
 msgid "Folder name is valid."
 msgstr "Il nome della cartella è valido."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Contributori di Jundot Engine"
 
 msgid "Double-click to open in browser."

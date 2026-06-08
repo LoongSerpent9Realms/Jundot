@@ -1,5 +1,5 @@
 # Finnish translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # basse <basse@roiske.org>, 2017.
@@ -6217,7 +6217,7 @@ msgstr ""
 msgid "Folder name is valid."
 msgstr "Kansion nimi on validi."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Jundot moottorin kehittäjät"
 
 msgid "Thanks from the Jundot community!"

@@ -1,5 +1,5 @@
 # Korean translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Ch <ccwpc@hanmail.net>, 2017.
@@ -6697,7 +6697,7 @@ msgstr "기본 경로: %s"
 msgid "Folder name is valid."
 msgstr "폴더 이름이 올바릅니다."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Jundot 엔진 기여자"
 
 msgid "Double-click to open in browser."

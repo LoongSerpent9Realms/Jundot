@@ -1,8 +1,8 @@
 # Jundot Engine authors
 
-Jundot Engine is developed by a community of voluntary contributors who
-contribute code, bug reports, documentation, translations, support, etc.,
-across multiple repositories.
+Jundot Engine is based on Godot Engine. The list below primarily preserves
+the Godot Engine authors and contributors whose work forms the base of this
+repository. Jundot-specific modifications are authored by Jundot contributors.
 
 It is impossible to list them all; nevertheless, this file aims at listing
 the developers who contributed significant improvements to the engine code.

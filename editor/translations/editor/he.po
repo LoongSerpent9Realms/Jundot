@@ -1,5 +1,5 @@
 # Hebrew translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Daniel <lorddaniel09@gmail.com>, 2018.
@@ -3006,7 +3006,7 @@ msgstr "שימוש בקווים נטויים בשמות תיקיות יצור ת
 msgid "Folder name is valid."
 msgstr "שם התיקייה תקין."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "מתנדבי מנוע גודו"
 
 msgid "Double-click to open in browser."

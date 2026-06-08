@@ -1,5 +1,5 @@
 # Slovak translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # J08nY <johnenter@gmail.com>, 2016.
@@ -3711,7 +3711,7 @@ msgstr "Použitie lomiek v názvoch priečinkov vytvorí podpriečinky rekurzív
 msgid "Folder name is valid."
 msgstr "Názov priečinku je platný."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Jundot Engine prispievatelia"
 
 msgid "Thanks from the Jundot community!"

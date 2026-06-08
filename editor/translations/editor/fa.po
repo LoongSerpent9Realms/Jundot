@@ -1,5 +1,5 @@
 # Persian translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # alabd14313 <alabd14313@yahoo.com>, 2016.
@@ -6419,7 +6419,7 @@ msgstr "مسیر پایه: %s"
 msgid "Folder name is valid."
 msgstr "نام پوشه معتبر است."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "مشارکت‌کنندگان موتور گودوت"
 
 msgid "Double-click to open in browser."

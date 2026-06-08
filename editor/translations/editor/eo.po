@@ -1,5 +1,5 @@
 # Esperanto translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors.
+# Copyright (c) 2014-present Godot Engine contributors.
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 # Scott Starkey <yekrats@gmail.com>, 2019.
@@ -3658,7 +3658,7 @@ msgstr "Arĝentaj Sponsoroj"
 msgid "Base path: %s"
 msgstr "Vojprefikso: %s"
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "Kontribuantoj de Jundot Engine"
 
 msgid "Thanks from the Jundot community!"

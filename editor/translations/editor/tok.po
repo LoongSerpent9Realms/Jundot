@@ -1,5 +1,5 @@
 # Toki Pona translation of the Jundot Engine editor interface.
-# Copyright (c) 2014-present Jundot Engine contributors (see AUTHORS.md).
+# Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md).
 # Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.
 # This file is distributed under the same license as the Jundot source code.
 #
@@ -1993,7 +1993,7 @@ msgstr "nimi lipu li ken."
 msgid "Folder name is valid."
 msgstr "nimi pi poki lipu li ken."
 
-msgid "Jundot Engine contributors"
+msgid "Godot Engine contributors"
 msgstr "jan pali pi ilo Koto"
 
 msgid "Double-click to open in browser."

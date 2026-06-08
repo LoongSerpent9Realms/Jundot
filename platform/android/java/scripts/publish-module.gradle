@@ -44,9 +44,9 @@ afterEvaluate {
                             email = 'rverschelde@gmail.com'
                         }
                         developer {
-                            id = 'jundotengine'
-                            name = 'Jundot Engine contributors'
-                            email = 'contact@jundotengine.org'
+                            id = 'godotengine'
+                            name = 'Godot Engine contributors'
+                            url = 'https://godotengine.org/'
                         }
                     }
 
@@ -96,9 +96,9 @@ afterEvaluate {
                             email = 'rverschelde@gmail.com'
                         }
                         developer {
-                            id = 'jundotengine'
-                            name = 'Jundot Engine contributors'
-                            email = 'contact@jundotengine.org'
+                            id = 'godotengine'
+                            name = 'Godot Engine contributors'
+                            url = 'https://godotengine.org/'
                         }
                     }
 
@@ -148,9 +148,9 @@ afterEvaluate {
                             email = 'rverschelde@gmail.com'
                         }
                         developer {
-                            id = 'jundotengine'
-                            name = 'Jundot Engine contributors'
-                            email = 'contact@jundotengine.org'
+                            id = 'godotengine'
+                            name = 'Godot Engine contributors'
+                            url = 'https://godotengine.org/'
                         }
                     }
 

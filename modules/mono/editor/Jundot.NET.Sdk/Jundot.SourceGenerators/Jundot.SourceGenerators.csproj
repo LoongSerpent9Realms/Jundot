@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>10</LangVersion>
@@ -7,7 +7,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <Description>Core C# source generator for Jundot projects.</Description>
-    <Authors>Jundot Engine contributors</Authors>
+    <Authors>Godot Engine contributors</Authors>
 
     <PackageId>Jundot.SourceGenerators</PackageId>
     <Version>4.7.0</Version>
@@ -15,7 +15,7 @@
     <RepositoryUrl>https://github.com/jundotengine/jundot/tree/master/modules/mono/editor/Jundot.NET.Sdk/Jundot.SourceGenerators</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Copyright>Copyright (c) Jundot Engine contributors</Copyright>
+    <Copyright>Copyright (c) Godot Engine contributors</Copyright>
 
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <!-- Do not include the generator as a lib dependency -->
