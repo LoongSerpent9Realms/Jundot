@@ -742,6 +742,8 @@ namespace JundotTools
                 // Migrate solution from old configuration names to: Debug, ExportDebug and ExportRelease
                 DotNetSolution.MigrateFromOldConfigNames(JundotSharpDirs.ProjectSlnPath);
 
+                CsProjOperations.EnsureJundotNuGetConfig(Path.GetDirectoryName(JundotSharpDirs.ProjectCsProjPath)!);
+
                 var msbuildProject = ProjectUtils.Open(JundotSharpDirs.ProjectCsProjPath)
                                      ?? throw new InvalidOperationException("Cannot open C# project.");
 

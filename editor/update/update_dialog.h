@@ -1,11 +1,10 @@
 /**************************************************************************/
-/*  update_dialog.h                                                       */
+/*  update_dialog.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JunDot ENGINE                               */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2026-present JunDot Engine contributors . */
 /**************************************************************************/
 
 #pragma once

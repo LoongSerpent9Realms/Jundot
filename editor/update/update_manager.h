@@ -54,7 +54,7 @@ public:
 	int trigger_launcher_rollback(const String &p_target_version = String());
 
 	/// Find the launcher executable path relative to the engine directory.
-	String find_launcher_path() const;
+	String find_launcher_path();
 
 protected:
 	static void _bind_methods();

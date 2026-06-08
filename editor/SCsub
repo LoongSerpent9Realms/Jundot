@@ -97,6 +97,7 @@ if env.editor_build:
     SConscript("shader/SCsub")
     SConscript("themes/SCsub")
     SConscript("translations/SCsub")
+    SConscript("update/SCsub")
     SConscript("version_control/SCsub")
 
     lib = env.add_library("editor", env.editor_sources)

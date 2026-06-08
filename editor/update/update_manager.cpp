@@ -1,13 +1,11 @@
 /**************************************************************************/
-/*  update_manager.cpp                                                    */
+/*  update_dialog.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JunDot ENGINE                               */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2026-present JunDot Engine contributors . */
 /**************************************************************************/
-
 #include "update_manager.h"
 
 #include "core/error/error_macros.h"
@@ -183,7 +181,7 @@ bool UpdateManager::_should_notify_update() const {
 //  Launcher integration
 // ═══════════════════════════════════════════════════════════════
 
-String UpdateManager::find_launcher_path() const {
+String UpdateManager::find_launcher_path() {
 	if (!launcher_path_cache.is_empty()) {
 		return launcher_path_cache;
 	}

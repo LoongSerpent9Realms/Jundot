@@ -1,11 +1,10 @@
 /**************************************************************************/
-/*  update_manifest.cpp                                                   */
+/*  update_dialog.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JunDot ENGINE                               */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2026-present JunDot Engine contributors . */
 /**************************************************************************/
 
 #include "update_manifest.h"
@@ -160,7 +159,7 @@ String GrayscaleEvaluator::generate_machine_id() {
 	// Convert first 8 bytes to hex for a 16-char ID
 	String hex;
 	for (int i = 0; i < 8; i++) {
-		hex += String::num_int64(hash[i], 16, true).lpad(2, '0');
+		hex += String::num_int64(hash[i], 16, true).lpad(2, "0");
 	}
 
 	return hex;
