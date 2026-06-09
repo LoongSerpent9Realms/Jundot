@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_chat_message.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,68 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "scene/gui/box_container.h"
 
-class EditorDock;
-class TabContainer;
+class Button;
+class HBoxContainer;
+class Label;
+class PanelContainer;
+class RichTextLabel;
+class VBoxContainer;
 
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
+class AIChatMessage : public VBoxContainer {
+	GDCLASS(AIChatMessage, VBoxContainer);
 
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
+	bool is_user = false;
+	String message_content;
+	String think_content;
+	double think_time_seconds = 0.0;
+	int prompt_tokens = 0;
+	int completion_tokens = 0;
+	bool think_expanded = false;
 
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
+	// Layout containers.
+	HBoxContainer *alignment_box = nullptr;
+	PanelContainer *bubble = nullptr;
+	VBoxContainer *bubble_content = nullptr;
+
+	// Content elements.
+	Label *author_label = nullptr;
+	RichTextLabel *content_label = nullptr;
+
+	// Thinking section.
+	VBoxContainer *think_container = nullptr;
+	Button *think_toggle = nullptr;
+	Label *think_label = nullptr;
+
+	// Footer.
+	HBoxContainer *footer = nullptr;
+	Label *token_label = nullptr;
+	Button *copy_button = nullptr;
+	Button *edit_button = nullptr;
+
+	void _toggle_think();
+	void _copy_pressed();
+	void _edit_pressed();
+	void _build_ui();
+	void _update_translations();
+	void _update_think_visibility();
+	void _update_footer();
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
 
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	void setup_user(const String &p_content);
+	void setup_ai(const String &p_content, const String &p_think_content = String(), double p_think_time = 0.0, int p_prompt_tokens = 0, int p_completion_tokens = 0);
+
+	String get_content() const;
+	void set_content(const String &p_content);
+
+	void set_markdown_content(const String &p_content);
+
+	AIChatMessage();
 };
+
+#undef VARIANT_PEEK_STEAL_ONLY

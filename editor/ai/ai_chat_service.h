@@ -1,12 +1,9 @@
-/**************************************************************************/
 /*  ai_chat_service.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                                JunDot                                  */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
-/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/* Copyright (c) 2024-present JunDot contributors.                        */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
 /* a copy of this software and associated documentation files (the        */
@@ -24,13 +21,14 @@
 /* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
 /* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
 /* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /**************************************************************************/
 
 #pragma once
 
 #include "core/io/http_client.h"
+#include "core/typedefs.h"
 #include "core/variant/dictionary.h"
 #include "scene/main/node.h"
 
@@ -43,13 +41,16 @@ class AIChatService : public Node {
 
 	HTTPRequest *http_request = nullptr;
 	AISettingsData settings;
-	double timeout = 60.0;
+	double timeout = 300.0;
 	bool use_threads = true;
+	uint64_t request_start_usec = 0;
 
 	String _build_chat_url() const;
 	void _ensure_http_request();
 	void _request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	String _extract_text_from_response(const Variant &p_data) const;
+	void _extract_usage_from_response(const Variant &p_data, int &r_prompt_tokens, int &r_completion_tokens) const;
+	void _extract_think_from_content(String &r_content, String &r_think) const;
 
 protected:
 	void _notification(int p_what);

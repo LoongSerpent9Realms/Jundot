@@ -16,6 +16,6 @@
   "CleanPackageDir": false,
   "ExtraSConsArgs": "",
   "Language": "zh_CN",
-  "AutoUpdateVersion": true,
+  "AutoUpdateVersion": false,
   "GenerateUpdateManifest": true
 }

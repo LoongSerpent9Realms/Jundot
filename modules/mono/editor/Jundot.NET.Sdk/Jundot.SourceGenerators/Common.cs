@@ -226,5 +226,35 @@ namespace Jundot.SourceGenerators
                 isEnabledByDefault: true,
                 "The class must not be generic. Make the class non-generic, or remove the '[GlobalClass]' attribute.",
                 helpLinkUri: string.Format(_helpLinkFormat, "GD0402"));
+
+        public static readonly DiagnosticDescriptor AlcUnloadabilityStrongGCHandleRule =
+            new DiagnosticDescriptor(id: "GD0501",
+                title: "Strong GCHandle allocations can prevent tool script assembly unloading",
+                messageFormat: "The GCHandle allocation '{0}' can keep a tool script AssemblyLoadContext alive",
+                category: "Usage",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                "Strong GCHandle allocations in tool scripts can prevent the editor from unloading and reloading C# assemblies. Use a weak handle, or free the handle from the AssemblyLoadContext.Unloading event.",
+                helpLinkUri: string.Format(_helpLinkFormat, "GD0501"));
+
+        public static readonly DiagnosticDescriptor AlcUnloadabilityStaticFieldRule =
+            new DiagnosticDescriptor(id: "GD0502",
+                title: "Static fields in tool scripts can prevent assembly unloading",
+                messageFormat: "The static field '{0}' can keep tool script state alive across assembly reloads",
+                category: "Usage",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                "Static fields in tool scripts that hold Godot objects, delegates, threads, or tasks can prevent the editor from unloading and reloading C# assemblies. Clear the field during AssemblyLoadContext.Unloading or avoid storing the value statically.",
+                helpLinkUri: string.Format(_helpLinkFormat, "GD0502"));
+
+        public static readonly DiagnosticDescriptor AlcUnloadabilityStaticEventSubscriptionRule =
+            new DiagnosticDescriptor(id: "GD0503",
+                title: "Static event subscriptions in tool scripts can prevent assembly unloading",
+                messageFormat: "The static event subscription '{0}' can keep a tool script AssemblyLoadContext alive",
+                category: "Usage",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                "Static event subscriptions from tool scripts can keep delegates and target objects alive across assembly reloads. Unsubscribe during AssemblyLoadContext.Unloading.",
+                helpLinkUri: string.Format(_helpLinkFormat, "GD0503"));
     }
 }

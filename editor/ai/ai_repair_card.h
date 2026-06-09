@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_repair_card.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,59 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "ai_repair_workflow.h"
 
-class EditorDock;
-class TabContainer;
+#include "scene/gui/panel_container.h"
 
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
+class Button;
+class HBoxContainer;
+class Label;
+class VBoxContainer;
 
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
+class AIRepairCard : public PanelContainer {
+	GDCLASS(AIRepairCard, PanelContainer)
 
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
+	AIRepairTask task;
+	bool expanded = false;
+
+	HBoxContainer *header = nullptr;
+	Label *type_label = nullptr;
+	Label *title_label = nullptr;
+	Label *state_label = nullptr;
+	Button *expand_button = nullptr;
+	Button *apply_button = nullptr;
+	Button *test_button = nullptr;
+	Button *open_files_button = nullptr;
+	Button *retry_ai_button = nullptr;
+	Button *skip_button = nullptr;
+	Button *rebuild_button = nullptr;
+	Button *publish_button = nullptr;
+	VBoxContainer *detail_container = nullptr;
+	Label *detail_label = nullptr;
+	Label *test_output_label = nullptr;
+	VBoxContainer *test_result_container = nullptr;
+
+	void _toggle_expand();
+	void _apply_pressed();
+	void _test_pressed();
+	void _open_files_pressed();
+	void _retry_ai_pressed();
+	void _skip_pressed();
+	void _rebuild_pressed();
+	void _publish_pressed();
+	void _build_ui();
+	void _build_detail_text();
+	void _update_buttons();
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
 
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	void setup(const AIRepairTask &p_repair_task);
+	AIRepairTask get_task() const;
+	void set_test_result(const String &p_output, int p_exit_code);
+	void set_dirty_warning(const String &p_warning);
+
+	AIRepairCard();
 };

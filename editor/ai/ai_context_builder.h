@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_context_builder.h                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,14 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "core/string/ustring.h"
 
-class EditorDock;
-class TabContainer;
-
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
-
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
-
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
+class AIContextBuilder {
+	static String _format_memories();
+	static String _format_tools();
+	static String _format_suggestion_instructions();
+	static String _apply_budget(const String &p_context, int p_budget);
 
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	static String build_context(bool p_include_memories, bool p_include_tools, int p_budget, bool p_include_suggestion_instructions = false);
 };

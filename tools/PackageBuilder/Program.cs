@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace JundotPackageBuilder;
 
 static class Program
@@ -5,6 +7,10 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // Register code pages provider to support GBK/Shift-JIS/etc.
+        // Required for correctly decoding MSVC/cl.exe output on non-English Windows.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
         ApplicationConfiguration.Initialize();
         if (!IsAiPackageBuilderSession(args))
         {

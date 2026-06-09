@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_build_bridge.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,27 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "core/error/error_list.h"
+#include "core/string/ustring.h"
 
-class EditorDock;
-class TabContainer;
-
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
-
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
-
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
-
+// Lightweight bridge between AI panel and PackageBuilder.
+// PackageBuilder is a separate C# GUI process; the bridge communicates
+// via the filesystem (build config file / build history JSON).
+class AIBuildBridge {
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	// Write a build request config that PackageBuilder can pick up.
+	static Error write_build_request();
+
+	// Launch PackageBuilder.exe as a subprocess. Returns immediately.
+	static Error launch_package_builder();
+
+	// Check whether the latest build record exists and what its zip/manifest paths are.
+	// Returns true if a build record was found, and fills the output params.
+	static bool get_latest_build_info(String &r_version, String &r_zip_path, String &r_manifest_path, String &r_build_log_path);
+
+	// Check whether the build request resulted in a successful build.
+	static bool is_build_ready();
+
+	// Get the project root directory (where version.py lives).
+	static String detect_repo_root();
 };

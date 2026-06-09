@@ -312,7 +312,7 @@ public class UpdateOrchestrator
 
     /// <summary>
     /// Fetch manifest from default URL or a user-provided override.
-    /// Default: GitHub Releases API for Jundot-Auto repo.
+    /// Default: GitHub Releases latest download URL for Jundot repo.
     /// </summary>
     private async Task<UpdateManifestV1?> FetchManifestAsync(string? manifestUrl)
     {
@@ -327,7 +327,6 @@ public class UpdateOrchestrator
         {
             // For testing: look for manifest in artifacts/packages/
             Path.Combine(_engineDir, "update-manifest.json"),
-            // Could add more URLs here in Step 11
         };
 
         // Try local file first (for dev/testing)
@@ -349,9 +348,27 @@ public class UpdateOrchestrator
             }
         }
 
-        // TODO Step 11: Add GitHub Releases URL construction
-        ConsoleUI.Warning("未配置远程 manifest URL，且无本地 manifest。");
-        ConsoleUI.Info("使用 --manifest-url 指定 manifest URL，或在 Step 11 配置默认 URL。");
+        // Default remote URL: GitHub Releases latest download
+        const string owner = "LoongSerpent9Realms";
+        const string repo = "Jundot";
+        var remoteUrl = $"https://github.com/{owner}/{repo}/releases/latest/download/update-manifest.json";
+
+        try
+        {
+            ConsoleUI.Info($"尝试从远程获取 manifest: {remoteUrl}");
+            var remoteManifest = await _fetcher.FetchAsync(remoteUrl);
+            if (remoteManifest != null)
+            {
+                return remoteManifest;
+            }
+        }
+        catch
+        {
+            // Fall through to warning
+        }
+
+        ConsoleUI.Warning("未配置远程 manifest URL，且无法从默认 URL 获取。");
+        ConsoleUI.Info("使用 --manifest-url 指定 manifest URL 重试。");
         return null;
     }
 }

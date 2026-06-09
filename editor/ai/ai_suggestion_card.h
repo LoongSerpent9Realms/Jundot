@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_suggestion_card.h                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,45 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "editor/ai/ai_chat_parser.h"
 
-class EditorDock;
-class TabContainer;
+#include "scene/gui/panel_container.h"
 
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
+class Button;
+class HBoxContainer;
+class Label;
+class TextEdit;
+class VBoxContainer;
 
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
+class AISuggestionCard : public PanelContainer {
+	GDCLASS(AISuggestionCard, PanelContainer)
 
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
+	AISuggestion suggestion;
+	bool expanded = false;
+
+	HBoxContainer *header = nullptr;
+	Label *type_icon = nullptr;
+	Label *name_label = nullptr;
+	Label *type_label = nullptr;
+	Button *expand_button = nullptr;
+	Button *accept_button = nullptr;
+	Button *reject_button = nullptr;
+	VBoxContainer *detail_container = nullptr;
+	Label *detail_label = nullptr;
+
+	void _toggle_expand();
+	void _accept_pressed();
+	void _reject_pressed();
+	void _build_ui();
+	void _update_translations();
+
+protected:
+	void _notification(int p_what);
+	static void _bind_methods();
 
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	void setup(const AISuggestion &p_suggestion);
+	AISuggestion get_suggestion() const;
+
+	AISuggestionCard();
 };

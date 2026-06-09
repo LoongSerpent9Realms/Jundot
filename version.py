@@ -1,9 +1,9 @@
 ﻿short_name = "jundot"
 name = "Jundot Engine"
-major = 1
-minor = 7
-patch = 3
-status = "beta"
+major = 0
+minor = 2
+patch = 2
+status = "alpha"
 module_config = ""
 website = "https://jundotengine.org"
 docs = "latest"

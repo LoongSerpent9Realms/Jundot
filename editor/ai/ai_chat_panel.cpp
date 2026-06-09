@@ -1,12 +1,9 @@
-/**************************************************************************/
 /*  ai_chat_panel.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                                JunDot                                  */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
-/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/* Copyright (c) 2024-present JunDot contributors.                        */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
 /* a copy of this software and associated documentation files (the        */
@@ -24,17 +21,31 @@
 /* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
 /* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
 /* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /**************************************************************************/
 
 #include "ai_chat_panel.h"
 
+#include "ai_build_bridge.h"
+#include "ai_chat_message.h"
 #include "ai_chat_service.h"
+#include "ai_context_builder.h"
+#include "ai_importer.h"
+#include "ai_memory_store.h"
 #include "ai_settings.h"
+#include "ai_repair_card.h"
+#include "ai_repair_workflow.h"
+#include "ai_suggestion_card.h"
+#include "ai_tool_registry.h"
+#include "ai_usage_agreement_dialog.h"
+#include "ai_feature_gate.h"
 
 #include "core/io/file_access.h"
+#include "core/io/dir_access.h"
 #include "core/object/callable_mp.h"
+#include "core/os/os.h"
+#include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
@@ -58,60 +69,64 @@ void AIChatPanel::_notification(int p_what) {
 	}
 }
 
-String AIChatPanel::_get_mode_prompt() const {
-	switch (current_mode) {
-		case ITERATION_MODE_DEFECTS:
-			return TTR("Mode: Defect discovery. Prioritize engine logs, crash reports, code patterns, root causes, and performance bottlenecks.");
-		case ITERATION_MODE_FEATURE:
-			return TTR("Mode: Feature evaluation. Judge whether a requested feature is generally useful and necessary before expanding scope.");
-		case ITERATION_MODE_HYBRID:
-			return TTR("Mode: Hybrid expansion. Propose AI-assisted changes while preserving developer confirmation and manual collaboration.");
-	}
-	return String();
-}
+String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
+	// Auto-detect the most appropriate mode based on user input keywords.
+	String msg = p_user_message.to_lower();
 
-String AIChatPanel::_get_mode_button_text(int p_mode) const {
-	switch ((IterationMode)p_mode) {
-		case ITERATION_MODE_DEFECTS:
-			return TTR("Defects");
-		case ITERATION_MODE_FEATURE:
-			return TTR("Feature");
-		case ITERATION_MODE_HYBRID:
-			return TTR("Hybrid");
+	// Defect-related keywords.
+	static const char *defect_keywords[] = {
+		"error", "bug", "crash", "issue", "problem", "fail", "broken", "exception",
+		"crash", "leak", "slow", "perf", "性能", "崩溃", "错误", "卡顿", "问题", "BUG", "bug",
+		"闪退", "异常", "缺陷", nullptr
+	};
+
+	// Feature-related keywords.
+	static const char *feature_keywords[] = {
+		"feature", "add", "implement", "support", "new", "create", "build",
+		"功能", "特性", "新增", "实现", "开发", "添加", "扩展", nullptr
+	};
+
+	int defect_score = 0;
+	int feature_score = 0;
+
+	for (const char **kw = defect_keywords; *kw != nullptr; kw++) {
+		if (msg.contains(*kw)) {
+			defect_score++;
+		}
 	}
-	return String();
+	for (const char **kw = feature_keywords; *kw != nullptr; kw++) {
+		if (msg.contains(*kw)) {
+			feature_score++;
+		}
+	}
+
+	if (defect_score > 0 && defect_score >= feature_score) {
+		return TTR("Mode: Defect discovery. Prioritize engine logs, crash reports, code patterns, root causes, and performance bottlenecks.");
+	} else if (feature_score > 0 && feature_score > defect_score) {
+		return TTR("Mode: Feature evaluation. Judge whether a requested feature is generally useful and necessary before expanding scope.");
+	}
+	// Default / hybrid.
+	return TTR("Mode: Hybrid assistant. Help the developer by analyzing context, proposing changes, and collaborating on solutions.");
 }
 
 void AIChatPanel::_update_translations() {
 	set_name(TTRC("Chat"));
-	for (int i = 0; i < 3; i++) {
-		mode_buttons[i]->set_text(_get_mode_button_text(i));
-	}
 	input->set_placeholder(TTR("Input message / drop files here"));
 	add_file_menu->set_text(TTR("+"));
 	add_file_menu->set_tooltip_text(TTR("Attach or reference a text file"));
 	PopupMenu *file_popup = add_file_menu->get_popup();
-	file_popup->set_item_text(file_popup->get_item_index(0), TTR("Reference Project File"));
-	file_popup->set_item_text(file_popup->get_item_index(1), TTR("Upload Text File"));
+	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_REFERENCE_PROJECT), TTR("Reference Project File"));
+	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_UPLOAD_TEXT), TTR("Upload Text File"));
+	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_IMPORT), TTR("Import Skill / MCP / Memory..."));
 	clear_button->set_text(TTR("Clear"));
 	cancel_button->set_text(TTR("Cancel"));
 	send_button->set_text(TTR("Send"));
 	reference_file_dialog->set_title(TTR("Reference Project File"));
 	upload_file_dialog->set_title(TTR("Upload Text File"));
+	import_file_dialog->set_title(TTR("Import Skill / MCP / Memory"));
+	add_all_button->set_text(TTR("Add All"));
+	dismiss_all_button->set_text(TTR("Dismiss All"));
 	_refresh_attachment_chips();
-	status_label->set_text(_get_mode_prompt());
-}
-
-void AIChatPanel::_update_mode_buttons() {
-	for (int i = 0; i < 3; i++) {
-		mode_buttons[i]->set_pressed(i == current_mode);
-	}
-}
-
-void AIChatPanel::_set_mode(int p_mode) {
-	current_mode = (IterationMode)p_mode;
-	_update_mode_buttons();
-	status_label->set_text(_get_mode_prompt());
 }
 
 void AIChatPanel::_set_requesting(bool p_requesting) {
@@ -119,20 +134,60 @@ void AIChatPanel::_set_requesting(bool p_requesting) {
 	cancel_button->set_disabled(!p_requesting);
 }
 
-void AIChatPanel::_add_message(const String &p_author, const String &p_text) {
-	Label *message = memnew(Label);
-	message->set_text(vformat("%s\n%s", p_author, p_text));
-	message->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	message->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+bool AIChatPanel::_ensure_usage_agreement() {
+	const AISettingsData settings = AISettings::load();
+	if (AISettings::is_usage_agreement_current(settings)) {
+		return true;
+	}
+
+	status_label->set_text(TTR("Please review and accept the AI usage agreement before sending messages."));
+	usage_agreement_dialog->popup_centered(Size2(420, 220) * EDSCALE);
+	return false;
+}
+
+void AIChatPanel::_usage_agreement_accepted() {
+	status_label->set_text(TTR("AI usage agreement accepted. Send your message again to continue."));
+}
+
+void AIChatPanel::_usage_agreement_rejected() {
+	status_label->set_text(TTR("AI message was not sent because the usage agreement was not accepted."));
+}
+
+void AIChatPanel::_add_user_message(const String &p_text) {
+	AIChatMessage *message = memnew(AIChatMessage);
+	message->setup_user(p_text);
 	message_list->add_child(message);
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
+void AIChatPanel::_add_ai_message(const String &p_content, const String &p_think_content, double p_think_time, int p_prompt_tokens, int p_completion_tokens) {
+	AIChatMessage *message = memnew(AIChatMessage);
+	message->setup_ai(p_content, p_think_content, p_think_time, p_prompt_tokens, p_completion_tokens);
+	message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
+	message_list->add_child(message);
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
+void AIChatPanel::_on_edit_requested(const String &p_content) {
+	editing_message_index = -1;
+	for (int i = 0; i < message_list->get_child_count(); i++) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (msg && msg->get_content() == p_content) {
+			editing_message_index = i;
+			break;
+		}
+	}
+	input->set_text(p_content);
+	input->grab_focus();
+}
+
 void AIChatPanel::_add_file_menu_id_pressed(int p_id) {
-	if (p_id == 0) {
+	if (p_id == FILE_MENU_REFERENCE_PROJECT) {
 		reference_file_dialog->popup_file_dialog();
-	} else if (p_id == 1) {
+	} else if (p_id == FILE_MENU_UPLOAD_TEXT) {
 		upload_file_dialog->popup_file_dialog();
+	} else if (p_id == FILE_MENU_IMPORT) {
+		import_file_dialog->popup_file_dialog();
 	}
 }
 
@@ -232,7 +287,22 @@ void AIChatPanel::_send_message() {
 		return;
 	}
 
-	settings.system_prompt = _get_mode_prompt() + "\n" + settings.system_prompt;
+	if (!_ensure_usage_agreement()) {
+		return;
+	}
+
+	const String configured_system_prompt = settings.system_prompt;
+	const String auto_mode_prompt = _detect_mode_prompt(text);
+	if (!auto_mode_prompt.is_empty()) {
+		settings.system_prompt = auto_mode_prompt;
+	}
+	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
+	if (!ai_context.is_empty()) {
+		settings.system_prompt += "\n\n" + ai_context;
+	}
+	if (!configured_system_prompt.strip_edges().is_empty()) {
+		settings.system_prompt += "\n\n" + configured_system_prompt;
+	}
 	chat_service->configure(settings);
 
 	String request_text = text;
@@ -247,7 +317,21 @@ void AIChatPanel::_send_message() {
 		return;
 	}
 
-	_add_message(TTR("You"), text);
+	// In edit mode, update the existing user message in-place and remove
+	// all messages after it so the upcoming AI reply overwrites the old one.
+	if (editing_message_index >= 0) {
+		AIChatMessage *user_msg = Object::cast_to<AIChatMessage>(message_list->get_child(editing_message_index));
+		if (user_msg) {
+			user_msg->set_content(text);
+		}
+		for (int i = message_list->get_child_count() - 1; i > editing_message_index; i--) {
+			message_list->get_child(i)->queue_free();
+		}
+		editing_message_index = -1;
+	} else {
+		_add_user_message(text);
+	}
+
 	input->clear();
 	attachments.clear();
 	_refresh_attachment_chips();
@@ -265,13 +349,40 @@ void AIChatPanel::_clear_messages() {
 	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
 		message_list->get_child(i)->queue_free();
 	}
-	status_label->set_text(_get_mode_prompt());
+	editing_message_index = -1;
+	_clear_suggestions();
+	_clear_repair_cards();
+	status_label->set_text(TTR("AI assistant ready."));
 }
 
-void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body) {
+void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
 	_set_requesting(false);
 	if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
-		_add_message(TTR("AI"), p_content);
+		_add_ai_message(p_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+
+		// Parse suggestions from the AI response.
+		const AISettingsData settings = AISettings::load();
+		if (settings.auto_suggest_entries) {
+			Vector<AISuggestion> suggestions;
+			AIChatParser::parse(p_content, suggestions);
+			if (!suggestions.is_empty()) {
+				_show_suggestions(suggestions);
+			}
+
+			Vector<AIFeatureGateResult> feature_gates;
+			AIChatParser::parse_feature_gates(p_content, feature_gates);
+			for (int i = 0; i < feature_gates.size(); i++) {
+				AIFeatureGateResult gate = feature_gates[i];
+				AIFeatureGate::evaluate(gate, settings);
+				_add_ai_message(AIFeatureGate::build_report(gate), String(), 0.0, 0, 0);
+			}
+
+			Vector<AIRepairSuggestion> repair_tasks;
+			AIChatParser::parse_repair_tasks(p_content, repair_tasks);
+			if (!repair_tasks.is_empty()) {
+				_show_repair_tasks(repair_tasks);
+			}
+		}
 		status_label->set_text(TTR("AI response received."));
 		return;
 	}
@@ -280,8 +391,325 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 	if (error_text.is_empty()) {
 		error_text = vformat(TTR("AI request failed. HTTP %d."), p_response_code);
 	}
-	_add_message(TTR("AI Error"), error_text);
+	_add_ai_message(error_text, String(), 0.0, 0, 0);
 	status_label->set_text(error_text);
+}
+
+void AIChatPanel::_suggestion_accepted(AISuggestionCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	const AISuggestion s = p_card->get_suggestion();
+
+	switch (s.type) {
+		case AISuggestion::TYPE_SKILL: {
+			Vector<AISkillEntry> skills;
+			Vector<AIMCPServerEntry> mcp_servers;
+			AIToolRegistry::load(skills, mcp_servers);
+			skills.push_back(s.skill);
+			AIToolRegistry::save(skills, mcp_servers);
+			status_label->set_text(vformat(TTR("Skill \"%s\" added."), s.skill.name));
+		} break;
+		case AISuggestion::TYPE_MCP_SERVER: {
+			Vector<AISkillEntry> skills;
+			Vector<AIMCPServerEntry> mcp_servers;
+			AIToolRegistry::load(skills, mcp_servers);
+			mcp_servers.push_back(s.mcp_server);
+			AIToolRegistry::save(skills, mcp_servers);
+			status_label->set_text(vformat(TTR("MCP server \"%s\" added."), s.mcp_server.name));
+		} break;
+		case AISuggestion::TYPE_MEMORY: {
+			Vector<AIMemoryEntry> entries;
+			AIMemoryStore::load(entries);
+			entries.push_back(s.memory);
+			AIMemoryStore::save(entries);
+			status_label->set_text(vformat(TTR("Memory \"%s\" added."), s.memory.title));
+		} break;
+	}
+
+	int idx = suggestion_cards.find(p_card);
+	if (idx >= 0) {
+		suggestion_cards.remove_at(idx);
+	}
+	p_card->queue_free();
+	_refresh_bulk_bar();
+}
+
+void AIChatPanel::_suggestion_rejected(AISuggestionCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	int idx = suggestion_cards.find(p_card);
+	if (idx >= 0) {
+		suggestion_cards.remove_at(idx);
+	}
+	p_card->queue_free();
+	_refresh_bulk_bar();
+}
+
+void AIChatPanel::_add_all_suggestions() {
+	// Copy the list since _suggestion_accepted mutates it.
+	const Vector<AISuggestionCard *> cards = suggestion_cards;
+	for (int i = 0; i < cards.size(); i++) {
+		_suggestion_accepted(cards[i]);
+	}
+}
+
+void AIChatPanel::_dismiss_all_suggestions() {
+	const Vector<AISuggestionCard *> cards = suggestion_cards;
+	for (int i = 0; i < cards.size(); i++) {
+		_suggestion_rejected(cards[i]);
+	}
+}
+
+void AIChatPanel::_show_suggestions(const Vector<AISuggestion> &p_suggestions) {
+	_clear_suggestions();
+
+	for (int i = 0; i < p_suggestions.size(); i++) {
+		AISuggestionCard *card = memnew(AISuggestionCard);
+		card->setup(p_suggestions[i]);
+		card->connect(SNAME("suggestion_accepted"), callable_mp(this, &AIChatPanel::_suggestion_accepted).bind(card));
+		card->connect(SNAME("suggestion_rejected"), callable_mp(this, &AIChatPanel::_suggestion_rejected).bind(card));
+		message_list->add_child(card);
+		suggestion_cards.push_back(card);
+	}
+
+	_refresh_bulk_bar();
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
+void AIChatPanel::_clear_suggestions() {
+	for (int i = suggestion_cards.size() - 1; i >= 0; i--) {
+		if (suggestion_cards[i]) {
+			suggestion_cards[i]->queue_free();
+		}
+	}
+	suggestion_cards.clear();
+	_refresh_bulk_bar();
+}
+
+void AIChatPanel::_refresh_bulk_bar() {
+	const bool show_bulk_bar = suggestion_cards.size() >= 2;
+	bulk_action_bar->set_visible(show_bulk_bar);
+}
+
+void AIChatPanel::_import_file_selected(const String &p_path) {
+	Vector<AISuggestion> suggestions;
+	const Error err = AIImporter::preview_from_file(p_path, suggestions);
+	if (err != OK || suggestions.is_empty()) {
+		status_label->set_text(TTR("No importable entries found in the selected file."));
+		return;
+	}
+	_show_suggestions(suggestions);
+	status_label->set_text(vformat(TTR("Imported %d entry(s) from file. Confirm to add."), suggestions.size()));
+}
+
+// --- Repair card callbacks ---
+
+void AIChatPanel::_repair_apply_patch(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+
+	// Check dirty worktree before applying
+	Vector<String> dirty = AIRepairWorkflow::check_dirty_worktree(task.candidate_files);
+	if (!dirty.is_empty()) {
+		String warning;
+		for (int i = 0; i < dirty.size() && i < 5; i++) {
+			if (i > 0) {
+				warning += ", ";
+			}
+			warning += dirty[i];
+		}
+		if (dirty.size() > 5) {
+			warning += vformat(" (+%d more)", dirty.size() - 5);
+		}
+		p_card->set_dirty_warning(TTR("Unrelated files have uncommitted changes:") + " " + warning);
+		status_label->set_text(TTR("Dirty worktree detected. Review warnings before applying the patch."));
+		return;
+	}
+
+	// Record pre-patch snapshot
+	String snapshot = AIRepairWorkflow::record_pre_patch_snapshot(task.candidate_files);
+	if (!snapshot.is_empty()) {
+		String snapshot_path = EditorPaths::get_singleton()->get_config_dir().path_join("ai_patch_snapshots").path_join(task.id + ".diff");
+		Ref<DirAccess> da = DirAccess::create_for_path(snapshot_path.get_base_dir());
+		if (da.is_valid()) {
+			da->make_dir_recursive(snapshot_path.get_base_dir());
+			Ref<FileAccess> f = FileAccess::open(snapshot_path, FileAccess::WRITE);
+			if (f.is_valid()) {
+				f->store_string(snapshot);
+			}
+		}
+	}
+
+	AIRepairWorkflow::update_task(task.id, AIRepairTask::STATE_APPLIED);
+	p_card->setup(task);
+	status_label->set_text(vformat(TTR("Patch applied for: %s. Use 'Run Tests' to verify."), task.title));
+}
+
+void AIChatPanel::_repair_run_tests(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+
+	String test_cmd = task.test_command;
+	if (test_cmd.is_empty()) {
+		test_cmd = AIRepairWorkflow::suggest_default_test(task.candidate_files);
+		if (test_cmd.is_empty()) {
+			status_label->set_text(TTR("No test command available. Please configure one for this task."));
+			return;
+		}
+		status_label->set_text(vformat(TTR("No test command specified. Using default: %s"), test_cmd));
+	}
+
+	String output;
+	int exit_code = -1;
+	Error err = AIRepairWorkflow::run_repair_tests(test_cmd, output, exit_code);
+
+	AIRepairTask::State new_state = (err == OK && exit_code == 0)
+		? AIRepairTask::STATE_TESTS_PASSED
+		: AIRepairTask::STATE_TESTS_FAILED;
+
+	String error_detail = (new_state == AIRepairTask::STATE_TESTS_FAILED)
+		? vformat("Test exited with code %d. %s", exit_code, output.substr(0, 256))
+		: String();
+
+	AIRepairWorkflow::update_task(task.id, new_state, error_detail);
+	task.state = new_state;
+	task.last_error = error_detail;
+	p_card->setup(task);
+	p_card->set_test_result(output, exit_code);
+
+	if (new_state == AIRepairTask::STATE_TESTS_PASSED) {
+		status_label->set_text(TTR("Tests passed. You can now build the fix."));
+	} else {
+		status_label->set_text(TTR("Tests failed. Review the output and use 'Ask AI' to continue debugging."));
+	}
+}
+
+void AIChatPanel::_repair_open_files(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+
+	int opened = 0;
+	for (int i = 0; i < task.candidate_files.size(); i++) {
+		String path = task.candidate_files[i];
+		// Resolve relative paths against project root
+		if (path.is_relative_path()) {
+			path = OS::get_singleton()->get_executable_path().get_base_dir().path_join(path);
+		}
+		if (FileAccess::exists(path)) {
+			OS::get_singleton()->shell_open(path);
+			opened++;
+		}
+	}
+	status_label->set_text(vformat(TTR("Opened %d of %d candidate file(s) in system editor."), opened, task.candidate_files.size()));
+}
+
+void AIChatPanel::_repair_retry_ai(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+
+	// Build a feedback message for AI to continue debugging
+	String feedback;
+	feedback += "The fix for \"" + task.title + "\" was applied but ";
+	if (task.state == AIRepairTask::STATE_TESTS_FAILED) {
+		feedback += "tests failed:\n";
+		feedback += task.last_error + "\n\n";
+	} else if (task.state == AIRepairTask::STATE_BUILD_FAILED) {
+		feedback += "the build failed:\n";
+		feedback += task.last_error + "\n\n";
+	}
+	feedback += "Please analyze the failure and suggest an updated fix for:\n";
+	feedback += "- Files: ";
+	for (int i = 0; i < task.candidate_files.size(); i++) {
+		if (i > 0) {
+			feedback += ", ";
+		}
+		feedback += task.candidate_files[i];
+	}
+	feedback += "\n- Root cause: " + task.root_cause;
+	feedback += "\n- Reproduction: " + task.reproduction;
+
+	// Send as user message to AI by setting input text and triggering send
+	input->set_text(feedback);
+	_send_message();
+	status_label->set_text(TTR("Sent failure feedback to AI for further analysis."));
+}
+
+void AIChatPanel::_repair_skip(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	int idx = repair_cards.find(p_card);
+	if (idx >= 0) {
+		repair_cards.remove_at(idx);
+	}
+	p_card->queue_free();
+	status_label->set_text(TTR("Repair task dismissed."));
+}
+
+void AIChatPanel::_repair_rebuild(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+	AIRepairWorkflow::update_task(task.id, AIRepairTask::STATE_BUILD_TRIGGERED);
+	p_card->setup(task);
+
+	// Write build request and launch PackageBuilder
+	AIBuildBridge::write_build_request();
+	Error err = AIBuildBridge::launch_package_builder();
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Could not launch PackageBuilder. Please run it manually from %s"), AIBuildBridge::detect_repo_root().path_join("tools/PackageBuilder")));
+	} else {
+		status_label->set_text(TTR("PackageBuilder launched. Complete the build and click 'Publish' when ready."));
+	}
+}
+
+void AIChatPanel::_repair_publish(AIRepairCard *p_card) {
+	ERR_FAIL_NULL(p_card);
+	AIRepairTask task = p_card->get_task();
+	AIRepairWorkflow::update_task(task.id, AIRepairTask::STATE_PUBLISHED);
+	p_card->setup(task);
+	status_label->set_text(vformat(TTR("Publish request sent for: %s."), task.title));
+}
+
+void AIChatPanel::_show_repair_tasks(const Vector<AIRepairSuggestion> &p_repairs) {
+	_clear_repair_cards();
+
+	for (int i = 0; i < p_repairs.size(); i++) {
+		const AIRepairSuggestion &suggestion = p_repairs[i];
+		AIRepairTask task;
+		task.id = "repair-" + itos(static_cast<int64_t>(OS::get_singleton()->get_unix_time())) + "-" + itos(i);
+		task.issue_type = suggestion.issue_type;
+		task.title = suggestion.title;
+		task.reproduction = suggestion.reproduction;
+		task.root_cause = suggestion.root_cause;
+		task.candidate_files = suggestion.candidate_files;
+		task.patch_summary = suggestion.patch_summary;
+		task.test_command = suggestion.test_command;
+		task.risk = suggestion.risk;
+		task.state = AIRepairTask::STATE_PENDING;
+		task.created_at = itos(static_cast<int64_t>(OS::get_singleton()->get_unix_time()));
+
+		AIRepairWorkflow::append(task);
+
+		AIRepairCard *card = memnew(AIRepairCard);
+		card->setup(task);
+		card->connect(SNAME("apply_patch"), callable_mp(this, &AIChatPanel::_repair_apply_patch).bind(card));
+		card->connect(SNAME("run_tests"), callable_mp(this, &AIChatPanel::_repair_run_tests).bind(card));
+		card->connect(SNAME("open_files"), callable_mp(this, &AIChatPanel::_repair_open_files).bind(card));
+		card->connect(SNAME("retry_with_ai"), callable_mp(this, &AIChatPanel::_repair_retry_ai).bind(card));
+		card->connect(SNAME("skip_task"), callable_mp(this, &AIChatPanel::_repair_skip).bind(card));
+		card->connect(SNAME("rebuild_requested"), callable_mp(this, &AIChatPanel::_repair_rebuild).bind(card));
+		card->connect(SNAME("publish_requested"), callable_mp(this, &AIChatPanel::_repair_publish).bind(card));
+		message_list->add_child(card);
+		repair_cards.push_back(card);
+	}
+
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+	status_label->set_text(vformat(TTR("AI found %d repair task(s). Review the suggested patch and tests before applying."), p_repairs.size()));
+}
+
+void AIChatPanel::_clear_repair_cards() {
+	for (int i = repair_cards.size() - 1; i >= 0; i--) {
+		if (repair_cards[i]) {
+			repair_cards[i]->queue_free();
+		}
+	}
+	repair_cards.clear();
 }
 
 AIChatPanel::AIChatPanel() {
@@ -297,17 +725,6 @@ AIChatPanel::AIChatPanel() {
 	root->add_theme_constant_override("separation", 8 * EDSCALE);
 	add_child(root);
 
-	HBoxContainer *modes = memnew(HBoxContainer);
-	modes->add_theme_constant_override("separation", 4 * EDSCALE);
-	root->add_child(modes);
-
-	for (int i = 0; i < 3; i++) {
-		mode_buttons[i] = memnew(Button);
-		mode_buttons[i]->set_toggle_mode(true);
-		mode_buttons[i]->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_set_mode).bind(i));
-		modes->add_child(mode_buttons[i]);
-	}
-
 	message_scroll = memnew(ScrollContainer);
 	message_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
@@ -317,6 +734,19 @@ AIChatPanel::AIChatPanel() {
 	message_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_list->add_theme_constant_override("separation", 10 * EDSCALE);
 	message_scroll->add_child(message_list);
+
+	bulk_action_bar = memnew(HBoxContainer);
+	bulk_action_bar->add_theme_constant_override("separation", 6 * EDSCALE);
+	bulk_action_bar->set_visible(false);
+	root->add_child(bulk_action_bar);
+
+	add_all_button = memnew(Button);
+	add_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_add_all_suggestions));
+	bulk_action_bar->add_child(add_all_button);
+
+	dismiss_all_button = memnew(Button);
+	dismiss_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_dismiss_all_suggestions));
+	bulk_action_bar->add_child(dismiss_all_button);
 
 	PanelContainer *composer = memnew(PanelContainer);
 	composer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -346,8 +776,9 @@ AIChatPanel::AIChatPanel() {
 	composer_vb->add_child(actions);
 
 	add_file_menu = memnew(MenuButton);
-	add_file_menu->get_popup()->add_item(TTR("Reference Project File"), 0);
-	add_file_menu->get_popup()->add_item(TTR("Upload Text File"), 1);
+	add_file_menu->get_popup()->add_item(TTR("Reference Project File"), FILE_MENU_REFERENCE_PROJECT);
+	add_file_menu->get_popup()->add_item(TTR("Upload Text File"), FILE_MENU_UPLOAD_TEXT);
+	add_file_menu->get_popup()->add_item(TTR("Import Skill / MCP / Memory..."), FILE_MENU_IMPORT);
 	add_file_menu->get_popup()->connect(SceneStringName(id_pressed), callable_mp(this, &AIChatPanel::_add_file_menu_id_pressed));
 	actions->add_child(add_file_menu);
 
@@ -389,8 +820,19 @@ AIChatPanel::AIChatPanel() {
 	upload_file_dialog->connect(SNAME("file_selected"), callable_mp(this, &AIChatPanel::_external_file_selected));
 	add_child(upload_file_dialog);
 
+	import_file_dialog = memnew(EditorFileDialog);
+	import_file_dialog->set_access(EditorFileDialog::ACCESS_FILESYSTEM);
+	import_file_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_FILE);
+	import_file_dialog->add_filter("*.md,*.json,*.txt", TTRC("Skill / MCP / Memory Files"));
+	import_file_dialog->connect(SNAME("file_selected"), callable_mp(this, &AIChatPanel::_import_file_selected));
+	add_child(import_file_dialog);
+
+	usage_agreement_dialog = memnew(AIUsageAgreementDialog);
+	usage_agreement_dialog->connect(SNAME("agreement_accepted"), callable_mp(this, &AIChatPanel::_usage_agreement_accepted));
+	usage_agreement_dialog->connect(SNAME("agreement_rejected"), callable_mp(this, &AIChatPanel::_usage_agreement_rejected));
+	add_child(usage_agreement_dialog);
+
 	_update_translations();
-	_update_mode_buttons();
 	_set_requesting(false);
-	status_label->set_text(_get_mode_prompt());
+	status_label->set_text(TTR("AI assistant ready."));
 }

@@ -1,4 +1,4 @@
-/*  ai_editor_plugin.h                                                     */
+/*  ai_importer.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,21 +27,30 @@
 
 #pragma once
 
-#include "editor/plugins/editor_plugin.h"
+#include "editor/ai/ai_chat_parser.h"
 
-class EditorDock;
-class TabContainer;
+#include "core/error/error_list.h"
+#include "core/string/ustring.h"
+#include "core/templates/vector.h"
 
-class AIEditorPlugin : public EditorPlugin {
-	GDCLASS(AIEditorPlugin, EditorPlugin)
+class AIImporter {
+	static constexpr int MAX_IMPORT_ENTRIES = 50;
+	static constexpr int MAX_FILE_SIZE = 64 * 1024;
 
-	EditorDock *ai_dock = nullptr;
-	TabContainer *tabs = nullptr;
+	enum FileFormat {
+		FORMAT_UNKNOWN,
+		FORMAT_SKILL_MD,
+		FORMAT_MCP_JSON,
+		FORMAT_TEXT_MEMORY,
+	};
 
-	void _create_dock();
-	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
+	static FileFormat _detect_format(const String &p_path);
+	static Error _parse_skill_md(const String &p_content, AISkillEntry &r_skill);
+	static Error _parse_mcp_json(const String &p_content, Vector<AIMCPServerEntry> &r_servers);
+	static Error _parse_text_memory(const String &p_path, const String &p_content, AIMemoryEntry &r_memory);
 
 public:
-	AIEditorPlugin();
-	~AIEditorPlugin();
+	static Error preview_from_file(const String &p_path, Vector<AISuggestion> &r_suggestions);
+	static Error preview_from_directory(const String &p_dir, Vector<AISuggestion> &r_suggestions);
+	static Error import_suggestions(const Vector<AISuggestion> &p_suggestions);
 };

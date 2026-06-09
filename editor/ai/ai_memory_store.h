@@ -1,8 +1,7 @@
-/**************************************************************************/
 /*  ai_memory_store.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
+/*                                JunDot                                  */
 /**************************************************************************/
 
 #pragma once
@@ -10,6 +9,9 @@
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
+#include "core/variant/array.h"
+#include "core/variant/dictionary.h"
+#include "core/variant/variant.h"
 
 struct AIMemoryEntry {
 	String id;

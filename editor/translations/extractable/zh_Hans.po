@@ -240,3 +240,22 @@ msgstr "插入控制字符"
 
 msgid "(Other)"
 msgstr "（其他）"
+
+# AI Panel Tabs (TTRC / class names)
+msgid "Chat"
+msgstr "聊天"
+
+msgid "Config"
+msgstr "配置"
+
+msgid "Memory"
+msgstr "记忆"
+
+msgid "Tools"
+msgstr "工具"
+
+msgid "Skills"
+msgstr "技能"
+
+msgid "MCP"
+msgstr "MCP"

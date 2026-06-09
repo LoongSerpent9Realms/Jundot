@@ -1,12 +1,9 @@
-/**************************************************************************/
 /*  ai_config_panel.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                                JunDot                                  */
 /**************************************************************************/
-/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
-/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/* Copyright (c) 2024-present JunDot contributors.                        */
 /*                                                                        */
 /* Permission is hereby granted, free of charge, to any person obtaining  */
 /* a copy of this software and associated documentation files (the        */
@@ -24,19 +21,21 @@
 /* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
 /* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
 /* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
 /**************************************************************************/
 
 #include "ai_config_panel.h"
 
 #include "ai_chat_service.h"
 #include "ai_settings.h"
+#include "ai_usage_agreement_dialog.h"
 
 #include "core/object/callable_mp.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
+#include "scene/gui/check_box.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
@@ -90,10 +89,20 @@ void AIConfigPanel::_update_translations() {
 	api_key_label->set_text(TTR("API Key"));
 	temperature_label->set_text(TTR("Temperature"));
 	max_tokens_label->set_text(TTR("Max Tokens"));
+	context_char_budget_label->set_text(TTR("Context Budget"));
+	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
+	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
 	system_prompt_label->set_text(TTR("System Prompt"));
+	include_project_memories_check->set_text(TTR("Include project memories"));
+	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
+	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
+	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
+	usage_notice_label->set_text(TTR("AI requests can consume additional API tokens when project context, attachments, logs, or repair analysis are included."));
 	save_button->set_text(TTR("Save"));
 	reset_button->set_text(TTR("Reset"));
 	test_button->set_text(TTR("Test Connection"));
+	view_agreement_button->set_text(TTR("View AI Usage Agreement"));
+	reset_agreement_button->set_text(TTR("Reset Agreement Consent"));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	model_edit->set_placeholder(AISettings::get_default_model());
 }
@@ -105,35 +114,64 @@ void AIConfigPanel::_load_settings() {
 	api_key_edit->set_text(settings.api_key);
 	temperature_spin->set_value(settings.temperature);
 	max_tokens_spin->set_value(settings.max_tokens);
+	context_char_budget_spin->set_value(settings.context_char_budget);
+	feature_universality_threshold_spin->set_value(settings.feature_universality_threshold);
+	feature_necessity_threshold_spin->set_value(settings.feature_necessity_threshold);
+	include_project_memories_check->set_pressed(settings.include_project_memories);
+	include_tool_context_check->set_pressed(settings.include_tool_context);
+	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
+	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
 	system_prompt_edit->set_text(settings.system_prompt);
 	status_label->set_text(TTR("AI settings loaded."));
 }
 
 void AIConfigPanel::_save_settings() {
-	AISettingsData settings;
+	AISettingsData settings = AISettings::load();
 	settings.base_url = base_url_edit->get_text().strip_edges();
 	settings.model = model_edit->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = max_tokens_spin->get_value();
+	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
+	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.include_project_memories = include_project_memories_check->is_pressed();
+	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
-	AISettings::save(settings);
+	const Error err = AISettings::save(settings);
+	if (err != OK) {
+		status_label->set_text(TTR("AI settings could not be saved."));
+		return;
+	}
 	status_label->set_text(TTR("AI settings saved."));
 }
 
 void AIConfigPanel::_reset_settings() {
-	AISettings::reset_to_defaults();
+	const Error err = AISettings::reset_to_defaults();
+	if (err != OK) {
+		status_label->set_text(TTR("AI settings could not be reset."));
+		return;
+	}
 	_load_settings();
 	status_label->set_text(TTR("AI settings reset to defaults."));
 }
 
 void AIConfigPanel::_test_connection() {
-	AISettingsData settings;
+	AISettingsData settings = AISettings::load();
 	settings.base_url = base_url_edit->get_text().strip_edges();
 	settings.model = model_edit->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = MIN<int>(max_tokens_spin->get_value(), 64);
+	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
+	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.include_project_memories = include_project_memories_check->is_pressed();
+	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
 
 	if (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty()) {
@@ -155,7 +193,7 @@ void AIConfigPanel::_test_connection() {
 	status_label->set_text(TTR("Testing AI connection..."));
 }
 
-void AIConfigPanel::_test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body) {
+void AIConfigPanel::_test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
 	if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
 		status_label->set_text(TTR("Connection test succeeded."));
 		return;
@@ -166,6 +204,15 @@ void AIConfigPanel::_test_connection_completed(int p_result, int p_response_code
 		error_text = vformat(TTR("Connection test failed. HTTP %d."), p_response_code);
 	}
 	status_label->set_text(error_text);
+}
+
+void AIConfigPanel::_view_usage_agreement() {
+	usage_agreement_dialog->popup_centered(Size2(420, 220) * EDSCALE);
+}
+
+void AIConfigPanel::_reset_usage_agreement() {
+	const Error err = AISettings::reset_usage_agreement();
+	status_label->set_text(err == OK ? TTR("AI usage agreement consent reset.") : TTR("AI usage agreement consent could not be reset."));
 }
 
 AIConfigPanel::AIConfigPanel() {
@@ -195,6 +242,25 @@ AIConfigPanel::AIConfigPanel() {
 	api_key_edit = _add_line_edit_row(grid, &api_key_label, TTR("API Key"), String(), true);
 	temperature_spin = _add_spin_box_row(grid, &temperature_label, TTR("Temperature"), 0.0, 2.0, 0.05);
 	max_tokens_spin = _add_spin_box_row(grid, &max_tokens_label, TTR("Max Tokens"), 1, 262144, 1);
+	context_char_budget_spin = _add_spin_box_row(grid, &context_char_budget_label, TTR("Context Budget"), 0, 262144, 256);
+	feature_universality_threshold_spin = _add_spin_box_row(grid, &feature_universality_threshold_label, TTR("Feature Universality Threshold (%)"), 0, 100, 1);
+	feature_necessity_threshold_spin = _add_spin_box_row(grid, &feature_necessity_threshold_label, TTR("Feature Necessity Threshold"), 0, 1, 0.05);
+
+	include_project_memories_check = memnew(CheckBox);
+	root->add_child(include_project_memories_check);
+
+	include_tool_context_check = memnew(CheckBox);
+	root->add_child(include_tool_context_check);
+
+	auto_suggest_entries_check = memnew(CheckBox);
+	root->add_child(auto_suggest_entries_check);
+
+	feature_design_philosophy_check = memnew(CheckBox);
+	root->add_child(feature_design_philosophy_check);
+
+	usage_notice_label = memnew(Label);
+	usage_notice_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	root->add_child(usage_notice_label);
 
 	system_prompt_label = memnew(Label);
 	root->add_child(system_prompt_label);
@@ -220,6 +286,14 @@ AIConfigPanel::AIConfigPanel() {
 	test_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_test_connection));
 	actions->add_child(test_button);
 
+	view_agreement_button = memnew(Button);
+	view_agreement_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_view_usage_agreement));
+	actions->add_child(view_agreement_button);
+
+	reset_agreement_button = memnew(Button);
+	reset_agreement_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_reset_usage_agreement));
+	actions->add_child(reset_agreement_button);
+
 	status_label = memnew(Label);
 	status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	status_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -228,6 +302,9 @@ AIConfigPanel::AIConfigPanel() {
 	test_service = memnew(AIChatService);
 	test_service->connect(SNAME("chat_completed"), callable_mp(this, &AIConfigPanel::_test_connection_completed));
 	add_child(test_service, false, INTERNAL_MODE_BACK);
+
+	usage_agreement_dialog = memnew(AIUsageAgreementDialog);
+	add_child(usage_agreement_dialog);
 
 	_update_translations();
 	_load_settings();

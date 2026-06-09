@@ -20834,3 +20834,268 @@ msgstr ""
 "正在尝试将模型空间的顶点位置 VERTEX 赋值给裁剪空间的顶点位置 POSITION。4.3 版"
 "本修改了裁剪空间的定义，因此如果这段代码是在 4.3 之前编写的，就会无法继续工"
 "作。请考虑直接指定裁剪空间的 Z 分量，即使用 `vec4(VERTEX.xy, 1.0, 1.0)`。"
+
+# AI Assistant Configuration
+msgid "AI Configuration"
+msgstr "AI 配置"
+
+msgid "Base URL"
+msgstr "基础 URL"
+
+msgid "API Key"
+msgstr "API 密钥"
+
+msgid "Temperature"
+msgstr "温度"
+
+msgid "Max Tokens"
+msgstr "最大令牌数"
+
+msgid "Context Budget"
+msgstr "上下文预算"
+
+msgid "System Prompt"
+msgstr "系统提示词"
+
+msgid "Include project memories"
+msgstr "包含项目记忆"
+
+msgid "Include skill and MCP context"
+msgstr "包含技能和 MCP 上下文"
+
+msgid "Allow AI to suggest Skill/MCP/Memory entries"
+msgstr "允许 AI 建议技能/MCP/记忆条目"
+
+msgid "Test Connection"
+msgstr "测试连接"
+
+msgid "AI settings loaded."
+msgstr "AI 设置已加载。"
+
+msgid "AI settings saved."
+msgstr "AI 设置已保存。"
+
+msgid "AI settings reset to defaults."
+msgstr "AI 设置已重置为默认值。"
+
+msgid "Base URL, model, and API key are required before testing the connection."
+msgstr "测试连接前需要填写基础 URL、模型和 API 密钥。"
+
+msgid "Connection test could not start."
+msgstr "连接测试无法启动。"
+
+msgid "Testing AI connection..."
+msgstr "正在测试 AI 连接..."
+
+msgid "Connection test succeeded."
+msgstr "连接测试成功。"
+
+msgid "Connection test failed. HTTP %d."
+msgstr "连接测试失败，HTTP %d。"
+
+msgid "Say hello from Jundot."
+msgstr "来自 Jundot 的问候。"
+
+msgid ""
+"You are an AI assistant inside the Jundot editor. Help analyze project issues, "
+"evaluate feature necessity, and propose confirmed next steps."
+msgstr ""
+"你是 Jundot 编辑器内的 AI 助手。请帮助分析项目问题、评估功能必要性，并提出确"
+"认后的后续步骤。"
+
+msgid "Config"
+msgstr "配置"
+
+# AI Chat Panel
+msgid "Input message / drop files here"
+msgstr "输入消息/拖放文件到此处"
+
+msgid "Attach or reference a text file"
+msgstr "附加或引用文本文件"
+
+msgid "Reference Project File"
+msgstr "引用项目文件"
+
+msgid "Import Skill / MCP / Memory..."
+msgstr "导入技能/MCP/记忆..."
+
+msgid "Import Skill / MCP / Memory"
+msgstr "导入技能/MCP/记忆"
+
+msgid "Add All"
+msgstr "全部添加"
+
+msgid "Dismiss All"
+msgstr "全部拒绝"
+
+msgid "Configure an API key before sending AI messages."
+msgstr "发送 AI 消息前请先配置 API 密钥。"
+
+msgid "Skill \"%s\" added."
+msgstr "技能 \"%s\" 已添加。"
+
+msgid "MCP server \"%s\" added."
+msgstr "MCP 服务器 \"%s\" 已添加。"
+
+msgid "Memory \"%s\" added."
+msgstr "记忆 \"%s\" 已添加。"
+
+msgid "Imported %d entry(s) from file. Confirm to add."
+msgstr "从文件导入 %d 个条目，确认后添加。"
+
+msgid "Import..."
+msgstr "导入..."
+
+msgid ""
+"Project fact, preference, or recurring issue for the AI assistant."
+msgstr ""
+"项目事实、偏好或 AI 助手的常见问题。"
+
+msgid ""
+"Prompt text shown to the AI when this skill is enabled."
+msgstr ""
+"此技能启用时向 AI 显示的提示文本。"
+
+msgid ""
+"Capability list JSON. The editor does not execute MCP tools in this phase."
+msgstr ""
+"能力列表 JSON。编辑器在此阶段不执行 MCP 工具。"
+
+# Iteration Mode descriptions
+msgid ""
+"Mode: Defect discovery. Prioritize engine logs, crash reports, code patterns, "
+"root causes, and performance bottlenecks."
+msgstr ""
+"模式：缺陷发现。优先分析引擎日志、崩溃报告、代码模式、根因和性能瓶颈。"
+
+msgid ""
+"Mode: Feature evaluation. Judge whether a requested feature is generally "
+"useful and necessary before expanding scope."
+msgstr ""
+"模式：功能评估。判断请求的功能是否通用和必要，然后再扩展范围。"
+
+msgid ""
+"Mode: Hybrid expansion. Propose AI-assisted changes while preserving "
+"developer confirmation and manual collaboration."
+msgstr ""
+"模式：混合扩展。在保留开发者确认和手动协作的前提下，提出 AI 辅助的变更。"
+
+msgid "Skill / MCP / Memory Files"
+msgstr "技能/MCP/记忆文件"
+
+msgid "MCP Config Files"
+msgstr "MCP 配置文件"
+
+msgid "Text Files"
+msgstr "文本文件"
+
+# Suggestion Card detail labels
+msgid "Name:"
+msgstr "名称："
+
+msgid "Description:"
+msgstr "描述："
+
+msgid "Permission:"
+msgstr "权限："
+
+msgid "Writes:"
+msgstr "写入："
+
+msgid "Confirmation:"
+msgstr "确认："
+
+msgid "Prompt:"
+msgstr "提示："
+
+msgid "Command:"
+msgstr "命令："
+
+msgid "Args:"
+msgstr "参数："
+
+msgid "Capabilities:"
+msgstr "能力："
+
+msgid "Title:"
+msgstr "标题："
+
+msgid "Tags:"
+msgstr "标签："
+
+msgid "Content:"
+msgstr "内容："
+
+# Suggestion card boolean values
+msgid "yes"
+msgstr "是"
+
+msgid "no"
+msgstr "否"
+
+msgid "required"
+msgstr "需要"
+
+msgid "not required"
+msgstr "不需要"
+
+# Misc AI strings
+msgid "Writes project data"
+msgstr "写入项目数据"
+
+msgid "Requires confirmation"
+msgstr "需要确认"
+
+msgid "Allowed in read-only mode"
+msgstr "允许在只读模式下运行"
+
+msgid "Enabled for AI context"
+msgstr "在 AI 上下文中启用"
+
+msgid "Imported: %s."
+msgstr "已导入：%s。"
+
+msgid "Imported %d entry(s)."
+msgstr "已导入 %d 个条目。"
+
+msgid "Imported %d entry(s) from directory."
+msgstr "从目录导入 %d 个条目。"
+
+msgid "Imported %d MCP server(s)."
+msgstr "已导入 %d 个 MCP 服务器。"
+
+msgid "Imported %d MCP server(s) from directory."
+msgstr "从目录导入 %d 个 MCP 服务器。"
+
+msgid "%d memory(ies)"
+msgstr "%d 条记忆"
+
+msgid "%d skill(s)"
+msgstr "%d 个技能"
+
+msgid "%d MCP server(s)"
+msgstr "%d 个 MCP 服务器"
+
+msgid "Thought"
+msgstr "已思考"
+
+msgid "In: %d tokens  Out: %d tokens"
+msgstr "输入 %d tokens · 输出 %d tokens"
+
+msgid "AI assistant ready."
+msgstr "AI 助手就绪。"
+
+msgid "Mode: Hybrid assistant. Help the developer by analyzing context, proposing changes, and collaborating on solutions."
+msgstr "模式：混合助手。通过分析上下文、提出修改建议、协作制定解决方案来协助开发者。"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Edit"
+msgstr "编辑"
+
+msgid "Copy message"
+msgstr "复制消息"
+
+msgid "Edit message"
+msgstr "编辑消息"

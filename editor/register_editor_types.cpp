@@ -40,6 +40,10 @@
 #include "editor/ai/ai_chat_panel.h"
 #include "editor/ai/ai_config_panel.h"
 #include "editor/ai/ai_editor_plugin.h"
+#include "editor/ai/ai_memory_panel.h"
+#include "editor/ai/ai_repair_card.h"
+#include "editor/ai/ai_tools_panel.h"
+#include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/animation/animation_tree_editor_plugin.h"
 #include "editor/audio/audio_stream_editor_plugin.h"
 #include "editor/audio/audio_stream_randomizer_editor_plugin.h"
@@ -212,6 +216,10 @@ void register_editor_types() {
 	GDREGISTER_CLASS(AIChatService);
 	GDREGISTER_CLASS(AIChatPanel);
 	GDREGISTER_CLASS(AIConfigPanel);
+	GDREGISTER_CLASS(AIMemoryPanel);
+	GDREGISTER_CLASS(AIToolsPanel);
+	GDREGISTER_CLASS(AIUsageAgreementDialog);
+	GDREGISTER_CLASS(AIRepairCard);
 	GDREGISTER_CLASS(UpdateManager);
 
 	// Required to document import options in the class reference.

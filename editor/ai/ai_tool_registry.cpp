@@ -1,16 +1,18 @@
-/**************************************************************************/
 /*  ai_tool_registry.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
+/*                                JunDot                                  */
 /**************************************************************************/
 
 #include "ai_tool_registry.h"
 
+#include "core/error/error_macros.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/os/time.h"
+#include "core/variant/array.h"
+#include "core/variant/variant.h"
 #include "editor/file_system/editor_paths.h"
 
 String AIToolRegistry::_get_default_path() {

@@ -1,8 +1,7 @@
-/**************************************************************************/
 /*  ai_tool_registry.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
+/*                                JunDot                                  */
 /**************************************************************************/
 
 #pragma once
@@ -10,6 +9,7 @@
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
+#include "core/variant/dictionary.h"
 
 struct AISkillEntry {
 	String id;

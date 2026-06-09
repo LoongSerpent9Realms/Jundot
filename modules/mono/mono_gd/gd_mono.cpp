@@ -808,7 +808,7 @@ Error GDMono::reload_project_assemblies() {
 	finalizing_scripts_domain = true;
 
 	if (!get_plugin_callbacks().UnloadProjectPluginCallback()) {
-		ERR_PRINT_ED(".NET: Failed to unload assemblies. Please check https://github.com/jundotengine/jundot/issues/78513 for more information.");
+		ERR_PRINT_ED(".NET: Failed to unload project assemblies. Tool scripts or libraries may be holding strong references, running threads, static caches, or event subscriptions that block AssemblyLoadContext unloading. Free those references during AssemblyLoadContext.Unloading, or restart the editor to recover. See https://github.com/godotengine/godot/issues/78513 for more information.");
 		reload_failure();
 		return FAILED;
 	}

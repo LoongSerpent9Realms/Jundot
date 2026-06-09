@@ -1022,6 +1022,7 @@ Install one of these toolchains, then run this tool again:
         }
 
         await CopyPackageBuilderAsync();
+        await CopyLauncherAsync();
 
         // Write manifest
         var manifestPath = Path.Combine(_stagingDir, "package-manifest.txt");
@@ -1047,7 +1048,11 @@ Install one of these toolchains, then run this tool again:
         lines.Add("Files:");
         lines.AddRange(products.Select(p => $"  {p.Name}"));
         if (_cfg.Mono) lines.Add("  JundotSharp/");
-        if (_cfg.PlatformName == "windows" && _cfg.Target == "editor") lines.Add("  Tools/PackageBuilder/");
+        if (_cfg.Target == "editor")
+        {
+            lines.Add("  Tools/PackageBuilder/");
+            lines.Add("  Tools/Launcher/");
+        }
 
         File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);
 
@@ -1112,6 +1117,41 @@ Install one of these toolchains, then run this tool again:
         });
 
         Report("  Copied: Tools/PackageBuilder/", "output");
+    }
+
+    private async Task CopyLauncherAsync()
+    {
+        if (_cfg.Target != "editor")
+            return;
+
+        var projectPath = Path.Combine(_repoRoot, "tools", "Launcher", "Launcher.csproj");
+        if (!File.Exists(projectPath))
+        {
+            Report("Launcher project was not found; skipping JundotLauncher.", "warning");
+            return;
+        }
+
+        var launcherDir = Path.Combine(_stagingDir, "Tools", "Launcher");
+        if (Directory.Exists(launcherDir))
+            Directory.Delete(launcherDir, true);
+        Directory.CreateDirectory(launcherDir);
+
+        Report("Embedding JundotLauncher", "step");
+        var logPath = Path.Combine(_logRoot, $"{_packageName}-launcher.log");
+        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, new[]
+        {
+            "publish",
+            projectPath,
+            "-c",
+            "Release",
+            "-o",
+            launcherDir,
+            "--self-contained",
+            "false",
+            "/p:UseAppHost=true"
+        });
+
+        Report("  Copied: Tools/Launcher/", "output");
     }
 
     private string GetProductPattern(bool monoBuild)
@@ -1328,10 +1368,26 @@ Install one of these toolchains, then run this tool again:
 
     private static void ConfigureProcessOutput(ProcessStartInfo psi)
     {
-        psi.StandardOutputEncoding = Encoding.UTF8;
-        psi.StandardErrorEncoding = Encoding.UTF8;
-        psi.Environment["PYTHONUTF8"] = "1";
-        psi.Environment["PYTHONIOENCODING"] = "utf-8";
+        // Use the system's active ANSI code page (e.g. GBK/936 on Chinese Windows)
+        // so that native tools like MSVC/cl.exe output Chinese correctly.
+        // Falls back to UTF-8 on non-Windows or if the system codepage is unavailable.
+        try
+        {
+            var sysEncoding = Encoding.GetEncoding(0);
+            psi.StandardOutputEncoding = sysEncoding;
+            psi.StandardErrorEncoding  = sysEncoding;
+        }
+        catch
+        {
+            psi.StandardOutputEncoding = Encoding.UTF8;
+            psi.StandardErrorEncoding  = Encoding.UTF8;
+        }
+
+        // Do NOT set PYTHONUTF8/PYTHONIOENCODING here.
+        // Let Python use its system default encoding (GBK on Chinese Windows),
+        // which matches the ANSI code page set above. MSVC/cl.exe also outputs
+        // GBK, so the whole pipeline stays consistent:
+        //   MSVC(GBK) → scons/Python(GBK) → C# stdout reader(GBK) → UI(Unicode)
         psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "zh-CN";
     }
 

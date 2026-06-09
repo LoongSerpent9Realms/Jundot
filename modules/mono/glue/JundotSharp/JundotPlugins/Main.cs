@@ -264,13 +264,14 @@ namespace JundotPlugins
                         takingTooLong = true;
 
                         // TODO: How to log from JundotPlugins? (delegate pointer?)
-                        Console.Error.WriteLine("Assembly unloading is taking longer than expected...");
+                        Console.Error.WriteLine(
+                            "Assembly unloading is taking longer than expected. Tool scripts or libraries may still hold references from static fields, running threads, event subscriptions, or strong GC handles.");
                     }
                     else if (elapsedTimeMs >= 1000)
                     {
                         // TODO: How to log from JundotPlugins? (delegate pointer?)
                         Console.Error.WriteLine(
-                            "Failed to unload assemblies. Possible causes: Strong GC handles, running threads, etc.");
+                            "Failed to unload assemblies. Common causes include strong GC handles, running threads, static caches, and event subscriptions in tool scripts or third-party libraries. Free these references during AssemblyLoadContext.Unloading, or restart the editor to recover.");
 
                         return false;
                     }
