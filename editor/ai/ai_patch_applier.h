@@ -1,4 +1,4 @@
-/*  ai_repair_workflow.h                                                   */
+/*  ai_patch_applier.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -31,61 +31,44 @@
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
 
-struct AIRepairTask {
-	enum State {
-		STATE_PENDING,
-		STATE_APPLIED,
-		STATE_TESTS_PASSED,
-		STATE_TESTS_FAILED,
-		STATE_BUILD_TRIGGERED,
-		STATE_BUILD_SUCCEEDED,
-		STATE_BUILD_FAILED,
-		STATE_EVALUATED,
-		STATE_PUBLISHED,
+// Forward declaration
+struct AIRepairTask;
+
+// Applies AI-generated code patches to the local working tree.
+//
+// Two modes:
+//   "full"  : overwrite the entire file with new content.
+//   "diff"  : parse a unified diff and apply line-level changes.
+//
+// Safety guarantees:
+//   - dry_run mode only reports what WOULD change, never writes.
+//   - Before writing, the original file is backed up to
+//     .jundot/ai_patch_backups/{task_id}/.
+//   - Unified diffs are validated against the target file line count
+//     before any write happens, and rejected on mismatch.
+class AIPatchApplier {
+public:
+	struct PatchResult {
+		bool valid = true;
+		String error;                      // empty on success
+		Vector<String> backup_paths;       // backup file paths created
+		Vector<String> dirty_files;        // files that were modified
 	};
 
-	String id;
-	String issue_type;
-	String title;
-	String reproduction;
-	String root_cause;
-	Vector<String> candidate_files;
-	String patch_summary;
-	String patch_type; // "full" or "diff"
-	String patch_code; // full file content or unified diff text
-	Vector<String> fetch_urls; // remote URLs to download before applying
-	String test_command;
-	String risk;
-	State state = STATE_PENDING;
+	// Apply an AI repair task's patch to the working tree.
+	// Routes to apply_unified_diff or apply_full_replace based on task.patch_type.
+	static PatchResult apply_patch(const AIRepairTask &p_task, bool p_dry_run = false);
 
-	String created_at;
-	String applied_at;
-	String tests_completed_at;
-	String build_completed_at;
-	String evaluated_at;
-	String published_at;
+	// Parse and apply a unified-diff string against the working directory.
+	// Supports standard diff --git header, @@ hunk ranges, + / - / context lines.
+	static PatchResult apply_unified_diff(const String &p_diff_text, const String &p_working_dir, bool p_dry_run = false);
 
-	String last_error;
-};
+	// Overwrite target file(s) with new content.
+	static PatchResult apply_full_replace(const Vector<String> &p_file_paths, const Vector<String> &p_new_contents, bool p_dry_run = false);
 
-class AIRepairWorkflow {
-	static String _make_task_id();
+	// Restore files from backup dir.
+	static Error rollback(const Vector<String> &p_backup_paths);
 
-public:
-	static Error load(Vector<AIRepairTask> &r_tasks);
-	static Error save(const Vector<AIRepairTask> &p_tasks);
-	static Error append(const AIRepairTask &p_task);
-	static Error update_task(const String &p_id, AIRepairTask::State p_state, const String &p_error = String());
-
-	// Dirty worktree protection: returns list of dirty files NOT in candidate_files.
-	static Vector<String> check_dirty_worktree(const Vector<String> &p_candidate_files);
-
-	// Suggest a default test command based on file extensions.
-	static String suggest_default_test(const Vector<String> &p_files);
-
-	// Record a pre-patch snapshot (git diff) for the given files; returns the diff text.
-	static String record_pre_patch_snapshot(const Vector<String> &p_files);
-
-	// Run the test command and capture output.
-	static Error run_repair_tests(const String &p_test_command, String &r_output, int &r_exit_code);
+	// Threshold in lines: files shorter than this use "full" mode; longer use "diff".
+	static constexpr int FULL_REPLACE_THRESHOLD = 200;
 };

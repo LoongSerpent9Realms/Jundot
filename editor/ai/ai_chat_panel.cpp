@@ -29,6 +29,9 @@
 
 #include "ai_build_bridge.h"
 #include "ai_chat_message.h"
+#include "ai_code_fetcher.h"
+#include "ai_new_build_notifier.h"
+#include "ai_patch_applier.h"
 #include "ai_chat_service.h"
 #include "ai_context_builder.h"
 #include "ai_importer.h"
@@ -524,7 +527,25 @@ void AIChatPanel::_repair_apply_patch(AIRepairCard *p_card) {
 		return;
 	}
 
-	// Record pre-patch snapshot
+	// Step 1: Download remote source files if needed.
+	if (!task.fetch_urls.is_empty() && !task.candidate_files.is_empty()) {
+		status_label->set_text(TTR("Fetching remote source files..."));
+		Vector<String> fetch_errors;
+		Error fetch_err = AICodeFetcher::fetch_files(task.fetch_urls, task.candidate_files, fetch_errors);
+		if (fetch_err != OK) {
+			String err_detail;
+			for (int i = 0; i < fetch_errors.size(); i++) {
+				if (i > 0) {
+					err_detail += "; ";
+				}
+				err_detail += fetch_errors[i];
+			}
+			status_label->set_text(vformat(TTR("Failed to download remote source files: %s"), err_detail));
+			return;
+		}
+	}
+
+	// Step 2: Record pre-patch snapshot (before writing).
 	String snapshot = AIRepairWorkflow::record_pre_patch_snapshot(task.candidate_files);
 	if (!snapshot.is_empty()) {
 		String snapshot_path = EditorPaths::get_singleton()->get_config_dir().path_join("ai_patch_snapshots").path_join(task.id + ".diff");
@@ -536,6 +557,24 @@ void AIChatPanel::_repair_apply_patch(AIRepairCard *p_card) {
 				f->store_string(snapshot);
 			}
 		}
+	}
+
+	// Step 3: Actually write the patch to disk (AIPatchApplier).
+	if (!task.patch_code.is_empty()) {
+		AIPatchApplier::PatchResult result = AIPatchApplier::apply_patch(task, false);
+		if (!result.valid) {
+			String err_msg = vformat(TTR("Failed to apply patch: %s"), result.error);
+			// Attempt rollback.
+			if (!result.backup_paths.is_empty()) {
+				AIPatchApplier::rollback(result.backup_paths);
+				err_msg += TTR(" Changes have been rolled back.");
+			}
+			status_label->set_text(err_msg);
+			return;
+		}
+		status_label->set_text(vformat(TTR("Patch written to %d file(s)."), result.dirty_files.size()));
+	} else {
+		status_label->set_text(TTR("No patch code provided. Only snapshot recorded (no files changed)."));
 	}
 
 	AIRepairWorkflow::update_task(task.id, AIRepairTask::STATE_APPLIED);
@@ -655,6 +694,8 @@ void AIChatPanel::_repair_rebuild(AIRepairCard *p_card) {
 		status_label->set_text(vformat(TTR("Could not launch PackageBuilder. Please run it manually from %s"), AIBuildBridge::detect_repo_root().path_join("tools/PackageBuilder")));
 	} else {
 		status_label->set_text(TTR("PackageBuilder launched. Complete the build and click 'Publish' when ready."));
+		// Start polling for build completion — will show restart dialog when ready.
+		AINewBuildNotifier::start_polling();
 	}
 }
 
@@ -679,6 +720,8 @@ void AIChatPanel::_show_repair_tasks(const Vector<AIRepairSuggestion> &p_repairs
 		task.root_cause = suggestion.root_cause;
 		task.candidate_files = suggestion.candidate_files;
 		task.patch_summary = suggestion.patch_summary;
+		task.patch_type = suggestion.patch_type;
+		task.patch_code = suggestion.patch_code;
 		task.test_command = suggestion.test_command;
 		task.risk = suggestion.risk;
 		task.state = AIRepairTask::STATE_PENDING;

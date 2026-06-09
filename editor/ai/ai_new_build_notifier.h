@@ -1,4 +1,4 @@
-/*  ai_repair_workflow.h                                                   */
+/*  ai_new_build_notifier.h                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,65 +27,38 @@
 
 #pragma once
 
-#include "core/error/error_list.h"
-#include "core/string/ustring.h"
-#include "core/templates/vector.h"
+#include "scene/gui/dialogs.h"
 
-struct AIRepairTask {
-	enum State {
-		STATE_PENDING,
-		STATE_APPLIED,
-		STATE_TESTS_PASSED,
-		STATE_TESTS_FAILED,
-		STATE_BUILD_TRIGGERED,
-		STATE_BUILD_SUCCEEDED,
-		STATE_BUILD_FAILED,
-		STATE_EVALUATED,
-		STATE_PUBLISHED,
-	};
+class Timer;
 
-	String id;
-	String issue_type;
-	String title;
-	String reproduction;
-	String root_cause;
-	Vector<String> candidate_files;
-	String patch_summary;
-	String patch_type; // "full" or "diff"
-	String patch_code; // full file content or unified diff text
-	Vector<String> fetch_urls; // remote URLs to download before applying
-	String test_command;
-	String risk;
-	State state = STATE_PENDING;
+// Polls for a new editor build and shows a countdown restart dialog.
+//
+// Lifecycle:
+//  1. start_polling() — begins checking AIBuildBridge::is_build_ready()
+//     every 2 seconds.
+//  2. When a new build is detected, a modal dialog appears:
+//     "New editor build is ready. Saving and restarting in N..."
+//  3. User can cancel to postpone, or let the countdown expire.
+//  4. On confirm/timeout: saves all scenes/layout, triggers
+//     EditorNode::restart_editor().
+class AINewBuildNotifier : public AcceptDialog {
+	GDCLASS(AINewBuildNotifier, AcceptDialog);
 
-	String created_at;
-	String applied_at;
-	String tests_completed_at;
-	String build_completed_at;
-	String evaluated_at;
-	String published_at;
+	Timer *poll_timer = nullptr;
+	Timer *countdown_timer = nullptr;
+	int countdown_seconds = 3;
+	String dialog_template_text;
 
-	String last_error;
-};
-
-class AIRepairWorkflow {
-	static String _make_task_id();
+	void _on_poll_tick();
+	void _on_countdown_tick();
+	void _on_confirmed();
 
 public:
-	static Error load(Vector<AIRepairTask> &r_tasks);
-	static Error save(const Vector<AIRepairTask> &p_tasks);
-	static Error append(const AIRepairTask &p_task);
-	static Error update_task(const String &p_id, AIRepairTask::State p_state, const String &p_error = String());
+	static AINewBuildNotifier *get_singleton();
 
-	// Dirty worktree protection: returns list of dirty files NOT in candidate_files.
-	static Vector<String> check_dirty_worktree(const Vector<String> &p_candidate_files);
+	static void start_polling();
+	static void stop_polling();
 
-	// Suggest a default test command based on file extensions.
-	static String suggest_default_test(const Vector<String> &p_files);
-
-	// Record a pre-patch snapshot (git diff) for the given files; returns the diff text.
-	static String record_pre_patch_snapshot(const Vector<String> &p_files);
-
-	// Run the test command and capture output.
-	static Error run_repair_tests(const String &p_test_command, String &r_output, int &r_exit_code);
+protected:
+	static AINewBuildNotifier *singleton;
 };

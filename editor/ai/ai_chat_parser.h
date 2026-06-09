@@ -54,6 +54,9 @@ struct AIRepairSuggestion {
 	String root_cause;
 	Vector<String> candidate_files;
 	String patch_summary;
+	String patch_type; // "full" or "diff"
+	String patch_code; // full file content or unified diff text
+	Vector<String> fetch_urls; // remote URLs to download before applying
 	String test_command;
 	String risk;
 };

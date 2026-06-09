@@ -167,6 +167,54 @@ AIMemoryEntry AIChatParser::_parse_memory_from_comment(const String &p_block) {
 	return entry;
 }
 
+static String _extract_code_fence_block(const String &p_text) {
+	// Find the PATCH_CODE: key line.
+	Vector<String> lines = p_text.split("\n");
+	int code_key_idx = -1;
+	for (int i = 0; i < lines.size(); i++) {
+		if (lines[i].strip_edges().begins_with("PATCH_CODE:")) {
+			code_key_idx = i;
+			break;
+		}
+	}
+	if (code_key_idx < 0) {
+		return String();
+	}
+
+	// Scan from the next line for an opening code fence (```).
+	for (int i = code_key_idx + 1; i < lines.size(); i++) {
+		String trimmed = lines[i].strip_edges();
+		if (trimmed.begins_with("```")) {
+			// Found opening fence. Collect everything until the closing fence.
+			Vector<String> code_lines;
+			for (int j = i + 1; j < lines.size(); j++) {
+				if (lines[j].strip_edges() == "```") {
+					// Join collected lines and return.
+					String result;
+					for (int k = 0; k < code_lines.size(); k++) {
+						if (k > 0) {
+							result += "\n";
+						}
+						result += code_lines[k];
+					}
+					return result;
+				}
+				code_lines.push_back(lines[j]);
+			}
+			// No closing fence — return what we collected.
+			String result;
+			for (int k = 0; k < code_lines.size(); k++) {
+				if (k > 0) {
+					result += "\n";
+				}
+				result += code_lines[k];
+			}
+			return result;
+		}
+	}
+	return String();
+}
+
 AIRepairSuggestion AIChatParser::_parse_repair_from_comment(const String &p_block) {
 	AIRepairSuggestion entry;
 	entry.issue_type = _extract_field(p_block, "TYPE");
@@ -174,6 +222,7 @@ AIRepairSuggestion AIChatParser::_parse_repair_from_comment(const String &p_bloc
 	entry.reproduction = _extract_field(p_block, "REPRODUCTION");
 	entry.root_cause = _extract_field(p_block, "ROOT_CAUSE");
 	entry.patch_summary = _extract_field(p_block, "PATCH");
+	entry.patch_type = _extract_field(p_block, "PATCH_TYPE");
 	entry.test_command = _extract_field(p_block, "TEST");
 	entry.risk = _extract_field(p_block, "RISK");
 
@@ -184,6 +233,43 @@ AIRepairSuggestion AIChatParser::_parse_repair_from_comment(const String &p_bloc
 			entry.candidate_files.write[i] = entry.candidate_files[i].strip_edges();
 		}
 	}
+
+	// FETCH_URL can appear multiple times (one per URL).
+	const String fetch_str = _extract_field(p_block, "FETCH_URL");
+	if (!fetch_str.is_empty()) {
+		// Each URL is separated by a newline or on the same "FETCH_URL: url1, url2" line.
+		Vector<String> urls = fetch_str.split("\n");
+		for (int i = 0; i < urls.size(); i++) {
+			String u = urls[i].strip_edges();
+			if (!u.is_empty()) {
+				entry.fetch_urls.push_back(u);
+			}
+		}
+	}
+	// Also support comma-separated URL on a single line.
+	if (entry.fetch_urls.size() == 1 && entry.fetch_urls[0].contains(",")) {
+		Vector<String> split = entry.fetch_urls[0].split(",");
+		entry.fetch_urls.clear();
+		for (int i = 0; i < split.size(); i++) {
+			String u = split[i].strip_edges();
+			if (!u.is_empty()) {
+				entry.fetch_urls.push_back(u);
+			}
+		}
+	}
+
+	// Extract PATCH_CODE from code fence inside the block.
+	entry.patch_code = _extract_code_fence_block(p_block);
+
+	// Auto-detect patch_type if not explicitly set.
+	if (entry.patch_type.is_empty()) {
+		if (entry.patch_code.begins_with("diff --git") || entry.patch_code.find("@@ ") >= 0) {
+			entry.patch_type = "diff";
+		} else if (!entry.patch_code.is_empty()) {
+			entry.patch_type = "full";
+		}
+	}
+
 	return entry;
 }
 
@@ -245,6 +331,8 @@ AIRepairSuggestion AIChatParser::_parse_repair_from_json(const Dictionary &p_dic
 	entry.reproduction = p_dict.get("reproduction", String());
 	entry.root_cause = p_dict.get("root_cause", String());
 	entry.patch_summary = p_dict.get("patch_summary", String());
+	entry.patch_type = p_dict.get("patch_type", String());
+	entry.patch_code = p_dict.get("patch_code", String());
 	entry.test_command = p_dict.get("test_command", String());
 	entry.risk = p_dict.get("risk", String());
 
@@ -255,6 +343,24 @@ AIRepairSuggestion AIChatParser::_parse_repair_from_json(const Dictionary &p_dic
 			entry.candidate_files.push_back(String(files[i]));
 		}
 	}
+
+	const Variant urls_var = p_dict.get("fetch_urls", Array());
+	if (urls_var.get_type() == Variant::ARRAY) {
+		Array urls = urls_var;
+		for (int i = 0; i < urls.size(); i++) {
+			entry.fetch_urls.push_back(String(urls[i]));
+		}
+	}
+
+	// Auto-detect patch_type if not explicitly set.
+	if (entry.patch_type.is_empty()) {
+		if (entry.patch_code.begins_with("diff --git") || entry.patch_code.find("@@ ") >= 0) {
+			entry.patch_type = "diff";
+		} else if (!entry.patch_code.is_empty()) {
+			entry.patch_type = "full";
+		}
+	}
+
 	return entry;
 }
 

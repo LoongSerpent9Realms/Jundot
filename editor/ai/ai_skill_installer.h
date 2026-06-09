@@ -1,4 +1,4 @@
-/*  ai_repair_workflow.h                                                   */
+/*  ai_skill_installer.h                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,65 +27,18 @@
 
 #pragma once
 
-#include "core/error/error_list.h"
 #include "core/string/ustring.h"
-#include "core/templates/vector.h"
 
-struct AIRepairTask {
-	enum State {
-		STATE_PENDING,
-		STATE_APPLIED,
-		STATE_TESTS_PASSED,
-		STATE_TESTS_FAILED,
-		STATE_BUILD_TRIGGERED,
-		STATE_BUILD_SUCCEEDED,
-		STATE_BUILD_FAILED,
-		STATE_EVALUATED,
-		STATE_PUBLISHED,
-	};
-
-	String id;
-	String issue_type;
-	String title;
-	String reproduction;
-	String root_cause;
-	Vector<String> candidate_files;
-	String patch_summary;
-	String patch_type; // "full" or "diff"
-	String patch_code; // full file content or unified diff text
-	Vector<String> fetch_urls; // remote URLs to download before applying
-	String test_command;
-	String risk;
-	State state = STATE_PENDING;
-
-	String created_at;
-	String applied_at;
-	String tests_completed_at;
-	String build_completed_at;
-	String evaluated_at;
-	String published_at;
-
-	String last_error;
-};
-
-class AIRepairWorkflow {
-	static String _make_task_id();
+class AISkillInstaller {
+	static String _find_defaults_dir();
+	static String _find_fallback_defaults_dir();
 
 public:
-	static Error load(Vector<AIRepairTask> &r_tasks);
-	static Error save(const Vector<AIRepairTask> &p_tasks);
-	static Error append(const AIRepairTask &p_task);
-	static Error update_task(const String &p_id, AIRepairTask::State p_state, const String &p_error = String());
+	/// Returns the path to bundled AI skill defaults, or empty string if not found.
+	static String get_defaults_dir();
 
-	// Dirty worktree protection: returns list of dirty files NOT in candidate_files.
-	static Vector<String> check_dirty_worktree(const Vector<String> &p_candidate_files);
-
-	// Suggest a default test command based on file extensions.
-	static String suggest_default_test(const Vector<String> &p_files);
-
-	// Record a pre-patch snapshot (git diff) for the given files; returns the diff text.
-	static String record_pre_patch_snapshot(const Vector<String> &p_files);
-
-	// Run the test command and capture output.
-	static Error run_repair_tests(const String &p_test_command, String &r_output, int &r_exit_code);
+	/// Auto-installs default skills into the current project.
+	/// Merges with existing skills — only installs defaults that aren't already present.
+	/// Returns true if new defaults were installed, false if all already present or not found.
+	static bool ensure_defaults_installed();
 };

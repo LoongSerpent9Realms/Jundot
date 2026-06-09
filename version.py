@@ -2,7 +2,7 @@
 name = "Jundot Engine"
 major = 0
 minor = 2
-patch = 2
+patch = 3
 status = "alpha"
 module_config = ""
 website = "https://jundotengine.org"

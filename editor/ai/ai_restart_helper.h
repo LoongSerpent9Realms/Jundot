@@ -1,4 +1,4 @@
-/*  ai_repair_workflow.h                                                   */
+/*  ai_restart_helper.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -31,61 +31,37 @@
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
 
-struct AIRepairTask {
-	enum State {
-		STATE_PENDING,
-		STATE_APPLIED,
-		STATE_TESTS_PASSED,
-		STATE_TESTS_FAILED,
-		STATE_BUILD_TRIGGERED,
-		STATE_BUILD_SUCCEEDED,
-		STATE_BUILD_FAILED,
-		STATE_EVALUATED,
-		STATE_PUBLISHED,
-	};
-
-	String id;
-	String issue_type;
-	String title;
-	String reproduction;
-	String root_cause;
-	Vector<String> candidate_files;
-	String patch_summary;
-	String patch_type; // "full" or "diff"
-	String patch_code; // full file content or unified diff text
-	Vector<String> fetch_urls; // remote URLs to download before applying
-	String test_command;
-	String risk;
-	State state = STATE_PENDING;
-
-	String created_at;
-	String applied_at;
-	String tests_completed_at;
-	String build_completed_at;
-	String evaluated_at;
-	String published_at;
-
-	String last_error;
-};
-
-class AIRepairWorkflow {
-	static String _make_task_id();
-
+// Persists editor work state across AI-triggered restarts.
+//
+// Before EditorNode::restart_editor() is called (e.g. after a new build),
+// save_state() writes a JSON blob of currently open scenes and scripts
+// to {project_settings}/ai_restore_state.json.
+//
+// On the next editor startup, restore_state() reads that file, re-opens
+// the scenes and scripts, and deletes the state file.
+//
+// This works _in addition to_ the built-in editor layout restore —
+// it does not replace EditorNode::restore_scenes_on_load or
+// ScriptEditor's script_editor_cache. It fills the gap where the
+// editor process is killed mid-work and needs an explicit "return to
+// where I was" signal.
+class AIRestartHelper {
 public:
-	static Error load(Vector<AIRepairTask> &r_tasks);
-	static Error save(const Vector<AIRepairTask> &p_tasks);
-	static Error append(const AIRepairTask &p_task);
-	static Error update_task(const String &p_id, AIRepairTask::State p_state, const String &p_error = String());
+	// Write current editor state to disk. Call before restart.
+	static Error save_state();
 
-	// Dirty worktree protection: returns list of dirty files NOT in candidate_files.
-	static Vector<String> check_dirty_worktree(const Vector<String> &p_candidate_files);
+	// Read and apply saved state. Call on startup after editor is ready.
+	static Error restore_state();
 
-	// Suggest a default test command based on file extensions.
-	static String suggest_default_test(const Vector<String> &p_files);
+	// Remove the state file (called after successful restore).
+	static void cleanup_state_file();
 
-	// Record a pre-patch snapshot (git diff) for the given files; returns the diff text.
-	static String record_pre_patch_snapshot(const Vector<String> &p_files);
+	// Path to the state JSON file.
+	static String _state_path();
 
-	// Run the test command and capture output.
-	static Error run_repair_tests(const String &p_test_command, String &r_output, int &r_exit_code);
+	// Internal struct serialized to/from JSON.
+	struct RestoreState {
+		Vector<String> open_scene_paths;
+		Vector<String> open_script_paths;
+	};
 };

@@ -31,11 +31,14 @@
 #include "ai_settings.h"
 #include "ai_usage_agreement_dialog.h"
 
+#include "core/io/file_access.h"
+#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
+#include "scene/gui/file_dialog.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
@@ -103,6 +106,8 @@ void AIConfigPanel::_update_translations() {
 	test_button->set_text(TTR("Test Connection"));
 	view_agreement_button->set_text(TTR("View AI Usage Agreement"));
 	reset_agreement_button->set_text(TTR("Reset Agreement Consent"));
+	export_button->set_text(TTR("Export Config"));
+	import_button->set_text(TTR("Import Config"));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	model_edit->set_placeholder(AISettings::get_default_model());
 }
@@ -195,7 +200,9 @@ void AIConfigPanel::_test_connection() {
 
 void AIConfigPanel::_test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
 	if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
-		status_label->set_text(TTR("Connection test succeeded."));
+		// Auto-save on successful test so users don't lose their config.
+		_save_settings();
+		status_label->set_text(TTR("Connection test succeeded. Settings saved."));
 		return;
 	}
 
@@ -213,6 +220,129 @@ void AIConfigPanel::_view_usage_agreement() {
 void AIConfigPanel::_reset_usage_agreement() {
 	const Error err = AISettings::reset_usage_agreement();
 	status_label->set_text(err == OK ? TTR("AI usage agreement consent reset.") : TTR("AI usage agreement consent could not be reset."));
+}
+
+void AIConfigPanel::_export_config() {
+	export_dialog->set_current_file("ai_config.json");
+	export_dialog->popup_file_dialog();
+}
+
+void AIConfigPanel::_export_config_confirmed(const String &p_path) {
+	AISettingsData settings = AISettings::load();
+	settings.base_url = base_url_edit->get_text().strip_edges();
+	settings.model = model_edit->get_text().strip_edges();
+	settings.api_key = api_key_edit->get_text();
+	settings.temperature = temperature_spin->get_value();
+	settings.max_tokens = max_tokens_spin->get_value();
+	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
+	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.include_project_memories = include_project_memories_check->is_pressed();
+	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
+	settings.system_prompt = system_prompt_edit->get_text();
+
+	Dictionary root;
+	root["base_url"] = settings.base_url;
+	root["model"] = settings.model;
+	root["api_key"] = settings.api_key;
+	root["temperature"] = settings.temperature;
+	root["max_tokens"] = settings.max_tokens;
+	root["system_prompt"] = settings.system_prompt;
+	root["include_project_memories"] = settings.include_project_memories;
+	root["include_tool_context"] = settings.include_tool_context;
+	root["context_char_budget"] = settings.context_char_budget;
+	root["auto_suggest_entries"] = settings.auto_suggest_entries;
+	root["feature_universality_threshold"] = settings.feature_universality_threshold;
+	root["feature_necessity_threshold"] = settings.feature_necessity_threshold;
+	root["feature_design_philosophy_check"] = settings.feature_design_philosophy_check;
+	root["schema_version"] = 1;
+
+	Error err;
+	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
+	if (err != OK || file.is_null()) {
+		status_label->set_text(vformat(TTR("Failed to export config: %s"), TTR(error_names[err])));
+		return;
+	}
+
+	file->store_string(JSON::stringify(root, "\t"));
+	status_label->set_text(vformat(TTR("Config exported to %s"), p_path));
+}
+
+void AIConfigPanel::_import_config() {
+	import_dialog->popup_file_dialog();
+}
+
+void AIConfigPanel::_import_config_confirmed(const String &p_path) {
+	if (!FileAccess::exists(p_path)) {
+		status_label->set_text(TTR("Import failed: file not found."));
+		return;
+	}
+
+	Error err = OK;
+	const String content = FileAccess::get_file_as_string(p_path, &err);
+	if (err != OK || content.is_empty()) {
+		status_label->set_text(TTR("Import failed: could not read file."));
+		return;
+	}
+
+	JSON json;
+	err = json.parse(content);
+	if (err != OK) {
+		status_label->set_text(TTR("Import failed: invalid JSON."));
+		return;
+	}
+
+	const Variant data = json.get_data();
+	if (data.get_type() != Variant::DICTIONARY) {
+		status_label->set_text(TTR("Import failed: unexpected JSON structure."));
+		return;
+	}
+
+	const Dictionary root = data;
+	if (root.has("base_url")) {
+		base_url_edit->set_text(root["base_url"]);
+	}
+	if (root.has("model")) {
+		model_edit->set_text(root["model"]);
+	}
+	if (root.has("api_key")) {
+		api_key_edit->set_text(root["api_key"]);
+	}
+	if (root.has("temperature")) {
+		temperature_spin->set_value(root["temperature"]);
+	}
+	if (root.has("max_tokens")) {
+		max_tokens_spin->set_value(root["max_tokens"]);
+	}
+	if (root.has("context_char_budget")) {
+		context_char_budget_spin->set_value(root["context_char_budget"]);
+	}
+	if (root.has("feature_universality_threshold")) {
+		feature_universality_threshold_spin->set_value(root["feature_universality_threshold"]);
+	}
+	if (root.has("feature_necessity_threshold")) {
+		feature_necessity_threshold_spin->set_value(root["feature_necessity_threshold"]);
+	}
+	if (root.has("include_project_memories")) {
+		include_project_memories_check->set_pressed(root["include_project_memories"]);
+	}
+	if (root.has("include_tool_context")) {
+		include_tool_context_check->set_pressed(root["include_tool_context"]);
+	}
+	if (root.has("auto_suggest_entries")) {
+		auto_suggest_entries_check->set_pressed(root["auto_suggest_entries"]);
+	}
+	if (root.has("feature_design_philosophy_check")) {
+		feature_design_philosophy_check->set_pressed(root["feature_design_philosophy_check"]);
+	}
+	if (root.has("system_prompt")) {
+		system_prompt_edit->set_text(root["system_prompt"]);
+	}
+
+	_save_settings();
+	status_label->set_text(vformat(TTR("Config imported from %s and saved."), p_path));
 }
 
 AIConfigPanel::AIConfigPanel() {
@@ -293,6 +423,32 @@ AIConfigPanel::AIConfigPanel() {
 	reset_agreement_button = memnew(Button);
 	reset_agreement_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_reset_usage_agreement));
 	actions->add_child(reset_agreement_button);
+
+	export_button = memnew(Button);
+	export_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_export_config));
+	actions->add_child(export_button);
+
+	import_button = memnew(Button);
+	import_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_import_config));
+	actions->add_child(import_button);
+
+	// Export dialog (save mode).
+	export_dialog = memnew(FileDialog);
+	export_dialog->set_file_mode(FileDialog::FILE_MODE_SAVE_FILE);
+	export_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	export_dialog->set_title(TTR("Export AI Config"));
+	export_dialog->add_filter("*.json", TTR("JSON Files"));
+	export_dialog->connect("file_selected", callable_mp(this, &AIConfigPanel::_export_config_confirmed));
+	add_child(export_dialog, false, INTERNAL_MODE_FRONT);
+
+	// Import dialog (open mode).
+	import_dialog = memnew(FileDialog);
+	import_dialog->set_file_mode(FileDialog::FILE_MODE_OPEN_FILE);
+	import_dialog->set_access(FileDialog::ACCESS_FILESYSTEM);
+	import_dialog->set_title(TTR("Import AI Config"));
+	import_dialog->add_filter("*.json", TTR("JSON Files"));
+	import_dialog->connect("file_selected", callable_mp(this, &AIConfigPanel::_import_config_confirmed));
+	add_child(import_dialog, false, INTERNAL_MODE_FRONT);
 
 	status_label = memnew(Label);
 	status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);

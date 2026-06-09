@@ -31,6 +31,7 @@
 
 class Button;
 class CheckBox;
+class FileDialog;
 class GridContainer;
 class AIChatService;
 class AIUsageAgreementDialog;
@@ -74,6 +75,10 @@ class AIConfigPanel : public MarginContainer {
 	Button *test_button = nullptr;
 	Button *view_agreement_button = nullptr;
 	Button *reset_agreement_button = nullptr;
+	Button *export_button = nullptr;
+	Button *import_button = nullptr;
+	FileDialog *export_dialog = nullptr;
+	FileDialog *import_dialog = nullptr;
 
 	void _load_settings();
 	void _save_settings();
@@ -81,6 +86,10 @@ class AIConfigPanel : public MarginContainer {
 	void _test_connection();
 	void _view_usage_agreement();
 	void _reset_usage_agreement();
+	void _export_config();
+	void _import_config();
+	void _export_config_confirmed(const String &p_path);
+	void _import_config_confirmed(const String &p_path);
 	void _test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _update_translations();
 

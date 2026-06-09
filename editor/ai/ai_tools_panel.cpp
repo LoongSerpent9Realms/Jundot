@@ -8,6 +8,7 @@
 
 #include "ai_importer.h"
 #include "ai_memory_store.h"
+#include "ai_skill_installer.h"
 
 #include "core/error/error_macros.h"
 #include "core/object/callable_mp.h"
@@ -197,6 +198,9 @@ void AIToolsPanel::_refresh_mcp_list() {
 }
 
 void AIToolsPanel::_load_registry() {
+	// Auto-install bundled default skills if this is a fresh project.
+	AISkillInstaller::ensure_defaults_installed();
+
 	const Error err = AIToolRegistry::load(skills, mcp_servers);
 	if (err != OK) {
 		skills.clear();
