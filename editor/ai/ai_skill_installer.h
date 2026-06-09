@@ -33,12 +33,17 @@ class AISkillInstaller {
 	static String _find_defaults_dir();
 	static String _find_fallback_defaults_dir();
 
+	/// Fallback: install default skills compiled into the binary.
+	/// Used when no disk-based defaults directory is available (packaged builds).
+	static bool _install_builtin_defaults();
+
 public:
 	/// Returns the path to bundled AI skill defaults, or empty string if not found.
 	static String get_defaults_dir();
 
 	/// Auto-installs default skills into the current project.
 	/// Merges with existing skills — only installs defaults that aren't already present.
+	/// Falls back to built-in data if disk defaults are unavailable.
 	/// Returns true if new defaults were installed, false if all already present or not found.
 	static bool ensure_defaults_installed();
 };

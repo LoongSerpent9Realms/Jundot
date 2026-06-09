@@ -27,6 +27,7 @@
 
 #include "ai_skill_installer.h"
 
+#include "ai_defaults_data.h"
 #include "ai_importer.h"
 #include "ai_tool_registry.h"
 
@@ -69,11 +70,55 @@ String AISkillInstaller::get_defaults_dir() {
 	return _find_fallback_defaults_dir();
 }
 
+bool AISkillInstaller::_install_builtin_defaults() {
+	// Fallback for packaged builds: install default skills compiled into the binary.
+	Vector<AISkillEntry> builtins = AIDefaultsData::get_default_skills();
+	if (builtins.is_empty()) {
+		return false;
+	}
+
+	// 1. Load the project's existing skills.
+	Vector<AISkillEntry> existing_skills;
+	Vector<AIMCPServerEntry> existing_mcp_servers;
+	AIToolRegistry::load(existing_skills, existing_mcp_servers);
+
+	// 2. Build a set of existing skill names for deduplication.
+	HashSet<String> existing_names;
+	for (const AISkillEntry &entry : existing_skills) {
+		existing_names.insert(entry.name.strip_edges().to_lower());
+	}
+
+	// 3. Only install built-in skills that aren't already present.
+	Vector<AISkillEntry> new_skills;
+	for (int i = 0; i < builtins.size(); i++) {
+		const String name = builtins[i].name.strip_edges().to_lower();
+		if (existing_names.has(name)) {
+			continue;
+		}
+		AISkillEntry entry = AIToolRegistry::make_skill(builtins[i].name);
+		entry.description = builtins[i].description;
+		entry.prompt_text = builtins[i].prompt_text;
+		new_skills.push_back(entry);
+	}
+
+	if (new_skills.is_empty()) {
+		return false;
+	}
+
+	// 4. Merge new skills with existing ones and save.
+	for (int i = 0; i < new_skills.size(); i++) {
+		existing_skills.push_back(new_skills[i]);
+	}
+	AIToolRegistry::save(existing_skills, existing_mcp_servers);
+	return true;
+}
+
 bool AISkillInstaller::ensure_defaults_installed() {
 	// 1. Find the bundled defaults directory.
 	const String defaults_dir = get_defaults_dir();
 	if (defaults_dir.is_empty()) {
-		return false;
+		// Fall back to built-in data compiled into the binary.
+		return _install_builtin_defaults();
 	}
 
 	// 2. Preview all default skills from the directory.

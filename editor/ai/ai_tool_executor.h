@@ -1,4 +1,4 @@
-/*  ai_settings.h                                                          */
+/*  ai_tool_executor.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -29,47 +29,32 @@
 
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
+#include "core/variant/dictionary.h"
+#include "core/variant/array.h"
 
-struct AISettingsData {
-	static constexpr int CURRENT_USAGE_AGREEMENT_VERSION = 1;
-
-	String base_url = "https://api.openai.com/v1";
-	String model = "gpt-4.1";
-	String api_key;
-	double temperature = 0.7;
-	int max_tokens = 1024;
-	String system_prompt = "You are an AI assistant inside the Jundot editor. Help analyze project issues, evaluate feature necessity, and propose confirmed next steps.";
-	bool include_project_memories = true;
-	bool include_tool_context = true;
-	bool tools_enabled = true;
-	bool mcp_tools_enabled = false;
-	int context_char_budget = 12000;
-	int history_char_budget = 16000;
-	bool auto_suggest_entries = true;
-	bool usage_agreement_accepted = false;
-	int usage_agreement_version = 0;
-	String usage_agreement_accepted_at;
-	double feature_universality_threshold = 70.0;
-	double feature_necessity_threshold = 0.7;
-	bool feature_design_philosophy_check = true;
-};
-
-class AISettings {
-	static String _get_config_path();
-
+// Executes tool calls returned by the LLM in a Function Calling response.
+// Each tool_call is a Dictionary with "id", "type", "function" keys.
+// AIToolExecutor executes the tool and returns a tool result Dictionary
+// suitable for use in the "tool" role message.
+class AIToolExecutor {
 public:
-	static String get_default_base_url();
-	static String get_default_model();
-	static String get_default_system_prompt();
-	static int get_default_context_char_budget();
-	static int get_default_history_char_budget();
-	static double get_default_feature_universality_threshold();
-	static double get_default_feature_necessity_threshold();
-	static bool is_usage_agreement_current(const AISettingsData &p_settings);
-	static Error accept_usage_agreement();
-	static Error reset_usage_agreement();
+	// Execute a single tool call.
+	// p_tool_call: Dictionary with {id, type, function: {name, arguments}}.
+	// Returns a Dictionary with {role: "tool", tool_call_id: p_id, content: "..."}.
+	static Dictionary execute(const Dictionary &p_tool_call);
 
-	static AISettingsData load();
-	static Error save(const AISettingsData &p_settings);
-	static Error reset_to_defaults();
+private:
+	static Dictionary _read_files(const Dictionary &p_args);
+	static Dictionary _write_file(const Dictionary &p_args);
+	static Dictionary _search_files(const Dictionary &p_args);
+	static Dictionary _grep_code(const Dictionary &p_args);
+	static Dictionary _run_build(const Dictionary &p_args);
+	static Dictionary _read_build_log(const Dictionary &p_args);
+	static Dictionary _fetch_url(const Dictionary &p_args);
+	static Dictionary _shell_command(const Dictionary &p_args);
+	static Dictionary _restart_engine(const Dictionary &p_args);
+	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
+
+	static Dictionary _make_result(const String &p_content, bool p_is_error = false);
+	static String _get_project_root();
 };

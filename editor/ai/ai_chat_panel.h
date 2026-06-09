@@ -86,12 +86,26 @@ class AIChatPanel : public MarginContainer {
 		bool external = false;
 	};
 
+	bool is_summarizing = false;
+	String pending_user_message;
+	Vector<ChatAttachment> pending_attachments;
+
 	Vector<ChatAttachment> attachments;
+
+	// Tool call execution.
+	struct PendingToolRound {
+		Array original_messages;
+		Array original_tools;
+	};
+
+	PendingToolRound pending_tool_round;
+	bool in_tool_loop = false;
 
 	void _send_message();
 	void _cancel_request();
 	void _clear_messages();
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
+	void _execute_tool_calls(const Dictionary &p_json);
 	void _add_user_message(const String &p_text);
 	void _add_ai_message(const String &p_content, const String &p_think_content, double p_think_time, int p_prompt_tokens, int p_completion_tokens);
 	void _on_edit_requested(const String &p_content);
@@ -102,6 +116,10 @@ class AIChatPanel : public MarginContainer {
 	void _remove_attachment(int p_index);
 	void _refresh_attachment_chips();
 	String _build_attachment_context() const;
+	Array _build_message_history() const;
+	void _start_summarization(const Array &p_history, int p_budget);
+	void _summary_completed(const String &p_summary_text);
+	void _add_summary_message(const String &p_content);
 	String _detect_mode_prompt(const String &p_user_message) const;
 	void _update_translations();
 	void _set_requesting(bool p_requesting);

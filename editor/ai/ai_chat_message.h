@@ -40,6 +40,7 @@ class AIChatMessage : public VBoxContainer {
 	GDCLASS(AIChatMessage, VBoxContainer);
 
 	bool is_user = false;
+	bool is_summary = false;
 	String message_content;
 	String think_content;
 	double think_time_seconds = 0.0;
@@ -82,7 +83,10 @@ protected:
 public:
 	void setup_user(const String &p_content);
 	void setup_ai(const String &p_content, const String &p_think_content = String(), double p_think_time = 0.0, int p_prompt_tokens = 0, int p_completion_tokens = 0);
+	void setup_summary(const String &p_content);
 
+	bool is_user_message() const { return is_user; }
+	bool is_summary_message() const { return is_summary; }
 	String get_content() const;
 	void set_content(const String &p_content);
 

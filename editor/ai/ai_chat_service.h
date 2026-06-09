@@ -60,6 +60,7 @@ public:
 	void configure(const AISettingsData &p_settings);
 	Error send_chat(const String &p_message);
 	Error send_messages(const Array &p_messages);
+	Error send_messages(const Array &p_messages, const Array &p_tools);
 	void cancel_request();
 	bool is_requesting() const;
 };

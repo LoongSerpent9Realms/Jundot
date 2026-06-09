@@ -58,6 +58,10 @@ int AISettings::get_default_context_char_budget() {
 	return 12000;
 }
 
+int AISettings::get_default_history_char_budget() {
+	return 16000;
+}
+
 double AISettings::get_default_feature_universality_threshold() {
 	return 70.0;
 }
@@ -129,11 +133,14 @@ AISettingsData AISettings::load() {
 	settings.model = root.get("model", get_default_model());
 	settings.api_key = root.get("api_key", String());
 	settings.temperature = root.get("temperature", 0.7);
-	settings.max_tokens = root.get("max_tokens", 1024);
+	settings.max_tokens = root.get("max_tokens", 40960);
 	settings.system_prompt = root.get("system_prompt", get_default_system_prompt());
 	settings.include_project_memories = root.get("include_project_memories", true);
 	settings.include_tool_context = root.get("include_tool_context", true);
+	settings.tools_enabled = root.get("tools_enabled", true);
+	settings.mcp_tools_enabled = root.get("mcp_tools_enabled", false);
 	settings.context_char_budget = root.get("context_char_budget", get_default_context_char_budget());
+	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
 	settings.auto_suggest_entries = root.get("auto_suggest_entries", true);
 	settings.usage_agreement_accepted = root.get("usage_agreement_accepted", false);
 	settings.usage_agreement_version = root.get("usage_agreement_version", 0);
@@ -159,7 +166,10 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["system_prompt"] = p_settings.system_prompt;
 	root["include_project_memories"] = p_settings.include_project_memories;
 	root["include_tool_context"] = p_settings.include_tool_context;
+	root["tools_enabled"] = p_settings.tools_enabled;
+	root["mcp_tools_enabled"] = p_settings.mcp_tools_enabled;
 	root["context_char_budget"] = p_settings.context_char_budget;
+	root["history_char_budget"] = p_settings.history_char_budget;
 	root["auto_suggest_entries"] = p_settings.auto_suggest_entries;
 	root["usage_agreement_accepted"] = p_settings.usage_agreement_accepted;
 	root["usage_agreement_version"] = p_settings.usage_agreement_version;

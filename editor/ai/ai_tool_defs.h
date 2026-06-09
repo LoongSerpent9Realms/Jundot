@@ -1,4 +1,4 @@
-/*  ai_settings.h                                                          */
+/*  ai_tool_defs.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,49 +27,29 @@
 
 #pragma once
 
-#include "core/error/error_list.h"
-#include "core/string/ustring.h"
+#include "core/templates/vector.h"
+#include "core/variant/array.h"
 
-struct AISettingsData {
-	static constexpr int CURRENT_USAGE_AGREEMENT_VERSION = 1;
+// Tool name constants.
+namespace AIToolNames {
+constexpr const char *READ_FILES = "read_files";
+constexpr const char *WRITE_FILE = "write_file";
+constexpr const char *SEARCH_FILES = "search_files";
+constexpr const char *GREP_CODE = "grep_code";
+constexpr const char *RUN_BUILD = "run_build";
+constexpr const char *READ_BUILD_LOG = "read_build_log";
+constexpr const char *FETCH_URL = "fetch_url";
+constexpr const char *SHELL_COMMAND = "shell_command";
+constexpr const char *RESTART_ENGINE = "restart_engine";
+} // namespace AIToolNames
 
-	String base_url = "https://api.openai.com/v1";
-	String model = "gpt-4.1";
-	String api_key;
-	double temperature = 0.7;
-	int max_tokens = 1024;
-	String system_prompt = "You are an AI assistant inside the Jundot editor. Help analyze project issues, evaluate feature necessity, and propose confirmed next steps.";
-	bool include_project_memories = true;
-	bool include_tool_context = true;
-	bool tools_enabled = true;
-	bool mcp_tools_enabled = false;
-	int context_char_budget = 12000;
-	int history_char_budget = 16000;
-	bool auto_suggest_entries = true;
-	bool usage_agreement_accepted = false;
-	int usage_agreement_version = 0;
-	String usage_agreement_accepted_at;
-	double feature_universality_threshold = 70.0;
-	double feature_necessity_threshold = 0.7;
-	bool feature_design_philosophy_check = true;
-};
-
-class AISettings {
-	static String _get_config_path();
-
+// Returns the built-in tool definitions as an Array of Dictionary,
+// formatted for OpenAI/OpenRouter-compatible "tools" parameter.
+class AIToolDefs {
 public:
-	static String get_default_base_url();
-	static String get_default_model();
-	static String get_default_system_prompt();
-	static int get_default_context_char_budget();
-	static int get_default_history_char_budget();
-	static double get_default_feature_universality_threshold();
-	static double get_default_feature_necessity_threshold();
-	static bool is_usage_agreement_current(const AISettingsData &p_settings);
-	static Error accept_usage_agreement();
-	static Error reset_usage_agreement();
+	// OpenAI-compatible tool definitions (the "tools" array in the API payload).
+	static Array get_builtin_tools();
 
-	static AISettingsData load();
-	static Error save(const AISettingsData &p_settings);
-	static Error reset_to_defaults();
+	// Tools derived from configured MCP server capabilities.
+	static Array get_mcp_tools();
 };

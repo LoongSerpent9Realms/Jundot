@@ -158,7 +158,12 @@ String AIContextBuilder::_apply_budget(const String &p_context, int p_budget) {
 }
 
 String AIContextBuilder::_format_suggestion_instructions() {
-	return "Suggestion Protocol (when the user asks you to create a skill, MCP server, or memory entry, or when it would be helpful to suggest one):\n"
+	return "You have access to built-in Function Calling tools for reading and modifying files, searching code, building the project, and executing shell commands. "
+		   "If MCP server tools are configured, they are available as tools with names prefixed by the server name (e.g. 'servername.toolname'). "
+		   "Use these tools when the user asks you to inspect, modify, build, or analyze engine source code. "
+		   "You do not need to ask for permission to use a tool — just call it directly. "
+		   "When you encounter a build error, read the build log to analyze the error, then use write_file to apply fixes and run_build to verify.\n\n"
+		   "Suggestion Protocol (when the user asks you to create a skill, MCP server, or memory entry, or when it would be helpful to suggest one):\n"
 		   "You may output structured suggestion blocks in your response using HTML comment markers. The user will see a confirmation card and must approve before anything is saved.\n"
 		   "Do NOT automatically execute or apply any suggestion.\n\n"
 		   "For a Skill suggestion:\n"

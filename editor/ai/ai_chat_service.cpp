@@ -276,6 +276,10 @@ Error AIChatService::send_chat(const String &p_message) {
 }
 
 Error AIChatService::send_messages(const Array &p_messages) {
+	return send_messages(p_messages, Array());
+}
+
+Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools) {
 	ERR_FAIL_COND_V_MSG(!is_inside_tree(), ERR_UNCONFIGURED, "AIChatService must be inside the scene tree before sending a request.");
 	ERR_FAIL_COND_V_MSG(settings.base_url.strip_edges().is_empty(), ERR_UNCONFIGURED, "AI base URL is empty.");
 	ERR_FAIL_COND_V_MSG(settings.model.strip_edges().is_empty(), ERR_UNCONFIGURED, "AI model is empty.");
@@ -290,6 +294,10 @@ Error AIChatService::send_messages(const Array &p_messages) {
 	payload["messages"] = p_messages;
 	payload["temperature"] = settings.temperature;
 	payload["max_tokens"] = settings.max_tokens;
+
+	if (!p_tools.is_empty()) {
+		payload["tools"] = p_tools;
+	}
 
 	Vector<String> headers;
 	headers.push_back("Content-Type: application/json");

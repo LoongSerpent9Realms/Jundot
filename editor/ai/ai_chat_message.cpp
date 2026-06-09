@@ -40,110 +40,450 @@
 #include "scene/resources/style_box_flat.h"
 #include "servers/display/display_server.h"
 
+// Helper: check if a character is a word character (alphanumeric or underscore).
+static bool _is_word_char(char32_t c) {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+// Helper: check if a trimmed line is a horizontal rule (---, ***, ___ with 3+ chars).
+static bool _is_horizontal_rule(const String &p_line) {
+	if (p_line.length() < 3) {
+		return false;
+	}
+	char32_t first = p_line[0];
+	if (first != '-' && first != '*' && first != '_') {
+		return false;
+	}
+	for (int i = 1; i < p_line.length(); i++) {
+		if (p_line[i] != first) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static String _markdown_to_bbcode(const String &p_md) {
 	Vector<String> code_blocks;
 	Vector<String> inline_codes;
 	String s = p_md;
 
-	// Extract code blocks (```...\n```).
-	int pos = 0;
-	while (true) {
-		int fence = s.find("```", pos);
-		if (fence == -1) {
-			break;
+	// ---------- Step 1: Extract code blocks (```...```) ----------
+	{
+		int pos = 0;
+		while (true) {
+			int fence = s.find("```", pos);
+			if (fence == -1) {
+				break;
+			}
+			int content_start = s.find("\n", fence);
+			if (content_start == -1) {
+				break;
+			}
+			content_start++;
+			int fence_end = s.find("```", content_start);
+			if (fence_end == -1) {
+				break;
+			}
+			String content = s.substr(content_start, fence_end - content_start).strip_edges();
+			code_blocks.push_back(content);
+			String placeholder = "[CODEBLOCK_" + vformat("%d", code_blocks.size() - 1) + "]";
+			s = s.substr(0, fence) + placeholder + s.substr(fence_end + 3);
+			pos = fence + placeholder.length();
 		}
-
-		int content_start = s.find("\n", fence);
-		if (content_start == -1) {
-			break;
-		}
-		content_start++;
-
-		int fence_end = s.find("```", content_start);
-		if (fence_end == -1) {
-			break;
-		}
-
-		String content = s.substr(content_start, fence_end - content_start).strip_edges();
-		code_blocks.push_back(content);
-
-		String placeholder = "[CODEBLOCK_" + vformat("%d", code_blocks.size() - 1) + "]";
-		s = s.substr(0, fence) + placeholder + s.substr(fence_end + 3);
-		pos = fence + placeholder.length();
 	}
 
-	// Extract inline code (`...`).
-	pos = 0;
-	while (true) {
-		int tick = s.find("`", pos);
-		if (tick == -1) {
-			break;
+	// ---------- Step 2: Extract inline code (`...`) ----------
+	{
+		int pos = 0;
+		while (true) {
+			int tick = s.find("`", pos);
+			if (tick == -1) {
+				break;
+			}
+			int end = s.find("`", tick + 1);
+			if (end == -1) {
+				break;
+			}
+			String code = s.substr(tick + 1, end - tick - 1);
+			inline_codes.push_back(code);
+			String placeholder = "[INLINECODE_" + vformat("%d", inline_codes.size() - 1) + "]";
+			s = s.substr(0, tick) + placeholder + s.substr(end + 1);
+			pos = tick + placeholder.length();
 		}
-
-		int end = s.find("`", tick + 1);
-		if (end == -1) {
-			break;
-		}
-
-		String code = s.substr(tick + 1, end - tick - 1);
-		inline_codes.push_back(code);
-
-		String placeholder = "[INLINECODE_" + vformat("%d", inline_codes.size() - 1) + "]";
-		s = s.substr(0, tick) + placeholder + s.substr(end + 1);
-		pos = tick + placeholder.length();
 	}
 
-	// Process bold (**...**).
-	pos = 0;
-	while (true) {
-		int bold_start = s.find("**", pos);
-		if (bold_start == -1) {
-			break;
+	// ---------- Step 3: Inline formatting on non-code text ----------
+	// Strikethrough (~~text~~) → [s]text[/s]
+	{
+		int pos = 0;
+		while (true) {
+			int ss = s.find("~~", pos);
+			if (ss == -1) {
+				break;
+			}
+			int se = s.find("~~", ss + 2);
+			if (se == -1) {
+				break;
+			}
+			String content = s.substr(ss + 2, se - ss - 2);
+			String replacement = "[s]" + content + "[/s]";
+			s = s.substr(0, ss) + replacement + s.substr(se + 2);
+			pos = ss + replacement.length();
 		}
-
-		int bold_end = s.find("**", bold_start + 2);
-		if (bold_end == -1) {
-			break;
-		}
-
-		String bold = s.substr(bold_start + 2, bold_end - bold_start - 2);
-		String replacement = "[b]" + bold + "[/b]";
-		s = s.substr(0, bold_start) + replacement + s.substr(bold_end + 2);
-		pos = bold_start + replacement.length();
 	}
 
-	// Process italic (_..._).
-	pos = 0;
-	while (true) {
-		int italic_start = s.find("_", pos);
-		if (italic_start == -1) {
-			break;
+	// Bold (**...**) → [b]...[/b]
+	{
+		int pos = 0;
+		while (true) {
+			int bold_start = s.find("**", pos);
+			if (bold_start == -1) {
+				break;
+			}
+			int bold_end = s.find("**", bold_start + 2);
+			if (bold_end == -1) {
+				break;
+			}
+			String bold = s.substr(bold_start + 2, bold_end - bold_start - 2);
+			String replacement = "[b]" + bold + "[/b]";
+			s = s.substr(0, bold_start) + replacement + s.substr(bold_end + 2);
+			pos = bold_start + replacement.length();
 		}
-
-		// Skip __ (bold underline).
-		if (italic_start + 1 < s.length() && s[italic_start + 1] == '_') {
-			pos = italic_start + 2;
-			continue;
-		}
-
-		int italic_end = s.find("_", italic_start + 1);
-		if (italic_end == -1) {
-			break;
-		}
-
-		String italic = s.substr(italic_start + 1, italic_end - italic_start - 1);
-		String replacement = "[i]" + italic + "[/i]";
-		s = s.substr(0, italic_start) + replacement + s.substr(italic_end + 1);
-		pos = italic_start + replacement.length();
 	}
 
-	// Restore inline code.
+	// Italic (_..._), skip __ and word-internal underscores.
+	{
+		int pos = 0;
+		while (true) {
+			int italic_start = s.find("_", pos);
+			if (italic_start == -1) {
+				break;
+			}
+			// Skip __.
+			if (italic_start + 1 < s.length() && s[italic_start + 1] == '_') {
+				pos = italic_start + 2;
+				continue;
+			}
+			int italic_end = s.find("_", italic_start + 1);
+			if (italic_end == -1) {
+				break;
+			}
+			// Only process if surrounded by non-word characters.
+			bool start_boundary = (italic_start == 0) || !_is_word_char(s[italic_start - 1]);
+			bool end_boundary = (italic_end == s.length() - 1) || !_is_word_char(s[italic_end + 1]);
+			if (!start_boundary || !end_boundary) {
+				pos = italic_start + 1;
+				continue;
+			}
+			String italic = s.substr(italic_start + 1, italic_end - italic_start - 1);
+			String replacement = "[i]" + italic + "[/i]";
+			s = s.substr(0, italic_start) + replacement + s.substr(italic_end + 1);
+			pos = italic_start + replacement.length();
+		}
+	}
+
+	// Images ![alt](url) → show alt text in italic (RTL doesn't support inline images easily).
+	{
+		int pos = 0;
+		while (true) {
+			int img_start = s.find("![", pos);
+			if (img_start == -1) {
+				break;
+			}
+			int alt_end = s.find("]", img_start + 2);
+			if (alt_end == -1) {
+				break;
+			}
+			int url_start = s.find("(", alt_end + 1);
+			if (url_start == -1) {
+				break;
+			}
+			int url_end = s.find(")", url_start + 1);
+			if (url_end == -1) {
+				break;
+			}
+			String alt = s.substr(img_start + 2, alt_end - img_start - 2);
+			String replacement = "[i]" + alt + "[/i]"; // fallback: show alt text as italic
+			s = s.substr(0, img_start) + replacement + s.substr(url_end + 1);
+			pos = img_start + replacement.length();
+		}
+	}
+
+	// Links [text](url) → [url=url]text[/url] (run after image processing).
+	{
+		int pos = 0;
+		while (true) {
+			int link_start = s.find("[", pos);
+			if (link_start == -1) {
+				break;
+			}
+			// Check it's not an already-handled image (marked by ! before [).
+			if (link_start > 0 && s[link_start - 1] == '!') {
+				pos = link_start + 1;
+				continue;
+			}
+			int text_end = s.find("]", link_start + 1);
+			if (text_end == -1) {
+				break;
+			}
+			int url_start = s.find("(", text_end + 1);
+			if (url_start == -1) {
+				break;
+			}
+			int url_end = s.find(")", url_start + 1);
+			if (url_end == -1) {
+				break;
+			}
+			String text = s.substr(link_start + 1, text_end - link_start - 1);
+			String url = s.substr(url_start + 1, url_end - url_start - 1);
+			String replacement = "[url=" + url + "]" + text + "[/url]";
+			s = s.substr(0, link_start) + replacement + s.substr(url_end + 1);
+			pos = link_start + replacement.length();
+		}
+	}
+
+	// ---------- Step 4: Block-level processing (line by line) ----------
+	{
+		Vector<String> lines = s.split("\n", false);
+		s.clear();
+		enum ListState { LIST_NONE, LIST_UL, LIST_OL };
+		ListState current_list = LIST_NONE;
+		bool in_table = false;
+		int table_cols = 0;
+
+		for (int i = 0; i < lines.size(); i++) {
+			String line = lines[i];
+			String trimmed = line.strip_edges();
+
+			// Blank line: flush lists and tables.
+			if (trimmed.is_empty()) {
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				if (in_table) {
+					s += "[/table]\n";
+					in_table = false;
+				}
+				s += "\n";
+				continue;
+			}
+
+			// Code placeholder lines: preserve as-is after flushing lists/tables.
+			if (trimmed.begins_with("[CODEBLOCK_") || trimmed.begins_with("[INLINECODE_")) {
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				if (in_table) {
+					s += "[/table]\n";
+					in_table = false;
+				}
+				s += line + "\n";
+				continue;
+			}
+
+			// Horizontal rules (---, ***, ___).
+			if (_is_horizontal_rule(trimmed)) {
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				if (in_table) {
+					s += "[/table]\n";
+					in_table = false;
+				}
+				s += "[hr]\n";
+				continue;
+			}
+
+			// Headers (# ...).
+			if (trimmed.begins_with("#") && trimmed.length() > 1 && trimmed[1] == ' ') {
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				if (in_table) {
+					s += "[/table]\n";
+					in_table = false;
+				}
+				int level = 0;
+				int j = 0;
+				while (j < trimmed.length() && trimmed[j] == '#') {
+					level++;
+					j++;
+				}
+				String text = trimmed.substr(j).strip_edges();
+				static const int header_sizes[] = { 24, 20, 18, 16, 14, 13 };
+				int size = header_sizes[MIN(level - 1, 5)];
+				s += "[b][font_size=" + itos(size) + "]" + text + "[/font_size][/b]\n";
+				continue;
+			}
+			// Header without space after # (e.g. "#title").
+			if (trimmed.begins_with("#") && trimmed[0] == '#') {
+				int level = 0;
+				int j = 0;
+				while (j < trimmed.length() && trimmed[j] == '#') {
+					level++;
+					j++;
+				}
+				String text = trimmed.substr(j).strip_edges();
+				if (!text.is_empty()) {
+					if (current_list != LIST_NONE) {
+						s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+						current_list = LIST_NONE;
+					}
+					if (in_table) {
+						s += "[/table]\n";
+						in_table = false;
+					}
+					static const int header_sizes[] = { 24, 20, 18, 16, 14, 13 };
+					int size = header_sizes[MIN(level - 1, 5)];
+					s += "[b][font_size=" + itos(size) + "]" + text + "[/font_size][/b]\n";
+					continue;
+				}
+			}
+
+			// Blockquotes (> ..., >> ..., >>> ...).
+			if (trimmed.begins_with(">")) {
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				if (in_table) {
+					s += "[/table]\n";
+					in_table = false;
+				}
+				int level = 0;
+				int j = 0;
+				while (j < trimmed.length() && trimmed[j] == '>') {
+					level++;
+					j++;
+				}
+				String quote_text = trimmed.substr(j).strip_edges();
+				String indent_tag;
+				for (int k = 0; k < level && k < 3; k++) {
+					indent_tag += "[indent]";
+				}
+				s += indent_tag + "[i][color=#888888]" + quote_text + "[/color][/i]\n";
+				for (int k = 0; k < level && k < 3; k++) {
+					s += "[/indent]";
+				}
+				continue;
+			}
+
+			// Table rows (| ... |).
+			if (trimmed.begins_with("|") && trimmed.ends_with("|")) {
+				// Separator row (|---|) -> skip.
+				if (trimmed.find("---", 0) != -1 || trimmed.find("===", 0) != -1) {
+					if (!in_table) {
+						// Separator without preceding header; skip.
+					}
+					continue;
+				}
+				String inner = trimmed.substr(1, trimmed.length() - 2);
+				Vector<String> cells = inner.split("|");
+				for (int c = 0; c < cells.size(); c++) {
+					cells.write[c] = cells[c].strip_edges();
+				}
+				if (!in_table) {
+					table_cols = cells.size();
+					s += "[table=" + itos(table_cols) + "]\n";
+					in_table = true;
+				}
+				for (int c = 0; c < cells.size(); c++) {
+					s += "[cell]" + cells[c] + "[/cell]";
+				}
+				s += "\n";
+				continue;
+			}
+			if (in_table) {
+				s += "[/table]\n";
+				in_table = false;
+			}
+
+			// Unordered list items (- or * at line start).
+			{
+				bool is_ul = false;
+				String item_text;
+				if (trimmed.begins_with("- ") || trimmed.begins_with("* ")) {
+					item_text = trimmed.substr(2);
+					is_ul = true;
+				} else if (trimmed.length() > 1 && trimmed[0] == '-' && !_is_word_char(trimmed[1])) {
+					item_text = trimmed.substr(1).strip_edges();
+					is_ul = true;
+				}
+				if (is_ul) {
+					if (current_list != LIST_UL) {
+						if (current_list != LIST_NONE) {
+							s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+						}
+						s += "[ul]\n";
+						current_list = LIST_UL;
+					}
+					s += "[li]" + item_text + "[/li]\n";
+					continue;
+				}
+			}
+
+			// Ordered list items (N. at line start).
+			{
+				bool is_ol = false;
+				String item_text;
+				int dot_pos = trimmed.find(". ");
+				if (dot_pos > 0 && dot_pos < 4) {
+					String prefix = trimmed.substr(0, dot_pos);
+					bool all_digits = true;
+					for (int c = 0; c < prefix.length(); c++) {
+						if (prefix[c] < '0' || prefix[c] > '9') {
+							all_digits = false;
+							break;
+						}
+					}
+					if (all_digits) {
+						item_text = trimmed.substr(dot_pos + 2);
+						is_ol = true;
+					}
+				}
+				if (is_ol) {
+					if (current_list != LIST_OL) {
+						if (current_list != LIST_NONE) {
+							s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+						}
+						s += "[ol]\n";
+						current_list = LIST_OL;
+					}
+					s += "[li]" + item_text + "[/li]\n";
+					continue;
+				}
+			}
+
+			// Regular paragraph line.
+			{
+				if (current_list != LIST_NONE) {
+					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+					current_list = LIST_NONE;
+				}
+				s += line + "\n";
+			}
+		}
+
+		// Flush remaining open list or table.
+		if (current_list != LIST_NONE) {
+			s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
+		}
+		if (in_table) {
+			s += "[/table]\n";
+		}
+	}
+
+	// ---------- Step 5: Restore inline code ----------
 	for (int j = 0; j < inline_codes.size(); j++) {
 		String placeholder = "[INLINECODE_" + vformat("%d", j) + "]";
 		s = s.replace(placeholder, "[code]" + inline_codes[j] + "[/code]");
 	}
 
-	// Restore code blocks.
+	// ---------- Step 6: Restore code blocks ----------
 	for (int j = 0; j < code_blocks.size(); j++) {
 		String placeholder = "[CODEBLOCK_" + vformat("%d", j) + "]";
 		s = s.replace(placeholder, "[code]" + code_blocks[j] + "[/code]");
@@ -176,6 +516,12 @@ void AIChatMessage::_notification(int p_what) {
 			bubble_style->set_bg_color(user_bg);
 			bubble_style->set_border_width_all(1);
 			bubble_style->set_border_color(base.lightened(0.15f));
+		} else if (is_summary) {
+			// Summary bubble: warm amber/yellow tone.
+			Color summary_bg(0.5f, 0.45f, 0.25f, 0.25f);
+			bubble_style->set_bg_color(summary_bg);
+			bubble_style->set_border_width_all(1);
+			bubble_style->set_border_color(Color(0.6f, 0.55f, 0.3f, 0.5f));
 		} else {
 			// AI bubble: use base color with subtle border.
 			Color ai_bg = base.lightened(0.02f);
@@ -240,7 +586,7 @@ void AIChatMessage::_update_footer() {
 }
 
 void AIChatMessage::_update_translations() {
-	author_label->set_text(is_user ? TTR("You") : TTR("AI"));
+	author_label->set_text(is_summary ? TTR("Summary") : (is_user ? TTR("You") : TTR("AI")));
 	copy_button->set_tooltip_text(TTR("Copy message"));
 	edit_button->set_tooltip_text(TTR("Edit message"));
 	_update_think_visibility();
@@ -374,6 +720,34 @@ void AIChatMessage::setup_ai(const String &p_content, const String &p_think_cont
 	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true); // right_spacer
 
 	_update_think_visibility();
+	_update_footer();
+	_update_translations();
+}
+
+void AIChatMessage::setup_summary(const String &p_content) {
+	is_user = false;
+	is_summary = true;
+	message_content = p_content;
+	think_content = String();
+	think_time_seconds = 0.0;
+	prompt_tokens = 0;
+	completion_tokens = 0;
+
+	// Prepend a marker prefix to identify summary content.
+	content_label->set_text("[b]Conversation Summary[/b]\n" + p_content);
+
+	// Summary messages: hide thinking, hide edit button, hide token stats.
+	think_container->set_visible(false);
+	token_label->set_visible(false);
+
+	if (edit_button && edit_button->is_inside_tree()) {
+		footer->remove_child(edit_button);
+	}
+
+	// Align to left (like AI messages).
+	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(false); // left_spacer
+	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true); // right_spacer
+
 	_update_footer();
 	_update_translations();
 }

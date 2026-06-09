@@ -40,6 +40,8 @@
 #include "ai_repair_card.h"
 #include "ai_repair_workflow.h"
 #include "ai_suggestion_card.h"
+#include "ai_tool_defs.h"
+#include "ai_tool_executor.h"
 #include "ai_tool_registry.h"
 #include "ai_usage_agreement_dialog.h"
 #include "ai_feature_gate.h"
@@ -70,6 +72,21 @@ void AIChatPanel::_notification(int p_what) {
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
 	}
+}
+
+Array AIChatPanel::_build_message_history() const {
+	Array history;
+	for (int i = 0; i < message_list->get_child_count(); i++) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (!msg) {
+			continue;
+		}
+		Dictionary entry;
+		entry["role"] = msg->is_user_message() ? "user" : "assistant";
+		entry["content"] = msg->get_content();
+		history.push_back(entry);
+	}
+	return history;
 }
 
 String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
@@ -294,32 +311,6 @@ void AIChatPanel::_send_message() {
 		return;
 	}
 
-	const String configured_system_prompt = settings.system_prompt;
-	const String auto_mode_prompt = _detect_mode_prompt(text);
-	if (!auto_mode_prompt.is_empty()) {
-		settings.system_prompt = auto_mode_prompt;
-	}
-	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
-	if (!ai_context.is_empty()) {
-		settings.system_prompt += "\n\n" + ai_context;
-	}
-	if (!configured_system_prompt.strip_edges().is_empty()) {
-		settings.system_prompt += "\n\n" + configured_system_prompt;
-	}
-	chat_service->configure(settings);
-
-	String request_text = text;
-	const String attachment_context = _build_attachment_context();
-	if (!attachment_context.is_empty()) {
-		request_text += "\n\n" + attachment_context;
-	}
-
-	const Error err = chat_service->send_chat(request_text);
-	if (err != OK) {
-		status_label->set_text(TTR("AI request could not start."));
-		return;
-	}
-
 	// In edit mode, update the existing user message in-place and remove
 	// all messages after it so the upcoming AI reply overwrites the old one.
 	if (editing_message_index >= 0) {
@@ -335,32 +326,290 @@ void AIChatPanel::_send_message() {
 		_add_user_message(text);
 	}
 
+	// Build the full messages array with conversation history.
+	Array history = _build_message_history();
+
+	// Check if history exceeds the character budget → trigger summarization.
+	if (settings.history_char_budget > 0) {
+		int total_chars = 0;
+		for (int i = 0; i < history.size(); i++) {
+			Dictionary entry = history[i];
+			total_chars += String(entry["role"]).length() + 2;
+			total_chars += String(entry["content"]).length();
+		}
+		if (total_chars > settings.history_char_budget) {
+			pending_user_message = text;
+			pending_attachments = attachments;
+			_start_summarization(history, settings.history_char_budget);
+			return;
+		}
+	}
+
+	// Build system prompt + context.
+	const String configured_system_prompt = settings.system_prompt;
+	const String auto_mode_prompt = _detect_mode_prompt(text);
+	if (!auto_mode_prompt.is_empty()) {
+		settings.system_prompt = auto_mode_prompt;
+	}
+	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
+	if (!ai_context.is_empty()) {
+		settings.system_prompt += "\n\n" + ai_context;
+	}
+	if (!configured_system_prompt.strip_edges().is_empty()) {
+		settings.system_prompt += "\n\n" + configured_system_prompt;
+	}
+	chat_service->configure(settings);
+
+	Array messages;
+	{
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = settings.system_prompt;
+		messages.push_back(system_msg);
+	}
+
+	String request_text = text;
+	const String attachment_context = _build_attachment_context();
+	if (!attachment_context.is_empty()) {
+		request_text += "\n\n" + attachment_context;
+	}
+
+	for (int i = 0; i < history.size(); i++) {
+		Dictionary entry = history[i];
+		if (i == history.size() - 1 && String(entry["role"]) == "user") {
+			entry["content"] = request_text;
+		}
+		messages.push_back(entry);
+	}
+
+	// If tools are enabled, include the built-in tool definitions.
+	Array tools;
+	if (settings.tools_enabled) {
+		tools = AIToolDefs::get_builtin_tools();
+		if (settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				tools.append_array(mcp_tools);
+			}
+		}
+	}
+
+	const Error err = chat_service->send_messages(messages, tools);
+	if (err != OK) {
+		status_label->set_text(TTR("AI request could not start."));
+		return;
+	}
+
 	input->clear();
+	pending_tool_round = PendingToolRound();
+	in_tool_loop = false;
 	attachments.clear();
 	_refresh_attachment_chips();
 	status_label->set_text(TTR("Waiting for AI response..."));
 	_set_requesting(true);
 }
 
+void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
+	// Build summary request: send oldest messages to AI for summarization.
+	Array summary_messages;
+	{
+		Dictionary summary_system;
+		summary_system["role"] = "system";
+		summary_system["content"] = TTR("You are a conversation summarizer. Summarize the following conversation concisely, preserving key decisions, code changes, root causes, and current state. Keep the summary under 500 characters.");
+		summary_messages.push_back(summary_system);
+	}
+
+	// Collect the messages that need summarization (everything except the last user+assistant pair).
+	int char_count = 0;
+	int summarize_end = 0;
+	for (int i = 0; i < p_history.size() - 1; i++) {
+		Dictionary entry = p_history[i];
+		int entry_size = String(entry["role"]).length() + 2 + String(entry["content"]).length();
+		char_count += entry_size;
+		// Stop when adding the next entry would exceed the remaining budget
+		// (reserve ~200 chars for the summary itself).
+		if (p_budget > 0 && (char_count + 200) > p_budget) {
+			break;
+		}
+		summarize_end = i + 1;
+	}
+
+	// Build the summarization request body.
+	String summary_text;
+	for (int i = 0; i < summarize_end && i < p_history.size(); i++) {
+		Dictionary entry = p_history[i];
+		summary_text += String(entry["role"]) + ": " + String(entry["content"]) + "\n";
+	}
+
+	Dictionary summary_request;
+	summary_request["role"] = "user";
+	summary_request["content"] = TTR("Please summarize the following conversation:") + "\n\n" + summary_text;
+	summary_messages.push_back(summary_request);
+
+	// Configure service with minimal token limit for summary.
+	AISettingsData summary_settings = AISettings::load();
+	summary_settings.max_tokens = 256;
+	summary_settings.temperature = 0.3; // Lower temperature for more deterministic summary.
+	chat_service->configure(summary_settings);
+
+	is_summarizing = true;
+	status_label->set_text(TTR("Compressing conversation history..."));
+	_set_requesting(true);
+
+	const Error err = chat_service->send_messages(summary_messages);
+	if (err != OK) {
+		// Fall back to truncation if the summary request fails to send.
+		_summary_completed(String());
+	}
+}
+
+void AIChatPanel::_summary_completed(const String &p_summary_text) {
+	is_summarizing = false;
+
+	// Find which messages to replace (all non-summary messages before the last user message).
+	int replace_end = -1;
+	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (msg && msg->is_summary_message()) {
+			// Avoid replacing existing summary messages.
+			replace_end = i;
+			break;
+		}
+	}
+	if (replace_end < 0) {
+		replace_end = message_list->get_child_count();
+	}
+
+	if (!p_summary_text.is_empty()) {
+		// Summary success: remove old messages and insert summary.
+		// Keep at most the last pair (user + assistant) of non-summary messages.
+		int keep_start = message_list->get_child_count() - 1;
+		// Count backwards to find the last user message.
+		int last_user_idx = -1;
+		for (int i = keep_start; i >= 0; i--) {
+			AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+			if (msg && msg->is_user_message() && !msg->is_summary_message()) {
+				last_user_idx = i;
+				break;
+			}
+		}
+
+		// Remove messages before the last user message (except summaries).
+		for (int i = replace_end - 1; i >= 0; i--) {
+			AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+			if (msg && !msg->is_summary_message()) {
+				// Stop if we've reached the last user message or its preceding messages.
+				if (i < last_user_idx - 1) {
+					message_list->get_child(i)->queue_free();
+				}
+			}
+		}
+
+		// Insert summary message at the beginning.
+		_add_summary_message(p_summary_text.strip_edges());
+	} else {
+		// Summary failed: fall back to truncation.
+		// Remove the oldest ~1/3 of messages.
+		int remove_count = MAX(1, message_list->get_child_count() / 3);
+		for (int i = remove_count - 1; i >= 0; i--) {
+			AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+			if (msg && !msg->is_summary_message()) {
+				message_list->get_child(i)->queue_free();
+			}
+		}
+		status_label->set_text(TTR("Failed to compress history, truncated oldest messages."));
+	}
+
+	// Restore attachments and re-send.
+	attachments = pending_attachments;
+	_refresh_attachment_chips();
+	input->set_text(pending_user_message);
+	pending_user_message = String();
+	pending_attachments.clear();
+
+	// Re-send the actual message (this time budget should not be exceeded).
+	editing_message_index = -1; // Not in edit mode for resume.
+	_send_message();
+}
+
+void AIChatPanel::_add_summary_message(const String &p_content) {
+	AIChatMessage *message = memnew(AIChatMessage);
+	message->setup_summary(p_content);
+	// Insert at the beginning of the message list, after any existing summaries.
+	int insert_pos = 0;
+	for (int i = 0; i < message_list->get_child_count(); i++) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (msg && msg->is_summary_message()) {
+			insert_pos = i + 1;
+		} else {
+			break;
+		}
+	}
+	message_list->add_child(message);
+	message->move_to_front(); // Simplified: just add to front.
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
 void AIChatPanel::_cancel_request() {
+	if (is_summarizing) {
+		is_summarizing = false;
+		pending_user_message = String();
+		pending_attachments.clear();
+	}
 	chat_service->cancel_request();
+	pending_tool_round = PendingToolRound();
+	in_tool_loop = false;
 	status_label->set_text(TTR("AI request cancelled."));
 	_set_requesting(false);
 }
 
 void AIChatPanel::_clear_messages() {
+	is_summarizing = false;
+	pending_user_message = String();
+	pending_attachments.clear();
 	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
 		message_list->get_child(i)->queue_free();
 	}
 	editing_message_index = -1;
 	_clear_suggestions();
 	_clear_repair_cards();
+	pending_tool_round = PendingToolRound();
+	in_tool_loop = false;
 	status_label->set_text(TTR("AI assistant ready."));
 }
 
 void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
+	// Handle summarization response before normal response.
+	if (is_summarizing) {
+		if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
+			// Extract the summary text from the AI response.
+			_summary_completed(p_content);
+		} else {
+			// Summarization failed — fall back to truncation.
+			_summary_completed(String());
+		}
+		return;
+	}
+
 	_set_requesting(false);
 	if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
+		// Check if the response contains tool_calls (Function Calling).
+		if (p_json.has("choices") && p_json["choices"].get_type() == Variant::ARRAY) {
+			Array choices = p_json["choices"];
+			if (choices.size() > 0 && choices[0].get_type() == Variant::DICTIONARY) {
+				Dictionary first = choices[0];
+				Dictionary msg = first.get("message", Dictionary());
+				if (msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY) {
+					Array tool_calls = msg["tool_calls"];
+					if (!tool_calls.is_empty()) {
+						// Execute tool calls in a loop.
+						_execute_tool_calls(p_json);
+						return;
+					}
+				}
+			}
+		}
+
 		_add_ai_message(p_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
 
 		// Parse suggestions from the AI response.
@@ -396,6 +645,80 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 	}
 	_add_ai_message(error_text, String(), 0.0, 0, 0);
 	status_label->set_text(error_text);
+}
+
+void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
+	Array choices = p_json["choices"];
+	Dictionary first_choice = choices[0];
+	Dictionary msg = first_choice["message"];
+	Array tool_calls = msg["tool_calls"];
+
+	// Rebuild messages array. If continuing from a previous tool round,
+	// reuse the accumulated messages to preserve tool results history.
+	AISettingsData settings = AISettings::load();
+	Array messages = pending_tool_round.original_messages;
+
+	if (messages.is_empty()) {
+		// First round: build from scratch.
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = settings.system_prompt;
+		messages.push_back(system_msg);
+
+		Array history = _build_message_history();
+		for (int i = 0; i < history.size(); i++) {
+			messages.push_back(history[i]);
+		}
+		history.clear();
+	}
+
+	// Add the assistant message with tool_calls (may have null content).
+	Dictionary clean_msg;
+	clean_msg["role"] = "assistant";
+	if (msg.has("content") && msg["content"].get_type() != Variant::NIL) {
+		clean_msg["content"] = msg["content"];
+	}
+	clean_msg["tool_calls"] = tool_calls;
+	messages.push_back(clean_msg);
+
+	// Show status.
+	status_label->set_text(vformat(TTR("AI is using %d tool(s)..."), tool_calls.size()));
+
+	// Build tools array.
+	Array tools;
+	if (settings.tools_enabled) {
+		tools = AIToolDefs::get_builtin_tools();
+		if (settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				tools.append_array(mcp_tools);
+			}
+		}
+	}
+
+	// Execute each tool call and append results.
+	for (int i = 0; i < tool_calls.size(); i++) {
+		Dictionary tc = tool_calls[i];
+		Dictionary result = AIToolExecutor::execute(tc);
+		messages.push_back(result);
+	}
+
+	// Save state for continuation on the next round.
+	pending_tool_round.original_messages = messages;
+	pending_tool_round.original_tools = tools;
+	in_tool_loop = true;
+
+	// Send results back to LLM.
+	chat_service->configure(settings);
+	_set_requesting(true);
+	Error err = chat_service->send_messages(messages, tools);
+	if (err != OK) {
+		status_label->set_text(TTR("Tool call continuation failed."));
+		in_tool_loop = false;
+		_set_requesting(false);
+		String tool_summary = vformat(TTR("[Tool calls executed: %d]"), tool_calls.size());
+		_add_ai_message(tool_summary, String(), 0.0, 0, 0);
+	}
 }
 
 void AIChatPanel::_suggestion_accepted(AISuggestionCard *p_card) {

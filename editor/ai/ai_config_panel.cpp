@@ -93,11 +93,14 @@ void AIConfigPanel::_update_translations() {
 	temperature_label->set_text(TTR("Temperature"));
 	max_tokens_label->set_text(TTR("Max Tokens"));
 	context_char_budget_label->set_text(TTR("Context Budget"));
+	history_budget_label->set_text(TTR("Compressed Context Size"));
 	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
 	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
 	system_prompt_label->set_text(TTR("System Prompt"));
 	include_project_memories_check->set_text(TTR("Include project memories"));
 	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
+	tools_enabled_check->set_text(TTR("Enable Function Calling tools (read/write files, build, etc.)"));
+	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
 	usage_notice_label->set_text(TTR("AI requests can consume additional API tokens when project context, attachments, logs, or repair analysis are included."));
@@ -120,10 +123,13 @@ void AIConfigPanel::_load_settings() {
 	temperature_spin->set_value(settings.temperature);
 	max_tokens_spin->set_value(settings.max_tokens);
 	context_char_budget_spin->set_value(settings.context_char_budget);
+	history_budget_spin->set_value(settings.history_char_budget);
 	feature_universality_threshold_spin->set_value(settings.feature_universality_threshold);
 	feature_necessity_threshold_spin->set_value(settings.feature_necessity_threshold);
 	include_project_memories_check->set_pressed(settings.include_project_memories);
 	include_tool_context_check->set_pressed(settings.include_tool_context);
+	tools_enabled_check->set_pressed(settings.tools_enabled);
+	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
 	system_prompt_edit->set_text(settings.system_prompt);
@@ -138,10 +144,13 @@ void AIConfigPanel::_save_settings() {
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = max_tokens_spin->get_value();
 	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.history_char_budget = history_budget_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
@@ -171,10 +180,13 @@ void AIConfigPanel::_test_connection() {
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = MIN<int>(max_tokens_spin->get_value(), 64);
 	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.history_char_budget = history_budget_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
@@ -235,10 +247,13 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = max_tokens_spin->get_value();
 	settings.context_char_budget = context_char_budget_spin->get_value();
+	settings.history_char_budget = history_budget_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
@@ -252,7 +267,10 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["system_prompt"] = settings.system_prompt;
 	root["include_project_memories"] = settings.include_project_memories;
 	root["include_tool_context"] = settings.include_tool_context;
+	root["tools_enabled"] = settings.tools_enabled;
+	root["mcp_tools_enabled"] = settings.mcp_tools_enabled;
 	root["context_char_budget"] = settings.context_char_budget;
+	root["history_char_budget"] = settings.history_char_budget;
 	root["auto_suggest_entries"] = settings.auto_suggest_entries;
 	root["feature_universality_threshold"] = settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = settings.feature_necessity_threshold;
@@ -294,13 +312,13 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 		return;
 	}
 
-	const Variant data = json.get_data();
-	if (data.get_type() != Variant::DICTIONARY) {
+	const Variant json_data = json.get_data();
+	if (json_data.get_type() != Variant::DICTIONARY) {
 		status_label->set_text(TTR("Import failed: unexpected JSON structure."));
 		return;
 	}
 
-	const Dictionary root = data;
+	const Dictionary root = json_data;
 	if (root.has("base_url")) {
 		base_url_edit->set_text(root["base_url"]);
 	}
@@ -319,6 +337,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("context_char_budget")) {
 		context_char_budget_spin->set_value(root["context_char_budget"]);
 	}
+	if (root.has("history_char_budget")) {
+		history_budget_spin->set_value(root["history_char_budget"]);
+	}
 	if (root.has("feature_universality_threshold")) {
 		feature_universality_threshold_spin->set_value(root["feature_universality_threshold"]);
 	}
@@ -330,6 +351,12 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	if (root.has("include_tool_context")) {
 		include_tool_context_check->set_pressed(root["include_tool_context"]);
+	}
+	if (root.has("tools_enabled")) {
+		tools_enabled_check->set_pressed(root["tools_enabled"]);
+	}
+	if (root.has("mcp_tools_enabled")) {
+		mcp_tools_enabled_check->set_pressed(root["mcp_tools_enabled"]);
 	}
 	if (root.has("auto_suggest_entries")) {
 		auto_suggest_entries_check->set_pressed(root["auto_suggest_entries"]);
@@ -373,6 +400,7 @@ AIConfigPanel::AIConfigPanel() {
 	temperature_spin = _add_spin_box_row(grid, &temperature_label, TTR("Temperature"), 0.0, 2.0, 0.05);
 	max_tokens_spin = _add_spin_box_row(grid, &max_tokens_label, TTR("Max Tokens"), 1, 262144, 1);
 	context_char_budget_spin = _add_spin_box_row(grid, &context_char_budget_label, TTR("Context Budget"), 0, 262144, 256);
+	history_budget_spin = _add_spin_box_row(grid, &history_budget_label, TTR("Compressed Context Size"), 0, 262144, 256);
 	feature_universality_threshold_spin = _add_spin_box_row(grid, &feature_universality_threshold_label, TTR("Feature Universality Threshold (%)"), 0, 100, 1);
 	feature_necessity_threshold_spin = _add_spin_box_row(grid, &feature_necessity_threshold_label, TTR("Feature Necessity Threshold"), 0, 1, 0.05);
 
@@ -381,6 +409,12 @@ AIConfigPanel::AIConfigPanel() {
 
 	include_tool_context_check = memnew(CheckBox);
 	root->add_child(include_tool_context_check);
+
+	tools_enabled_check = memnew(CheckBox);
+	root->add_child(tools_enabled_check);
+
+	mcp_tools_enabled_check = memnew(CheckBox);
+	root->add_child(mcp_tools_enabled_check);
 
 	auto_suggest_entries_check = memnew(CheckBox);
 	root->add_child(auto_suggest_entries_check);

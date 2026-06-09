@@ -1,4 +1,4 @@
-/*  ai_settings.h                                                          */
+/*  ai_defaults_data.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,49 +27,17 @@
 
 #pragma once
 
-#include "core/error/error_list.h"
-#include "core/string/ustring.h"
+#include "ai_tool_registry.h"
+#include "core/templates/vector.h"
 
-struct AISettingsData {
-	static constexpr int CURRENT_USAGE_AGREEMENT_VERSION = 1;
+/// Built-in default skills compiled directly into the editor binary.
+/// These provide a fallback for packaged builds where the source-tree
+/// defaults directory (editor/ai/defaults/) does not exist.
+namespace AIDefaultsData {
 
-	String base_url = "https://api.openai.com/v1";
-	String model = "gpt-4.1";
-	String api_key;
-	double temperature = 0.7;
-	int max_tokens = 1024;
-	String system_prompt = "You are an AI assistant inside the Jundot editor. Help analyze project issues, evaluate feature necessity, and propose confirmed next steps.";
-	bool include_project_memories = true;
-	bool include_tool_context = true;
-	bool tools_enabled = true;
-	bool mcp_tools_enabled = false;
-	int context_char_budget = 12000;
-	int history_char_budget = 16000;
-	bool auto_suggest_entries = true;
-	bool usage_agreement_accepted = false;
-	int usage_agreement_version = 0;
-	String usage_agreement_accepted_at;
-	double feature_universality_threshold = 70.0;
-	double feature_necessity_threshold = 0.7;
-	bool feature_design_philosophy_check = true;
-};
+/// Returns the 5 bundled default skills.
+/// The returned entries have no id/timestamps — the caller is responsible
+/// for assigning those via AIToolRegistry::make_skill().
+Vector<AISkillEntry> get_default_skills();
 
-class AISettings {
-	static String _get_config_path();
-
-public:
-	static String get_default_base_url();
-	static String get_default_model();
-	static String get_default_system_prompt();
-	static int get_default_context_char_budget();
-	static int get_default_history_char_budget();
-	static double get_default_feature_universality_threshold();
-	static double get_default_feature_necessity_threshold();
-	static bool is_usage_agreement_current(const AISettingsData &p_settings);
-	static Error accept_usage_agreement();
-	static Error reset_usage_agreement();
-
-	static AISettingsData load();
-	static Error save(const AISettingsData &p_settings);
-	static Error reset_to_defaults();
-};
+} // namespace AIDefaultsData
