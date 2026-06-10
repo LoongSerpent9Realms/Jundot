@@ -93,6 +93,7 @@ struct AISettingsData {
 	bool mcp_tools_enabled = false;
 	int context_char_budget = 12000;
 	int history_char_budget = 16000;
+	int max_tool_iterations = 10;
 	bool auto_suggest_entries = true;
 	String user_extra_instructions; // User-customizable extra instructions appended to system prompt
 	bool usage_agreement_accepted = false;
@@ -119,6 +120,7 @@ public:
 	static String get_default_system_prompt();
 	static int get_default_context_char_budget();
 	static int get_default_history_char_budget();
+	static int get_default_max_tool_iterations();
 	static double get_default_feature_universality_threshold();
 	static double get_default_feature_necessity_threshold();
 	static bool is_usage_agreement_current(const AISettingsData &p_settings);

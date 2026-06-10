@@ -95,6 +95,7 @@ void AIConfigPanel::_update_translations() {
 	max_tokens_label->set_text(TTR("Max Tokens"));
 	context_char_budget_label->set_text(TTR("Context Budget"));
 	history_budget_label->set_text(TTR("Compressed Context Size"));
+	max_tool_iterations_label->set_text(TTR("Max Tool Call Iterations"));
 	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
 	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
 	system_prompt_label->set_text(TTR("System Prompt"));
@@ -127,6 +128,7 @@ void AIConfigPanel::_load_settings() {
 	max_tokens_spin->set_value(settings.max_tokens);
 	context_char_budget_spin->set_value(settings.context_char_budget);
 	history_budget_spin->set_value(settings.history_char_budget);
+	max_tool_iterations_spin->set_value(settings.max_tool_iterations);
 	feature_universality_threshold_spin->set_value(settings.feature_universality_threshold);
 	feature_necessity_threshold_spin->set_value(settings.feature_necessity_threshold);
 	include_project_memories_check->set_pressed(settings.include_project_memories);
@@ -152,6 +154,7 @@ void AIConfigPanel::_save_settings() {
 	settings.max_tokens = max_tokens_spin->get_value();
 	settings.context_char_budget = context_char_budget_spin->get_value();
 	settings.history_char_budget = history_budget_spin->get_value();
+	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
@@ -193,6 +196,7 @@ void AIConfigPanel::_test_connection() {
 	settings.max_tokens = MIN<int>(max_tokens_spin->get_value(), 64);
 	settings.context_char_budget = context_char_budget_spin->get_value();
 	settings.history_char_budget = history_budget_spin->get_value();
+	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
@@ -260,6 +264,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.max_tokens = max_tokens_spin->get_value();
 	settings.context_char_budget = context_char_budget_spin->get_value();
 	settings.history_char_budget = history_budget_spin->get_value();
+	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
 	settings.include_project_memories = include_project_memories_check->is_pressed();
@@ -283,6 +288,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["mcp_tools_enabled"] = settings.mcp_tools_enabled;
 	root["context_char_budget"] = settings.context_char_budget;
 	root["history_char_budget"] = settings.history_char_budget;
+	root["max_tool_iterations"] = settings.max_tool_iterations;
 	root["auto_suggest_entries"] = settings.auto_suggest_entries;
 	root["feature_universality_threshold"] = settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = settings.feature_necessity_threshold;
@@ -352,6 +358,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("history_char_budget")) {
 		history_budget_spin->set_value(root["history_char_budget"]);
 	}
+	if (root.has("max_tool_iterations")) {
+		max_tool_iterations_spin->set_value(root["max_tool_iterations"]);
+	}
 	if (root.has("feature_universality_threshold")) {
 		feature_universality_threshold_spin->set_value(root["feature_universality_threshold"]);
 	}
@@ -413,6 +422,7 @@ AIConfigPanel::AIConfigPanel() {
 	max_tokens_spin = _add_spin_box_row(grid, &max_tokens_label, TTR("Max Tokens"), 1, 262144, 1);
 	context_char_budget_spin = _add_spin_box_row(grid, &context_char_budget_label, TTR("Context Budget"), 0, 262144, 256);
 	history_budget_spin = _add_spin_box_row(grid, &history_budget_label, TTR("Compressed Context Size"), 0, 262144, 256);
+	max_tool_iterations_spin = _add_spin_box_row(grid, &max_tool_iterations_label, TTR("Max Tool Call Iterations"), 1, 1000, 1);
 	feature_universality_threshold_spin = _add_spin_box_row(grid, &feature_universality_threshold_label, TTR("Feature Universality Threshold (%)"), 0, 100, 1);
 	feature_necessity_threshold_spin = _add_spin_box_row(grid, &feature_necessity_threshold_label, TTR("Feature Necessity Threshold"), 0, 1, 0.05);
 

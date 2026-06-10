@@ -76,6 +76,10 @@ int AISettings::get_default_history_char_budget() {
 	return 16000;
 }
 
+int AISettings::get_default_max_tool_iterations() {
+	return 10;
+}
+
 double AISettings::get_default_feature_universality_threshold() {
 	return 70.0;
 }
@@ -155,6 +159,7 @@ AISettingsData AISettings::load() {
 	settings.mcp_tools_enabled = root.get("mcp_tools_enabled", false);
 	settings.context_char_budget = root.get("context_char_budget", get_default_context_char_budget());
 	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
+	settings.max_tool_iterations = root.get("max_tool_iterations", get_default_max_tool_iterations());
 	settings.auto_suggest_entries = root.get("auto_suggest_entries", true);
 	settings.user_extra_instructions = root.get("user_extra_instructions", String());
 	settings.usage_agreement_accepted = root.get("usage_agreement_accepted", false);
@@ -191,6 +196,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["mcp_tools_enabled"] = p_settings.mcp_tools_enabled;
 	root["context_char_budget"] = p_settings.context_char_budget;
 	root["history_char_budget"] = p_settings.history_char_budget;
+	root["max_tool_iterations"] = p_settings.max_tool_iterations;
 	root["auto_suggest_entries"] = p_settings.auto_suggest_entries;
 	root["user_extra_instructions"] = p_settings.user_extra_instructions;
 	root["usage_agreement_accepted"] = p_settings.usage_agreement_accepted;

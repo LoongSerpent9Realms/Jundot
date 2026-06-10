@@ -51,9 +51,11 @@ class PopupMenu;
 class ScrollContainer;
 class TextEdit;
 class VBoxContainer;
+class PanelContainer;
+class ItemList;
 
 class AIChatPanel : public MarginContainer {
-	GDCLASS(AIChatPanel, MarginContainer)
+	GDCLASS(AIChatPanel, MarginContainer);
 
 	enum FileMenuId {
 		FILE_MENU_REFERENCE_PROJECT = 0,
@@ -127,6 +129,8 @@ class AIChatPanel : public MarginContainer {
 	struct PendingToolRound {
 		Array original_messages;
 		Array original_tools;
+		int iteration_count = 0;
+		int max_iterations = 10;
 	};
 
 	PendingToolRound pending_tool_round;
@@ -136,6 +140,53 @@ class AIChatPanel : public MarginContainer {
 	// reuses the same system prompt (with auto_mode, context, etc.) instead
 	// of reloading from disk and losing those modifications.
 	AISettingsData active_settings;
+
+	// ============ Multi-conversation support ============
+	struct ConversationMessage {
+		bool is_user = false;
+		bool is_summary = false;
+		String content;
+		String think_content;
+		double think_time_seconds = 0.0;
+		int prompt_tokens = 0;
+		int completion_tokens = 0;
+	};
+
+	struct Conversation {
+		String id;
+		String title;
+		Vector<ConversationMessage> messages;
+		uint64_t created_at = 0;
+		uint64_t updated_at = 0;
+
+		static Dictionary to_dict(const Conversation &p_conv);
+		static Conversation from_dict(const Dictionary &p_dict);
+	};
+
+	Vector<Conversation> conversations;
+	String active_conversation_id;
+
+	// Sidebar UI.
+	PanelContainer *sidebar_panel = nullptr;
+	VBoxContainer *sidebar = nullptr;
+	Button *new_conversation_button = nullptr;
+	Button *delete_conversation_button = nullptr;
+	ItemList *conversation_list = nullptr;
+
+	void _new_conversation();
+	void _delete_current_conversation();
+	void _conversation_selected(int p_index);
+	void _select_conversation(const String &p_id);
+	String _generate_conversation_id() const;
+	String _auto_generate_title(const Conversation &p_conv) const;
+	void _save_all_conversations() const;
+	void _load_all_conversations();
+	String _get_conversations_file_path() const;
+	void _refresh_conversation_list_ui();
+	void _serialize_current_messages();
+	void _load_conversation_to_ui(const Conversation &p_conv);
+
+	// ============ End multi-conversation support ============
 
 	void _send_message();
 	void _cancel_request();
