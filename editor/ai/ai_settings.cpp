@@ -31,6 +31,7 @@
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
+#include "core/os/os.h"
 #include "core/os/time.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/settings/editor_settings.h"
@@ -167,6 +168,12 @@ AISettingsData AISettings::load() {
 	settings.feature_universality_threshold = root.get("feature_universality_threshold", get_default_feature_universality_threshold());
 	settings.feature_necessity_threshold = root.get("feature_necessity_threshold", get_default_feature_necessity_threshold());
 	settings.feature_design_philosophy_check = root.get("feature_design_philosophy_check", true);
+	int mode_int = root.get("context_mode", 0);
+	settings.context_mode = (mode_int == 1) ? AIContextMode::ENGINE : AIContextMode::PROJECT;
+	settings.engine_source_root = root.get("engine_source_root", "");
+	settings.external_api_enabled = root.get("external_api_enabled", false);
+	settings.external_api_port = root.get("external_api_port", 8080);
+	settings.external_api_bind_address = root.get("external_api_bind_address", "127.0.0.1");
 	return settings;
 }
 
@@ -198,6 +205,11 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["feature_universality_threshold"] = p_settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = p_settings.feature_necessity_threshold;
 	root["feature_design_philosophy_check"] = p_settings.feature_design_philosophy_check;
+	root["context_mode"] = (p_settings.context_mode == AIContextMode::ENGINE) ? 1 : 0;
+	root["engine_source_root"] = p_settings.engine_source_root;
+	root["external_api_enabled"] = p_settings.external_api_enabled;
+	root["external_api_port"] = p_settings.external_api_port;
+	root["external_api_bind_address"] = p_settings.external_api_bind_address;
 	root["schema_version"] = 1;
 
 	Error err = DirAccess::make_dir_recursive_absolute(path.get_base_dir());
@@ -230,4 +242,51 @@ Error AISettings::reset_usage_agreement() {
 	settings.usage_agreement_version = 0;
 	settings.usage_agreement_accepted_at = String();
 	return save(settings);
+}
+
+String AISettings::get_effective_system_prompt(const AISettingsData &p_settings) {
+	String prompt;
+	switch (p_settings.context_mode) {
+		case AIContextMode::ENGINE:
+			prompt = p_settings.engine_system_prompt;
+			if (prompt.is_empty()) {
+				prompt = p_settings.system_prompt;
+			}
+			break;
+		case AIContextMode::PROJECT:
+		default:
+			prompt = p_settings.project_system_prompt;
+			if (prompt.is_empty()) {
+				prompt = p_settings.system_prompt;
+			}
+			break;
+	}
+	if (!p_settings.user_extra_instructions.is_empty()) {
+		prompt += "\n\n=== User Extra Instructions ===\n" + p_settings.user_extra_instructions;
+	}
+	return prompt;
+}
+
+String AISettings::get_engine_source_root(const AISettingsData &p_settings) {
+	if (!p_settings.engine_source_root.is_empty()) {
+		return p_settings.engine_source_root;
+	}
+	// Fall back to the directory containing the engine executable.
+	String exe_path = OS::get_singleton()->get_executable_path();
+	if (!exe_path.is_empty()) {
+		String exe_dir = exe_path.get_base_dir();
+		// Walk up to find the project.godot or SConstruct file to locate the source root.
+		String candidate = exe_dir;
+		for (int i = 0; i < 6; i++) {
+			if (FileAccess::exists(candidate.path_join("project.godot")) ||
+				FileAccess::exists(candidate.path_join("SConstruct"))) {
+				return candidate;
+			}
+			if (candidate.get_base_dir() == candidate) {
+				break;
+			}
+			candidate = candidate.get_base_dir();
+		}
+	}
+	return exe_path.get_base_dir();
 }

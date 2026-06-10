@@ -28,7 +28,7 @@ public partial class MainForm : Form
     private ComboBox _cbArch = null!;
     private NumericUpDown _numJobs = null!;
     private ComboBox _cbScriptLang = null!;
-    private ComboBox _cbLanguage = null!;
+
     private CheckBox _chkUseMinGW = null!;
     private CheckBox _chkWinOptDeps = null!;
     private CheckBox _chkSkipBuild = null!;
@@ -600,15 +600,7 @@ public partial class MainForm : Form
         };
         layout.Controls.Add(_txtExtraSCons, 1, row);
 
-        // Row 13: Language
-        row++;
-        AddLabel(layout, "Label.Language", row);
-        _cbLanguage = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        foreach (var langKey in new[] { "zh_CN", "en", "ja", "ko", "fr", "de", "es", "pt_BR", "ru" })
-            _cbLanguage.Items.Add(I18N.T($"Lang.{langKey}"));
-        _cbLanguage.SelectedIndex = 0;
 
-        layout.Controls.Add(_cbLanguage, 1, row);
 
         // Row 14: Auto Update Version
         row++;
@@ -1038,14 +1030,6 @@ public partial class MainForm : Form
         _chkWinOptDeps.Visible = isWindows;
     }
 
-    /// <summary>Extract locale code from the Language ComboBox selection.</summary>
-    private string GetSelectedLanguage()
-    {
-        var text = _cbLanguage.SelectedItem?.ToString() ?? "中文 (zh_CN)";
-        var match = System.Text.RegularExpressions.Regex.Match(text, @"\((\w+)\)");
-        return match.Success ? match.Groups[1].Value : "zh_CN";
-    }
-
     private void LoadDefaults()
     {
         // Try to detect the Jundot repo root
@@ -1102,7 +1086,6 @@ public partial class MainForm : Form
                 LogDir = _txtLogDir.Text.Trim(),
                 ExtraSConsArgs = _txtExtraSCons.Text.Trim(),
                 RepoRoot = _txtRepoRoot.Text.Trim(),
-                Language = GetSelectedLanguage(),
                 AutoUpdateVersion = _chkAutoVersion?.Checked ?? false,
                 GenerateUpdateManifest = _chkGenManifest?.Checked ?? true
             };
@@ -1147,19 +1130,6 @@ public partial class MainForm : Form
                 _chkAutoVersion.Checked = cfg.AutoUpdateVersion;
             if (_chkGenManifest != null)
                 _chkGenManifest.Checked = cfg.GenerateUpdateManifest;
-
-            // Restore language combobox selection
-            var selIdx = 0;
-            for (int i = 0; i < _cbLanguage.Items.Count; i++)
-            {
-                var item = _cbLanguage.Items[i]?.ToString() ?? "";
-                if (item.Contains($"({cfg.Language})"))
-                {
-                    selIdx = i;
-                    break;
-                }
-            }
-            _cbLanguage.SelectedIndex = selIdx;
 
             // Re-init build manager if repo root changed
             ReinitBuildManager();
@@ -1214,7 +1184,6 @@ public partial class MainForm : Form
             LogDir = _txtLogDir.Text.Trim(),
             ExtraSConsArgs = _txtExtraSCons.Text.Trim(),
             RepoRoot = _txtRepoRoot.Text.Trim(),
-            Language = GetSelectedLanguage(),
             AutoUpdateVersion = _chkAutoVersion?.Checked ?? false,
             GenerateUpdateManifest = _chkGenManifest?.Checked ?? true
         };
@@ -1417,7 +1386,6 @@ public partial class MainForm : Form
         _lvBuilds.Columns.Add(I18N.T("Col.Type"), 65);
         _lvBuilds.Columns.Add(I18N.T("Col.Arch"), 55);
         _lvBuilds.Columns.Add(I18N.T("Col.Script"), 75);
-        _lvBuilds.Columns.Add(I18N.T("Col.Lang"), 55);
         _lvBuilds.Columns.Add(I18N.T("Col.Date"), 135);
         _lvBuilds.Columns.Add(I18N.T("Col.Size"), 70);
         _lvBuilds.Columns.Add(I18N.T("Col.Status"), 65);
@@ -1511,14 +1479,6 @@ public partial class MainForm : Form
 
         foreach (var b in builds)
         {
-            // Lang display: zh_CN → 中文, en → English
-            var langDisplay = b.Language switch
-            {
-                "zh_CN" => I18N.T("Lang.zh_CN"),
-                "en" => I18N.T("Lang.en"),
-                _ => string.IsNullOrEmpty(b.Language) || b.Language == "?" ? "—" : b.Language
-            };
-
             var nameDisplay = b.PackageName;
             // Prettify: jundot-4.7-beta-windows-editor-x86_64-20260606-142153-build → Jundot 4.7-beta Editor (x86_64)
             if (nameDisplay.StartsWith("jundot-"))
@@ -1551,7 +1511,6 @@ public partial class MainForm : Form
             item.SubItems.Add(b.Target);
             item.SubItems.Add(b.Arch);
             item.SubItems.Add(b.Mono ? "C# (Mono)" : "GDScript");
-            item.SubItems.Add(langDisplay);
             item.SubItems.Add(b.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"));
             item.SubItems.Add(b.SizeDisplay);
             item.SubItems.Add(b.ExeExists ? I18N.T("Status.Ready") : I18N.T("Status.Missing"));
@@ -1624,12 +1583,7 @@ public partial class MainForm : Form
 
         try
         {
-            var args = "";
-            var editorLanguage = BuildEngine.NormalizeEditorLanguage(record.Language);
-            if (!string.IsNullOrEmpty(editorLanguage) && editorLanguage != "en")
-                args = $"--language {editorLanguage}";
-
-            var psi = new System.Diagnostics.ProcessStartInfo(record.ExePath, args)
+            var psi = new System.Diagnostics.ProcessStartInfo(record.ExePath)
             {
                 WorkingDirectory = Path.GetDirectoryName(record.ExePath) ?? "",
                 UseShellExecute = true

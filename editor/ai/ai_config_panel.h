@@ -76,8 +76,13 @@ class AIConfigPanel : public MarginContainer {
 	Label *user_extra_instructions_label = nullptr;
 	Label *usage_notice_label = nullptr;
 	Label *status_label = nullptr;
+	Label *external_api_port_label = nullptr;
+	Label *external_api_bind_address_label = nullptr;
 	AIChatService *test_service = nullptr;
 	AIUsageAgreementDialog *usage_agreement_dialog = nullptr;
+	CheckBox *external_api_enabled_check = nullptr;
+	SpinBox *external_api_port_spin = nullptr;
+	LineEdit *external_api_bind_address_edit = nullptr;
 	Button *save_button = nullptr;
 	Button *reset_button = nullptr;
 	Button *test_button = nullptr;

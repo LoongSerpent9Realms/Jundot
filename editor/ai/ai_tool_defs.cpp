@@ -27,6 +27,7 @@
 
 #include "ai_tool_defs.h"
 #include "ai_tool_registry.h"
+#include "ai_mcp_runtime.h"
 
 #include "core/io/json.h"
 
@@ -207,60 +208,101 @@ Array AIToolDefs::get_mcp_tools() {
 		return tools;
 	}
 
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+
 	for (const AIMCPServerEntry &server : mcp_servers) {
 		if (!server.enabled) {
 			continue;
 		}
 
-		if (server.capabilities_json.is_empty()) {
-			continue;
+		bool has_runtime_tools = false;
+
+		// Try to get tools from runtime (dynamic discovery via tools/list)
+		if (runtime->is_alive() && runtime->get_state() == MCPServerRuntime::ServerState::RUNNING) {
+			Array runtime_tools = runtime->get_tools();
+			if (!runtime_tools.is_empty()) {
+				for (int i = 0; i < runtime_tools.size(); i++) {
+					if (runtime_tools[i].get_type() == Variant::DICTIONARY) {
+						Dictionary rt = runtime_tools[i];
+						Dictionary tool;
+						tool["type"] = "function";
+						tool["function"] = rt;
+						tool["x_mcp_server_name"] = server.name;
+						tool["x_mcp_server_command"] = server.command;
+						tool["x_mcp_server_args"] = server.arguments;
+						tools.push_back(tool);
+						has_runtime_tools = true;
+					}
+				}
+			}
 		}
 
-		// Parse capabilities JSON (array of tool definitions).
-		Variant parsed = JSON::parse_string(server.capabilities_json);
-		if (parsed.get_type() != Variant::ARRAY) {
-			continue;
-		}
+		// Fallback to static capabilities_json if runtime has no tools
+		if (!has_runtime_tools && !server.capabilities_json.is_empty()) {
+			Variant parsed = JSON::parse_string(server.capabilities_json);
+			if (parsed.get_type() == Variant::ARRAY) {
+				Array caps = parsed;
+				for (int i = 0; i < caps.size(); i++) {
+					if (caps[i].get_type() != Variant::DICTIONARY) {
+						continue;
+					}
 
-		Array caps = parsed;
-		for (int i = 0; i < caps.size(); i++) {
-			if (caps[i].get_type() != Variant::DICTIONARY) {
-				continue;
+					Dictionary cap = caps[i];
+					String cap_name = cap.get("name", String());
+					if (cap_name.is_empty()) {
+						continue;
+					}
+
+					String tool_name = server.name + "." + cap_name;
+
+					Dictionary fn;
+					fn["name"] = tool_name;
+					fn["description"] = cap.get("description", String());
+
+					Dictionary params;
+					params["type"] = "object";
+					params["properties"] = cap.get("inputSchema", cap.get("parameters", cap.get("input", Dictionary())));
+					if (params["properties"].get_type() != Variant::DICTIONARY) {
+						params["properties"] = _str_property("Tool input as a JSON string.");
+					}
+
+					fn["parameters"] = params;
+
+					Dictionary tool;
+					tool["type"] = "function";
+					tool["function"] = fn;
+					tool["x_mcp_server_name"] = server.name;
+					tool["x_mcp_server_command"] = server.command;
+					tool["x_mcp_server_args"] = server.arguments;
+					tools.push_back(tool);
+				}
 			}
-
-			Dictionary cap = caps[i];
-			String cap_name = cap.get("name", String());
-			if (cap_name.is_empty()) {
-				continue;
-			}
-
-			// Prefix tool name with MCP server name to avoid collisions.
-			String tool_name = server.name + "." + cap_name;
-
-			// Build OpenAI tool definition.
-			Dictionary fn;
-			fn["name"] = tool_name;
-			fn["description"] = cap.get("description", String());
-
-			Dictionary params;
-			params["type"] = "object";
-			params["properties"] = cap.get("inputSchema", cap.get("parameters", cap.get("input", Dictionary())));
-			if (params["properties"].get_type() != Variant::DICTIONARY) {
-				// Some MCP tools use a flat input format. Convert to OpenAI format.
-				params["properties"] = _str_property("Tool input as a JSON string.");
-			}
-
-			fn["parameters"] = params;
-
-			Dictionary tool;
-			tool["type"] = "function";
-			tool["function"] = fn;
-			tool["x_mcp_server_name"] = server.name;
-			tool["x_mcp_server_command"] = server.command;
-			tool["x_mcp_server_args"] = server.arguments;
-			tools.push_back(tool);
 		}
 	}
 
 	return tools;
+}
+
+Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
+	Array all_tools = get_builtin_tools();
+	Array filtered;
+
+	HashSet<StringName> engine_only;
+	engine_only.insert(StringName(AIToolNames::RUN_BUILD));
+	engine_only.insert(StringName(AIToolNames::READ_BUILD_LOG));
+	engine_only.insert(StringName(AIToolNames::CHECK_BUILD_STATUS));
+	engine_only.insert(StringName(AIToolNames::RESTART_ENGINE));
+	engine_only.insert(StringName(AIToolNames::FETCH_URL));
+
+	for (int i = 0; i < all_tools.size(); i++) {
+		Dictionary tool = all_tools[i];
+		Dictionary fn = tool["function"];
+		String name = fn["name"];
+		if (engine_only.has(StringName(name)) && p_mode != AIContextMode::ENGINE) {
+			continue;
+		}
+		filtered.push_back(tool);
+	}
+
+	return filtered;
 }

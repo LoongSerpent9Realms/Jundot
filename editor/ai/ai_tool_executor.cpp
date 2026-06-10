@@ -28,7 +28,9 @@
 #include "ai_tool_executor.h"
 #include "ai_tool_defs.h"
 #include "ai_code_fetcher.h"
+#include "ai_mcp_runtime.h"
 #include "ai_restart_helper.h"
+#include "ai_settings.h"
 #include "ai_tool_registry.h"
 
 #include "core/error/error_macros.h"
@@ -226,14 +228,19 @@ Dictionary AIToolExecutor::_make_result(const String &p_content, bool p_is_error
 }
 
 String AIToolExecutor::_get_project_root() {
-	// Use OS::get_singleton()->get_executable_path() and go up to the repo root.
+	// In ENGINE mode, return the engine source directory from settings
+	// (auto-detected via AISettings::get_engine_source_root).
+	// In PROJECT mode, return the currently-opened project directory.
+	AISettingsData s = AISettings::load();
+	if (s.context_mode == AIContextMode::ENGINE) {
+		return AISettings::get_engine_source_root(s);
+	}
+	// Project mode: try project.godot directory, otherwise fall back to the engine source.
 	String exe_path = OS::get_singleton()->get_executable_path();
-	// Try detecting via a known subdirectory.
 	String probe = exe_path.get_base_dir().path_join("SConstruct");
 	if (FileAccess::exists(probe)) {
 		return exe_path.get_base_dir();
 	}
-	// Walk up looking for SConstruct.
 	String dir = exe_path.get_base_dir();
 	for (int i = 0; i < 10; i++) {
 		if (FileAccess::exists(dir.path_join("SConstruct"))) {
@@ -776,91 +783,36 @@ Dictionary AIToolExecutor::_execute_mcp_tool(const String &p_server_name, const 
 		return _make_result(vformat("MCP server '%s' is not configured or not enabled.", p_server_name), true);
 	}
 
-	// Build the JSON-RPC request.
-	Dictionary rpc_request;
-	rpc_request["jsonrpc"] = "2.0";
-	rpc_request["id"] = 1;
-	rpc_request["method"] = "tools/call";
+	if (target_server.command.is_empty() && target_server.url.is_empty()) {
+		return _make_result(vformat("MCP server '%s' has no command or URL configured.", p_server_name), true);
+	}
 
-	Dictionary rpc_params;
-	rpc_params["name"] = p_tool_name;
+	// Use MCPServerRuntime for interactive MCP communication
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
 
-	// Parse arguments JSON.
+	// Lazy start: if runtime not running for this server, start it
+	if (!runtime->is_alive()) {
+		Error err = runtime->start(target_server);
+		if (err != OK) {
+			return _make_result(vformat("Failed to start MCP server '%s': %s", p_server_name, runtime->get_last_error()), true);
+		}
+	}
+
+	// Parse arguments JSON
+	Dictionary arguments;
 	Variant parsed_args = JSON::parse_string(p_args_json);
 	if (parsed_args.get_type() == Variant::DICTIONARY) {
-		rpc_params["arguments"] = parsed_args;
-	} else {
-		rpc_params["arguments"] = Dictionary();
+		arguments = parsed_args;
 	}
 
-	rpc_request["params"] = rpc_params;
+	// Call the tool via runtime
+	Dictionary result = runtime->call_tool(p_tool_name, arguments);
 
-	String request_body = JSON::stringify(rpc_request);
-
-	// Launch MCP server as a subprocess.
-	String command = target_server.command;
-	if (command.is_empty()) {
-		return _make_result(vformat("MCP server '%s' has no command configured.", p_server_name), true);
+	if (result.has("is_error") && result["is_error"]) {
+		String error_content = result.get("content", "Unknown error");
+		return _make_result(vformat("MCP tool '%s.%s' error: %s", p_server_name, p_tool_name, error_content), true);
 	}
 
-	List<String> mcp_args;
-	if (!target_server.arguments.is_empty()) {
-		// Parse space-separated arguments.
-		Vector<String> arg_parts = target_server.arguments.split(" ", false);
-		for (int i = 0; i < arg_parts.size(); i++) {
-			mcp_args.push_back(arg_parts[i]);
-		}
-	}
-
-	String std_out;
-	int exit_code = -1;
-
-	// Execute the MCP server with the request piped via stdin.
-	Error err = OS::get_singleton()->execute(command, mcp_args, &std_out, &exit_code, true);
-	if (err != OK) {
-		return _make_result(vformat("Failed to start MCP server '%s': err=%d", p_server_name, (int)err), true);
-	}
-
-	// The MCP protocol uses stdin/stdout. OS::execute captures stdout,
-	// but we also need stdin. For now, we execute the command and check output.
-	// A more robust implementation would use the url field for HTTP-based MCP.
-	if (!target_server.url.is_empty()) {
-		// HTTP-based MCP: send request via HTTPRequest to the server URL.
-		// This is deferred — the current implementation uses subprocess only.
-		return _make_result(vformat("HTTP-based MCP server '%s' is not yet supported via Function Calling. Use subprocess-based MCP servers instead.", p_server_name), true);
-	}
-
-	// Parse the response. The stdout should contain a JSON-RPC response.
-	if (std_out.is_empty()) {
-		return _make_result(vformat("MCP tool '%s.%s' returned empty response.", p_server_name, p_tool_name), true);
-	}
-
-	// Parse JSON-RPC response.
-	Variant response = JSON::parse_string(std_out);
-	if (response.get_type() != Variant::DICTIONARY) {
-		return _make_result(vformat("MCP tool '%s.%s' returned invalid JSON: %s", p_server_name, p_tool_name, std_out.substr(0, 500)), true);
-	}
-
-	Dictionary rpc = response;
-
-	// Check for JSON-RPC error.
-	if (rpc.has("error") && rpc["error"].get_type() == Variant::DICTIONARY) {
-		Dictionary error_obj = rpc["error"];
-		String err_msg = error_obj.get("message", "Unknown error");
-		return _make_result(vformat("MCP tool '%s.%s' error: %s", p_server_name, p_tool_name, err_msg), true);
-	}
-
-	// Extract the result content.
-	if (rpc.has("result")) {
-		Variant result_data = rpc["result"];
-		if (result_data.get_type() == Variant::DICTIONARY) {
-			Dictionary result_dict = result_data;
-			// MCP tools typically return content in content[0].text or a data field.
-			Variant content = result_dict.get("content", result_dict);
-			return _make_result(JSON::stringify(content));
-		}
-		return _make_result(JSON::stringify(result_data));
-	}
-
-	return _make_result(vformat("MCP tool '%s.%s' returned result with no recognizable data.", p_server_name, p_tool_name), true);
+	String content = result.get("content", "");
+	return _make_result(content);
 }

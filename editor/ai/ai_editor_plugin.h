@@ -31,12 +31,14 @@
 
 class EditorDock;
 class TabContainer;
+class AIInspectorContextMenu;
 
 class AIEditorPlugin : public EditorPlugin {
 	GDCLASS(AIEditorPlugin, EditorPlugin)
 
 	EditorDock *ai_dock = nullptr;
 	TabContainer *tabs = nullptr;
+	Ref<AIInspectorContextMenu> inspector_context_menu_plugin;
 
 	void _create_dock();
 	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
