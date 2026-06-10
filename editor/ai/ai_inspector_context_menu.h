@@ -1,4 +1,4 @@
-/*  ai_tool_defs.h                                                          */
+/*  ai_inspector_context_menu.h                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -21,42 +21,34 @@
 /* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
 /* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
 /* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR THE DEALINGS IN THE SOFTWARE.                   */
 /**************************************************************************/
 
 #pragma once
 
-#include "ai_settings.h"
-#include "core/templates/vector.h"
-#include "core/variant/array.h"
+#include "editor/inspector/editor_context_menu_plugin.h"
 
-// Tool name constants.
-namespace AIToolNames {
-constexpr const char *READ_FILES = "read_files";
-constexpr const char *WRITE_FILE = "write_file";
-constexpr const char *SEARCH_FILES = "search_files";
-constexpr const char *GREP_CODE = "grep_code";
-constexpr const char *RUN_BUILD = "run_build";
-constexpr const char *READ_BUILD_LOG = "read_build_log";
-constexpr const char *FETCH_URL = "fetch_url";
-constexpr const char *SHELL_COMMAND = "shell_command";
-constexpr const char *RESTART_ENGINE = "restart_engine";
-constexpr const char *CHECK_BUILD_STATUS = "check_build_status";
-} // namespace AIToolNames
+class AIChatPanel;
+class Node;
+class Control;
+class TextEdit;
 
-// Returns the built-in tool definitions as an Array of Dictionary,
-// formatted for OpenAI/OpenRouter-compatible "tools" parameter.
-class AIToolDefs {
+class AIInspectorContextMenu : public EditorContextMenuPlugin {
+	GDCLASS(AIInspectorContextMenu, EditorContextMenuPlugin);
+
+private:
+	String last_property_path;
+	String last_property_name;
+
+	static AIChatPanel *_find_chat_panel(Node *p_node);
+	static TextEdit *_find_input_edit(Control *p_root);
+
+	void _ask_ai(Object *p_property);
+
+protected:
+	static void _bind_methods();
+
 public:
-	// OpenAI-compatible tool definitions (the "tools" array in the API payload).
-	static Array get_builtin_tools();
-
-	// Tools derived from configured MCP server capabilities.
-	static Array get_mcp_tools();
-
-	// Returns the tools available for a specific context mode.
-	// - PROJECT: project file tools + shell_command (no build tools).
-	// - ENGINE: all project tools + build tools (run_build, read_build_log, check_build_status, restart_engine, fetch_url).
-	static Array get_tools_for_mode(AIContextMode p_mode);
+	virtual void get_options(const Vector<String> &p_paths) override;
 };

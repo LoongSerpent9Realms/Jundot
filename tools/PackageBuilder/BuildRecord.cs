@@ -32,9 +32,6 @@ public class BuildRecord
     /// <summary>Git commit hash (if available).</summary>
     public string Commit        { get; set; } = "";
 
-    /// <summary>Editor UI language locale (e.g. zh_CN, en).</summary>
-    public string Language      { get; set; } = "zh_CN";
-
     /// <summary>Human-readable summary line for the list view.</summary>
     public string Summary => $"{Version} {Target} {Arch}{(Mono ? " Mono" : "")}";
 

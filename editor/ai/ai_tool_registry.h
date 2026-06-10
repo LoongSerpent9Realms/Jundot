@@ -25,6 +25,12 @@ struct AISkillEntry {
 	String updated_at;
 };
 
+enum class MCPServerLifecycle {
+	DEFAULT,    // 按需启动，对话结束后关闭
+	KEEPALIVE,  // 永久驻留，编辑器退出时关闭
+	ONE_SHOT    // 单次使用
+};
+
 struct AIMCPServerEntry {
 	String id;
 	String name;
@@ -38,6 +44,12 @@ struct AIMCPServerEntry {
 	bool read_only_allowed = true;
 	String created_at;
 	String updated_at;
+
+	// 交互式 MCP 新增字段
+	MCPServerLifecycle lifecycle = MCPServerLifecycle::DEFAULT;
+	int timeout_seconds = 30;
+	String last_error;
+	String last_connected_at;
 };
 
 class AIToolRegistry {

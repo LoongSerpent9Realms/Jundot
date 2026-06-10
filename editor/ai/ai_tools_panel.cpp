@@ -9,6 +9,7 @@
 #include "ai_importer.h"
 #include "ai_memory_store.h"
 #include "ai_skill_installer.h"
+#include "ai_mcp_runtime.h"
 
 #include "core/error/error_macros.h"
 #include "core/object/callable_mp.h"
@@ -22,7 +23,9 @@
 #include "scene/gui/item_list.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
+#include "scene/gui/option_button.h"
 #include "scene/gui/panel_container.h"
+#include "scene/gui/spin_box.h"
 #include "scene/gui/tab_container.h"
 #include "scene/gui/text_edit.h"
 
@@ -674,6 +677,55 @@ AIToolsPanel::AIToolsPanel() {
 	mcp_delete_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_delete_mcp_server));
 	mcp_actions->add_child(mcp_delete_button);
 
+	// MCP runtime controls
+	HBoxContainer *mcp_controls = memnew(HBoxContainer);
+	mcp_controls->add_theme_constant_override("separation", 4 * EDSCALE);
+	mcp_editor->add_child(mcp_controls);
+
+	mcp_status_label = memnew(Label);
+	mcp_status_label->set_text(TTR("Status: Stopped"));
+	mcp_controls->add_child(mcp_status_label);
+
+	mcp_test_button = memnew(Button);
+	mcp_test_button->set_text(TTR("Test"));
+	mcp_test_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_mcp_test_connection));
+	mcp_controls->add_child(mcp_test_button);
+
+	mcp_refresh_button = memnew(Button);
+	mcp_refresh_button->set_text(TTR("Refresh"));
+	mcp_refresh_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_mcp_refresh_tools));
+	mcp_controls->add_child(mcp_refresh_button);
+
+	mcp_stop_button = memnew(Button);
+	mcp_stop_button->set_text(TTR("Stop"));
+	mcp_stop_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_mcp_stop_server));
+	mcp_controls->add_child(mcp_stop_button);
+
+	// Lifecycle and timeout settings
+	GridContainer *mcp_advanced_grid = memnew(GridContainer);
+	mcp_advanced_grid->set_columns(2);
+	mcp_advanced_grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	mcp_editor->add_child(mcp_advanced_grid);
+
+	Label *mcp_lifecycle_label = memnew(Label);
+	mcp_lifecycle_label->set_text(TTR("Lifecycle"));
+	mcp_advanced_grid->add_child(mcp_lifecycle_label);
+	mcp_lifecycle = memnew(OptionButton);
+	mcp_lifecycle->add_item(TTR("Default (start on demand)"));
+	mcp_lifecycle->add_item(TTR("Keepalive (stay running)"));
+	mcp_lifecycle->add_item(TTR("One-shot"));
+	mcp_advanced_grid->add_child(mcp_lifecycle);
+
+	Label *mcp_timeout_label = memnew(Label);
+	mcp_timeout_label->set_text(TTR("Timeout (seconds)"));
+	mcp_advanced_grid->add_child(mcp_timeout_label);
+	mcp_timeout = memnew(SpinBox);
+	mcp_timeout->set_min(1);
+	mcp_timeout->set_max(300);
+	mcp_timeout->set_value(30);
+	mcp_timeout->set_step(1);
+	mcp_advanced_grid->add_child(mcp_timeout);
+
 	HBoxContainer *bottom = memnew(HBoxContainer);
 	bottom->add_theme_constant_override("separation", 6 * EDSCALE);
 	root->add_child(bottom);
@@ -719,4 +771,77 @@ AIToolsPanel::AIToolsPanel() {
 
 	_update_translations();
 	_load_registry();
+}
+
+void AIToolsPanel::_mcp_test_connection() {
+	if (selected_mcp_server < 0 || selected_mcp_server >= mcp_servers.size()) {
+		mcp_status_label->set_text(TTR("No server selected"));
+		return;
+	}
+
+	const AIMCPServerEntry &server = mcp_servers[selected_mcp_server];
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+
+	mcp_status_label->set_text(TTR("Testing connection..."));
+
+	Error err = runtime->start(server);
+	if (err != OK) {
+		mcp_status_label->set_text(TTR("Connection failed: ") + runtime->get_last_error());
+		return;
+	}
+
+	Array tools = runtime->get_tools();
+	mcp_status_label->set_text(vformat("Connected! %d tools available.", tools.size()));
+}
+
+void AIToolsPanel::_mcp_refresh_tools() {
+	if (selected_mcp_server < 0 || selected_mcp_server >= mcp_servers.size()) {
+		mcp_status_label->set_text(TTR("No server selected"));
+		return;
+	}
+
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+	if (!runtime->is_alive()) {
+		mcp_status_label->set_text(TTR("Server not running"));
+		return;
+	}
+
+	Array tools = runtime->get_tools();
+	mcp_status_label->set_text(vformat("%d tools loaded.", tools.size()));
+}
+
+void AIToolsPanel::_mcp_stop_server() {
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+	runtime->stop();
+	mcp_status_label->set_text(TTR("Status: Stopped"));
+}
+
+void AIToolsPanel::_update_mcp_status() {
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+	if (runtime->is_alive()) {
+		MCPServerRuntime::ServerState state = runtime->get_state();
+		switch (state) {
+			case MCPServerRuntime::ServerState::RUNNING:
+				mcp_status_label->set_text(TTR("Status: Running"));
+				break;
+			case MCPServerRuntime::ServerState::INITIALIZING:
+				mcp_status_label->set_text(TTR("Status: Initializing..."));
+				break;
+			case MCPServerRuntime::ServerState::STARTING:
+				mcp_status_label->set_text(TTR("Status: Starting..."));
+				break;
+			case MCPServerRuntime::ServerState::ERROR:
+				mcp_status_label->set_text(TTR("Status: Error - ") + runtime->get_last_error());
+				break;
+			default:
+				mcp_status_label->set_text(TTR("Status: Stopped"));
+				break;
+		}
+	} else {
+		mcp_status_label->set_text(TTR("Status: Stopped"));
+	}
+}
+
+void AIToolsPanel::_update_mcp_status_from_runtime() {
+	_update_mcp_status();
 }

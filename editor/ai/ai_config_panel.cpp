@@ -30,6 +30,7 @@
 #include "ai_chat_service.h"
 #include "ai_settings.h"
 #include "ai_usage_agreement_dialog.h"
+#include "ai_mcp_manager.h"
 
 #include "core/io/file_access.h"
 #include "core/io/json.h"
@@ -104,6 +105,7 @@ void AIConfigPanel::_update_translations() {
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
+	external_api_enabled_check->set_text(TTR("Enable External API Server (for remote MCP tool calls)"));
 	usage_notice_label->set_text(TTR("AI requests can consume additional API tokens when project context, attachments, logs, or repair analysis are included."));
 	save_button->set_text(TTR("Save"));
 	reset_button->set_text(TTR("Reset"));
@@ -133,6 +135,9 @@ void AIConfigPanel::_load_settings() {
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
+	external_api_enabled_check->set_pressed(settings.external_api_enabled);
+	external_api_port_spin->set_value(settings.external_api_port);
+	external_api_bind_address_edit->set_text(settings.external_api_bind_address);
 	system_prompt_edit->set_text(settings.system_prompt);
 	user_extra_instructions_edit->set_text(settings.user_extra_instructions);
 	status_label->set_text(TTR("AI settings loaded."));
@@ -157,11 +162,15 @@ void AIConfigPanel::_save_settings() {
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
 	settings.user_extra_instructions = user_extra_instructions_edit->get_text();
+	settings.external_api_enabled = external_api_enabled_check->is_pressed();
+	settings.external_api_port = external_api_port_spin->get_value();
+	settings.external_api_bind_address = external_api_bind_address_edit->get_text().strip_edges();
 	const Error err = AISettings::save(settings);
 	if (err != OK) {
 		status_label->set_text(TTR("AI settings could not be saved."));
 		return;
 	}
+	AIMCPManager::get_singleton()->update_settings(settings);
 	status_label->set_text(TTR("AI settings saved."));
 }
 
@@ -424,6 +433,12 @@ AIConfigPanel::AIConfigPanel() {
 
 	feature_design_philosophy_check = memnew(CheckBox);
 	root->add_child(feature_design_philosophy_check);
+
+	external_api_enabled_check = memnew(CheckBox);
+	root->add_child(external_api_enabled_check);
+
+	external_api_port_spin = _add_spin_box_row(grid, &external_api_port_label, TTR("External API Port"), 1, 65535, 1);
+	external_api_bind_address_edit = _add_line_edit_row(grid, &external_api_bind_address_label, TTR("Bind Address"), "127.0.0.1");
 
 	usage_notice_label = memnew(Label);
 	usage_notice_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);

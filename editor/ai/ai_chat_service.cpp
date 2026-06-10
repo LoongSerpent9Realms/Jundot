@@ -27,6 +27,8 @@
 
 #include "ai_chat_service.h"
 
+#include "ai_settings.h"
+
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
@@ -260,10 +262,11 @@ void AIChatService::configure(const AISettingsData &p_settings) {
 
 Error AIChatService::send_chat(const String &p_message) {
 	Array messages;
-	if (!settings.system_prompt.is_empty()) {
+	String effective_prompt = AISettings::get_effective_system_prompt(settings);
+	if (!effective_prompt.is_empty()) {
 		Dictionary system_message;
 		system_message["role"] = "system";
-		system_message["content"] = settings.system_prompt;
+		system_message["content"] = effective_prompt;
 		messages.push_back(system_message);
 	}
 

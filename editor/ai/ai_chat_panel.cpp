@@ -48,18 +48,23 @@
 
 #include "core/io/file_access.h"
 #include "core/io/dir_access.h"
+#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
+#include "core/os/time.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
+#include "scene/gui/item_list.h"
 #include "scene/gui/label.h"
+#include "scene/gui/line_edit.h"
 #include "scene/gui/menu_button.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/popup_menu.h"
 #include "scene/gui/scroll_container.h"
+#include "scene/gui/split_container.h"
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
 
@@ -127,6 +132,230 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	}
 	// Default / hybrid.
 	return TTR("Mode: Hybrid assistant. Help the developer by analyzing context, proposing changes, and collaborating on solutions.");
+}
+
+void AIChatPanel::_switch_to_engine() {
+	AISettingsData s = AISettings::load();
+	s.context_mode = AIContextMode::ENGINE;
+	AISettings::save(s);
+	_update_mode_indicator();
+	status_label->set_text(TTR("Switched to ENGINE mode — engine source mode."));
+}
+
+void AIChatPanel::_switch_to_project() {
+	AISettingsData s = AISettings::load();
+	s.context_mode = AIContextMode::PROJECT;
+	AISettings::save(s);
+	_update_mode_indicator();
+	status_label->set_text(TTR("Switched to PROJECT mode — game project mode."));
+}
+
+void AIChatPanel::_update_mode_indicator() {
+	AISettingsData s = AISettings::load();
+	if (s.context_mode == AIContextMode::ENGINE) {
+		engine_mode_btn->add_theme_color_override("font_color", Color(1.0f, 0.4f, 0.4f));
+		project_mode_btn->add_theme_color_override("font_color", Color(0.7f, 0.7f, 0.7f));
+	} else {
+		project_mode_btn->add_theme_color_override("font_color", Color(0.4f, 1.0f, 0.4f));
+		engine_mode_btn->add_theme_color_override("font_color", Color(0.7f, 0.7f, 0.7f));
+	}
+}
+
+void AIChatPanel::_new_conversation() {
+	// Clear current messages
+	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
+		message_list->get_child(i)->queue_free();
+	}
+	conversation_name_edit->set_text("");
+	has_auto_titled = false;
+	is_titling = false;
+	status_label->set_text(TTR("New conversation started."));
+}
+
+void AIChatPanel::_update_conversation_menu() {
+	if (!conversation_menu) {
+		return;
+	}
+	PopupMenu *popup = conversation_menu->get_popup();
+	popup->clear();
+
+	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
+	Ref<DirAccess> da = DirAccess::open(save_dir);
+	if (da.is_null()) {
+		return;
+	}
+
+	da->list_dir_begin();
+	String f = da->get_next();
+	while (!f.is_empty()) {
+		if (f.ends_with(".json")) {
+			String full_path = save_dir.path_join(f);
+			Ref<FileAccess> fa = FileAccess::open(full_path, FileAccess::READ);
+			if (fa.is_valid()) {
+				String content = fa->get_as_text();
+				String title = f.trim_suffix(".json");
+				JSON json;
+				if (json.parse(content) == OK) {
+					Array msgs = json.get_data();
+					for (int i = 0; i < msgs.size(); i++) {
+						Dictionary msg = msgs[i];
+						if (msg.get("role", "") == "user") {
+							String content_str = msg.get("content", "");
+							if (!content_str.is_empty()) {
+								title = content_str.substr(0, MIN(40, content_str.length()));
+								break;
+							}
+						}
+					}
+				}
+				popup->add_item(title, popup->get_item_count());
+			}
+		}
+		f = da->get_next();
+	}
+	da->list_dir_end();
+}
+
+void AIChatPanel::_update_conversation_list() {
+	conversation_list->clear();
+	saved_conversations.clear();
+
+	// Load from user data dir
+	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
+	Ref<DirAccess> da = DirAccess::open(save_dir);
+	if (da.is_null()) {
+		return;
+	}
+
+	da->list_dir_begin();
+	String f = da->get_next();
+	while (!f.is_empty()) {
+		if (f.ends_with(".json")) {
+			String full_path = save_dir.path_join(f);
+			Ref<FileAccess> fa = FileAccess::open(full_path, FileAccess::READ);
+			if (fa.is_valid()) {
+				String content = fa->get_as_text();
+				// Try to extract a title from the first user message
+				String title = f.trim_suffix(".json");
+				JSON json;
+				if (json.parse(content) == OK) {
+					Array msgs = json.get_data();
+					for (int i = 0; i < msgs.size(); i++) {
+						Dictionary msg = msgs[i];
+						if (msg.get("role", "") == "user") {
+							String content_str = msg.get("content", "");
+							if (!content_str.is_empty()) {
+								title = content_str.substr(0, MIN(40, content_str.length()));
+								break;
+							}
+						}
+					}
+				}
+				conversation_list->add_item(title);
+				saved_conversations.push_back(Vector<String>()); // placeholder
+			}
+		}
+		f = da->get_next();
+	}
+	da->list_dir_end();
+}
+
+void AIChatPanel::_select_conversation(int p_index) {
+	if (p_index < 0 || p_index >= saved_conversations.size()) {
+		return;
+	}
+	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
+	Ref<DirAccess> da = DirAccess::open(save_dir);
+	if (da.is_null()) {
+		return;
+	}
+
+	da->list_dir_begin();
+	String f = da->get_next();
+	int idx = 0;
+	while (!f.is_empty()) {
+		if (f.ends_with(".json") && idx == p_index) {
+			String full_path = save_dir.path_join(f);
+			_load_conversation(full_path);
+			break;
+		}
+		f = da->get_next();
+		if (f.ends_with(".json")) {
+			idx++;
+		}
+	}
+	da->list_dir_end();
+}
+
+void AIChatPanel::_save_current_conversation() {
+	// Save current message_list content to disk.
+	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
+	Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+	if (da.is_null()) {
+		return;
+	}
+	if (!da->dir_exists(save_dir)) {
+		da->make_dir_recursive(save_dir);
+	}
+
+	String timestamp = Time::get_singleton()->get_datetime_string_from_system().replace(":", "-").replace("T", "_");
+	String file_path = save_dir.path_join(timestamp + ".json");
+
+	Ref<FileAccess> fa = FileAccess::open(file_path, FileAccess::WRITE);
+	if (fa.is_valid()) {
+		// Build JSON from message history (UI children).
+		Array history = _build_message_history();
+		String json_content = "[\n";
+		for (int i = 0; i < history.size(); i++) {
+			Dictionary msg = history[i];
+			json_content += "{\"role\": \"" + String(msg.get("role", "")) + "\", \"content\": \"";
+			String content = msg.get("content", "");
+			content = content.replace("\\", "\\\\").replace("\"", "\\\"");
+			json_content += content + "\"}\n";
+			if (i < history.size() - 1) {
+				json_content += ",\n";
+			}
+		}
+		json_content += "]\n";
+		fa->store_string(json_content);
+		fa->close();
+	}
+	_update_conversation_list();
+}
+
+void AIChatPanel::_load_conversation(const String &p_file_path) {
+	Ref<FileAccess> fa = FileAccess::open(p_file_path, FileAccess::READ);
+	if (fa.is_null()) {
+		return;
+	}
+	String content = fa->get_as_text();
+	fa->close();
+
+	JSON json;
+	if (json.parse(content) != OK) {
+		return;
+	}
+
+	Array msgs = json.get_data();
+	// Clear existing UI children.
+	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
+		message_list->get_child(i)->queue_free();
+	}
+	// Re-add messages from loaded data.
+	for (int i = 0; i < msgs.size(); i++) {
+		Dictionary msg = msgs[i];
+		String role = msg.get("role", "");
+		String content = msg.get("content", "");
+		if (role == "user") {
+			_add_user_message(content);
+		} else if (role == "assistant") {
+			_add_ai_message(content, "", 0.0, 0, 0);
+		}
+	}
+
+	// Don't auto-title loaded conversations — they are already saved.
+	has_auto_titled = true;
+	is_titling = false;
 }
 
 void AIChatPanel::_update_translations() {
@@ -329,6 +558,13 @@ void AIChatPanel::_send_message() {
 	// Build the full messages array with conversation history.
 	Array history = _build_message_history();
 
+	// Auto-title: on the first user message of a conversation with no
+	// manually-set title, ask the AI to summarise a conversation title
+	// once the normal response has been received.
+	bool needs_auto_title = !has_auto_titled &&
+			conversation_name_edit->get_text().strip_edges().is_empty() &&
+			!is_summarizing && !is_titling;
+
 	// Check if history exceeds the character budget → trigger summarization.
 	if (settings.history_char_budget > 0) {
 		int total_chars = 0;
@@ -345,21 +581,18 @@ void AIChatPanel::_send_message() {
 		}
 	}
 
-	// Build system prompt + context.
-	const String configured_system_prompt = settings.system_prompt;
-	const String auto_mode_prompt = _detect_mode_prompt(text);
-	if (!auto_mode_prompt.is_empty()) {
-		settings.system_prompt = auto_mode_prompt;
+	// Queue an auto-title request for after this round completes.
+	if (needs_auto_title) {
+		pending_title_text = text;
+		pending_title_attachments = attachments;
 	}
+
+	// Build system prompt + context. Use the effective prompt based on the current context mode.
+	String configured_system_prompt = AISettings::get_effective_system_prompt(settings);
+	settings.system_prompt = configured_system_prompt;
 	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
 	if (!ai_context.is_empty()) {
 		settings.system_prompt += "\n\n" + ai_context;
-	}
-	if (!settings.user_extra_instructions.is_empty()) {
-		settings.system_prompt += "\n\n" + settings.user_extra_instructions;
-	}
-	if (!configured_system_prompt.strip_edges().is_empty()) {
-		settings.system_prompt += "\n\n" + configured_system_prompt;
 	}
 	chat_service->configure(settings);
 	active_settings = settings; // Cache for tool loop reuse.
@@ -386,10 +619,10 @@ void AIChatPanel::_send_message() {
 		messages.push_back(entry);
 	}
 
-	// If tools are enabled, include the built-in tool definitions.
+	// If tools are enabled, include tool definitions filtered by the current context mode.
 	Array tools;
 	if (settings.tools_enabled) {
-		tools = AIToolDefs::get_builtin_tools();
+		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
 		if (settings.mcp_tools_enabled) {
 			Array mcp_tools = AIToolDefs::get_mcp_tools();
 			if (!mcp_tools.is_empty()) {
@@ -554,11 +787,121 @@ void AIChatPanel::_add_summary_message(const String &p_content) {
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
+void AIChatPanel::_try_auto_title(const String &p_user_first_message, const Array &p_history) {
+	// Use the first user message (and up to the first AI reply if available)
+	// to ask the AI for a short conversation title. The request is sent as
+	// a low-cost chat call; the result overwrites conversation_name_edit.
+
+	// If the user already manually typed a title since we queued the request,
+	// skip the auto-title call.
+	if (!conversation_name_edit->get_text().strip_edges().is_empty()) {
+		has_auto_titled = true;
+		return;
+	}
+
+	Array title_messages;
+
+	// System prompt: short title summariser.
+	{
+		Dictionary sys;
+		sys["role"] = "system";
+		sys["content"] = TTR("You are a conversation title generator. Generate a very short title (under 12 words) that summarises the user's question or goal. Respond with ONLY the title text: no quotes, no prefix, no explanation.");
+		title_messages.push_back(sys);
+	}
+
+	// Build a compact representation of the first exchange.
+	String first_user_text = p_user_first_message;
+	String first_ai_text;
+
+	// Prefer the first assistant message from the conversation history if
+	// available (p_history contains the last round).
+	for (int i = 0; i < p_history.size(); i++) {
+		Dictionary entry = p_history[i];
+		String role = entry["role"];
+		String content = entry["content"];
+		if (role == "assistant") {
+			first_ai_text = content;
+			break;
+		}
+	}
+
+	// Compose the title query: the user message plus, optionally, a short
+	// snippet of the AI reply for better context.
+	String title_body = vformat(TTR("User: %s"), first_user_text);
+	if (!first_ai_text.is_empty()) {
+		// Take the first ~300 chars of the reply to keep it cheap.
+		String ai_snippet = first_ai_text;
+		if (ai_snippet.length() > 300) {
+			ai_snippet = ai_snippet.substr(0, 300) + "...";
+		}
+		title_body += "\n\n" + vformat(TTR("Assistant: %s"), ai_snippet);
+	}
+
+	Dictionary user_msg;
+	user_msg["role"] = "user";
+	user_msg["content"] = title_body;
+	title_messages.push_back(user_msg);
+
+	// Re-load settings with a low token budget and deterministic temperature.
+	AISettingsData title_settings = AISettings::load();
+	title_settings.max_tokens = 64;
+	title_settings.temperature = 0.3;
+	chat_service->configure(title_settings);
+
+	is_titling = true;
+	const Error err = chat_service->send_messages(title_messages);
+	if (err != OK) {
+		// Silent fallback: leave the title empty.
+		is_titling = false;
+	}
+}
+
+void AIChatPanel::_title_completed(int p_result, int p_response_code, const String &p_title_content) {
+	is_titling = false;
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code >= HTTPClient::RESPONSE_BAD_REQUEST) {
+		// Silent failure: leave the title blank for the user to set.
+		return;
+	}
+
+	String title = p_title_content.strip_edges();
+	// Strip surrounding quotes that the model sometimes emits.
+	if (title.length() >= 2) {
+		// ASCII quotes.
+		if ((title[0] == '"' && title[title.length() - 1] == '"') ||
+				(title[0] == '\'' && title[title.length() - 1] == '\'') ||
+				(title[0] == 0x201C && title[title.length() - 1] == 0x201D)) {
+			title = title.substr(1, title.length() - 2).strip_edges();
+		}
+	}
+	// Take the first line only — some models emit a short paragraph.
+	int newline_pos = title.find_char('\n');
+	if (newline_pos >= 0) {
+		title = title.substr(0, newline_pos).strip_edges();
+	}
+
+	// Hard cap the display length.
+	if (title.length() > 120) {
+		title = title.substr(0, 120).strip_edges() + "...";
+	}
+
+	if (!title.is_empty()) {
+		// Only overwrite the title field if the user has not typed one yet.
+		if (conversation_name_edit->get_text().strip_edges().is_empty()) {
+			conversation_name_edit->set_text(title);
+			has_auto_titled = true;
+		}
+	}
+}
+
 void AIChatPanel::_cancel_request() {
 	if (is_summarizing) {
 		is_summarizing = false;
 		pending_user_message = String();
 		pending_attachments.clear();
+	}
+	if (is_titling) {
+		is_titling = false;
 	}
 	chat_service->cancel_request();
 	pending_tool_round = PendingToolRound();
@@ -569,8 +912,11 @@ void AIChatPanel::_cancel_request() {
 
 void AIChatPanel::_clear_messages() {
 	is_summarizing = false;
+	is_titling = false;
 	pending_user_message = String();
 	pending_attachments.clear();
+	pending_title_text = String();
+	pending_title_attachments.clear();
 	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
 		message_list->get_child(i)->queue_free();
 	}
@@ -579,10 +925,18 @@ void AIChatPanel::_clear_messages() {
 	_clear_repair_cards();
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
+	conversation_name_edit->set_text("");
+	has_auto_titled = false;
 	status_label->set_text(TTR("AI assistant ready."));
 }
 
 void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
+	// Handle title response first (auto-summary conversation title).
+	if (is_titling) {
+		_title_completed(p_result, p_response_code, p_content);
+		return;
+	}
+
 	// Handle summarization response before normal response.
 	if (is_summarizing) {
 		if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
@@ -617,6 +971,19 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		}
 
 		_add_ai_message(p_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+
+		// Auto-title: if a title request was queued, fire it off now.
+		if (!pending_title_text.is_empty() && !is_titling) {
+			Array title_history = _build_message_history();
+			String first_user_message = pending_title_text;
+			String attachment_context = "";
+			for (int i = 0; i < pending_title_attachments.size(); i++) {
+				attachment_context += pending_title_attachments[i].display_name + "; ";
+			}
+			pending_title_text = String();
+			pending_title_attachments.clear();
+			_try_auto_title(first_user_message, title_history);
+		}
 
 		// Clear tool call display.
 		tool_call_label->set_visible(false);
@@ -723,7 +1090,7 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	// Build tools array.
 	Array tools;
 	if (settings.tools_enabled) {
-		tools = AIToolDefs::get_builtin_tools();
+		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
 		if (settings.mcp_tools_enabled) {
 			Array mcp_tools = AIToolDefs::get_mcp_tools();
 			if (!mcp_tools.is_empty()) {
@@ -1127,20 +1494,75 @@ AIChatPanel::AIChatPanel() {
 	root->add_theme_constant_override("separation", 8 * EDSCALE);
 	add_child(root);
 
+	// === Top bar (mode switch + conversation selector) ===
+	HBoxContainer *top_bar = memnew(HBoxContainer);
+	top_bar->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	top_bar->add_theme_constant_override("separation", 8 * EDSCALE);
+	root->add_child(top_bar);
+
+	// Left: Engine/Project mode buttons
+	mode_bar = memnew(HBoxContainer);
+	mode_bar->add_theme_constant_override("separation", 4 * EDSCALE);
+	top_bar->add_child(mode_bar);
+
+	engine_mode_btn = memnew(Button);
+	engine_mode_btn->set_text(TTR("Engine"));
+	engine_mode_btn->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_switch_to_engine));
+	mode_bar->add_child(engine_mode_btn);
+
+	project_mode_btn = memnew(Button);
+	project_mode_btn->set_text(TTR("Project"));
+	project_mode_btn->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_switch_to_project));
+	mode_bar->add_child(project_mode_btn);
+
+	// Spacer
+	Control *top_spacer = memnew(Control);
+	top_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	top_bar->add_child(top_spacer);
+
+	// Right: Conversation selector
+	conversation_bar = memnew(HBoxContainer);
+	conversation_bar->add_theme_constant_override("separation", 4 * EDSCALE);
+	top_bar->add_child(conversation_bar);
+
+	conversation_name_edit = memnew(LineEdit);
+	conversation_name_edit->set_placeholder(TTR("Conversation Name"));
+	conversation_name_edit->set_custom_minimum_size(Size2(150 * EDSCALE, 0));
+	conversation_bar->add_child(conversation_name_edit);
+
+	new_conversation_btn = memnew(Button);
+	new_conversation_btn->set_text("+");
+	new_conversation_btn->set_custom_minimum_size(Size2(32 * EDSCALE, 0));
+	new_conversation_btn->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_new_conversation));
+	conversation_bar->add_child(new_conversation_btn);
+
+	conversation_menu = memnew(MenuButton);
+	conversation_menu->set_text(TTR("Conversations"));
+	conversation_bar->add_child(conversation_menu);
+
+	// === Main content area ===
+	VBoxContainer *main_area = memnew(VBoxContainer);
+	main_area->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	main_area->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	main_area->add_theme_constant_override("separation", 8 * EDSCALE);
+	root->add_child(main_area);
+
+	// Message scroll area
 	message_scroll = memnew(ScrollContainer);
 	message_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	root->add_child(message_scroll);
+	main_area->add_child(message_scroll);
 
 	message_list = memnew(VBoxContainer);
 	message_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_list->add_theme_constant_override("separation", 10 * EDSCALE);
 	message_scroll->add_child(message_list);
 
+	// Bulk action bar
 	bulk_action_bar = memnew(HBoxContainer);
 	bulk_action_bar->add_theme_constant_override("separation", 6 * EDSCALE);
 	bulk_action_bar->set_visible(false);
-	root->add_child(bulk_action_bar);
+	main_area->add_child(bulk_action_bar);
 
 	add_all_button = memnew(Button);
 	add_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_add_all_suggestions));
@@ -1150,18 +1572,20 @@ AIChatPanel::AIChatPanel() {
 	dismiss_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_dismiss_all_suggestions));
 	bulk_action_bar->add_child(dismiss_all_button);
 
+	// Tool call label
 	tool_call_label = memnew(Label);
 	tool_call_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	tool_call_label->set_visible(false);
 	tool_call_label->set_custom_minimum_size(Size2(0, 20) * EDSCALE);
 	tool_call_label->add_theme_color_override("font_color", Color(0.4f, 0.6f, 1.0f));
 	tool_call_label->set_modulate(Color(1, 1, 1, 0.85f));
-	root->add_child(tool_call_label);
+	main_area->add_child(tool_call_label);
 
+	// === Composer panel ===
 	PanelContainer *composer = memnew(PanelContainer);
 	composer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	composer->set_custom_minimum_size(Size2(0, 180) * EDSCALE);
-	root->add_child(composer);
+	main_area->add_child(composer);
 
 	VBoxContainer *composer_vb = memnew(VBoxContainer);
 	composer_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -1208,10 +1632,16 @@ AIChatPanel::AIChatPanel() {
 	send_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_send_message));
 	actions->add_child(send_button);
 
+	// === Status bar ===
 	status_label = memnew(Label);
 	status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	status_label->set_custom_minimum_size(Size2(0, 24) * EDSCALE);
 	root->add_child(status_label);
 
+	// Initialize mode indicator
+	_update_mode_indicator();
+
+	// Chat service
 	chat_service = memnew(AIChatService);
 	chat_service->connect(SNAME("chat_completed"), callable_mp(this, &AIChatPanel::_chat_completed));
 	add_child(chat_service, false, INTERNAL_MODE_BACK);

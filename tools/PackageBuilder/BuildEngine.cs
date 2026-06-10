@@ -43,9 +43,6 @@ public class BuildConfig
     /// <summary>Extra key=value args forwarded to SCons.</summary>
     public string ExtraSConsArgs { get; set; } = "";
 
-    /// <summary>Editor UI language locale (e.g. zh_CN, en). Defaults to Chinese.</summary>
-    public string Language { get; set; } = "zh_CN";
-
     /// <summary>After a successful build + package, auto-increment the patch number in version.py.</summary>
     public bool AutoUpdateVersion { get; set; } = false;
 
@@ -158,10 +155,7 @@ public class BuildEngine
             Report("", "success");
             Report($"Package created: {_zipPath}", "success");
 
-            // ── 6. Apply language preset ─────────────────────
-            ApplyLanguagePreset();
-
-            // ── 7. Auto-update version ──────────────────────
+            // ── 6. Auto-update version ──────────────────────
             if (_cfg.AutoUpdateVersion)
             {
                 var newVer = UpdateVersionFile();
@@ -169,7 +163,7 @@ public class BuildEngine
                 Report($"Version auto-updated: {_version} → {newVer}", "success");
             }
 
-            // ── 8. Record build history ─────────────────────
+            // ── 7. Record build history ─────────────────────
             if (!_cfg.AutoUpdateVersion)
                 Report("Auto-update version is disabled; version.py was not changed.", "info");
 
@@ -1687,76 +1681,12 @@ Install one of these toolchains, then run this tool again:
                 PackageDir = _stagingDir,
                 ZipPath = _zipPath,
                 BuildLogPath = buildLogPath,
-                Language = NormalizeEditorLanguage(_cfg.Language),
                 CreatedAt = DateTime.Now,
             };
 
             BuildManager.SaveRecord(record);
         }
         catch { /* best effort — don't fail the build over history recording */ }
-    }
-
-    /// <summary>
-    /// Write editor settings to pre-set the UI language in the built Jundot editor.
-    /// Creates _sc_ (self-contained mode marker) and editor_data/editor_settings-4.tres
-    /// both in bin/ and in the staging package directory.
-    /// </summary>
-    public static string NormalizeEditorLanguage(string language)
-    {
-        var normalized = (language ?? "").Trim().Replace('-', '_');
-
-        return normalized switch
-        {
-            "" => "",
-            "zh" or "zh_CN" or "zh_SG" or "zh_Hans_CN" or "zh_Hans_SG" => "zh_Hans",
-            "zh_TW" or "zh_HK" or "zh_MO" or "zh_Hant_TW" or "zh_Hant_HK" or "zh_Hant_MO" => "zh_Hant",
-            _ => normalized
-        };
-    }
-
-    private void ApplyLanguagePreset()
-    {
-        var editorLanguage = NormalizeEditorLanguage(_cfg.Language);
-        if (string.IsNullOrEmpty(editorLanguage) || editorLanguage == "en")
-            return; // English is the default — no preset needed
-
-        try
-        {
-            var settingsContent = $@"[gd_resource type=""EditorSettings"" format=3]
-
-[resource]
-interface/editor/localization/editor_language = ""{editorLanguage}""
-interface/editor/editor_language = ""{editorLanguage}""
-";
-
-            // Write to bin/ so the editor starts with the selected language
-            var binDir = Path.Combine(_repoRoot, "bin");
-            if (Directory.Exists(binDir))
-            {
-                // Self-contained mode marker
-                File.WriteAllText(Path.Combine(binDir, "_sc_"), "");
-
-                // Editor settings
-                var editorDataDir = Path.Combine(binDir, "editor_data");
-                Directory.CreateDirectory(editorDataDir);
-                File.WriteAllText(Path.Combine(editorDataDir, "editor_settings-4.tres"), settingsContent);
-            }
-
-            // Also write to staging package dir
-            if (Directory.Exists(_stagingDir))
-            {
-                File.WriteAllText(Path.Combine(_stagingDir, "_sc_"), "");
-                var editorDataDir = Path.Combine(_stagingDir, "editor_data");
-                Directory.CreateDirectory(editorDataDir);
-                File.WriteAllText(Path.Combine(editorDataDir, "editor_settings-4.tres"), settingsContent);
-            }
-
-            Report($"Editor language preset: {editorLanguage}", "info");
-        }
-        catch (Exception ex)
-        {
-            Report($"Warning: Failed to write language preset: {ex.Message}", "warning");
-        }
     }
 
     private void Report(string message, string type)

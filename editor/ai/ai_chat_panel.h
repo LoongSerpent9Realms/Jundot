@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "ai_settings.h"
 #include "editor/ai/ai_chat_parser.h"
 
 #include "core/templates/vector.h"
@@ -40,8 +41,13 @@ class AISuggestionCard;
 class Button;
 class EditorFileDialog;
 class HBoxContainer;
+class HSplitContainer;
+class ItemList;
 class Label;
+class LineEdit;
 class MenuButton;
+class PanelContainer;
+class PopupMenu;
 class ScrollContainer;
 class TextEdit;
 class VBoxContainer;
@@ -71,6 +77,24 @@ class AIChatPanel : public MarginContainer {
 	EditorFileDialog *import_file_dialog = nullptr;
 	AIUsageAgreementDialog *usage_agreement_dialog = nullptr;
 
+	// Mode switching (PROJECT / ENGINE).
+	HBoxContainer *mode_bar = nullptr;
+	Button *engine_mode_btn = nullptr;
+	Button *project_mode_btn = nullptr;
+	Label *mode_indicator = nullptr;
+
+	// Conversation selector.
+	HBoxContainer *conversation_bar = nullptr;
+	LineEdit *conversation_name_edit = nullptr;
+	Button *new_conversation_btn = nullptr;
+	MenuButton *conversation_menu = nullptr;
+	PopupMenu *conversation_popup = nullptr;
+
+	// Conversation history list.
+	ItemList *conversation_list = nullptr;
+	Vector<Vector<String>> saved_conversations; // Each: [title, timestamp, messages_json].
+	String current_conversation_id;
+
 	Vector<AISuggestion> pending_suggestions;
 	Vector<AISuggestionCard *> suggestion_cards;
 	Vector<AIRepairCard *> repair_cards;
@@ -90,6 +114,12 @@ class AIChatPanel : public MarginContainer {
 	bool is_summarizing = false;
 	String pending_user_message;
 	Vector<ChatAttachment> pending_attachments;
+
+	// Conversation title auto-summary.
+	bool is_titling = false;
+	bool has_auto_titled = false;
+	String pending_title_text;
+	Vector<ChatAttachment> pending_title_attachments;
 
 	Vector<ChatAttachment> attachments;
 
@@ -126,12 +156,29 @@ class AIChatPanel : public MarginContainer {
 	void _start_summarization(const Array &p_history, int p_budget);
 	void _summary_completed(const String &p_summary_text);
 	void _add_summary_message(const String &p_content);
+
+	// Conversation title auto-summary.
+	void _try_auto_title(const String &p_user_first_message, const Array &p_history);
+	void _title_completed(int p_result, int p_response_code, const String &p_title_content);
 	String _detect_mode_prompt(const String &p_user_message) const;
 	void _update_translations();
 	void _set_requesting(bool p_requesting);
 	bool _ensure_usage_agreement();
 	void _usage_agreement_accepted();
 	void _usage_agreement_rejected();
+
+	// Mode switching (PROJECT / ENGINE).
+	void _switch_to_engine();
+	void _switch_to_project();
+	void _update_mode_indicator();
+
+	// Conversation management.
+	void _new_conversation();
+	void _update_conversation_menu();
+	void _select_conversation(int p_index);
+	void _save_current_conversation();
+	void _load_conversation(const String &p_messages_json);
+	void _update_conversation_list();
 
 	// Suggestion card callbacks.
 	void _suggestion_accepted(AISuggestionCard *p_card);

@@ -30,6 +30,12 @@
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
 
+// AI working context mode - determines tool availability, system prompt, and path scope.
+enum class AIContextMode {
+	PROJECT,   // Focus on the open game project (scenes, scripts, resources under res://).
+	ENGINE     // Focus on engine source code (C++ files, scons build, engine API).
+};
+
 struct AISettingsData {
 	static constexpr int CURRENT_USAGE_AGREEMENT_VERSION = 1;
 
@@ -52,6 +58,35 @@ struct AISettingsData {
 		"- Provide a thorough summary of what was done, what was found, or what the user should know.\n"
 		"- Suggest concrete next steps or ask clarifying questions if needed.\n"
 		"- Keep the conversation going — a single terse response is never sufficient.";
+	String project_system_prompt = "You are an AI assistant inside the Jundot editor, currently working in **PROJECT MODE** — focused on the open Godot game project.\n\n"
+		"Your job is to help the user create and modify their game project (scenes, GDScript scripts, resources, textures, etc.). You MUST use Function Calling tools to actually read and modify project files — do not just describe solutions.\n\n"
+		"=== Project Mode Rules ===\n"
+		"- File paths are relative to the project root (res://).\n"
+		"- Read existing files before writing new code.\n"
+		"- Use scene (.tscn) and script (.gd) file patterns consistent with Godot 4.x.\n"
+		"- shell_command runs inside the project directory.\n"
+		"- Suggest next steps after each tool round.\n\n"
+		"=== Tool Call Protocol ===\n"
+		"- read_files / write_file / search_files / grep_code: for project files only.\n"
+		"- shell_command: for project-related commands (e.g. validation, resource management).\n"
+		"- Do NOT modify engine C++ source code in this mode.\n\n"
+		"If MCP tools are configured, they are available as tools with names prefixed by the server name.";
+	String engine_system_prompt = "You are an AI assistant inside the Jundot editor, currently working in **ENGINE MODE** — focused on the JunDot engine source code.\n\n"
+		"Your job is to help the user modify, extend, and debug the engine itself (C++ source files, scons build system, core engine APIs, modules, etc.). You MUST use Function Calling tools to actually read and modify engine files — do not just describe solutions.\n\n"
+		"=== Engine Mode Rules ===\n"
+		"- File paths are relative to the engine source root (e.g. H:\\Godot-Auto).\n"
+		"- ALWAYS read relevant source files before making changes.\n"
+		"- Use scons (run_build) to compile the engine after modifying C++ code.\n"
+		"- Use read_build_log to analyze build errors and fix them iteratively.\n"
+		"- Use check_build_status to poll for background build completion.\n"
+		"- Use restart_engine after a successful build to apply changes.\n"
+		"- Use fetch_url for pulling external dependencies (e.g. new SDKs).\n\n"
+		"=== Critical Tooling ===\n"
+		"- read_files / write_file / search_files / grep_code: for engine C++/header source.\n"
+		"- run_build / read_build_log / check_build_status: compile & diagnose.\n"
+		"- restart_engine: reload changes into the editor.\n"
+		"- shell_command: for advanced engine workflows (git, patches, etc.).\n\n"
+		"If MCP tools are configured, they are available as tools with names prefixed by the server name.";
 	bool include_project_memories = true;
 	bool include_tool_context = true;
 	bool tools_enabled = true;
@@ -66,6 +101,13 @@ struct AISettingsData {
 	double feature_universality_threshold = 70.0;
 	double feature_necessity_threshold = 0.7;
 	bool feature_design_philosophy_check = true;
+
+	AIContextMode context_mode = AIContextMode::PROJECT; // Default to project mode (safer).
+	String engine_source_root; // Absolute path to engine source (e.g. "H:/Godot-Auto"). Auto-detected.
+
+	bool external_api_enabled = false;
+	int external_api_port = 8080;
+	String external_api_bind_address = "127.0.0.1";
 };
 
 class AISettings {
@@ -86,4 +128,11 @@ public:
 	static AISettingsData load();
 	static Error save(const AISettingsData &p_settings);
 	static Error reset_to_defaults();
+
+	// Returns the effective system prompt based on the configured context mode.
+	// Falls back to the legacy system_prompt if the mode-specific prompt is empty.
+	static String get_effective_system_prompt(const AISettingsData &p_settings);
+
+	// Returns the current engine source root. If empty, falls back to the executable directory.
+	static String get_engine_source_root(const AISettingsData &p_settings);
 };

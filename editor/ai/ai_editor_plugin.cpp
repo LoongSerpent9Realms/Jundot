@@ -31,11 +31,14 @@
 #include "ai_config_panel.h"
 #include "ai_memory_panel.h"
 #include "ai_tools_panel.h"
+#include "ai_mcp_manager.h"
+#include "ai_inspector_context_menu.h"
 
 #include "editor/docks/editor_dock.h"
 #include "editor/docks/editor_dock_manager.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
+#include "editor/inspector/editor_context_menu_plugin.h"
 #include "editor/settings/editor_command_palette.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/label.h"
@@ -98,6 +101,13 @@ void AIEditorPlugin::_create_dock() {
 
 AIEditorPlugin::AIEditorPlugin() {
 	_create_dock();
+	AIMCPManager::get_singleton()->initialize();
+
+	// Register the inspector context menu plugin for "Ask AI" feature.
+	inspector_context_menu_plugin.instantiate();
+	EditorContextMenuPluginManager::get_singleton()->add_plugin(
+			EditorContextMenuPlugin::CONTEXT_SLOT_INSPECTOR_PROPERTY,
+			inspector_context_menu_plugin);
 }
 
 AIEditorPlugin::~AIEditorPlugin() {
@@ -105,4 +115,11 @@ AIEditorPlugin::~AIEditorPlugin() {
 		EditorDockManager::get_singleton()->remove_dock(ai_dock);
 		ai_dock->queue_free();
 	}
+
+	// Unregister the inspector context menu plugin.
+	if (inspector_context_menu_plugin.is_valid()) {
+		EditorContextMenuPluginManager::get_singleton()->remove_plugin(inspector_context_menu_plugin);
+	}
+
+	AIMCPManager::cleanup();
 }

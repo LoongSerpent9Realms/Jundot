@@ -17,6 +17,8 @@ class EditorFileDialog;
 class ItemList;
 class Label;
 class LineEdit;
+class OptionButton;
+class SpinBox;
 class TextEdit;
 
 class AIToolsPanel : public MarginContainer {
@@ -55,6 +57,12 @@ class AIToolsPanel : public MarginContainer {
 	Button *mcp_delete_button = nullptr;
 	Button *mcp_save_button = nullptr;
 	Button *mcp_import_button = nullptr;
+	Label *mcp_status_label = nullptr;
+	Button *mcp_test_button = nullptr;
+	Button *mcp_refresh_button = nullptr;
+	Button *mcp_stop_button = nullptr;
+	OptionButton *mcp_lifecycle = nullptr;
+	SpinBox *mcp_timeout = nullptr;
 
 	Button *reload_button = nullptr;
 	Label *status_label = nullptr;
@@ -92,6 +100,11 @@ class AIToolsPanel : public MarginContainer {
 	void _mcp_import_pressed();
 	void _mcp_import_file_selected(const String &p_path);
 	void _mcp_import_dir_selected(const String &p_dir);
+	void _mcp_test_connection();
+	void _mcp_refresh_tools();
+	void _mcp_stop_server();
+	void _update_mcp_status();
+	void _update_mcp_status_from_runtime();
 
 protected:
 	void _notification(int p_what);
