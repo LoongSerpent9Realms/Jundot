@@ -37,6 +37,9 @@ public class BuildConfig
     /// <summary>Remove staging dir before copying.</summary>
     public bool   CleanPackageDir { get; set; } = false;
 
+    /// <summary>Run scons -c before building to force full rebuild.</summary>
+    public bool   CleanBuild { get; set; } = false;
+
     /// <summary>Extra key=value args forwarded to SCons.</summary>
     public string ExtraSConsArgs { get; set; } = "";
 
@@ -57,6 +60,8 @@ public class BuildProgressEventArgs : EventArgs
 {
     public string Message   { get; init; } = "";
     public string MessageType { get; init; } = "info";  // info | step | warning | error | success | output
+    /// <summary>Progress value 0.0–1.0, or null for indeterminate.</summary>
+    public double? Progress { get; init; }
 }
 
 /// <summary>
@@ -81,6 +86,11 @@ public class BuildEngine
     private List<string> _sconsPrefix = new();
 
     private Process? _currentProcess;
+    private readonly object _logLock = new();
+
+    /// <summary>爬取 Ninja/SCons 输出的编译进度。</summary>
+    private double? _ninjaTotal;
+    private double _ninjaCurrent;
 
     /// <summary>Optional — set to enable automatic build history recording.</summary>
     public BuildManager? BuildManager { get; set; }
@@ -799,9 +809,8 @@ Install one of these toolchains, then run this tool again:
         var jobs = _cfg.Jobs;
         if (jobs <= 0)
         {
+            // 释放全部 CPU 核心（留一个给系统），不再限制 editor 为 4 线程
             jobs = Math.Max(1, Environment.ProcessorCount - 1);
-            if (_cfg.PlatformName == "windows" && _cfg.Target == "editor")
-                jobs = Math.Min(jobs, 4);
         }
 
         // MSVC version detection
@@ -838,6 +847,18 @@ Install one of these toolchains, then run this tool again:
             buildArgs.AddRange(_cfg.ExtraSConsArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
 
+        // ── 默认启用加速选项（用户可通过 ExtraSConsArgs 覆盖） ─────────
+        AddIfMissing(buildArgs, "scu_build", "yes");           // 单编译单元：合并源文件减少编译次数
+        AddIfMissing(buildArgs, "fast_unsafe", "yes");         // 隐式缓存 + 最大漂移：加速增量构建
+        buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
+        AddIfMissing(buildArgs, "fast_unsafe", "yes");
+        buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
+        buildArgs.Add("ninja=no");
+
+        // 构建缓存目录（用户的项目 gitignore 中应已忽略 .scons_cache）
+        var defaultCache = Path.Combine(_repoRoot, ".scons_cache");
+        AddIfMissing(buildArgs, "cache_path", defaultCache);
+
         // MinGW
         if (_cfg.PlatformName == "windows" && _cfg.UseMinGW)
         {
@@ -872,7 +893,7 @@ Install one of these toolchains, then run this tool again:
         // MSVC cxxflags
         if (_cfg.PlatformName == "windows" && !_cfg.UseMinGW)
         {
-            AddIfMissing(buildArgs, "cxxflags", "/Zm200");
+            AddIfMissing(buildArgs, "cxxflags", "/Zm500");
         }
 
         // Mono
@@ -883,6 +904,28 @@ Install one of these toolchains, then run this tool again:
 
         var argsStr = string.Join(" ", buildArgs);
         Report($"SCons args: {argsStr}", "info");
+
+        // ── Clean stale build artifacts from previous (failed) builds ──
+        if (_cfg.CleanBuild)
+        {
+            Report("Cleaning previous build artifacts", "step");
+            var cleanArgs = new List<string>(_sconsPrefix) { "-c" };
+            cleanArgs.AddRange(buildArgs.Skip(_sconsPrefix.Count)); // re-use same platform/target/arch args
+            try
+            {
+                var cleanLogPath = Path.Combine(_logRoot, $"{_packageName}-clean.log");
+                await RunAndReportInDirAsync(_sconsCmd, _repoRoot, cleanLogPath, cleanArgs.ToArray());
+                Report("Previous build artifacts cleaned.", "success");
+            }
+            catch (Exception ex)
+            {
+                Report($"Clean step warning (non-fatal): {ex.Message}", "warning");
+            }
+        }
+        else
+        {
+            Report("Incremental build (skip clean) — enable 'Clean Build' in Advanced tab for full rebuild.", "info");
+        }
 
         // Create log directory
         Directory.CreateDirectory(_logRoot);
@@ -1056,12 +1099,17 @@ Install one of these toolchains, then run this tool again:
 
         File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);
 
-        // Create zip
+        // Create zip — prefer 7-Zip for multi-threaded compression (5-10x faster)
         Report("Creating zip package", "step");
         if (File.Exists(_zipPath))
             File.Delete(_zipPath);
 
-        System.IO.Compression.ZipFile.CreateFromDirectory(_stagingDir, _zipPath);
+        if (!await TryCompressWith7zAsync(_stagingDir, _zipPath))
+        {
+            Report("7-Zip not available, falling back to .NET ZipFile (single-threaded).", "warning");
+            Report("Install 7-Zip (https://7-zip.org) for faster multi-threaded compression.", "warning");
+            System.IO.Compression.ZipFile.CreateFromDirectory(_stagingDir, _zipPath);
+        }
 
         // ── Generate update manifest for hot-update system ─────
         if (_cfg.GenerateUpdateManifest)
@@ -1196,6 +1244,61 @@ Install one of these toolchains, then run this tool again:
             File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite: true);
         foreach (var dir in Directory.GetDirectories(sourceDir))
             CopyDirectory(dir, Path.Combine(destDir, Path.GetFileName(dir)));
+    }
+
+    /// <summary>
+    /// Try to compress a directory using 7-Zip with multi-threaded compression.
+    /// Returns true if 7-Zip was found and succeeded, false if 7-Zip is not available.
+    /// </summary>
+    private static async Task<bool> TryCompressWith7zAsync(string sourceDir, string zipPath)
+    {
+        var sevenZipPaths = new[]
+        {
+            @"C:\Program Files\7-Zip\7z.exe",
+            @"C:\Program Files (x86)\7-Zip\7z.exe",
+            "7z" // fallback to PATH
+        };
+
+        string? sevenZip = null;
+        foreach (var p in sevenZipPaths)
+        {
+            if (p == "7z")
+            {
+                var found = FindCommand("7z");
+                if (found != null) { sevenZip = "7z"; break; }
+            }
+            else if (File.Exists(p))
+            {
+                sevenZip = p;
+                break;
+            }
+        }
+
+        if (sevenZip == null)
+            return false;
+
+        try
+        {
+            // -mmt = multi-threaded, -mx5 = normal compression (good speed/ratio balance)
+            var psi = new ProcessStartInfo(sevenZip, $"a -tzip \"{zipPath}\" \"{sourceDir}\\*\" -mx5 -mmt")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            ConfigureProcessOutput(psi);
+
+            using var p = Process.Start(psi);
+            if (p == null) return false;
+
+            await p.WaitForExitAsync();
+            return p.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string? FindCommand(string name)
@@ -1347,9 +1450,11 @@ Install one of these toolchains, then run this tool again:
 
         try
         {
-            // Read stdout and stderr line by line
-            var stdoutTask = ReadLinesAsync(_currentProcess.StandardOutput, "output", logWriter);
-            var stderrTask = ReadLinesAsync(_currentProcess.StandardError, "warning", logWriter);
+            // Read stdout and stderr as console records. Ninja/SCons often update
+            // progress with '\r' instead of '\n', so ReadLineAsync can hide output
+            // until the process exits or is killed.
+            var stdoutTask = ReadConsoleOutputAsync(_currentProcess.StandardOutput, "output", logWriter);
+            var stderrTask = ReadConsoleOutputAsync(_currentProcess.StandardError, "warning", logWriter);
 
             await Task.WhenAll(stdoutTask, stderrTask);
             await _currentProcess.WaitForExitAsync(_ct);
@@ -1388,11 +1493,125 @@ Install one of these toolchains, then run this tool again:
         // which matches the ANSI code page set above. MSVC/cl.exe also outputs
         // GBK, so the whole pipeline stays consistent:
         //   MSVC(GBK) → scons/Python(GBK) → C# stdout reader(GBK) → UI(Unicode)
+        // Force Python unbuffered output so Ninja/SCons daemon output is visible
+        // in real-time instead of being buffered until process exit.
+        psi.Environment["PYTHONUNBUFFERED"] = "1";
         psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "zh-CN";
+    }
+
+    private async Task ReadConsoleOutputAsync(StreamReader reader, string msgType, StreamWriter? logWriter)
+    {
+        var ninjaProgress = new Regex(@"^\[(\d+)/(\d+)\].*$");
+        var buffer = new StringBuilder();
+        var readBuffer = new char[4096];
+        string? lastPartialReport = null;
+
+        try
+        {
+            while (true)
+            {
+                _ct.ThrowIfCancellationRequested();
+                var read = await reader.ReadAsync(readBuffer, _ct);
+                if (read == 0)
+                    break;
+
+                for (var i = 0; i < read; i++)
+                {
+                    var ch = readBuffer[i];
+                    if (ch == '\r' || ch == '\n')
+                    {
+                        var line = buffer.ToString();
+                        buffer.Clear();
+
+                        if (line.Length > 0)
+                        {
+                            WriteLogLine(logWriter, line);
+                            if (!string.Equals(line, lastPartialReport, StringComparison.Ordinal))
+                                ReportConsoleLine(line, msgType, ninjaProgress);
+                        }
+
+                        lastPartialReport = null;
+
+                        if (ch == '\r' && i + 1 < read && readBuffer[i + 1] == '\n')
+                            i++;
+                    }
+                    else
+                    {
+                        buffer.Append(ch);
+                    }
+                }
+
+                if (buffer.Length > 0)
+                {
+                    var partial = buffer.ToString();
+                    if (ShouldReportPartialConsoleLine(partial) &&
+                        !string.Equals(partial, lastPartialReport, StringComparison.Ordinal))
+                    {
+                        ReportConsoleLine(partial, msgType, ninjaProgress);
+                        lastPartialReport = partial;
+                    }
+                }
+            }
+
+            if (buffer.Length > 0)
+            {
+                var line = buffer.ToString();
+                WriteLogLine(logWriter, line);
+                if (!string.Equals(line, lastPartialReport, StringComparison.Ordinal))
+                    ReportConsoleLine(line, msgType, ninjaProgress);
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Report($"Stream read error: {ex.Message}", "error");
+        }
+    }
+
+    private void WriteLogLine(StreamWriter? logWriter, string line)
+    {
+        if (logWriter == null)
+            return;
+
+        lock (_logLock)
+        {
+            logWriter.WriteLine(line);
+            logWriter.Flush();
+        }
+    }
+
+    private void ReportConsoleLine(string line, string msgType, Regex ninjaProgress)
+    {
+        var match = ninjaProgress.Match(line);
+        if (match.Success)
+        {
+            var current = double.Parse(match.Groups[1].Value);
+            var total = double.Parse(match.Groups[2].Value);
+            _ninjaTotal = total;
+            _ninjaCurrent = current;
+
+            Report(line, msgType, current / total);
+            return;
+        }
+
+        Report(line, msgType);
+    }
+
+    private static bool ShouldReportPartialConsoleLine(string line)
+    {
+        return line.StartsWith("[", StringComparison.Ordinal) ||
+               line.Contains("Starting scons daemon", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task ReadLinesAsync(StreamReader reader, string msgType, StreamWriter? logWriter)
     {
+        await ReadConsoleOutputAsync(reader, msgType, logWriter);
+        if (reader.GetType() != null)
+            return;
+
+        // 匹配 Ninja 的 [N/M] 进度前缀
+        var ninjaProgress = new Regex(@"^\[(\d+)/(\d+)\].*$");
+
         try
         {
             while (true)
@@ -1402,6 +1621,20 @@ Install one of these toolchains, then run this tool again:
                 if (line == null) break;
 
                 logWriter?.WriteLine(line);
+
+                // 解析 Ninja 编译进度 [N/M]
+                var match = ninjaProgress.Match(line);
+                if (match.Success)
+                {
+                    var current = double.Parse(match.Groups[1].Value);
+                    var total = double.Parse(match.Groups[2].Value);
+                    _ninjaTotal = total;
+                    _ninjaCurrent = current;
+
+                    Report(line, msgType, current / total);
+                    continue;
+                }
+
                 Report(line, msgType);
             }
         }
@@ -1532,6 +1765,16 @@ interface/editor/editor_language = ""{editorLanguage}""
         {
             Message = message,
             MessageType = type
+        });
+    }
+
+    private void Report(string message, string type, double progress)
+    {
+        ProgressChanged?.Invoke(this, new BuildProgressEventArgs
+        {
+            Message = message,
+            MessageType = type,
+            Progress = progress
         });
     }
 }

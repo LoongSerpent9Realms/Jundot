@@ -36,8 +36,137 @@
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/os/os.h"
+#include "core/os/thread.h"
+#include "core/os/thread_safe.h"
 #include "core/string/string_builder.h"
 #include "editor/editor_node.h"
+
+// ---- Async build state ----
+struct BuildState {
+	enum Status { IDLE, RUNNING, DONE, FAILED };
+
+	Status status = IDLE;
+	String std_out;
+	int exit_code = -1;
+	String extra_args; // snapshot of args for the running build
+	bool has_result = false;
+
+	Mutex mutex;
+	Thread thread;
+
+	void start(const String &p_extra_args) {
+		MutexLock lock(mutex);
+		if (status == RUNNING) {
+			return; // already running
+		}
+		status = RUNNING;
+		has_result = false;
+		std_out.clear();
+		exit_code = -1;
+		extra_args = p_extra_args;
+	}
+
+	void complete(const String &p_std_out, int p_exit_code) {
+		MutexLock lock(mutex);
+		std_out = p_std_out;
+		exit_code = p_exit_code;
+		status = (p_exit_code == 0) ? DONE : FAILED;
+		has_result = true;
+	}
+
+	Dictionary get_result() {
+		MutexLock lock(mutex);
+		Dictionary r;
+		r["status"] = (status == RUNNING) ? "running" : (status == DONE ? "done" : (status == FAILED ? "failed" : "idle"));
+		r["exit_code"] = exit_code;
+		r["stdout"] = std_out;
+		r["has_result"] = has_result;
+		return r;
+	}
+
+	bool is_running() {
+		MutexLock lock(mutex);
+		return status == RUNNING;
+	}
+
+	// Must be called from the main thread after the build finishes,
+	// to clean up the thread resource.
+	void join_thread() {
+		MutexLock lock(mutex);
+		if (status == RUNNING || status == IDLE) {
+			return; // thread is still running or never started, don't join
+		}
+		lock.temp_unlock();
+		if (thread.is_started()) {
+			thread.wait_to_finish();
+		}
+		lock.temp_relock();
+	}
+};
+
+static BuildState build_state;
+
+static void _build_thread_callback(void *p_userdata) {
+	String extra_args = String();
+	if (p_userdata) {
+		extra_args = *(static_cast<String *>(p_userdata));
+		delete static_cast<String *>(p_userdata);
+	}
+
+	String project_root = AIToolExecutor::_get_project_root();
+
+	// Build scons arguments.
+	List<String> scons_args;
+	scons_args.push_back("platform=windows");
+	scons_args.push_back("target=editor");
+	scons_args.push_back("arch=x86_64");
+	scons_args.push_back("debug_symbols=no");
+	scons_args.push_back("-j4");
+	scons_args.push_back("d3d12=no");
+	scons_args.push_back("accesskit=no");
+	scons_args.push_back("angle=no");
+
+	if (!extra_args.is_empty()) {
+		Vector<String> extras = extra_args.split(" ", false);
+		for (int i = 0; i < extras.size(); i++) {
+			scons_args.push_back(extras[i]);
+		}
+	}
+
+	// Clean stale build artifacts from previous (failed) builds.
+	{
+		List<String> clean_args;
+		clean_args.push_back("-c");
+		for (const String &arg : scons_args) {
+			clean_args.push_back(arg);
+		}
+		String clean_out;
+		int clean_exit = -1;
+		OS::get_singleton()->execute("python", clean_args, &clean_out, &clean_exit, true);
+		// Clean exit code is ignored — non-zero on first clean is expected (nothing to clean).
+	}
+
+	// Try python -m SCons first, then scons, then python3 -m SCons.
+	String std_out;
+	int exit_code = -1;
+
+	Error err = OS::get_singleton()->execute("python", scons_args, &std_out, &exit_code, true);
+	if (err != OK) {
+		List<String> py_args;
+		py_args.push_back("-m");
+		py_args.push_back("SCons");
+		for (const String &arg : scons_args) {
+			py_args.push_back(arg);
+		}
+		err = OS::get_singleton()->execute("python3", py_args, &std_out, &exit_code, true);
+		if (err != OK) {
+			std_out = "Failed to start build: neither 'python' nor 'python3' with scons was found.";
+			exit_code = -1;
+		}
+	}
+
+	build_state.complete(std_out, exit_code);
+}
 
 Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 	const String tool_call_id = p_tool_call.get("id", String());
@@ -62,6 +191,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _grep_code(args);
 	} else if (name == AIToolNames::RUN_BUILD) {
 		result = _run_build(args);
+	} else if (name == AIToolNames::CHECK_BUILD_STATUS) {
+		result = _check_build_status(args);
 	} else if (name == AIToolNames::READ_BUILD_LOG) {
 		result = _read_build_log(args);
 	} else if (name == AIToolNames::FETCH_URL) {
@@ -433,47 +564,43 @@ Dictionary AIToolExecutor::_grep_code(const Dictionary &p_args) {
 Dictionary AIToolExecutor::_run_build(const Dictionary &p_args) {
 	String extra_args = p_args.get("extra_args", String());
 
-	String project_root = _get_project_root();
-
-	// Build the scons command.
-	List<String> scons_args;
-	scons_args.push_back("platform=windows");
-	scons_args.push_back("target=editor");
-	scons_args.push_back("arch=x86_64");
-	scons_args.push_back("debug_symbols=no");
-	scons_args.push_back("-j4");
-	scons_args.push_back("d3d12=no");
-	scons_args.push_back("accesskit=no");
-	scons_args.push_back("angle=no");
-
-	if (!extra_args.is_empty()) {
-		// Parse extra args by space.
-		Vector<String> extras = extra_args.split(" ", false);
-		for (int i = 0; i < extras.size(); i++) {
-			scons_args.push_back(extras[i]);
-		}
+	// Check if build is already running.
+	if (build_state.is_running()) {
+		return _make_result("A build is already running in the background. Use check_build_status to monitor progress.");
 	}
 
-	String std_out;
-	int exit_code = -1;
+	// Start the build in a background thread.
+	build_state.start(extra_args);
+	String *args_copy = new String(extra_args);
+	build_state.thread.start(_build_thread_callback, args_copy);
 
-	// Try python -m SCons first, then scons.
-	Error err = OS::get_singleton()->execute("python", scons_args, &std_out, &exit_code, true);
-	if (err != OK) {
-		// Fallback: try "scons" directly or "python3".
-		List<String> py_args;
-		py_args.push_back("-m");
-		py_args.push_back("SCons");
-		for (const String &arg : scons_args) {
-			py_args.push_back(arg);
-		}
-		err = OS::get_singleton()->execute("python3", py_args, &std_out, &exit_code, true);
+	return _make_result("Build started in background. Use check_build_status to check progress and get results when complete.");
+}
+
+Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
+	if (build_state.is_running()) {
+		return _make_result("Build is still running in the background. Check again later.");
 	}
+
+	Dictionary r = build_state.get_result();
+	String status = r["status"];
+
+	if (status == "idle") {
+		return _make_result("No build has been started yet. Use run_build to start one.");
+	}
+
+	// Build is done — retrieve the result.
+	String std_out = r["stdout"];
+	int exit_code = r["exit_code"];
+
+	// Clean up the thread resource before returning.
+	build_state.join_thread();
 
 	StringBuilder result;
-	result += vformat("Build exit code: %d\n", exit_code);
+	result += vformat("Build status: %s\n", status);
+	result += vformat("Exit code: %d\n", exit_code);
 	if (!std_out.is_empty()) {
-		result += "\n--- stdout ---\n" + std_out;
+		result += "\n--- build output ---\n" + std_out;
 	}
 
 	if (result.as_string().length() > 10000) {

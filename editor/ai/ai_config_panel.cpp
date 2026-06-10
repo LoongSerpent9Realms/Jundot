@@ -97,6 +97,7 @@ void AIConfigPanel::_update_translations() {
 	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
 	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
 	system_prompt_label->set_text(TTR("System Prompt"));
+	user_extra_instructions_label->set_text(TTR("Extra Instructions (appended to system prompt)"));
 	include_project_memories_check->set_text(TTR("Include project memories"));
 	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
 	tools_enabled_check->set_text(TTR("Enable Function Calling tools (read/write files, build, etc.)"));
@@ -133,6 +134,7 @@ void AIConfigPanel::_load_settings() {
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
 	system_prompt_edit->set_text(settings.system_prompt);
+	user_extra_instructions_edit->set_text(settings.user_extra_instructions);
 	status_label->set_text(TTR("AI settings loaded."));
 }
 
@@ -154,6 +156,7 @@ void AIConfigPanel::_save_settings() {
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = system_prompt_edit->get_text();
+	settings.user_extra_instructions = user_extra_instructions_edit->get_text();
 	const Error err = AISettings::save(settings);
 	if (err != OK) {
 		status_label->set_text(TTR("AI settings could not be saved."));
@@ -433,6 +436,16 @@ AIConfigPanel::AIConfigPanel() {
 	system_prompt_edit->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	system_prompt_edit->set_custom_minimum_size(Size2(0, 120) * EDSCALE);
 	root->add_child(system_prompt_edit);
+
+	// User extra instructions — a customizable prompt that appends to system message.
+	user_extra_instructions_label = memnew(Label);
+	root->add_child(user_extra_instructions_label);
+
+	user_extra_instructions_edit = memnew(TextEdit);
+	user_extra_instructions_edit->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	user_extra_instructions_edit->set_custom_minimum_size(Size2(0, 100) * EDSCALE);
+	user_extra_instructions_edit->set_placeholder(TTR("Optional: enter extra instructions here. These will be appended to the system prompt."));
+	root->add_child(user_extra_instructions_edit);
 
 	HBoxContainer *actions = memnew(HBoxContainer);
 	actions->add_theme_constant_override("separation", 6 * EDSCALE);

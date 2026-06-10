@@ -65,6 +65,7 @@ class AIChatPanel : public MarginContainer {
 	Button *clear_button = nullptr;
 	MenuButton *add_file_menu = nullptr;
 	Label *status_label = nullptr;
+	Label *tool_call_label = nullptr;
 	EditorFileDialog *reference_file_dialog = nullptr;
 	EditorFileDialog *upload_file_dialog = nullptr;
 	EditorFileDialog *import_file_dialog = nullptr;
@@ -100,6 +101,11 @@ class AIChatPanel : public MarginContainer {
 
 	PendingToolRound pending_tool_round;
 	bool in_tool_loop = false;
+
+	// Active settings used for the current send, cached so the tool loop
+	// reuses the same system prompt (with auto_mode, context, etc.) instead
+	// of reloading from disk and losing those modifications.
+	AISettingsData active_settings;
 
 	void _send_message();
 	void _cancel_request();

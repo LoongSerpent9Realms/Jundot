@@ -41,6 +41,7 @@ constexpr const char *READ_BUILD_LOG = "read_build_log";
 constexpr const char *FETCH_URL = "fetch_url";
 constexpr const char *SHELL_COMMAND = "shell_command";
 constexpr const char *RESTART_ENGINE = "restart_engine";
+constexpr const char *CHECK_BUILD_STATUS = "check_build_status";
 } // namespace AIToolNames
 
 // Returns the built-in tool definitions as an Array of Dictionary,

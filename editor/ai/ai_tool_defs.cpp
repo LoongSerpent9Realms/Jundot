@@ -186,6 +186,16 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RESTART_ENGINE, "", fn));
 	}
 
+	// 10. check_build_status
+	{
+		Dictionary props;
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_BUILD_STATUS,
+				"Check the status of a background build started by run_build. Returns 'running' if the build is still in progress, or the build output and exit code once it completes. Call this after run_build to get build results.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CHECK_BUILD_STATUS, "", fn));
+	}
+
 	return tools;
 }
 

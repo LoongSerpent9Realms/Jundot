@@ -297,6 +297,7 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 
 	if (!p_tools.is_empty()) {
 		payload["tools"] = p_tools;
+		payload["tool_choice"] = "auto";
 	}
 
 	Vector<String> headers;

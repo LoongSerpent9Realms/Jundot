@@ -34,6 +34,7 @@ public partial class MainForm : Form
     private CheckBox _chkSkipBuild = null!;
     private CheckBox _chkInstallSCons = null!;
     private CheckBox _chkCleanDir = null!;
+    private CheckBox _chkCleanBuild = null!;
     private TextBox _txtMingwPrefix = null!;
     private TextBox _txtPackageName = null!;
     private TextBox _txtOutputDir = null!;
@@ -555,8 +556,10 @@ public partial class MainForm : Form
         var optsPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
         _chkInstallSCons = new CheckBox { Text = "Auto-install SCons", AutoSize = true };
         _chkCleanDir = new CheckBox { Text = "Clean Package Dir", AutoSize = true };
+        _chkCleanBuild = new CheckBox { Text = "Clean Build", AutoSize = true };
         optsPanel.Controls.Add(_chkInstallSCons);
         optsPanel.Controls.Add(_chkCleanDir);
+        optsPanel.Controls.Add(_chkCleanBuild);
         layout.Controls.Add(optsPanel, 1, row);
 
         // Row 9: Package Name
@@ -1023,6 +1026,7 @@ public partial class MainForm : Form
         _chkUseMinGW.Enabled = enabled;
         _chkWinOptDeps.Enabled = enabled;
         _chkInstallSCons.Enabled = enabled;
+        _chkCleanBuild.Enabled = enabled;
         _txtMingwPrefix.Enabled = enabled && _chkUseMinGW.Checked;
         _txtExtraSCons.Enabled = enabled;
     }
@@ -1091,6 +1095,7 @@ public partial class MainForm : Form
                 SkipBuild = _chkSkipBuild.Checked,
                 InstallSCons = _chkInstallSCons.Checked,
                 CleanPackageDir = _chkCleanDir.Checked,
+                CleanBuild = _chkCleanBuild.Checked,
                 MingwPrefix = _txtMingwPrefix.Text.Trim(),
                 PackageName = _txtPackageName.Text.Trim(),
                 OutputDir = _txtOutputDir.Text.Trim(),
@@ -1131,6 +1136,7 @@ public partial class MainForm : Form
             _chkSkipBuild.Checked = cfg.SkipBuild;
             _chkInstallSCons.Checked = cfg.InstallSCons;
             _chkCleanDir.Checked = cfg.CleanPackageDir;
+            _chkCleanBuild.Checked = cfg.CleanBuild;
             _txtMingwPrefix.Text = cfg.MingwPrefix;
             _txtPackageName.Text = cfg.PackageName;
             _txtOutputDir.Text = cfg.OutputDir;
@@ -1201,6 +1207,7 @@ public partial class MainForm : Form
             SkipBuild = _chkSkipBuild.Checked,
             InstallSCons = _chkInstallSCons.Checked,
             CleanPackageDir = _chkCleanDir.Checked,
+            CleanBuild = _chkCleanBuild.Checked,
             MingwPrefix = _txtMingwPrefix.Text.Trim(),
             PackageName = _txtPackageName.Text.Trim(),
             OutputDir = _txtOutputDir.Text.Trim(),
@@ -1246,19 +1253,25 @@ public partial class MainForm : Form
         _btnBuild.Enabled = !running;
         _btnCancel.Enabled = running;
         _progressBar.Visible = running;
-        _lblStatus.Visible = !running;
+        _lblStatus.Visible = running;
 
         if (!running)
         {
             _btnBuild.BackColor = Color.FromArgb(0, 120, 212);
             _btnBuild.ForeColor = Color.White;
             _btnBuild.Text = I18N.T("Button.Build");
+            _lblStatus.Text = "";
         }
         else
         {
             _btnBuild.BackColor = SystemColors.Control;
             _btnBuild.ForeColor = SystemColors.ControlText;
             _btnBuild.Text = I18N.T("Status.Building");
+
+            // 初始为不确定进度（等待实际进度数据）
+            _progressBar.Style = ProgressBarStyle.Marquee;
+            _lblStatus.Text = "Initializing...";
+            _lblStatus.ForeColor = Color.Gray;
         }
     }
 
@@ -1280,6 +1293,46 @@ public partial class MainForm : Form
         {
             BeginInvoke(() => OnBuildProgress(sender, e));
             return;
+        }
+
+        if (e.Progress.HasValue)
+        {
+            _progressBar.Style = ProgressBarStyle.Continuous;
+            _progressBar.Value = (int)Math.Round(e.Progress.Value * 100);
+            _lblStatus.Text = $"{(int)Math.Round(e.Progress.Value * 100)}%";
+        }
+        else
+        {
+            // 无精确进度时显示当前阶段
+            switch (e.MessageType)
+            {
+                case "step":
+                    _lblStatus.Text = e.Message;
+                    _lblStatus.ForeColor = Color.FromArgb(88, 166, 255);
+                    break;
+                case "warning":
+                    _lblStatus.Text = e.Message;
+                    _lblStatus.ForeColor = Color.FromArgb(210, 153, 34);
+                    break;
+                case "error":
+                    _lblStatus.Text = e.Message;
+                    _lblStatus.ForeColor = Color.FromArgb(255, 123, 114);
+                    break;
+                case "success":
+                    _lblStatus.Text = e.Message;
+                    _lblStatus.ForeColor = Color.FromArgb(63, 185, 80);
+                    break;
+                case "output":
+                    // Ninja 输出行：提取 [N/M] 或文件名做状态提示
+                    if (!e.Progress.HasValue && e.Message.StartsWith("["))
+                    {
+                        _lblStatus.Text = e.Message.Length > 60
+                            ? e.Message.Substring(0, 60) + "..."
+                            : e.Message;
+                        _lblStatus.ForeColor = Color.FromArgb(201, 209, 217);
+                    }
+                    break;
+            }
         }
 
         AppendConsole(e.Message, e.MessageType);

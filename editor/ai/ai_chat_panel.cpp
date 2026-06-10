@@ -355,10 +355,14 @@ void AIChatPanel::_send_message() {
 	if (!ai_context.is_empty()) {
 		settings.system_prompt += "\n\n" + ai_context;
 	}
+	if (!settings.user_extra_instructions.is_empty()) {
+		settings.system_prompt += "\n\n" + settings.user_extra_instructions;
+	}
 	if (!configured_system_prompt.strip_edges().is_empty()) {
 		settings.system_prompt += "\n\n" + configured_system_prompt;
 	}
 	chat_service->configure(settings);
+	active_settings = settings; // Cache for tool loop reuse.
 
 	Array messages;
 	{
@@ -598,19 +602,25 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			Array choices = p_json["choices"];
 			if (choices.size() > 0 && choices[0].get_type() == Variant::DICTIONARY) {
 				Dictionary first = choices[0];
+				// Prefer finish_reason check for robustness; fall back to
+				// inspecting message.tool_calls for providers that omit it.
+				String finish_reason = first.get("finish_reason", String());
 				Dictionary msg = first.get("message", Dictionary());
-				if (msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY) {
-					Array tool_calls = msg["tool_calls"];
-					if (!tool_calls.is_empty()) {
-						// Execute tool calls in a loop.
-						_execute_tool_calls(p_json);
-						return;
-					}
+				bool has_tool_calls = (finish_reason == "tool_calls") ||
+					(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
+						!((Array)msg["tool_calls"]).is_empty());
+				if (has_tool_calls) {
+					_execute_tool_calls(p_json);
+					return;
 				}
 			}
 		}
 
 		_add_ai_message(p_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+
+		// Clear tool call display.
+		tool_call_label->set_visible(false);
+		tool_call_label->set_text(String());
 
 		// Parse suggestions from the AI response.
 		const AISettingsData settings = AISettings::load();
@@ -655,14 +665,21 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 
 	// Rebuild messages array. If continuing from a previous tool round,
 	// reuse the accumulated messages to preserve tool results history.
-	AISettingsData settings = AISettings::load();
+	// Use the cached active settings so auto_mode_prompt, context, and
+	// user_extra_instructions from _send_message() are preserved.
+	AISettingsData settings = active_settings;
 	Array messages = pending_tool_round.original_messages;
 
 	if (messages.is_empty()) {
-		// First round: build from scratch.
+		// First round: build from scratch using the cached active_settings.
+		// active_settings.system_prompt already contains the auto_mode_prompt,
+		// context, and user_extra_instructions from _send_message(), so we
+		// do NOT rebuild context here to avoid duplication.
+		String system_content = settings.system_prompt;
+
 		Dictionary system_msg;
 		system_msg["role"] = "system";
-		system_msg["content"] = settings.system_prompt;
+		system_msg["content"] = system_content;
 		messages.push_back(system_msg);
 
 		Array history = _build_message_history();
@@ -683,6 +700,25 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 
 	// Show status.
 	status_label->set_text(vformat(TTR("AI is using %d tool(s)..."), tool_calls.size()));
+
+	// Build tool call display.
+	String tool_display;
+	for (int i = 0; i < tool_calls.size(); i++) {
+		Dictionary tc = tool_calls[i];
+		Dictionary fn = tc.get("function", Dictionary());
+		String name = fn.get("name", "?");
+		String args_preview = fn.get("arguments", "{}");
+		// Truncate long arguments for display.
+		if (args_preview.length() > 80) {
+			args_preview = args_preview.substr(0, 77) + "...";
+		}
+		if (i > 0) {
+			tool_display += "\n";
+		}
+		tool_display += vformat("\xe2\x9a\x99 %s(%s)", name, args_preview);
+	}
+	tool_call_label->set_visible(true);
+	tool_call_label->set_text(tool_display);
 
 	// Build tools array.
 	Array tools;
@@ -1113,6 +1149,14 @@ AIChatPanel::AIChatPanel() {
 	dismiss_all_button = memnew(Button);
 	dismiss_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_dismiss_all_suggestions));
 	bulk_action_bar->add_child(dismiss_all_button);
+
+	tool_call_label = memnew(Label);
+	tool_call_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	tool_call_label->set_visible(false);
+	tool_call_label->set_custom_minimum_size(Size2(0, 20) * EDSCALE);
+	tool_call_label->add_theme_color_override("font_color", Color(0.4f, 0.6f, 1.0f));
+	tool_call_label->set_modulate(Color(1, 1, 1, 0.85f));
+	root->add_child(tool_call_label);
 
 	PanelContainer *composer = memnew(PanelContainer);
 	composer->set_h_size_flags(Control::SIZE_EXPAND_FILL);

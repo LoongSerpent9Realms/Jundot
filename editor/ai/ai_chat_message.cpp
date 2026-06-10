@@ -413,7 +413,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 					item_text = trimmed.substr(1).strip_edges();
 					is_ul = true;
 				}
-				if (is_ul) {
+			if (is_ul) {
 					if (current_list != LIST_UL) {
 						if (current_list != LIST_NONE) {
 							s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
@@ -421,7 +421,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 						s += "[ul]\n";
 						current_list = LIST_UL;
 					}
-					s += "[li]" + item_text + "[/li]\n";
+					s += item_text + "\n";
 					continue;
 				}
 			}
@@ -453,7 +453,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 						s += "[ol]\n";
 						current_list = LIST_OL;
 					}
-					s += "[li]" + item_text + "[/li]\n";
+					s += item_text + "\n";
 					continue;
 				}
 			}

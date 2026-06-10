@@ -59,6 +59,7 @@ class AIConfigPanel : public MarginContainer {
 	CheckBox *auto_suggest_entries_check = nullptr;
 	CheckBox *feature_design_philosophy_check = nullptr;
 	TextEdit *system_prompt_edit = nullptr;
+	TextEdit *user_extra_instructions_edit = nullptr;
 	Label *title_label = nullptr;
 	Label *base_url_label = nullptr;
 	Label *model_label = nullptr;
@@ -70,6 +71,7 @@ class AIConfigPanel : public MarginContainer {
 	Label *feature_universality_threshold_label = nullptr;
 	Label *feature_necessity_threshold_label = nullptr;
 	Label *system_prompt_label = nullptr;
+	Label *user_extra_instructions_label = nullptr;
 	Label *usage_notice_label = nullptr;
 	Label *status_label = nullptr;
 	AIChatService *test_service = nullptr;

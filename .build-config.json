@@ -14,8 +14,9 @@
   "MingwPrefix": "",
   "EnableWindowsOptionalDeps": false,
   "CleanPackageDir": false,
+  "CleanBuild": false,
   "ExtraSConsArgs": "",
   "Language": "zh_CN",
-  "AutoUpdateVersion": false,
+  "AutoUpdateVersion": true,
   "GenerateUpdateManifest": true
 }

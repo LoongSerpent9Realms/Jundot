@@ -5576,6 +5576,15 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 		if (tag.begins_with("/") && tag_stack.size()) {
 			bool tag_ok = tag_stack.size() && tag_stack.front()->get() == tag.substr(1);
 
+			if (!tag_ok) {
+				txt += "[" + tag;
+				add_text(txt);
+				after_list_open_tag = false;
+				after_list_close_tag = false;
+				pos = brk_end;
+				continue;
+			}
+
 			if (tag_stack.front()->get() == "b") {
 				in_bold = false;
 			}
@@ -5584,15 +5593,6 @@ void RichTextLabel::append_text(const String &p_bbcode) {
 			}
 			if ((tag_stack.front()->get() == "indent") || (tag_stack.front()->get() == "ol") || (tag_stack.front()->get() == "ul")) {
 				current_frame->indent_level--;
-			}
-
-			if (!tag_ok) {
-				txt += "[" + tag;
-				add_text(txt);
-				after_list_open_tag = false;
-				after_list_close_tag = false;
-				pos = brk_end;
-				continue;
 			}
 
 			if (txt.is_empty() && after_list_open_tag) {

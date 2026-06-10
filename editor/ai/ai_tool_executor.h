@@ -49,6 +49,7 @@ private:
 	static Dictionary _search_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
+	static Dictionary _check_build_status(const Dictionary &p_args);
 	static Dictionary _read_build_log(const Dictionary &p_args);
 	static Dictionary _fetch_url(const Dictionary &p_args);
 	static Dictionary _shell_command(const Dictionary &p_args);
@@ -56,5 +57,7 @@ private:
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 
 	static Dictionary _make_result(const String &p_content, bool p_is_error = false);
+
+public:
 	static String _get_project_root();
 };
