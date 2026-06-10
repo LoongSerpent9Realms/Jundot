@@ -65,9 +65,93 @@ static bool _is_horizontal_rule(const String &p_line) {
 static String _markdown_to_bbcode(const String &p_md) {
 	Vector<String> code_blocks;
 	Vector<String> inline_codes;
+	Vector<String> links;
 	String s = p_md;
 
-	// ---------- Step 1: Extract code blocks (```...```) ----------
+	// ---------- Step 1: Extract images (![alt](url)) and links ([text](url)) ----------
+	// Do this FIRST so that literal square brackets in URLs and the placeholder
+	// tokens we emit won't be mis-interpreted as BBCode or markdown by later
+	// passes. The placeholders contain NO square brackets, making them safe.
+	{
+		int pos = 0;
+		while (true) {
+			// Try image first: ![alt](url)
+			int img_start = s.find("![", pos);
+			// Try link: [text](url)
+			int link_start = s.find("[", pos);
+			// Guard against matching our own placeholders: placeholders start
+			// with "@@LINK_", "@@IMG_", "@@CODE_", "@@INLINE_", so if we find
+			// '[' inside one of those it's been broken already; just bail.
+			// In practice, because placeholders contain no '[' this can't happen
+			// as long as we emit bracket-free placeholders.
+
+			int chosen_start = -1;
+			bool is_image = false;
+			if (img_start != -1 && (link_start == -1 || img_start < link_start)) {
+				chosen_start = img_start;
+				is_image = true;
+			} else if (link_start != -1) {
+				// If the "[" is immediately preceded by '!', it's actually an
+				// image that the "img_start" search missed (because of -1).
+				if (link_start > 0 && s[link_start - 1] == '!') {
+					chosen_start = link_start - 1;
+					is_image = true;
+				} else {
+					chosen_start = link_start;
+					is_image = false;
+				}
+			} else {
+				break;
+			}
+
+			int open_bracket = is_image ? chosen_start + 1 : chosen_start;
+			int text_end = s.find("]", open_bracket + 1);
+			if (text_end == -1) {
+				// No matching ']' — treat as a literal bracket and escape it.
+				s = s.substr(0, chosen_start) + "[lb]" + s.substr(chosen_start + (is_image ? 2 : 1));
+				pos = chosen_start + 4; // "[lb]" is 4 chars
+				continue;
+			}
+			int url_open = s.find("(", text_end + 1);
+			// Allow at most 1 whitespace char between ] and ( for standard
+			// markdown links.
+			bool paren_adjacent = url_open != -1 && url_open - text_end <= 2;
+			if (url_open == -1 || !paren_adjacent) {
+				// Not a link: it's a literal "[...]" — escape the opening '['.
+				s = s.substr(0, open_bracket) + "[lb]" + s.substr(open_bracket + 1);
+				pos = open_bracket + 4;
+				continue;
+			}
+			int url_close = s.find(")", url_open + 1);
+			if (url_close == -1) {
+				// Unterminated URL; escape the opening '['.
+				s = s.substr(0, open_bracket) + "[lb]" + s.substr(open_bracket + 1);
+				pos = open_bracket + 4;
+				continue;
+			}
+
+			String text = s.substr(open_bracket + 1, text_end - open_bracket - 1);
+			String url = s.substr(url_open + 1, url_close - url_open - 1);
+
+			if (is_image) {
+				links.push_back("[i]" + text + "[/i]"); // fall back: show alt-text as italic
+				String placeholder = "@@IMG_" + vformat("%d", links.size() - 1) + "@@";
+				s = s.substr(0, chosen_start) + placeholder + s.substr(url_close + 1);
+				pos = chosen_start + placeholder.length();
+			} else {
+				// Don't emit the final BBCode yet: the text portion might still
+				// contain bold/italic markdown that later passes will convert.
+				// Instead we store the raw pair and emit BBCode at the very end
+				// so literal brackets in the URL don't get mangled.
+				links.push_back(url + "\x1f" + text); // use \x1f as a separator unlikely to appear in text
+				String placeholder = "@@LINK_" + vformat("%d", links.size() - 1) + "@@";
+				s = s.substr(0, chosen_start) + placeholder + s.substr(url_close + 1);
+				pos = chosen_start + placeholder.length();
+			}
+		}
+	}
+
+	// ---------- Step 2: Extract code blocks (```...```) ----------
 	{
 		int pos = 0;
 		while (true) {
@@ -86,13 +170,13 @@ static String _markdown_to_bbcode(const String &p_md) {
 			}
 			String content = s.substr(content_start, fence_end - content_start).strip_edges();
 			code_blocks.push_back(content);
-			String placeholder = "[CODEBLOCK_" + vformat("%d", code_blocks.size() - 1) + "]";
+			String placeholder = "@@CODE_" + vformat("%d", code_blocks.size() - 1) + "@@";
 			s = s.substr(0, fence) + placeholder + s.substr(fence_end + 3);
 			pos = fence + placeholder.length();
 		}
 	}
 
-	// ---------- Step 2: Extract inline code (`...`) ----------
+	// ---------- Step 3: Extract inline code (`...`) ----------
 	{
 		int pos = 0;
 		while (true) {
@@ -106,13 +190,13 @@ static String _markdown_to_bbcode(const String &p_md) {
 			}
 			String code = s.substr(tick + 1, end - tick - 1);
 			inline_codes.push_back(code);
-			String placeholder = "[INLINECODE_" + vformat("%d", inline_codes.size() - 1) + "]";
+			String placeholder = "@@INLINE_" + vformat("%d", inline_codes.size() - 1) + "@@";
 			s = s.substr(0, tick) + placeholder + s.substr(end + 1);
 			pos = tick + placeholder.length();
 		}
 	}
 
-	// ---------- Step 3: Inline formatting on non-code text ----------
+	// ---------- Step 4: Inline formatting on non-code text ----------
 	// Strikethrough (~~text~~) → [s]text[/s]
 	{
 		int pos = 0;
@@ -182,63 +266,83 @@ static String _markdown_to_bbcode(const String &p_md) {
 		}
 	}
 
-	// Images ![alt](url) → show alt text in italic (RTL doesn't support inline images easily).
+	// ---------- Step 4.5: Escape remaining literal square brackets ----------
+	// Any '[' still present at this point is NOT a markdown link (those were all
+	// extracted) and NOT a BBCode tag we emit (those use our known tag names).
+	// It's a literal bracket (e.g. "array[0]", "[1, 2, 3]") and must be escaped
+	// to "[lb]" so RichTextLabel's BBCode parser won't try to interpret it as a
+	// tag. We must NOT escape brackets that are part of our own placeholders, so
+	// the walk is careful to skip over placeholder tokens.
 	{
 		int pos = 0;
 		while (true) {
-			int img_start = s.find("![", pos);
-			if (img_start == -1) {
+			int brk = s.find_char('[', pos);
+			if (brk == -1) {
 				break;
 			}
-			int alt_end = s.find("]", img_start + 2);
-			if (alt_end == -1) {
-				break;
+			// Check if this bracket belongs to one of our placeholders.
+			bool is_placeholder = false;
+			if (brk + 7 < s.length() && s.substr(brk, 7) == "[CODEBL") {
+				is_placeholder = true; // legacy
 			}
-			int url_start = s.find("(", alt_end + 1);
-			if (url_start == -1) {
-				break;
+			if (brk + 10 < s.length() && s.substr(brk, 10) == "[INLINECOD") {
+				is_placeholder = true; // legacy
 			}
-			int url_end = s.find(")", url_start + 1);
-			if (url_end == -1) {
-				break;
-			}
-			String alt = s.substr(img_start + 2, alt_end - img_start - 2);
-			String replacement = "[i]" + alt + "[/i]"; // fallback: show alt text as italic
-			s = s.substr(0, img_start) + replacement + s.substr(url_end + 1);
-			pos = img_start + replacement.length();
-		}
-	}
+			// Check for our new @-style sentinels (shouldn't contain '[', but
+			// keep the check for safety).
+			if (!is_placeholder) {
+				// Heuristic: if the next few chars look like a known BBCode tag
+				// we intentionally emitted, leave it alone.
+				int close_bracket = s.find_char(']', brk + 1);
+				if (close_bracket != -1) {
+					String tag_text = s.substr(brk + 1, close_bracket - brk - 1);
+					// Strip any "=value" or " option=value" suffix before
+					// comparing against the whitelist.
+					String tag_name = tag_text;
+					int eq_or_space = tag_name.find_char('=');
+					int pure_space = tag_name.find_char(' ');
+					int cutoff = -1;
+					if (eq_or_space != -1) {
+						cutoff = eq_or_space;
+					}
+					if (pure_space != -1 && (cutoff == -1 || pure_space < cutoff)) {
+						cutoff = pure_space;
+					}
+					if (cutoff != -1) {
+						tag_name = tag_name.substr(0, cutoff);
+					}
+					// Normalize close-tags (strip leading '/').
+					bool is_close = tag_name.length() > 0 && tag_name[0] == '/';
+					String normalized = is_close ? tag_name.substr(1) : tag_name;
 
-	// Links [text](url) → [url=url]text[/url] (run after image processing).
-	{
-		int pos = 0;
-		while (true) {
-			int link_start = s.find("[", pos);
-			if (link_start == -1) {
-				break;
-			}
-			// Check it's not an already-handled image (marked by ! before [).
-			if (link_start > 0 && s[link_start - 1] == '!') {
-				pos = link_start + 1;
+					static const char *whitelist[] = {
+						"b", "i", "u", "lb", "s", "code", "url", "hr",
+						"table", "cell", "ul", "ol", "indent",
+						"font_size", "font", "color", "center", "right",
+						nullptr
+					};
+					bool on_whitelist = false;
+					for (int i = 0; whitelist[i] != nullptr; i++) {
+						if (normalized == whitelist[i]) {
+							on_whitelist = true;
+							break;
+						}
+					}
+					if (on_whitelist) {
+						pos = close_bracket + 1;
+						continue;
+					}
+					// Unknown '[' tag — escape it to prevent BBCode mis-parsing.
+					s = s.substr(0, brk) + "[lb]" + s.substr(brk + 1);
+					pos = brk + 4;
+					continue;
+				}
+				// Unterminated '[' — escape it too.
+				s = s.substr(0, brk) + "[lb]" + s.substr(brk + 1);
+				pos = brk + 4;
 				continue;
 			}
-			int text_end = s.find("]", link_start + 1);
-			if (text_end == -1) {
-				break;
-			}
-			int url_start = s.find("(", text_end + 1);
-			if (url_start == -1) {
-				break;
-			}
-			int url_end = s.find(")", url_start + 1);
-			if (url_end == -1) {
-				break;
-			}
-			String text = s.substr(link_start + 1, text_end - link_start - 1);
-			String url = s.substr(url_start + 1, url_end - url_start - 1);
-			String replacement = "[url=" + url + "]" + text + "[/url]";
-			s = s.substr(0, link_start) + replacement + s.substr(url_end + 1);
-			pos = link_start + replacement.length();
+			pos = brk + 1;
 		}
 	}
 
@@ -269,8 +373,15 @@ static String _markdown_to_bbcode(const String &p_md) {
 				continue;
 			}
 
-			// Code placeholder lines: preserve as-is after flushing lists/tables.
-			if (trimmed.begins_with("[CODEBLOCK_") || trimmed.begins_with("[INLINECODE_")) {
+			// Placeholder lines (code/link/image) must pass through untouched so
+			// that their final restoration works correctly. We flush any open
+			// list/table, then keep the raw placeholder in place.
+			bool is_placeholder_line = false;
+			for (int check = 0; check < 4 && !is_placeholder_line; check++) {
+				static const char *prefixes[] = { "@@CODE_", "@@INLINE_", "@@LINK_", "@@IMG_" };
+				is_placeholder_line = trimmed.begins_with(prefixes[check]);
+			}
+			if (is_placeholder_line) {
 				if (current_list != LIST_NONE) {
 					s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
 					current_list = LIST_NONE;
@@ -477,16 +588,61 @@ static String _markdown_to_bbcode(const String &p_md) {
 		}
 	}
 
-	// ---------- Step 5: Restore inline code ----------
+	// ---------- Step 5: Restore inline code (escape '[' first) ----------
 	for (int j = 0; j < inline_codes.size(); j++) {
-		String placeholder = "[INLINECODE_" + vformat("%d", j) + "]";
-		s = s.replace(placeholder, "[code]" + inline_codes[j] + "[/code]");
+		String placeholder = "@@INLINE_" + vformat("%d", j) + "@@";
+		// Godot's [code] tag still parses BBCode inside (it only switches to a
+		// monospace font), so literal '[' characters must be escaped to [lb].
+		String escaped = inline_codes[j].replace("[", "[lb]");
+		s = s.replace(placeholder, "[code]" + escaped + "[/code]");
 	}
 
-	// ---------- Step 6: Restore code blocks ----------
+	// ---------- Step 6: Restore code blocks (escape '[' first) ----------
 	for (int j = 0; j < code_blocks.size(); j++) {
-		String placeholder = "[CODEBLOCK_" + vformat("%d", j) + "]";
-		s = s.replace(placeholder, "[code]" + code_blocks[j] + "[/code]");
+		String placeholder = "@@CODE_" + vformat("%d", j) + "@@";
+		String escaped = code_blocks[j].replace("[", "[lb]");
+		s = s.replace(placeholder, "[code]" + escaped + "[/code]");
+	}
+
+	// ---------- Step 7: Restore links & images ----------
+	// Links are restored AFTER the bracket-escape pass so that any '[' character
+	// inside `url` or `text` (which was extracted BEFORE escaping) doesn't get
+	// double-escaped. The stored format for a link is "url\x1ftext" (a single
+	// \x1f unit separator char; images store "[i]alt[/i]" directly).
+	for (int j = 0; j < links.size(); j++) {
+		// Try image placeholder first.
+		{
+			String img_placeholder = "@@IMG_" + vformat("%d", j) + "@@";
+			if (s.contains(img_placeholder)) {
+				s = s.replace(img_placeholder, links[j]);
+				continue;
+			}
+		}
+		// Otherwise it's a link: split on the \x1f separator.
+		{
+			String link_placeholder = "@@LINK_" + vformat("%d", j) + "@@";
+			if (!s.contains(link_placeholder)) {
+				continue;
+			}
+			String pair = links[j];
+			int sep = pair.find_char('\x1f');
+			if (sep == -1) {
+				// Shouldn't happen, but fallback: dump as plain text.
+				s = s.replace(link_placeholder, pair);
+				continue;
+			}
+			String url = pair.substr(0, sep);
+			String text = pair.substr(sep + 1, pair.length() - sep - 1);
+			// Trim trailing whitespace that's sometimes present inside the
+			// link's text portion (it can't legitimately contain newlines).
+			text = text.strip_edges();
+			// Escape '[' characters inside the URL because the BBCode parser
+			// will otherwise try to interpret them as tags.
+			url = url.replace("[", "[lb]");
+			text = text.replace("[", "[lb]");
+			String bbcode = "[url=" + url + "]" + text + "[/url]";
+			s = s.replace(link_placeholder, bbcode);
+		}
 	}
 
 	return s;
