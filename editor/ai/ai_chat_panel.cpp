@@ -48,13 +48,16 @@
 
 #include "core/io/file_access.h"
 #include "core/io/dir_access.h"
+#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
+#include "core/os/time.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
+#include "scene/gui/item_list.h"
 #include "scene/gui/label.h"
 #include "scene/gui/menu_button.h"
 #include "scene/gui/panel_container.h"
@@ -67,6 +70,380 @@ static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
 
 void AIChatPanel::_bind_methods() {
 }
+
+// ==========================================================================
+// Multi-conversation support
+// ==========================================================================
+
+Dictionary AIChatPanel::Conversation::to_dict(const Conversation &p_conv) {
+	Dictionary d;
+	d["id"] = p_conv.id;
+	d["title"] = p_conv.title;
+	d["created_at"] = (int64_t)p_conv.created_at;
+	d["updated_at"] = (int64_t)p_conv.updated_at;
+
+	Array msgs;
+	for (int i = 0; i < p_conv.messages.size(); i++) {
+		const ConversationMessage &m = p_conv.messages[i];
+		Dictionary md;
+		md["is_user"] = m.is_user;
+		md["is_summary"] = m.is_summary;
+		md["content"] = m.content;
+		md["think_content"] = m.think_content;
+		md["think_time"] = m.think_time_seconds;
+		md["prompt_tokens"] = m.prompt_tokens;
+		md["completion_tokens"] = m.completion_tokens;
+		msgs.push_back(md);
+	}
+	d["messages"] = msgs;
+	return d;
+}
+
+AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary &p_dict) {
+	Conversation conv;
+	conv.id = p_dict.get("id", String());
+	conv.title = p_dict.get("title", TTR("Untitled Chat"));
+	conv.created_at = (uint64_t)p_dict.get("created_at", 0);
+	conv.updated_at = (uint64_t)p_dict.get("updated_at", 0);
+
+	Array msgs = p_dict.get("messages", Array());
+	for (int i = 0; i < msgs.size(); i++) {
+		Dictionary md = msgs[i];
+		if (md.get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		ConversationMessage m;
+		m.is_user = md.get("is_user", false);
+		m.is_summary = md.get("is_summary", false);
+		m.content = md.get("content", String());
+		m.think_content = md.get("think_content", String());
+		m.think_time_seconds = md.get("think_time", 0.0);
+		m.prompt_tokens = md.get("prompt_tokens", 0);
+		m.completion_tokens = md.get("completion_tokens", 0);
+		conv.messages.push_back(m);
+	}
+	return conv;
+}
+
+String AIChatPanel::_get_conversations_file_path() const {
+	if (!EditorPaths::get_singleton()) {
+		return String();
+	}
+	return EditorPaths::get_singleton()->get_config_dir().path_join("ai_conversations.json");
+}
+
+String AIChatPanel::_generate_conversation_id() const {
+	uint64_t t = Time::get_singleton()->get_unix_time_from_system();
+	uint64_t r = OS::get_singleton()->get_unix_time_from_system() ^ (uint64_t)OS::get_singleton()->get_process_id();
+	return vformat("conv_%llx_%llx", (long long unsigned)t, (long long unsigned)r);
+}
+
+String AIChatPanel::_auto_generate_title(const Conversation &p_conv) const {
+	for (int i = 0; i < p_conv.messages.size(); i++) {
+		const ConversationMessage &m = p_conv.messages[i];
+		if (m.is_user && !m.content.is_empty()) {
+			String title = m.content.strip_edges();
+			if (title.length() > 60) {
+				title = title.substr(0, 57) + "...";
+			}
+			return title;
+		}
+	}
+	return TTR("New Chat");
+}
+
+void AIChatPanel::_refresh_conversation_list_ui() {
+	if (!conversation_list) {
+		return;
+	}
+	conversation_list->clear();
+	for (int i = 0; i < conversations.size(); i++) {
+		String title = conversations[i].title;
+		if (title.is_empty()) {
+			title = TTR("New Chat");
+		}
+		conversation_list->add_item(title);
+		if (conversations[i].id == active_conversation_id) {
+			conversation_list->select(i);
+		}
+	}
+}
+
+void AIChatPanel::_serialize_current_messages() {
+	if (active_conversation_id.is_empty()) {
+		return;
+	}
+
+	int conv_idx = -1;
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conv_idx = i;
+			break;
+		}
+	}
+	if (conv_idx < 0) {
+		return;
+	}
+
+	Conversation &conv = conversations.write[conv_idx];
+	conv.messages.clear();
+
+	for (int i = 0; i < message_list->get_child_count(); i++) {
+		// Skip suggestion cards and repair cards.
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (!msg) {
+			continue;
+		}
+
+		ConversationMessage cm;
+		cm.is_user = msg->is_user_message();
+		cm.is_summary = msg->is_summary_message();
+		cm.content = msg->get_content();
+		// think_content / token stats are not directly exposed on AIChatMessage;
+		// they are stored in the message's own private fields and restored via
+		// setup_ai / setup_summary. Here we only capture what we can recover:
+		conv.messages.push_back(cm);
+	}
+
+	conv.updated_at = Time::get_singleton()->get_unix_time_from_system();
+
+	// Auto-update title based on the first user message if still default.
+	static const String default_title = TTR("New Chat");
+	if (conv.title.is_empty() || conv.title == default_title) {
+		conv.title = _auto_generate_title(conv);
+	}
+}
+
+void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
+	// Clear existing UI messages.
+	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
+		message_list->get_child(i)->queue_free();
+	}
+
+	// Clear suggestion / repair cards.
+	suggestion_cards.clear();
+	repair_cards.clear();
+	_refresh_bulk_bar();
+
+	// Reset tool loop and editing state.
+	pending_tool_round = PendingToolRound();
+	in_tool_loop = false;
+	editing_message_index = -1;
+	attachments.clear();
+	_refresh_attachment_chips();
+	input->clear();
+
+	// Re-populate messages.
+	for (int i = 0; i < p_conv.messages.size(); i++) {
+		const ConversationMessage &cm = p_conv.messages[i];
+		if (cm.is_summary) {
+			_add_summary_message(cm.content);
+		} else if (cm.is_user) {
+			_add_user_message(cm.content);
+		} else {
+			_add_ai_message(cm.content, cm.think_content, cm.think_time_seconds, cm.prompt_tokens, cm.completion_tokens);
+		}
+	}
+}
+
+void AIChatPanel::_select_conversation(const String &p_id) {
+	// Save the active conversation first.
+	_serialize_current_messages();
+
+	// If the target conversation doesn't exist, do nothing.
+	if (p_id.is_empty()) {
+		return;
+	}
+	int idx = -1;
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == p_id) {
+			idx = i;
+			break;
+		}
+	}
+	if (idx < 0) {
+		return;
+	}
+
+	active_conversation_id = p_id;
+	_load_conversation_to_ui(conversations[idx]);
+	_refresh_conversation_list_ui();
+
+	// Persist the change so that restart opens on the same conversation.
+	_save_all_conversations();
+
+	status_label->set_text(vformat(TTR("Switched to: %s"), conversations[idx].title));
+}
+
+void AIChatPanel::_conversation_selected(int p_index) {
+	if (p_index < 0 || p_index >= conversations.size()) {
+		return;
+	}
+	// Avoid bouncing off the same conversation (e.g. when the user clicks the
+	// already selected item).
+	if (conversations[p_index].id == active_conversation_id) {
+		return;
+	}
+	_select_conversation(conversations[p_index].id);
+}
+
+void AIChatPanel::_new_conversation() {
+	// Serialize current conversation before switching.
+	_serialize_current_messages();
+
+	// Create a fresh conversation.
+	Conversation conv;
+	conv.id = _generate_conversation_id();
+	conv.title = TTR("New Chat");
+	conv.created_at = Time::get_singleton()->get_unix_time_from_system();
+	conv.updated_at = conv.created_at;
+
+	conversations.insert(0, conv);
+	active_conversation_id = conv.id;
+
+	_load_conversation_to_ui(conv);
+	_refresh_conversation_list_ui();
+	_save_all_conversations();
+
+	status_label->set_text(TTR("Started a new chat."));
+}
+
+void AIChatPanel::_delete_current_conversation() {
+	if (active_conversation_id.is_empty()) {
+		return;
+	}
+
+	int idx = -1;
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			idx = i;
+			break;
+		}
+	}
+	if (idx < 0) {
+		return;
+	}
+
+	conversations.remove_at(idx);
+
+	// Pick the next conversation to show.
+	if (conversations.size() > 0) {
+		int next_idx = idx > 0 ? idx - 1 : 0;
+		_select_conversation(conversations[next_idx].id);
+	} else {
+		// No conversation left — create a default one.
+		_new_conversation();
+	}
+}
+
+void AIChatPanel::_save_all_conversations() const {
+	// Make sure the currently active conversation is up-to-date before saving.
+	// (This is a const method that serialises by working on a cached copy;
+	// we instead rely on callers invoking _serialize_current_messages first.)
+
+	String path = _get_conversations_file_path();
+	if (path.is_empty()) {
+		return;
+	}
+
+	Error err = DirAccess::make_dir_recursive_absolute(path.get_base_dir());
+	if (err != OK && err != ERR_ALREADY_EXISTS) {
+		return;
+	}
+
+	Dictionary root;
+	root["version"] = 1;
+	root["active_conversation_id"] = active_conversation_id;
+
+	Array arr;
+	for (int i = 0; i < conversations.size(); i++) {
+		arr.push_back(Conversation::to_dict(conversations[i]));
+	}
+	root["conversations"] = arr;
+
+	Ref<FileAccess> f = FileAccess::open(path, FileAccess::WRITE);
+	if (f.is_null()) {
+		return;
+	}
+	f->store_string(JSON::stringify(root, "\t"));
+}
+
+void AIChatPanel::_load_all_conversations() {
+	conversations.clear();
+	active_conversation_id = String();
+
+	String path = _get_conversations_file_path();
+	if (path.is_empty() || !FileAccess::exists(path)) {
+		// No saved conversations — create an initial empty conversation.
+		_new_conversation();
+		return;
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(path, &err);
+	if (err != OK || content.is_empty()) {
+		_new_conversation();
+		return;
+	}
+
+	JSON json;
+	err = json.parse(content);
+	if (err != OK) {
+		_new_conversation();
+		return;
+	}
+
+	Variant data = json.get_data();
+	if (data.get_type() != Variant::DICTIONARY) {
+		_new_conversation();
+		return;
+	}
+
+	Dictionary root = data;
+	active_conversation_id = root.get("active_conversation_id", String());
+
+	Array arr = root.get("conversations", Array());
+	for (int i = 0; i < arr.size(); i++) {
+		Dictionary d = arr[i];
+		if (d.get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Conversation conv = Conversation::from_dict(d);
+		if (!conv.id.is_empty()) {
+			conversations.push_back(conv);
+		}
+	}
+
+	// Sort by updated_at descending so most recent is at the top.
+	for (int i = 0; i < conversations.size() - 1; i++) {
+		for (int j = i + 1; j < conversations.size(); j++) {
+			if (conversations[j].updated_at > conversations[i].updated_at) {
+				SWAP(conversations[i], conversations[j]);
+			}
+		}
+	}
+
+	// Ensure there is at least one conversation and a valid active one.
+	if (conversations.is_empty()) {
+		_new_conversation();
+		return;
+	}
+
+	bool valid = false;
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			valid = true;
+			break;
+		}
+	}
+	if (!valid) {
+		active_conversation_id = conversations[0].id;
+	}
+}
+
+// ==========================================================================
+// End multi-conversation support
+// ==========================================================================
 
 void AIChatPanel::_notification(int p_what) {
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
@@ -146,6 +523,12 @@ void AIChatPanel::_update_translations() {
 	import_file_dialog->set_title(TTR("Import Skill / MCP / Memory"));
 	add_all_button->set_text(TTR("Add All"));
 	dismiss_all_button->set_text(TTR("Dismiss All"));
+	if (new_conversation_button) {
+		new_conversation_button->set_text(TTR("New Chat"));
+	}
+	if (delete_conversation_button) {
+		delete_conversation_button->set_text(TTR("Delete"));
+	}
 	_refresh_attachment_chips();
 }
 
@@ -326,6 +709,12 @@ void AIChatPanel::_send_message() {
 		_add_user_message(text);
 	}
 
+	// Persist the conversation after the user message has been added so that
+	// a crash or request failure does not lose the message.
+	_serialize_current_messages();
+	_refresh_conversation_list_ui();
+	_save_all_conversations();
+
 	// Build the full messages array with conversation history.
 	Array history = _build_message_history();
 
@@ -406,6 +795,7 @@ void AIChatPanel::_send_message() {
 
 	input->clear();
 	pending_tool_round = PendingToolRound();
+	pending_tool_round.max_iterations = settings.max_tool_iterations > 0 ? settings.max_tool_iterations : 10;
 	in_tool_loop = false;
 	attachments.clear();
 	_refresh_attachment_chips();
@@ -610,6 +1000,17 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 					(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
 						!((Array)msg["tool_calls"]).is_empty());
 				if (has_tool_calls) {
+					// Enforce maximum iteration limit to prevent infinite loops.
+					if (pending_tool_round.iteration_count >= pending_tool_round.max_iterations) {
+						_add_ai_message(vformat(TTR("Maximum tool call iterations (%d) reached. Stopping here to prevent an infinite loop. You can continue manually by asking the AI to proceed."),
+								pending_tool_round.max_iterations),
+								String(), 0.0, p_prompt_tokens, p_completion_tokens);
+						tool_call_label->set_visible(false);
+						tool_call_label->set_text(String());
+						in_tool_loop = false;
+						status_label->set_text(TTR("AI tool iteration limit reached."));
+						return;
+					}
 					_execute_tool_calls(p_json);
 					return;
 				}
@@ -621,6 +1022,13 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		// Clear tool call display.
 		tool_call_label->set_visible(false);
 		tool_call_label->set_text(String());
+		in_tool_loop = false;
+
+		// Persist the conversation (and refresh the sidebar title since new
+		// user + AI messages may have changed the auto title).
+		_serialize_current_messages();
+		_refresh_conversation_list_ui();
+		_save_all_conversations();
 
 		// Parse suggestions from the AI response.
 		const AISettingsData settings = AISettings::load();
@@ -698,8 +1106,14 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	clean_msg["tool_calls"] = tool_calls;
 	messages.push_back(clean_msg);
 
-	// Show status.
-	status_label->set_text(vformat(TTR("AI is using %d tool(s)..."), tool_calls.size()));
+	// Increment the iteration counter for multi-round iteration.
+	pending_tool_round.iteration_count++;
+	int current_iteration = pending_tool_round.iteration_count;
+	int max_iterations = pending_tool_round.max_iterations;
+
+	// Show status with iteration progress.
+	status_label->set_text(vformat(TTR("AI tool call round %d of %d: using %d tool(s)..."),
+			current_iteration, max_iterations, tool_calls.size()));
 
 	// Build tool call display.
 	String tool_display;
@@ -715,7 +1129,8 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 		if (i > 0) {
 			tool_display += "\n";
 		}
-		tool_display += vformat("\xe2\x9a\x99 %s(%s)", name, args_preview);
+		tool_display += vformat(TTR("[Round %d/%d] \xe2\x9a\x99 %s(%s)"),
+				current_iteration, max_iterations, name, args_preview);
 	}
 	tool_call_label->set_visible(true);
 	tool_call_label->set_text(tool_display);
@@ -744,7 +1159,7 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	pending_tool_round.original_tools = tools;
 	in_tool_loop = true;
 
-	// Send results back to LLM.
+	// Send results back to LLM for the next iteration round.
 	chat_service->configure(settings);
 	_set_requesting(true);
 	Error err = chat_service->send_messages(messages, tools);
@@ -1127,10 +1542,61 @@ AIChatPanel::AIChatPanel() {
 	root->add_theme_constant_override("separation", 8 * EDSCALE);
 	add_child(root);
 
+	// Top-level horizontal layout: conversation sidebar + chat area.
+	HBoxContainer *hbox = memnew(HBoxContainer);
+	hbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	hbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	hbox->add_theme_constant_override("separation", 8 * EDSCALE);
+	root->add_child(hbox);
+
+	// Sidebar with conversation list.
+	sidebar_panel = memnew(PanelContainer);
+	sidebar_panel->set_custom_minimum_size(Size2(220 * EDSCALE, 0));
+	hbox->add_child(sidebar_panel);
+
+	sidebar = memnew(VBoxContainer);
+	sidebar->add_theme_constant_override("separation", 4 * EDSCALE);
+	sidebar->add_theme_constant_override("margin_left", 6 * EDSCALE);
+	sidebar->add_theme_constant_override("margin_top", 6 * EDSCALE);
+	sidebar->add_theme_constant_override("margin_right", 6 * EDSCALE);
+	sidebar->add_theme_constant_override("margin_bottom", 6 * EDSCALE);
+	sidebar_panel->add_child(sidebar);
+
+	Label *sidebar_title = memnew(Label);
+	sidebar_title->set_text(TTR("Conversations"));
+	sidebar_title->add_theme_font_size_override("font_size", 14 * EDSCALE);
+	sidebar_title->add_theme_color_override("font_color", Color(0.75f, 0.75f, 0.75f));
+	sidebar->add_child(sidebar_title);
+
+	HBoxContainer *sidebar_buttons = memnew(HBoxContainer);
+	sidebar_buttons->add_theme_constant_override("separation", 4 * EDSCALE);
+	sidebar->add_child(sidebar_buttons);
+
+	new_conversation_button = memnew(Button);
+	new_conversation_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	new_conversation_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_new_conversation));
+	sidebar_buttons->add_child(new_conversation_button);
+
+	delete_conversation_button = memnew(Button);
+	delete_conversation_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_delete_current_conversation));
+	sidebar_buttons->add_child(delete_conversation_button);
+
+	conversation_list = memnew(ItemList);
+	conversation_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	conversation_list->connect("item_selected", callable_mp(this, &AIChatPanel::_conversation_selected));
+	sidebar->add_child(conversation_list);
+
+	// Chat area (the right side) reuses most of the original root layout.
+	VBoxContainer *chat_vbox = memnew(VBoxContainer);
+	chat_vbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	chat_vbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	chat_vbox->add_theme_constant_override("separation", 8 * EDSCALE);
+	hbox->add_child(chat_vbox);
+
 	message_scroll = memnew(ScrollContainer);
 	message_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	root->add_child(message_scroll);
+	chat_vbox->add_child(message_scroll);
 
 	message_list = memnew(VBoxContainer);
 	message_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -1140,7 +1606,7 @@ AIChatPanel::AIChatPanel() {
 	bulk_action_bar = memnew(HBoxContainer);
 	bulk_action_bar->add_theme_constant_override("separation", 6 * EDSCALE);
 	bulk_action_bar->set_visible(false);
-	root->add_child(bulk_action_bar);
+	chat_vbox->add_child(bulk_action_bar);
 
 	add_all_button = memnew(Button);
 	add_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_add_all_suggestions));
@@ -1156,12 +1622,12 @@ AIChatPanel::AIChatPanel() {
 	tool_call_label->set_custom_minimum_size(Size2(0, 20) * EDSCALE);
 	tool_call_label->add_theme_color_override("font_color", Color(0.4f, 0.6f, 1.0f));
 	tool_call_label->set_modulate(Color(1, 1, 1, 0.85f));
-	root->add_child(tool_call_label);
+	chat_vbox->add_child(tool_call_label);
 
 	PanelContainer *composer = memnew(PanelContainer);
 	composer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	composer->set_custom_minimum_size(Size2(0, 180) * EDSCALE);
-	root->add_child(composer);
+	chat_vbox->add_child(composer);
 
 	VBoxContainer *composer_vb = memnew(VBoxContainer);
 	composer_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -1210,7 +1676,7 @@ AIChatPanel::AIChatPanel() {
 
 	status_label = memnew(Label);
 	status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	root->add_child(status_label);
+	chat_vbox->add_child(status_label);
 
 	chat_service = memnew(AIChatService);
 	chat_service->connect(SNAME("chat_completed"), callable_mp(this, &AIChatPanel::_chat_completed));
@@ -1243,6 +1709,15 @@ AIChatPanel::AIChatPanel() {
 	add_child(usage_agreement_dialog);
 
 	_update_translations();
+	_load_all_conversations();
+	if (conversations.is_empty()) {
+		_new_conversation();
+	} else {
+		Conversation first = conversations[0];
+		active_conversation_id = first.id;
+		_load_conversation_to_ui(first);
+		_refresh_conversation_list_ui();
+	}
 	_set_requesting(false);
 	status_label->set_text(TTR("AI assistant ready."));
 }

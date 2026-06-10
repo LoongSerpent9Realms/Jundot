@@ -50,6 +50,7 @@ class AIConfigPanel : public MarginContainer {
 	SpinBox *max_tokens_spin = nullptr;
 	SpinBox *context_char_budget_spin = nullptr;
 	SpinBox *history_budget_spin = nullptr;
+	SpinBox *max_tool_iterations_spin = nullptr;
 	SpinBox *feature_universality_threshold_spin = nullptr;
 	SpinBox *feature_necessity_threshold_spin = nullptr;
 	CheckBox *include_project_memories_check = nullptr;
@@ -68,6 +69,7 @@ class AIConfigPanel : public MarginContainer {
 	Label *max_tokens_label = nullptr;
 	Label *context_char_budget_label = nullptr;
 	Label *history_budget_label = nullptr;
+	Label *max_tool_iterations_label = nullptr;
 	Label *feature_universality_threshold_label = nullptr;
 	Label *feature_necessity_threshold_label = nullptr;
 	Label *system_prompt_label = nullptr;
