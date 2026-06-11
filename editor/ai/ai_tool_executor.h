@@ -54,6 +54,7 @@ private:
 	static Dictionary _fetch_url(const Dictionary &p_args);
 	static Dictionary _shell_command(const Dictionary &p_args);
 	static Dictionary _restart_engine(const Dictionary &p_args);
+	static Dictionary _upload_code(const Dictionary &p_args);
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 
 	static Dictionary _make_result(const String &p_content, bool p_is_error = false);

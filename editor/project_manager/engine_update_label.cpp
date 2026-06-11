@@ -391,7 +391,10 @@ EngineUpdateLabel::EngineUpdateLabel() {
 	set_underline_mode(UNDERLINE_MODE_ON_HOVER);
 
 	http = memnew(HTTPRequest);
-	http->set_https_proxy(EDITOR_GET("network/http_proxy/host"), EDITOR_GET("network/http_proxy/port"));
+	// Delay EDITOR_GET until EditorSettings is ready
+	if (EditorSettings::get_singleton()) {
+		http->set_https_proxy(EDITOR_GET("network/http_proxy/host"), EDITOR_GET("network/http_proxy/port"));
+	}
 	http->set_timeout(10.0);
 	add_child(http);
 	http->connect("request_completed", callable_mp(this, &EngineUpdateLabel::_http_request_completed));

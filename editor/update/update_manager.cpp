@@ -22,7 +22,7 @@ namespace {
 
 // Default manifest URL template (configured via editor settings).
 // The launcher has more sophisticated URL resolution; here we keep it simple.
-const char *DEFAULT_MANIFEST_URL = "https://github.com/LoongSerpent9Realms/Jundot-Auto/releases/latest/download/update-manifest.json";
+const char *DEFAULT_MANIFEST_URL = "https://github.com/LoongSerpent9Realms/Jundot/releases/latest/download/update-manifest.json";
 
 /// Build the current Jundot version string (e.g. "1.7.2-beta").
 String _get_current_version_string() {
@@ -67,12 +67,19 @@ UpdateManager::UpdateManager() {
 	// Generate stable machine ID
 	machine_id = GrayscaleEvaluator::generate_machine_id();
 
+	// Register editor settings defaults (EditorSettings is guaranteed to exist here,
+	// since UpdateManager is created after EditorSettings::create() in ProjectManager).
+	EDITOR_DEF("network/connection/update_manifest_url", String(DEFAULT_MANIFEST_URL));
+
 	// Read manifest URL from editor settings (or use default)
 	manifest_url = String(DEFAULT_MANIFEST_URL);
 
 	// Create HTTPRequest for async manifest fetching
 	http = memnew(HTTPRequest);
-	http->set_https_proxy(EDITOR_GET("network/http_proxy/host"), EDITOR_GET("network/http_proxy/port"));
+	// Delay EDITOR_GET until EditorSettings is ready
+	if (EditorSettings::get_singleton()) {
+		http->set_https_proxy(EDITOR_GET("network/http_proxy/host"), EDITOR_GET("network/http_proxy/port"));
+	}
 	http->set_timeout(15.0);
 	add_child(http);
 	http->connect("request_completed", callable_mp(this, &UpdateManager::_http_request_completed));
@@ -261,14 +268,4 @@ int UpdateManager::trigger_launcher_rollback(const String &p_target_version) {
 	int exitcode = -1;
 	Error err = OS::get_singleton()->execute(launcher, args, nullptr, &exitcode);
 	return (err == OK) ? exitcode : -1;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  Editor settings registration
-// ═══════════════════════════════════════════════════════════════
-
-void register_update_settings() {
-	// Reuse existing check_for_updates setting (0=DISABLED, 1=AUTO, etc.)
-	// Add a new setting for manifest URL override
-	EDITOR_DEF("network/connection/update_manifest_url", String(DEFAULT_MANIFEST_URL));
 }

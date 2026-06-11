@@ -12000,10 +12000,10 @@ msgstr "D3D12"
 msgid "OpenGL"
 msgstr "أُبِن-جي-إل"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "فيزياء جودو (2D)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "فيزياء جودو (3D)"
 
 msgid "Text Server: Fallback"

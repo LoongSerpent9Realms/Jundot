@@ -476,7 +476,7 @@ public partial class MainForm : Form
         // Row 0: Target
         AddLabel(layout, "Label.Target", row);
         _cbTarget = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
-        _cbTarget.Items.AddRange(new[] { "editor", "template_release", "template_debug" });
+        _cbTarget.Items.AddRange(new[] { "editor", "editor.dev", "template_release", "template_debug" });
         _cbTarget.SelectedIndex = 0;
         layout.Controls.Add(_cbTarget, 1, row);
 

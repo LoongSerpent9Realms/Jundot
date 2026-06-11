@@ -47,21 +47,27 @@
 // where I was" signal.
 class AIRestartHelper {
 public:
+	// Internal struct serialized to/from JSON.
+	struct RestoreState {
+		Vector<String> open_scene_paths;
+		Vector<String> open_script_paths;
+		String restart_reason;      // "ai_build" / "manual" / ""
+		String task_summary;        // 修复摘要（文件列表等）
+		String task_id;            // 关联的任务 ID
+	};
+
 	// Write current editor state to disk. Call before restart.
 	static Error save_state();
 
+	// Write current editor state with AI build info. Call before AI-triggered restart.
+	static Error save_state(const String &p_reason, const String &p_task_summary, const String &p_task_id);
+
 	// Read and apply saved state. Call on startup after editor is ready.
-	static Error restore_state();
+	static RestoreState restore_state();
 
 	// Remove the state file (called after successful restore).
 	static void cleanup_state_file();
 
 	// Path to the state JSON file.
 	static String _state_path();
-
-	// Internal struct serialized to/from JSON.
-	struct RestoreState {
-		Vector<String> open_scene_paths;
-		Vector<String> open_script_paths;
-	};
 };

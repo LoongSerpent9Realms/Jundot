@@ -15020,13 +15020,13 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "Fyzický server (2D)"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Jundot Fyzika (2D)"
 
 msgid "Physics Server (3D)"
 msgstr "Fyzický server (3D)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Jundot Fyzika (3D)"
 
 msgid "Jolt Physics"
@@ -15075,10 +15075,10 @@ msgstr "Back-end Metal pro RenderingDevice (jen pro Apple arm64)."
 msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr "OpenGL back-end (je-li zakázán, je vyžadován back-end RenderingDevice)."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Backend Jundot Fyziky (2D)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Backend Jundot Fyziky (3D)."
 
 msgid "Jolt Physics backend (3D only)."

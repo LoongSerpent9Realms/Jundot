@@ -30,6 +30,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/variant/variant.h"
+#include "editor/gui/editor_toaster.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
@@ -711,6 +712,9 @@ void AIChatMessage::_toggle_think() {
 
 void AIChatMessage::_copy_pressed() {
 	DisplayServer::get_singleton()->clipboard_set(message_content);
+	if (EditorToaster::get_singleton()) {
+		EditorToaster::get_singleton()->popup_str(TTR("Message copied to clipboard."), EditorToaster::SEVERITY_INFO);
+	}
 }
 
 void AIChatMessage::_edit_pressed() {

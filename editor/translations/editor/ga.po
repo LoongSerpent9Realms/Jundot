@@ -15254,13 +15254,13 @@ msgstr "OpenGLName"
 msgid "Physics Server (2D)"
 msgstr "Freastalaí Fisice (2T)"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Fisic Jundot (2T)"
 
 msgid "Physics Server (3D)"
 msgstr "Freastalaí Fisice (3T)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Fisic Jundot (3T)"
 
 msgid "Jolt Physics"
@@ -15311,10 +15311,10 @@ msgstr ""
 "Cúltaca OpenGL (má tá sé díchumasaithe, tá an cúltaca RenderingDevice ag "
 "teastáil)."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Cúltaca Fisice Jundot (2T)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Cúltaca Fisice Jundot (3T)."
 
 msgid "Jolt Physics backend (3D only)."

@@ -213,13 +213,13 @@ void register_editor_types() {
 	GDREGISTER_VIRTUAL_CLASS(EditorCommandPalette);
 	GDREGISTER_CLASS(EditorDebuggerPlugin);
 	GDREGISTER_ABSTRACT_CLASS(EditorDebuggerSession);
-	GDREGISTER_CLASS(AIChatService);
-	GDREGISTER_CLASS(AIChatPanel);
-	GDREGISTER_CLASS(AIConfigPanel);
-	GDREGISTER_CLASS(AIMemoryPanel);
-	GDREGISTER_CLASS(AIToolsPanel);
-	GDREGISTER_CLASS(AIUsageAgreementDialog);
-	GDREGISTER_CLASS(AIRepairCard);
+	GDREGISTER_ABSTRACT_CLASS(AIChatService);
+	GDREGISTER_ABSTRACT_CLASS(AIChatPanel);
+	GDREGISTER_ABSTRACT_CLASS(AIConfigPanel);
+	GDREGISTER_ABSTRACT_CLASS(AIMemoryPanel);
+	GDREGISTER_ABSTRACT_CLASS(AIToolsPanel);
+	GDREGISTER_ABSTRACT_CLASS(AIUsageAgreementDialog);
+	GDREGISTER_ABSTRACT_CLASS(AIRepairCard);
 	GDREGISTER_CLASS(UpdateManager);
 
 	// Required to document import options in the class reference.
@@ -329,9 +329,6 @@ void register_editor_types() {
 
 	GLOBAL_DEF("editor/version_control/plugin_name", "");
 	GLOBAL_DEF("editor/version_control/autoload_on_startup", false);
-
-	// Register update system settings (manifest URL, etc.)
-	register_update_settings();
 
 	EditorInterface::create();
 	Engine::Singleton ei_singleton = Engine::Singleton("EditorInterface", EditorInterface::get_singleton());

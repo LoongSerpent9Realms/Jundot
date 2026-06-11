@@ -77,7 +77,3 @@ private:
 	void _set_check_status(CheckStatus p_status);
 };
 
-// ── Editor settings defaults ───────────────────────────────────────────
-
-/// Register editor settings for the update system.
-void register_update_settings();

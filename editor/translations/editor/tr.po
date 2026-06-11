@@ -14408,13 +14408,13 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "Fizik Sunucusu (2B)"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Jundot Fizikleri (2B)"
 
 msgid "Physics Server (3D)"
 msgstr "Fizik Sunucusu (3B)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Jundot Fizikleri (3B)"
 
 msgid "Jolt Physics"
@@ -14463,10 +14463,10 @@ msgstr "RenderingDevice için Metal desteği (sadece Apple arm64)."
 msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr "OpenGL desteği (devre dışı ise, RenderingDevice desteği gerekir)."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Jundot Fizik desteği (2B)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Jundot Fizik desteği (3B)."
 
 msgid "Jolt Physics backend (3D only)."

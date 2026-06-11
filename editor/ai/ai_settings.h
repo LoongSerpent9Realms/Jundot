@@ -96,6 +96,7 @@ struct AISettingsData {
 	int max_tool_iterations = 10;
 	bool auto_suggest_entries = true;
 	String user_extra_instructions; // User-customizable extra instructions appended to system prompt
+	String output_language = "auto";
 	bool usage_agreement_accepted = false;
 	int usage_agreement_version = 0;
 	String usage_agreement_accepted_at;
@@ -105,6 +106,9 @@ struct AISettingsData {
 
 	AIContextMode context_mode = AIContextMode::PROJECT; // Default to project mode (safer).
 	String engine_source_root; // Absolute path to engine source (e.g. "H:/Godot-Auto"). Auto-detected.
+	String engine_source_cache_root; // Local cache used when packaged editor builds do not include source.
+	String engine_source_repository_url; // Optional Git URL used by AI bootstrap flows.
+	bool encrypt_engine_source_cache = false; // Setting flag; encryption is enforced by source-cache workflow.
 
 	bool external_api_enabled = false;
 	int external_api_port = 8080;
@@ -135,6 +139,6 @@ public:
 	// Falls back to the legacy system_prompt if the mode-specific prompt is empty.
 	static String get_effective_system_prompt(const AISettingsData &p_settings);
 
-	// Returns the current engine source root. If empty, falls back to the executable directory.
+	// Returns the current engine source root, or empty when no source checkout is configured/detected.
 	static String get_engine_source_root(const AISettingsData &p_settings);
 };

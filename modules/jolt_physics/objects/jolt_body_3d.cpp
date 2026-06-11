@@ -1,4 +1,4 @@
-/**************************************************************************/
+﻿/**************************************************************************/
 /*  jolt_body_3d.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
@@ -149,8 +149,8 @@ void JoltBody3D::_integrate_forces(float p_step) {
 
 	JPH::MotionProperties &motion_properties = *jolt_body->GetMotionPropertiesUnchecked();
 
-	// Jolt applies damping differently from Jundot Physics, where Jundot Physics applies damping before integrating
-	// forces whereas Jolt does it after integrating forces. The way Jundot Physics does it seems to yield more
+	// Jolt applies damping differently from Godot Physics, where Godot Physics applies damping before integrating
+	// forces whereas Jolt does it after integrating forces. The way Godot Physics does it seems to yield more
 	// consistent results across different update frequencies when using high (>1) damping values, so we apply the
 	// damping ourselves instead, before any force integration happens.
 	JPH::Vec3 linear_velocity = motion_properties.GetLinearVelocity();

@@ -13556,13 +13556,13 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "کارساز فیزیک (دوبعدی)"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "فیزیک (دو بعدی) گودوت"
 
 msgid "Physics Server (3D)"
 msgstr "کارساز فیزیک (سه‌بعدی)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "فیزیک (سه‌بعدی) گودوت"
 
 msgid "Jolt Physics"
@@ -13610,10 +13610,10 @@ msgstr "بَک‌اِند متالِ RenderingDevice (تنها برای آرم۶
 msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr "بَک‌اِند OpenGL (اگر ازکارافتاده باشد، به بَک‌اِند RenderingDevice نیاز است)."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "بک‌اند فیزیک گودوت (دوبعدی)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "بک‌اند فیزیک گودوت (سه‌بعدی)."
 
 msgid "Jolt Physics backend (3D only)."

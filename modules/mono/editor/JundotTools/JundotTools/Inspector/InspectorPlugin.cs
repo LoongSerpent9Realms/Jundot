@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Jundot;
 using JundotTools.Build;
 using JundotTools.Utils;
@@ -56,6 +58,8 @@ namespace JundotTools.Inspector
                     break;
                 }
             }
+
+            AddOdinLikeControls(jundotObject);
         }
 
         private static IEnumerable<Script> EnumerateScripts(JundotObject jundotObject)
@@ -65,6 +69,94 @@ namespace JundotTools.Inspector
             {
                 yield return script;
                 script = script.GetBaseScript();
+            }
+        }
+
+        private void AddOdinLikeControls(JundotObject jundotObject)
+        {
+            Type type = jundotObject.GetType();
+
+            foreach (var attribute in EnumerateInfoBoxes(type))
+            {
+                AddCustomControl(new OdinLikeInspectorInfoBox(attribute));
+            }
+
+            foreach (var method in EnumerateButtonMethods(type))
+            {
+                var attribute = method.GetCustomAttribute<JundotEditorButtonAttribute>(inherit: true);
+                if (attribute == null)
+                {
+                    continue;
+                }
+
+                if (method.ContainsGenericParameters || method.GetParameters().Length != 0)
+                {
+                    GD.PushWarning($"Ignoring [JundotEditorButton] on '{type.FullName}.{method.Name}'. Editor buttons must be non-generic methods with no parameters.");
+                    continue;
+                }
+
+                AddCustomControl(new OdinLikeInspectorButton(jundotObject, method, attribute));
+            }
+        }
+
+        private static IEnumerable<JundotEditorInfoBoxAttribute> EnumerateInfoBoxes(Type type)
+        {
+            foreach (var attribute in type.GetCustomAttributes<JundotEditorInfoBoxAttribute>(inherit: true))
+            {
+                yield return attribute;
+            }
+
+            foreach (var member in EnumerateInspectableMembers(type))
+            {
+                foreach (var attribute in member.GetCustomAttributes<JundotEditorInfoBoxAttribute>(inherit: true))
+                {
+                    yield return attribute;
+                }
+            }
+        }
+
+        private static IEnumerable<MemberInfo> EnumerateInspectableMembers(Type type)
+        {
+            Type? currentType = type;
+            while (currentType != typeof(JundotObject) && currentType != null)
+            {
+                const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+                foreach (var field in currentType.GetFields(flags))
+                {
+                    yield return field;
+                }
+
+                foreach (var property in currentType.GetProperties(flags))
+                {
+                    yield return property;
+                }
+
+                foreach (var method in currentType.GetMethods(flags).Where(method => !method.IsSpecialName))
+                {
+                    yield return method;
+                }
+
+                currentType = currentType.BaseType;
+            }
+        }
+
+        private static IEnumerable<MethodInfo> EnumerateButtonMethods(Type type)
+        {
+            Type? currentType = type;
+            while (currentType != typeof(JundotObject) && currentType != null)
+            {
+                const BindingFlags flags = BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+                foreach (var method in currentType.GetMethods(flags))
+                {
+                    if (!method.IsSpecialName && method.IsDefined(typeof(JundotEditorButtonAttribute), inherit: true))
+                    {
+                        yield return method;
+                    }
+                }
+
+                currentType = currentType.BaseType;
             }
         }
     }

@@ -31,7 +31,6 @@
 #include "crash_handler_windows.h"
 
 #include "core/config/project_settings.h"
-#include "core/io/file_access.h"
 #include "core/object/script_language.h"
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
@@ -179,34 +178,62 @@ int trace_callback(void *data, uintptr_t pc) {
 	return 0;
 }
 
-int64_t get_image_base(const String &p_path) {
-	Ref<FileAccess> f = FileAccess::open(p_path, FileAccess::READ);
-	if (f.is_null()) {
+int64_t get_image_base(const WCHAR *p_path) {
+	HANDLE file = CreateFileW(p_path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE) {
 		return 0;
 	}
-	{
-		f->seek(0x3c);
-		uint32_t pe_pos = f->get_32();
 
-		f->seek(pe_pos);
-		uint32_t magic = f->get_32();
-		if (magic != 0x00004550) {
+	uint32_t pe_pos = 0;
+	DWORD bytes_read;
+	if (!SetFilePointerEx(file, {0x3c, 0}, nullptr, FILE_BEGIN) ||
+			!ReadFile(file, &pe_pos, sizeof(pe_pos), &bytes_read, nullptr) ||
+			bytes_read != sizeof(pe_pos)) {
+		CloseHandle(file);
+		return 0;
+	}
+
+	uint32_t magic = 0;
+	if (!SetFilePointerEx(file, {pe_pos, 0}, nullptr, FILE_BEGIN) ||
+			!ReadFile(file, &magic, sizeof(magic), &bytes_read, nullptr) ||
+			bytes_read != sizeof(magic) ||
+			magic != 0x00004550) {
+		CloseHandle(file);
+		return 0;
+	}
+
+	int64_t opt_header_pos = pe_pos + sizeof(magic) + 0x14;
+	uint16_t opt_header_magic = 0;
+	if (!SetFilePointerEx(file, {opt_header_pos, 0}, nullptr, FILE_BEGIN) ||
+			!ReadFile(file, &opt_header_magic, sizeof(opt_header_magic), &bytes_read, nullptr) ||
+			bytes_read != sizeof(opt_header_magic)) {
+		CloseHandle(file);
+		return 0;
+	}
+
+	int64_t result = 0;
+	if (opt_header_magic == 0x10B) {
+		uint32_t base32 = 0;
+		if (!SetFilePointerEx(file, {opt_header_pos + 0x1C, 0}, nullptr, FILE_BEGIN) ||
+				!ReadFile(file, &base32, sizeof(base32), &bytes_read, nullptr) ||
+				bytes_read != sizeof(base32)) {
+			CloseHandle(file);
 			return 0;
 		}
-	}
-	int64_t opt_header_pos = f->get_position() + 0x14;
-	f->seek(opt_header_pos);
-
-	uint16_t opt_header_magic = f->get_16();
-	if (opt_header_magic == 0x10B) {
-		f->seek(opt_header_pos + 0x1C);
-		return f->get_32();
+		result = base32;
 	} else if (opt_header_magic == 0x20B) {
-		f->seek(opt_header_pos + 0x18);
-		return f->get_64();
-	} else {
-		return 0;
+		uint64_t base64 = 0;
+		if (!SetFilePointerEx(file, {opt_header_pos + 0x18, 0}, nullptr, FILE_BEGIN) ||
+				!ReadFile(file, &base64, sizeof(base64), &bytes_read, nullptr) ||
+				bytes_read != sizeof(base64)) {
+			CloseHandle(file);
+			return 0;
+		}
+		result = base64;
 	}
+
+	CloseHandle(file);
+	return result;
 }
 
 extern void CrashHandlerException(int signal) {
@@ -220,12 +247,9 @@ extern void CrashHandlerException(int signal) {
 		std::_Exit(0);
 	}
 
+	// 避免使用 GLOBAL_GET，因为它可能触发 EditorSettings 访问
 	String msg;
-	if (ProjectSettings::get_singleton()) {
-		msg = GLOBAL_GET("debug/settings/crash_handler/message");
-	}
 
-	// Tell MainLoop about the crash. This can be handled by users too in Node.
 	if (OS::get_singleton()->get_main_loop()) {
 		OS::get_singleton()->get_main_loop()->notification(MainLoop::NOTIFICATION_CRASH);
 	}
@@ -233,7 +257,6 @@ extern void CrashHandlerException(int signal) {
 	print_error("\n================================================================");
 	print_error(vformat("%s: Program crashed with signal %d", __FUNCTION__, signal));
 
-	// Print the engine version just before, so that people are reminded to include the version in backtrace reports.
 	if (String(JUNDOT_VERSION_HASH).is_empty()) {
 		print_error(vformat("Engine version: %s", JUNDOT_VERSION_FULL_NAME));
 	} else {
@@ -241,13 +264,16 @@ extern void CrashHandlerException(int signal) {
 	}
 	print_error(vformat("Dumping the backtrace. %s", msg));
 
-	String _execpath = OS::get_singleton()->get_executable_path();
+	WCHAR execpath[MAX_PATH] = {0};
+	if (!GetModuleFileNameW(nullptr, execpath, MAX_PATH)) {
+		print_error("Failed to get executable path");
+		return;
+	}
 
-	// Load process and image info to determine ASLR addresses offset.
 	MODULEINFO mi;
 	GetModuleInformation(GetCurrentProcess(), GetModuleHandle(nullptr), &mi, sizeof(mi));
 	int64_t image_mem_base = reinterpret_cast<int64_t>(mi.lpBaseOfDll);
-	int64_t image_file_base = get_image_base(_execpath);
+	int64_t image_file_base = get_image_base(execpath);
 	data.offset = image_mem_base - image_file_base;
 
 	std::vector<module_data> modules;
@@ -255,10 +281,20 @@ extern void CrashHandlerException(int signal) {
 	std::vector<HMODULE> module_handles(1);
 
 	data.process = GetCurrentProcess();
-	data.sym_ok = SymInitialize(data.process, nullptr, false);
+
+	// 获取 exe 所在目录作为 DbgHelp 符号搜索路径（使用 W 版本匹配已存在的宽字符串）
+	WCHAR sym_search_path[MAX_PATH] = L".";
+	WCHAR *last_sep = wcsrchr(execpath, L'\\');
+	if (last_sep) {
+		size_t dir_len = last_sep - execpath;
+		wcsncpy_s(sym_search_path, MAX_PATH, execpath, dir_len);
+		sym_search_path[dir_len] = L'\0';
+	}
+
+	data.sym_ok = SymInitializeW(data.process, sym_search_path, false);
 
 	if (data.sym_ok) {
-		SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_EXACT_SYMBOLS);
+		SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
 		EnumProcessModules(data.process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cbNeeded);
 		module_handles.resize(cbNeeded / sizeof(HMODULE));
 		EnumProcessModules(data.process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cbNeeded);
@@ -268,13 +304,14 @@ extern void CrashHandlerException(int signal) {
 
 	print_error(vformat("Load address: %x\n", (uint64_t)data.offset));
 
-	if (FileAccess::exists(_execpath + ".debugsymbols")) {
-		_execpath = _execpath + ".debugsymbols";
+	WCHAR debug_path[MAX_PATH * 2];
+	swprintf_s(debug_path, L"%s.debugsymbols", execpath);
+	const WCHAR *backtrace_path = execpath;
+	if (GetFileAttributesW(debug_path) != INVALID_FILE_ATTRIBUTES) {
+		backtrace_path = debug_path;
 	}
-	_execpath = _execpath.replace_char('/', '\\');
 
-	CharString cs = _execpath.utf8(); // Note: should remain in scope during backtrace_simple call.
-	data.state = backtrace_create_state(cs.get_data(), 0, &error_callback, reinterpret_cast<void *>(&data));
+	data.state = backtrace_create_state((const char *)backtrace_path, 0, &error_callback, reinterpret_cast<void *>(&data));
 	if (data.state != nullptr) {
 		data.index = 1;
 		backtrace_simple(data.state, 1, &trace_callback, &error_callback, reinterpret_cast<void *>(&data));

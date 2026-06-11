@@ -35,6 +35,11 @@
       <Private>false</Private>
     </ProjectReference>
   </ItemGroup>
+  <!-- Sources -->
+  <ItemGroup>
+    <Compile Include="Attributes\JundotEditorButtonAttribute.cs" />
+    <Compile Include="Attributes\JundotEditorInfoBoxAttribute.cs" />
+  </ItemGroup>
   <!-- Compat Sources -->
   <ItemGroup Condition=" '$(JundotNoDeprecated)' == '' ">
     <Compile Include="Compat.cs" />

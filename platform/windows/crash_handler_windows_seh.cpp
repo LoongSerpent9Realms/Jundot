@@ -39,6 +39,9 @@
 
 #ifdef CRASH_HANDLER_EXCEPTION
 
+// Forward declaration for crash dialog launcher
+static void launch_crash_dialog_if_present();
+
 // Backtrace code based on: https://stackoverflow.com/questions/6205981/windows-c-stack-trace-from-a-running-app
 
 #include <psapi.h>
@@ -131,10 +134,8 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 		std::_Exit(0);
 	}
 
+	// 避免使用 GLOBAL_GET，因为它可能触发 EditorSettings 访问
 	String msg;
-	if (ProjectSettings::get_singleton()) {
-		msg = GLOBAL_GET("debug/settings/crash_handler/message");
-	}
 
 	// Tell MainLoop about the crash. This can be handled by users too in Node.
 	if (OS::get_singleton()->get_main_loop()) {
@@ -152,12 +153,24 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 	}
 	print_error(vformat("Dumping the backtrace. %s", msg));
 
+	// 获取 exe 所在目录作为 DbgHelp 符号搜索路径（使用 ANSI 版本与 SymInitialize 匹配）
+	char execpath[MAX_PATH] = {0};
+	char sym_search_path[MAX_PATH] = ".";
+	if (GetModuleFileNameA(nullptr, execpath, MAX_PATH)) {
+		char *last_sep = strrchr(execpath, '\\');
+		if (last_sep) {
+			size_t dir_len = last_sep - execpath;
+			strncpy_s(sym_search_path, MAX_PATH, execpath, dir_len);
+			sym_search_path[dir_len] = '\0';
+		}
+	}
+
 	// Load the symbols:
-	if (!SymInitialize(process, nullptr, false)) {
+	if (!SymInitialize(process, sym_search_path, false)) {
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
 
-	SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_EXACT_SYMBOLS);
+	SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
 	EnumProcessModules(process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cbNeeded);
 	module_handles.resize(cbNeeded / sizeof(HMODULE));
 	EnumProcessModules(process, &module_handles[0], module_handles.size() * sizeof(HMODULE), &cbNeeded);
@@ -255,8 +268,126 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 		}
 	}
 
+	// Launch the crash dialog before terminating
+	launch_crash_dialog_if_present();
+
 	// Pass the exception to the OS
 	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/**
+ * Launches CrashDialog.exe if present in the engine directory or Tools/CrashDialog/.
+ * Uses DETACHED_PROCESS so the dialog survives the parent crash.
+ * Crash info is written to a temp file and passed via --crash-info argument.
+ * 
+ * Note: This function must be robust and avoid operations that could cause
+ * a secondary crash (e.g., memory allocation, complex string operations).
+ */
+static void launch_crash_dialog_if_present() {
+	WCHAR engine_path[MAX_PATH] = {0};
+	if (!GetModuleFileNameW(nullptr, engine_path, MAX_PATH)) {
+		return;
+	}
+
+	WCHAR engine_dir[MAX_PATH] = {0};
+	WCHAR* last_sep = wcsrchr(engine_path, L'\\');
+	if (!last_sep) {
+		return;
+	}
+	size_t dir_len = last_sep - engine_path;
+	wcsncpy_s(engine_dir, MAX_PATH, engine_path, dir_len);
+	engine_dir[dir_len] = L'\0';
+
+	WCHAR crash_dialog_path[MAX_PATH * 2] = {0};
+	WCHAR test_path[MAX_PATH * 2];
+	bool found = false;
+
+	swprintf_s(test_path, L"%s\\..\\Tools\\CrashDialog\\JundotCrashDialog.exe", engine_dir);
+	if (GetFileAttributesW(test_path) != INVALID_FILE_ATTRIBUTES) {
+		wcscpy_s(crash_dialog_path, test_path);
+		found = true;
+	}
+
+	if (!found) {
+		swprintf_s(test_path, L"%s\\Tools\\CrashDialog\\JundotCrashDialog.exe", engine_dir);
+		if (GetFileAttributesW(test_path) != INVALID_FILE_ATTRIBUTES) {
+			wcscpy_s(crash_dialog_path, test_path);
+			found = true;
+		}
+	}
+
+	if (!found) {
+		swprintf_s(test_path, L"%s\\CrashDialog\\JundotCrashDialog.exe", engine_dir);
+		if (GetFileAttributesW(test_path) != INVALID_FILE_ATTRIBUTES) {
+			wcscpy_s(crash_dialog_path, test_path);
+			found = true;
+		}
+	}
+
+	if (!found) {
+		swprintf_s(test_path, L"%s\\JundotCrashDialog.exe", engine_dir);
+		if (GetFileAttributesW(test_path) != INVALID_FILE_ATTRIBUTES) {
+			wcscpy_s(crash_dialog_path, test_path);
+			found = true;
+		}
+	}
+
+	if (!found) {
+		return;
+	}
+
+	WCHAR crash_info_path[MAX_PATH];
+	WCHAR temp_path[MAX_PATH];
+	if (GetTempPathW(MAX_PATH, temp_path) == 0) {
+		return;
+	}
+	swprintf_s(crash_info_path, L"%s\\jundot_crash_info_%llu.txt",
+			temp_path,
+			(unsigned long long)GetCurrentThreadId());
+
+	FILE* crash_info_file = nullptr;
+	if (_wfopen_s(&crash_info_file, crash_info_path, L"w") != 0 || !crash_info_file) {
+		return;
+	}
+
+	fwprintf_s(crash_info_file, L"Engine: %s\n", engine_path);
+	fwprintf_s(crash_info_file, L"EngineDir: %s\n", engine_dir);
+	fwprintf_s(crash_info_file, L"Version: %hs\n", JUNDOT_VERSION_FULL_NAME);
+	const char *hash = JUNDOT_VERSION_HASH;
+	if (hash && hash[0] != '\0') {
+		fwprintf_s(crash_info_file, L"Hash: %hs\n", hash);
+	}
+	SYSTEMTIME st;
+	GetSystemTime(&st);
+	fwprintf_s(crash_info_file, L"CrashTime: %04d-%02d-%02d %02d:%02d:%02d\n",
+			st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	fclose(crash_info_file);
+
+	WCHAR cmd_line[MAX_PATH * 3];
+	swprintf_s(cmd_line, L"\"%s\" --crash-info \"%s\"", crash_dialog_path, crash_info_path);
+
+	STARTUPINFOW si = {0};
+	PROCESS_INFORMATION pi = {0};
+	si.cb = sizeof(si);
+
+	BOOL created = CreateProcessW(
+			crash_dialog_path,
+			cmd_line,
+			nullptr,
+			nullptr,
+			FALSE,
+			DETACHED_PROCESS,
+			nullptr,
+			engine_dir,
+			&si,
+			&pi);
+
+	if (created) {
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	} else {
+		DeleteFileW(crash_info_path);
+	}
 }
 #endif
 

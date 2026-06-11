@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8" ?>
 <class name="ProjectSettings" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
 	<brief_description>
 		Stores globally-accessible variables.
@@ -954,7 +954,7 @@
 			Windows override for [member display/display_server/driver].
 		</member>
 		<member name="display/mouse_cursor/custom_image" type="String" setter="" getter="" default="&quot;&quot;">
-			Custom image for the mouse cursor (limited to 256×256).
+			Custom image for the mouse cursor (limited to 256脳256).
 		</member>
 		<member name="display/mouse_cursor/custom_image_hotspot" type="Vector2" setter="" getter="" default="Vector2(0, 0)">
 			Hotspot for the custom mouse cursor image.
@@ -2546,8 +2546,8 @@
 		</member>
 		<member name="physics/2d/physics_engine" type="String" setter="" getter="" default="&quot;DEFAULT&quot;" keywords="jundotphysics">
 			Sets which physics engine to use for 2D physics.
-			[b]DEFAULT[/b] is currently equivalent to [b]JundotPhysics2D[/b], but may change in future releases. Select an explicit implementation if you want to ensure that your project stays on the same engine.
-			[b]JundotPhysics2D[/b] is Jundot's internal 2D physics engine.
+			[b]DEFAULT[/b] is currently equivalent to [b]GodotPhysics2D[/b], but may change in future releases. Select an explicit implementation if you want to ensure that your project stays on the same engine.
+			[b]GodotPhysics2D[/b] is Godot's internal 2D physics engine.
 			[b]Dummy[/b] is a 2D physics server that does nothing and returns only dummy values, effectively disabling all 2D physics functionality.
 			Third-party extensions and modules can add other physics engines to select with this setting.
 		</member>
@@ -2559,11 +2559,11 @@
 		</member>
 		<member name="physics/2d/sleep_threshold_linear" type="float" setter="" getter="" default="2.0">
 			Threshold linear velocity under which a 2D physics body will be considered inactive. See [constant PhysicsServer2D.SPACE_PARAM_BODY_LINEAR_VELOCITY_SLEEP_THRESHOLD].
-			[b]Note:[/b] Only supported when using JundotPhysics3D. This project setting is ignored when using Jolt Physics.
+			[b]Note:[/b] Only supported when using GodotPhysics3D. This project setting is ignored when using Jolt Physics.
 		</member>
 		<member name="physics/2d/solver/contact_max_allowed_penetration" type="float" setter="" getter="" default="0.3">
 			Maximum distance a shape can penetrate another shape before it is considered a collision. See [constant PhysicsServer2D.SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION].
-			[b]Note:[/b] Only supported when using JundotPhysics3D. This project setting is ignored when using Jolt Physics.
+			[b]Note:[/b] Only supported when using GodotPhysics3D. This project setting is ignored when using Jolt Physics.
 		</member>
 		<member name="physics/2d/solver/contact_max_separation" type="float" setter="" getter="" default="1.5">
 			Maximum distance a shape can be from another before they are considered separated and the contact is discarded. See [constant PhysicsServer2D.SPACE_PARAM_CONTACT_MAX_SEPARATION].
@@ -2629,9 +2629,9 @@
 		</member>
 		<member name="physics/3d/physics_engine" type="String" setter="" getter="" default="&quot;DEFAULT&quot;" keywords="jundotphysics, jolt">
 			Sets which physics engine to use for 3D physics.
-			[b]DEFAULT[/b] is currently equivalent to [b]JundotPhysics3D[/b], but may change in future releases. Select an explicit implementation if you want to ensure that your project stays on the same engine.
-			[b]JundotPhysics3D[/b] is Jundot's internal 3D physics engine.
-			[b]Jolt Physics[/b] is an alternative physics engine that is generally faster and more reliable than [b]JundotPhysics3D[/b]. Jolt Physics is the default for projects created starting in Jundot 4.6.
+			[b]DEFAULT[/b] is currently equivalent to [b]GodotPhysics3D[/b], but may change in future releases. Select an explicit implementation if you want to ensure that your project stays on the same engine.
+			[b]GodotPhysics3D[/b] is Godot's internal 3D physics engine.
+			[b]Jolt Physics[/b] is an alternative physics engine that is generally faster and more reliable than [b]GodotPhysics3D[/b]. Jolt Physics is the default for projects created starting in Jundot 4.6.
 			[b]Dummy[/b] is a 3D physics server that does nothing and returns only dummy values, effectively disabling all 3D physics functionality.
 			Third-party extensions and modules can add other physics engines to select with this setting.
 		</member>
@@ -2647,36 +2647,36 @@
 		</member>
 		<member name="physics/3d/sleep_threshold_angular" type="float" setter="" getter="" default="0.13962634">
 			Threshold angular velocity under which a 3D physics body will be considered inactive. See [constant PhysicsServer3D.SPACE_PARAM_BODY_ANGULAR_VELOCITY_SLEEP_THRESHOLD].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/sleep_threshold_linear" type="float" setter="" getter="" default="0.1">
 			Threshold linear velocity under which a 3D physics body will be considered inactive. See [constant PhysicsServer3D.SPACE_PARAM_BODY_LINEAR_VELOCITY_SLEEP_THRESHOLD].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/solver/contact_max_allowed_penetration" type="float" setter="" getter="" default="0.01">
 			Maximum distance a shape can penetrate another shape before it is considered a collision. See [constant PhysicsServer3D.SPACE_PARAM_CONTACT_MAX_ALLOWED_PENETRATION].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/solver/contact_max_separation" type="float" setter="" getter="" default="0.05">
 			Maximum distance a shape can be from another before they are considered separated and the contact is discarded. See [constant PhysicsServer3D.SPACE_PARAM_CONTACT_MAX_SEPARATION].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/solver/contact_recycle_radius" type="float" setter="" getter="" default="0.01">
 			Maximum distance a pair of bodies has to move before their collision status has to be recalculated. See [constant PhysicsServer3D.SPACE_PARAM_CONTACT_RECYCLE_RADIUS].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/solver/default_contact_bias" type="float" setter="" getter="" default="0.8">
 			Default solver bias for all physics contacts. Defines how much bodies react to enforce contact separation. See [constant PhysicsServer3D.SPACE_PARAM_CONTACT_DEFAULT_BIAS].
 			Individual shapes can have a specific bias value (see [member Shape3D.custom_solver_bias]).
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/solver/solver_iterations" type="int" setter="" getter="" default="16">
 			Number of solver iterations for all contacts and constraints. The greater the number of iterations, the more accurate the collisions will be. However, a greater number of iterations requires more CPU power, which can decrease performance. See [constant PhysicsServer3D.SPACE_PARAM_SOLVER_ITERATIONS].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/3d/time_before_sleep" type="float" setter="" getter="" default="0.5">
 			Time (in seconds) of inactivity before which a 3D physics body will put to sleep. See [constant PhysicsServer3D.SPACE_PARAM_BODY_TIME_TO_SLEEP].
-			[b]Note:[/b] This project setting is only effective when using JundotPhysics3D. It has no effect when using Jolt Physics.
+			[b]Note:[/b] This project setting is only effective when using GodotPhysics3D. It has no effect when using Jolt Physics.
 		</member>
 		<member name="physics/common/enable_object_picking" type="bool" setter="" getter="" default="true">
 			Enables [member Viewport.physics_object_picking] on the root viewport.
@@ -2720,7 +2720,7 @@
 		</member>
 		<member name="physics/jolt_physics_3d/joints/world_node" type="int" setter="" getter="" default="0">
 			Which of the two nodes bound by a joint should represent the world when one of the two is omitted, as either [member Joint3D.node_a] or [member Joint3D.node_b]. This can be thought of as having the omitted node be a [StaticBody3D] at the joint's position. Joint limits are more easily expressed when [member Joint3D.node_a] represents the world.
-			[b]Note:[/b] In Jundot Physics, only [member Joint3D.node_b] can represent the world.
+			[b]Note:[/b] In Godot Physics, only [member Joint3D.node_b] can represent the world.
 		</member>
 		<member name="physics/jolt_physics_3d/limits/max_angular_velocity" type="float" setter="" getter="" default="47.12389">
 			The maximum angular velocity that a [RigidBody3D] can reach, in radians per second.
@@ -3060,7 +3060,7 @@
 			[b]Note:[/b] This setting only works on Windows, as threaded optimization is disabled by default on other platforms.
 		</member>
 		<member name="rendering/global_illumination/gi/use_half_resolution" type="bool" setter="" getter="" default="false" keywords="size">
-			If [code]true[/code], renders [VoxelGI] and SDFGI ([member Environment.sdfgi_enabled]) buffers at halved resolution (e.g. 960×540 when the viewport size is 1920×1080). This improves performance significantly when VoxelGI or SDFGI is enabled, at the cost of artifacts that may be visible on polygon edges. The loss in quality becomes less noticeable as the viewport resolution increases. [LightmapGI] rendering is not affected by this setting.
+			If [code]true[/code], renders [VoxelGI] and SDFGI ([member Environment.sdfgi_enabled]) buffers at halved resolution (e.g. 960脳540 when the viewport size is 1920脳1080). This improves performance significantly when VoxelGI or SDFGI is enabled, at the cost of artifacts that may be visible on polygon edges. The loss in quality becomes less noticeable as the viewport resolution increases. [LightmapGI] rendering is not affected by this setting.
 			[b]Note:[/b] This property is only read when the project starts. To set half-resolution GI at run-time, call [method RenderingServer.gi_set_use_half_resolution] instead.
 		</member>
 		<member name="rendering/global_illumination/sdfgi/frames_to_converge" type="int" setter="" getter="" default="5">
@@ -3152,7 +3152,7 @@
 		<member name="rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality" type="int" setter="" getter="" default="2">
 			Quality setting for shadows cast by [DirectionalLight3D]s. Higher quality settings use more samples when reading from shadow maps and are thus slower. Low quality settings may result in shadows looking grainy.
 			[b]Note:[/b] The Soft Very Low setting will automatically multiply [i]constant[/i] shadow blur by 0.75x to reduce the amount of noise visible. This automatic blur change only affects the constant blur factor defined in [member Light3D.shadow_blur], not the variable blur performed by [DirectionalLight3D]s' [member Light3D.light_angular_distance].
-			[b]Note:[/b] The Soft High and Soft Ultra settings will automatically multiply [i]constant[/i] shadow blur by 1.5× and 2× respectively to make better use of the increased sample count. This increased blur also improves stability of dynamic object shadows.
+			[b]Note:[/b] The Soft High and Soft Ultra settings will automatically multiply [i]constant[/i] shadow blur by 1.5脳 and 2脳 respectively to make better use of the increased sample count. This increased blur also improves stability of dynamic object shadows.
 		</member>
 		<member name="rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile" type="int" setter="" getter="" default="0">
 			Lower-end override for [member rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality] on mobile devices, due to performance concerns or driver support.
@@ -3181,7 +3181,7 @@
 		<member name="rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality" type="int" setter="" getter="" default="2">
 			Quality setting for shadows cast by [OmniLight3D]s and [SpotLight3D]s. Higher quality settings use more samples when reading from shadow maps and are thus slower. Low quality settings may result in shadows looking grainy.
 			[b]Note:[/b] The Soft Very Low setting will automatically multiply [i]constant[/i] shadow blur by 0.75x to reduce the amount of noise visible. This automatic blur change only affects the constant blur factor defined in [member Light3D.shadow_blur], not the variable blur performed by [DirectionalLight3D]s' [member Light3D.light_angular_distance].
-			[b]Note:[/b] The Soft High and Soft Ultra settings will automatically multiply shadow blur by 1.5× and 2× respectively to make better use of the increased sample count. This increased blur also improves stability of dynamic object shadows.
+			[b]Note:[/b] The Soft High and Soft Ultra settings will automatically multiply shadow blur by 1.5脳 and 2脳 respectively to make better use of the increased sample count. This increased blur also improves stability of dynamic object shadows.
 		</member>
 		<member name="rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality.mobile" type="int" setter="" getter="" default="0">
 			Lower-end override for [member rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality] on mobile devices, due to performance concerns or driver support.
@@ -3493,7 +3493,7 @@
 			[b]Note:[/b] Currently this only affects certain compressed formats (BC1, BC3, BC4, BC5, and BC6), all of which are exclusive to desktop platforms and consoles.
 		</member>
 		<member name="rendering/textures/vram_compression/import_etc2_astc" type="bool" setter="" getter="" default="false">
-			If [code]true[/code], the texture importer will import VRAM-compressed textures using the Ericsson Texture Compression 2 algorithm for lower quality textures and normal maps and Adaptable Scalable Texture Compression algorithm for high quality textures (in 4×4 block size).
+			If [code]true[/code], the texture importer will import VRAM-compressed textures using the Ericsson Texture Compression 2 algorithm for lower quality textures and normal maps and Adaptable Scalable Texture Compression algorithm for high quality textures (in 4脳4 block size).
 			[b]Note:[/b] This setting is an override. The texture importer will always import the format the host platform needs, even if this is set to [code]false[/code].
 			[b]Note:[/b] Changing this setting does [i]not[/i] impact textures that were already imported before. To make this setting apply to textures that were already imported, exit the editor, remove the [code].jundot/imported/[/code] folder located inside the project folder then restart the editor (see [member application/config/use_hidden_project_data_directory]).
 		</member>
@@ -3523,16 +3523,16 @@
 			If [member rendering/vrs/mode] is set to [b]Texture[/b], this is the path to default texture loaded as the VRS image.
 			The texture [i]must[/i] use a lossless compression format so that colors can be matched precisely. The following VRS densities are mapped to various colors, with brighter colors representing a lower level of shading precision:
 			[codeblock lang=text]
-			- 1×1 = rgb(0, 0, 0)     - #000000
-			- 1×2 = rgb(0, 85, 0)    - #005500
-			- 2×1 = rgb(85, 0, 0)    - #550000
-			- 2×2 = rgb(85, 85, 0)   - #555500
-			- 2×4 = rgb(85, 170, 0)  - #55aa00
-			- 4×2 = rgb(170, 85, 0)  - #aa5500
-			- 4×4 = rgb(170, 170, 0) - #aaaa00
-			- 4×8 = rgb(170, 255, 0) - #aaff00 - Not supported on most hardware
-			- 8×4 = rgb(255, 170, 0) - #ffaa00 - Not supported on most hardware
-			- 8×8 = rgb(255, 255, 0) - #ffff00 - Not supported on most hardware
+			- 1脳1 = rgb(0, 0, 0)     - #000000
+			- 1脳2 = rgb(0, 85, 0)    - #005500
+			- 2脳1 = rgb(85, 0, 0)    - #550000
+			- 2脳2 = rgb(85, 85, 0)   - #555500
+			- 2脳4 = rgb(85, 170, 0)  - #55aa00
+			- 4脳2 = rgb(170, 85, 0)  - #aa5500
+			- 4脳4 = rgb(170, 170, 0) - #aaaa00
+			- 4脳8 = rgb(170, 255, 0) - #aaff00 - Not supported on most hardware
+			- 8脳4 = rgb(255, 170, 0) - #ffaa00 - Not supported on most hardware
+			- 8脳8 = rgb(255, 255, 0) - #ffff00 - Not supported on most hardware
 			[/codeblock]
 		</member>
 		<member name="threading/worker_pool/low_priority_thread_ratio" type="float" setter="" getter="" default="0.3">

@@ -45,12 +45,19 @@ class AIChatService : public Node {
 	bool use_threads = true;
 	uint64_t request_start_usec = 0;
 
+	bool streaming = false;
+	String stream_buffer;
+	int stream_prompt_tokens = 0;
+	int stream_completion_tokens = 0;
+	Array stream_tool_calls;
+
 	String _build_chat_url() const;
 	void _ensure_http_request();
 	void _request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	String _extract_text_from_response(const Variant &p_data) const;
 	void _extract_usage_from_response(const Variant &p_data, int &r_prompt_tokens, int &r_completion_tokens) const;
 	void _extract_think_from_content(String &r_content, String &r_think) const;
+	void _process_stream_chunk(const String &p_chunk);
 
 protected:
 	void _notification(int p_what);
@@ -63,4 +70,6 @@ public:
 	Error send_messages(const Array &p_messages, const Array &p_tools);
 	void cancel_request();
 	bool is_requesting() const;
+
+	bool is_streaming() const;
 };

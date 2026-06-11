@@ -1,4 +1,4 @@
-"""Functions used to generate scu build source files during build time"""
+﻿"""Functions used to generate scu build source files during build time"""
 
 import glob
 import math
@@ -346,9 +346,9 @@ def generate_scu_files(max_includes_per_scu):
     process_folder(["modules/gltf/editor"])
     process_folder(["modules/gltf/extensions"])
     process_folder(["modules/gltf/extensions/physics"])
-    process_folder(["modules/jundot_physics_2d"])
-    process_folder(["modules/jundot_physics_3d"])
-    process_folder(["modules/jundot_physics_3d/joints"])
+    process_folder(["modules/godot_physics_2d"])
+    process_folder(["modules/godot_physics_3d"])
+    process_folder(["modules/godot_physics_3d/joints"])
     process_folder(["modules/gridmap"])
     process_folder(["modules/interactive_music"])
     process_folder(["modules/jolt_physics"])

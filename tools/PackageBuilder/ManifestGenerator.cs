@@ -98,7 +98,7 @@ public static class ManifestGenerator
 
             // ── 7. Also copy to package root (next to the ZIP) ──
             var packageRoot = Path.GetDirectoryName(zipPath)!;
-            var externalManifestPath = Path.Combine(packageRoot, $"{packageName}-manifest.json");
+            var externalManifestPath = Path.Combine(packageRoot, "manifest.json");
             File.WriteAllText(externalManifestPath, json, Encoding.UTF8);
 
             return manifestPath;

@@ -15223,14 +15223,14 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "Server di fisica (2D)"
 
-msgid "Jundot Physics (2D)"
-msgstr "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
+msgstr "Godot Physics (2D)"
 
 msgid "Physics Server (3D)"
 msgstr "Server di fisica (3D)"
 
-msgid "Jundot Physics (3D)"
-msgstr "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
+msgstr "Godot Physics (3D)"
 
 msgid "Jolt Physics"
 msgstr "Jolt Physics"
@@ -15278,11 +15278,11 @@ msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr ""
 "Backend OpenGL (se disabilito, è richiesto il backend di RenderingDevice)."
 
-msgid "Jundot Physics backend (2D)."
-msgstr "Backend di Jundot Physics (2D)."
+msgid "Godot Physics backend (2D)."
+msgstr "Backend di Godot Physics (2D)."
 
-msgid "Jundot Physics backend (3D)."
-msgstr "Backend di Jundot Physics (3D)."
+msgid "Godot Physics backend (3D)."
+msgstr "Backend di Godot Physics (3D)."
 
 msgid "Jolt Physics backend (3D only)."
 msgstr "Backend di Jolt Physics (solo per il 3D)."

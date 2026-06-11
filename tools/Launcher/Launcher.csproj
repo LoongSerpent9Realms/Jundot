@@ -9,6 +9,8 @@
     <RootNamespace>JundotLauncher</RootNamespace>
     <StartupObject>JundotLauncher.Program</StartupObject>
     <ApplicationIcon />
+    <!-- Ensure UTF-8 encoding for source files with CJK characters -->
+    <Utf8Output>true</Utf8Output>
   </PropertyGroup>
 
 </Project>

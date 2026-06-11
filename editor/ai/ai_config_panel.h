@@ -37,6 +37,7 @@ class AIChatService;
 class AIUsageAgreementDialog;
 class Label;
 class LineEdit;
+class OptionButton;
 class SpinBox;
 class TextEdit;
 
@@ -53,6 +54,7 @@ class AIConfigPanel : public MarginContainer {
 	SpinBox *max_tool_iterations_spin = nullptr;
 	SpinBox *feature_universality_threshold_spin = nullptr;
 	SpinBox *feature_necessity_threshold_spin = nullptr;
+	OptionButton *output_language_option = nullptr;
 	CheckBox *include_project_memories_check = nullptr;
 	CheckBox *include_tool_context_check = nullptr;
 	CheckBox *tools_enabled_check = nullptr;
@@ -72,6 +74,7 @@ class AIConfigPanel : public MarginContainer {
 	Label *max_tool_iterations_label = nullptr;
 	Label *feature_universality_threshold_label = nullptr;
 	Label *feature_necessity_threshold_label = nullptr;
+	Label *output_language_label = nullptr;
 	Label *system_prompt_label = nullptr;
 	Label *user_extra_instructions_label = nullptr;
 	Label *usage_notice_label = nullptr;
@@ -108,6 +111,7 @@ class AIConfigPanel : public MarginContainer {
 
 	LineEdit *_add_line_edit_row(GridContainer *p_grid, Label **r_label, const String &p_label, const String &p_placeholder = String(), bool p_secret = false);
 	SpinBox *_add_spin_box_row(GridContainer *p_grid, Label **r_label, const String &p_label, double p_min, double p_max, double p_step);
+	OptionButton *_add_output_language_row(GridContainer *p_grid, Label **r_label, const String &p_label);
 
 protected:
 	void _notification(int p_what);

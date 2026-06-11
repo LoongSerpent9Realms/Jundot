@@ -71,6 +71,7 @@
 #include "editor/editor_main_screen.h"
 #include "editor/editor_string_names.h"
 #include "editor/ai/ai_restart_helper.h"
+#include "editor/ai/ai_chat_panel.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/export/dedicated_server_export_plugin.h"
 #include "editor/export/editor_export.h"
@@ -6360,7 +6361,42 @@ void EditorNode::_load_editor_layout() {
 	load_editor_layout_done = true;
 
 	// AI-triggered restart: restore additional work state (open scenes/scripts).
-	AIRestartHelper::restore_state();
+	// Check if this is an AI build restart and trigger post-restart question.
+	AIRestartHelper::RestoreState ai_state = AIRestartHelper::restore_state();
+	if (ai_state.restart_reason == "ai_build") {
+		// Defer to next frame to ensure AI Chat Panel is fully initialized.
+		call_deferred(SNAME("_on_ai_build_restart"));
+	}
+}
+
+void EditorNode::_on_ai_build_restart() {
+	AIRestartHelper::RestoreState ai_state = AIRestartHelper::restore_state();
+	if (ai_state.restart_reason != "ai_build") {
+		return;
+	}
+
+	// Forward to AI Chat Panel to send post-restart question.
+	AIChatPanel *chat_panel = nullptr;
+	if (get_tree() && get_tree()->get_root()) {
+		List<Node *> nodes;
+		nodes.push_back(get_tree()->get_root());
+		while (!nodes.is_empty()) {
+			Node *node = nodes.front()->get();
+			nodes.pop_front();
+
+			chat_panel = Object::cast_to<AIChatPanel>(node);
+			if (chat_panel) {
+				break;
+			}
+
+			for (int i = 0; i < node->get_child_count(); i++) {
+				nodes.push_back(node->get_child(i));
+			}
+		}
+	}
+	if (chat_panel) {
+		chat_panel->send_post_restart_question();
+	}
 }
 
 void EditorNode::_save_central_editor_layout_to_config(Ref<ConfigFile> p_config_file) {

@@ -1,4 +1,4 @@
-/*  ai_chat_panel.cpp                                                      */
+﻿/*  ai_chat_panel.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -32,6 +32,7 @@
 #include "ai_code_fetcher.h"
 #include "ai_new_build_notifier.h"
 #include "ai_patch_applier.h"
+#include "ai_restart_helper.h"
 #include "ai_chat_service.h"
 #include "ai_context_builder.h"
 #include "ai_importer.h"
@@ -40,6 +41,7 @@
 #include "ai_repair_card.h"
 #include "ai_repair_workflow.h"
 #include "ai_suggestion_card.h"
+#include "ai_tool_confirmation_dialog.h"
 #include "ai_tool_defs.h"
 #include "ai_tool_executor.h"
 #include "ai_tool_registry.h"
@@ -52,6 +54,7 @@
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "editor/docks/editor_dock.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
@@ -65,6 +68,7 @@
 #include "scene/gui/popup_menu.h"
 #include "scene/gui/scroll_container.h"
 #include "scene/gui/split_container.h"
+#include "scene/gui/tab_container.h"
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
 
@@ -110,10 +114,11 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 
 	Array msgs = p_dict.get("messages", Array());
 	for (int i = 0; i < msgs.size(); i++) {
-		Dictionary md = msgs[i];
-		if (md.get_type() != Variant::DICTIONARY) {
+		Variant md_var = msgs[i];
+		if (md_var.get_type() != Variant::DICTIONARY) {
 			continue;
 		}
+		Dictionary md = md_var;
 		ConversationMessage m;
 		m.is_user = md.get("is_user", false);
 		m.is_summary = md.get("is_summary", false);
@@ -136,8 +141,8 @@ String AIChatPanel::_get_conversations_file_path() const {
 
 String AIChatPanel::_generate_conversation_id() const {
 	uint64_t t = Time::get_singleton()->get_unix_time_from_system();
-	uint64_t r = OS::get_singleton()->get_unix_time_from_system() ^ (uint64_t)OS::get_singleton()->get_process_id();
-	return vformat("conv_%llx_%llx", (long long unsigned)t, (long long unsigned)r);
+	uint64_t r = (uint64_t)OS::get_singleton()->get_unix_time() ^ (uint64_t)OS::get_singleton()->get_process_id();
+	return vformat("conv_%x_%x", (uint64_t)t, (uint64_t)r);
 }
 
 String AIChatPanel::_auto_generate_title(const Conversation &p_conv) const {
@@ -231,6 +236,7 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
 	editing_message_index = -1;
+	has_auto_titled = !p_conv.messages.is_empty();
 	attachments.clear();
 	_refresh_attachment_chips();
 	input->clear();
@@ -249,6 +255,11 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 }
 
 void AIChatPanel::_select_conversation(const String &p_id) {
+	if (chat_service && chat_service->is_requesting()) {
+		status_label->set_text(TTR("Wait for the current AI response before switching conversations."));
+		return;
+	}
+
 	// Save the active conversation first.
 	_serialize_current_messages();
 
@@ -290,6 +301,11 @@ void AIChatPanel::_conversation_selected(int p_index) {
 }
 
 void AIChatPanel::_new_conversation() {
+	if (chat_service && chat_service->is_requesting()) {
+		status_label->set_text(TTR("Wait for the current AI response before starting a new chat."));
+		return;
+	}
+
 	// Serialize current conversation before switching.
 	_serialize_current_messages();
 
@@ -311,6 +327,11 @@ void AIChatPanel::_new_conversation() {
 }
 
 void AIChatPanel::_delete_current_conversation() {
+	if (chat_service && chat_service->is_requesting()) {
+		status_label->set_text(TTR("Wait for the current AI response before deleting conversations."));
+		return;
+	}
+
 	if (active_conversation_id.is_empty()) {
 		return;
 	}
@@ -333,7 +354,7 @@ void AIChatPanel::_delete_current_conversation() {
 		int next_idx = idx > 0 ? idx - 1 : 0;
 		_select_conversation(conversations[next_idx].id);
 	} else {
-		// No conversation left — create a default one.
+		// No conversation left �?create a default one.
 		_new_conversation();
 	}
 }
@@ -376,7 +397,7 @@ void AIChatPanel::_load_all_conversations() {
 
 	String path = _get_conversations_file_path();
 	if (path.is_empty() || !FileAccess::exists(path)) {
-		// No saved conversations — create an initial empty conversation.
+		// No saved conversations �?create an initial empty conversation.
 		_new_conversation();
 		return;
 	}
@@ -395,21 +416,22 @@ void AIChatPanel::_load_all_conversations() {
 		return;
 	}
 
-	Variant data = json.get_data();
-	if (data.get_type() != Variant::DICTIONARY) {
+	Variant json_data = json.get_data();
+	if (json_data.get_type() != Variant::DICTIONARY) {
 		_new_conversation();
 		return;
 	}
 
-	Dictionary root = data;
+	Dictionary root = json_data;
 	active_conversation_id = root.get("active_conversation_id", String());
 
 	Array arr = root.get("conversations", Array());
 	for (int i = 0; i < arr.size(); i++) {
-		Dictionary d = arr[i];
-		if (d.get_type() != Variant::DICTIONARY) {
+		Variant d_var = arr[i];
+		if (d_var.get_type() != Variant::DICTIONARY) {
 			continue;
 		}
+		Dictionary d = d_var;
 		Conversation conv = Conversation::from_dict(d);
 		if (!conv.id.is_empty()) {
 			conversations.push_back(conv);
@@ -420,7 +442,7 @@ void AIChatPanel::_load_all_conversations() {
 	for (int i = 0; i < conversations.size() - 1; i++) {
 		for (int j = i + 1; j < conversations.size(); j++) {
 			if (conversations[j].updated_at > conversations[i].updated_at) {
-				SWAP(conversations[i], conversations[j]);
+				SWAP(conversations.write[i], conversations.write[j]);
 			}
 		}
 	}
@@ -448,6 +470,9 @@ void AIChatPanel::_load_all_conversations() {
 // ==========================================================================
 
 void AIChatPanel::_notification(int p_what) {
+	if (p_what == NOTIFICATION_READY) {
+		callable_mp(this, &AIChatPanel::_update_mode_indicator).call_deferred();
+	}
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
 	}
@@ -475,14 +500,12 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	// Defect-related keywords.
 	static const char *defect_keywords[] = {
 		"error", "bug", "crash", "issue", "problem", "fail", "broken", "exception",
-		"crash", "leak", "slow", "perf", "性能", "崩溃", "错误", "卡顿", "问题", "BUG", "bug",
-		"闪退", "异常", "缺陷", nullptr
+		"leak", "slow", "perf", "BUG", nullptr
 	};
 
 	// Feature-related keywords.
 	static const char *feature_keywords[] = {
-		"feature", "add", "implement", "support", "new", "create", "build",
-		"功能", "特性", "新增", "实现", "开发", "添加", "扩展", nullptr
+		"feature", "add", "implement", "support", "new", "create", "build", nullptr
 	};
 
 	int defect_score = 0;
@@ -513,7 +536,7 @@ void AIChatPanel::_switch_to_engine() {
 	s.context_mode = AIContextMode::ENGINE;
 	AISettings::save(s);
 	_update_mode_indicator();
-	status_label->set_text(TTR("Switched to ENGINE mode — engine source mode."));
+	status_label->set_text(TTR("Switched to ENGINE mode �?engine source mode."));
 }
 
 void AIChatPanel::_switch_to_project() {
@@ -521,10 +544,17 @@ void AIChatPanel::_switch_to_project() {
 	s.context_mode = AIContextMode::PROJECT;
 	AISettings::save(s);
 	_update_mode_indicator();
-	status_label->set_text(TTR("Switched to PROJECT mode — game project mode."));
+	status_label->set_text(TTR("Switched to PROJECT mode �?game project mode."));
 }
 
 void AIChatPanel::_update_mode_indicator() {
+	if (!engine_mode_btn || !project_mode_btn) {
+		return;
+	}
+	if (!engine_mode_btn->is_inside_tree() || !project_mode_btn->is_inside_tree()) {
+		return;
+	}
+
 	AISettingsData s = AISettings::load();
 	if (s.context_mode == AIContextMode::ENGINE) {
 		engine_mode_btn->add_theme_color_override("font_color", Color(1.0f, 0.4f, 0.4f));
@@ -533,203 +563,6 @@ void AIChatPanel::_update_mode_indicator() {
 		project_mode_btn->add_theme_color_override("font_color", Color(0.4f, 1.0f, 0.4f));
 		engine_mode_btn->add_theme_color_override("font_color", Color(0.7f, 0.7f, 0.7f));
 	}
-}
-
-void AIChatPanel::_new_conversation() {
-	// Clear current messages
-	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
-		message_list->get_child(i)->queue_free();
-	}
-	conversation_name_edit->set_text("");
-	has_auto_titled = false;
-	is_titling = false;
-	status_label->set_text(TTR("New conversation started."));
-}
-
-void AIChatPanel::_update_conversation_menu() {
-	if (!conversation_menu) {
-		return;
-	}
-	PopupMenu *popup = conversation_menu->get_popup();
-	popup->clear();
-
-	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
-	Ref<DirAccess> da = DirAccess::open(save_dir);
-	if (da.is_null()) {
-		return;
-	}
-
-	da->list_dir_begin();
-	String f = da->get_next();
-	while (!f.is_empty()) {
-		if (f.ends_with(".json")) {
-			String full_path = save_dir.path_join(f);
-			Ref<FileAccess> fa = FileAccess::open(full_path, FileAccess::READ);
-			if (fa.is_valid()) {
-				String content = fa->get_as_text();
-				String title = f.trim_suffix(".json");
-				JSON json;
-				if (json.parse(content) == OK) {
-					Array msgs = json.get_data();
-					for (int i = 0; i < msgs.size(); i++) {
-						Dictionary msg = msgs[i];
-						if (msg.get("role", "") == "user") {
-							String content_str = msg.get("content", "");
-							if (!content_str.is_empty()) {
-								title = content_str.substr(0, MIN(40, content_str.length()));
-								break;
-							}
-						}
-					}
-				}
-				popup->add_item(title, popup->get_item_count());
-			}
-		}
-		f = da->get_next();
-	}
-	da->list_dir_end();
-}
-
-void AIChatPanel::_update_conversation_list() {
-	conversation_list->clear();
-	saved_conversations.clear();
-
-	// Load from user data dir
-	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
-	Ref<DirAccess> da = DirAccess::open(save_dir);
-	if (da.is_null()) {
-		return;
-	}
-
-	da->list_dir_begin();
-	String f = da->get_next();
-	while (!f.is_empty()) {
-		if (f.ends_with(".json")) {
-			String full_path = save_dir.path_join(f);
-			Ref<FileAccess> fa = FileAccess::open(full_path, FileAccess::READ);
-			if (fa.is_valid()) {
-				String content = fa->get_as_text();
-				// Try to extract a title from the first user message
-				String title = f.trim_suffix(".json");
-				JSON json;
-				if (json.parse(content) == OK) {
-					Array msgs = json.get_data();
-					for (int i = 0; i < msgs.size(); i++) {
-						Dictionary msg = msgs[i];
-						if (msg.get("role", "") == "user") {
-							String content_str = msg.get("content", "");
-							if (!content_str.is_empty()) {
-								title = content_str.substr(0, MIN(40, content_str.length()));
-								break;
-							}
-						}
-					}
-				}
-				conversation_list->add_item(title);
-				saved_conversations.push_back(Vector<String>()); // placeholder
-			}
-		}
-		f = da->get_next();
-	}
-	da->list_dir_end();
-}
-
-void AIChatPanel::_select_conversation(int p_index) {
-	if (p_index < 0 || p_index >= saved_conversations.size()) {
-		return;
-	}
-	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
-	Ref<DirAccess> da = DirAccess::open(save_dir);
-	if (da.is_null()) {
-		return;
-	}
-
-	da->list_dir_begin();
-	String f = da->get_next();
-	int idx = 0;
-	while (!f.is_empty()) {
-		if (f.ends_with(".json") && idx == p_index) {
-			String full_path = save_dir.path_join(f);
-			_load_conversation(full_path);
-			break;
-		}
-		f = da->get_next();
-		if (f.ends_with(".json")) {
-			idx++;
-		}
-	}
-	da->list_dir_end();
-}
-
-void AIChatPanel::_save_current_conversation() {
-	// Save current message_list content to disk.
-	String save_dir = OS::get_singleton()->get_user_data_dir().path_join("ai_conversations");
-	Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
-	if (da.is_null()) {
-		return;
-	}
-	if (!da->dir_exists(save_dir)) {
-		da->make_dir_recursive(save_dir);
-	}
-
-	String timestamp = Time::get_singleton()->get_datetime_string_from_system().replace(":", "-").replace("T", "_");
-	String file_path = save_dir.path_join(timestamp + ".json");
-
-	Ref<FileAccess> fa = FileAccess::open(file_path, FileAccess::WRITE);
-	if (fa.is_valid()) {
-		// Build JSON from message history (UI children).
-		Array history = _build_message_history();
-		String json_content = "[\n";
-		for (int i = 0; i < history.size(); i++) {
-			Dictionary msg = history[i];
-			json_content += "{\"role\": \"" + String(msg.get("role", "")) + "\", \"content\": \"";
-			String content = msg.get("content", "");
-			content = content.replace("\\", "\\\\").replace("\"", "\\\"");
-			json_content += content + "\"}\n";
-			if (i < history.size() - 1) {
-				json_content += ",\n";
-			}
-		}
-		json_content += "]\n";
-		fa->store_string(json_content);
-		fa->close();
-	}
-	_update_conversation_list();
-}
-
-void AIChatPanel::_load_conversation(const String &p_file_path) {
-	Ref<FileAccess> fa = FileAccess::open(p_file_path, FileAccess::READ);
-	if (fa.is_null()) {
-		return;
-	}
-	String content = fa->get_as_text();
-	fa->close();
-
-	JSON json;
-	if (json.parse(content) != OK) {
-		return;
-	}
-
-	Array msgs = json.get_data();
-	// Clear existing UI children.
-	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
-		message_list->get_child(i)->queue_free();
-	}
-	// Re-add messages from loaded data.
-	for (int i = 0; i < msgs.size(); i++) {
-		Dictionary msg = msgs[i];
-		String role = msg.get("role", "");
-		String content = msg.get("content", "");
-		if (role == "user") {
-			_add_user_message(content);
-		} else if (role == "assistant") {
-			_add_ai_message(content, "", 0.0, 0, 0);
-		}
-	}
-
-	// Don't auto-title loaded conversations — they are already saved.
-	has_auto_titled = true;
-	is_titling = false;
 }
 
 void AIChatPanel::_update_translations() {
@@ -761,6 +594,15 @@ void AIChatPanel::_update_translations() {
 void AIChatPanel::_set_requesting(bool p_requesting) {
 	send_button->set_disabled(p_requesting);
 	cancel_button->set_disabled(!p_requesting);
+	if (conversation_list) {
+		conversation_list->set_mouse_filter(p_requesting ? Control::MOUSE_FILTER_IGNORE : Control::MOUSE_FILTER_STOP);
+	}
+	if (new_conversation_button) {
+		new_conversation_button->set_disabled(p_requesting);
+	}
+	if (delete_conversation_button) {
+		delete_conversation_button->set_disabled(p_requesting);
+	}
 }
 
 bool AIChatPanel::_ensure_usage_agreement() {
@@ -905,6 +747,11 @@ String AIChatPanel::_build_attachment_context() const {
 }
 
 void AIChatPanel::_send_message() {
+	if (chat_service && chat_service->is_requesting()) {
+		status_label->set_text(TTR("Wait for the current AI request to finish before sending another message."));
+		return;
+	}
+
 	const String text = input->get_text().strip_edges();
 	if (text.is_empty()) {
 		return;
@@ -937,6 +784,7 @@ void AIChatPanel::_send_message() {
 
 	// Persist the conversation after the user message has been added so that
 	// a crash or request failure does not lose the message.
+	request_conversation_id = active_conversation_id;
 	_serialize_current_messages();
 	_refresh_conversation_list_ui();
 	_save_all_conversations();
@@ -948,10 +796,10 @@ void AIChatPanel::_send_message() {
 	// manually-set title, ask the AI to summarise a conversation title
 	// once the normal response has been received.
 	bool needs_auto_title = !has_auto_titled &&
-			conversation_name_edit->get_text().strip_edges().is_empty() &&
+			(!conversation_name_edit || conversation_name_edit->get_text().strip_edges().is_empty()) &&
 			!is_summarizing && !is_titling;
 
-	// Check if history exceeds the character budget → trigger summarization.
+	// Check if history exceeds the character budget �?trigger summarization.
 	if (settings.history_char_budget > 0) {
 		int total_chars = 0;
 		for (int i = 0; i < history.size(); i++) {
@@ -1017,16 +865,20 @@ void AIChatPanel::_send_message() {
 		}
 	}
 
+	pending_tool_round = PendingToolRound();
+	pending_tool_round.max_iterations = settings.max_tool_iterations > 0 ? settings.max_tool_iterations : 10;
+	pending_tool_round.original_messages = messages.duplicate(true);
+	pending_tool_round.original_tools = tools.duplicate(true);
+	in_tool_loop = false;
+
 	const Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
 		status_label->set_text(TTR("AI request could not start."));
+		request_conversation_id = String();
 		return;
 	}
 
 	input->clear();
-	pending_tool_round = PendingToolRound();
-	pending_tool_round.max_iterations = settings.max_tool_iterations > 0 ? settings.max_tool_iterations : 10;
-	in_tool_loop = false;
 	attachments.clear();
 	_refresh_attachment_chips();
 	status_label->set_text(TTR("Waiting for AI response..."));
@@ -1181,7 +1033,7 @@ void AIChatPanel::_try_auto_title(const String &p_user_first_message, const Arra
 
 	// If the user already manually typed a title since we queued the request,
 	// skip the auto-title call.
-	if (!conversation_name_edit->get_text().strip_edges().is_empty()) {
+	if (conversation_name_edit && !conversation_name_edit->get_text().strip_edges().is_empty()) {
 		has_auto_titled = true;
 		return;
 	}
@@ -1236,10 +1088,12 @@ void AIChatPanel::_try_auto_title(const String &p_user_first_message, const Arra
 	chat_service->configure(title_settings);
 
 	is_titling = true;
+	title_request_conversation_id = active_conversation_id;
 	const Error err = chat_service->send_messages(title_messages);
 	if (err != OK) {
 		// Silent fallback: leave the title empty.
 		is_titling = false;
+		title_request_conversation_id = String();
 	}
 }
 
@@ -1248,6 +1102,7 @@ void AIChatPanel::_title_completed(int p_result, int p_response_code, const Stri
 
 	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code >= HTTPClient::RESPONSE_BAD_REQUEST) {
 		// Silent failure: leave the title blank for the user to set.
+		title_request_conversation_id = String();
 		return;
 	}
 
@@ -1261,7 +1116,7 @@ void AIChatPanel::_title_completed(int p_result, int p_response_code, const Stri
 			title = title.substr(1, title.length() - 2).strip_edges();
 		}
 	}
-	// Take the first line only — some models emit a short paragraph.
+	// Take the first line only �?some models emit a short paragraph.
 	int newline_pos = title.find_char('\n');
 	if (newline_pos >= 0) {
 		title = title.substr(0, newline_pos).strip_edges();
@@ -1274,11 +1129,22 @@ void AIChatPanel::_title_completed(int p_result, int p_response_code, const Stri
 
 	if (!title.is_empty()) {
 		// Only overwrite the title field if the user has not typed one yet.
-		if (conversation_name_edit->get_text().strip_edges().is_empty()) {
+		if (conversation_name_edit && conversation_name_edit->get_text().strip_edges().is_empty()) {
 			conversation_name_edit->set_text(title);
 			has_auto_titled = true;
 		}
+		for (int i = 0; i < conversations.size(); i++) {
+			if (conversations[i].id == title_request_conversation_id) {
+				conversations.write[i].title = title;
+				conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
+				has_auto_titled = true;
+				_refresh_conversation_list_ui();
+				_save_all_conversations();
+				break;
+			}
+		}
 	}
+	title_request_conversation_id = String();
 }
 
 void AIChatPanel::_cancel_request() {
@@ -1289,10 +1155,16 @@ void AIChatPanel::_cancel_request() {
 	}
 	if (is_titling) {
 		is_titling = false;
+		title_request_conversation_id = String();
 	}
 	chat_service->cancel_request();
+	if (streaming_message) {
+		streaming_message->queue_free();
+		streaming_message = nullptr;
+	}
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
+	request_conversation_id = String();
 	status_label->set_text(TTR("AI request cancelled."));
 	_set_requesting(false);
 }
@@ -1312,9 +1184,104 @@ void AIChatPanel::_clear_messages() {
 	_clear_repair_cards();
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
-	conversation_name_edit->set_text("");
+	if (conversation_name_edit) {
+		conversation_name_edit->set_text("");
+	}
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conversations.write[i].title = TTR("New Chat");
+			break;
+		}
+	}
 	has_auto_titled = false;
+	_serialize_current_messages();
+	_refresh_conversation_list_ui();
+	_save_all_conversations();
 	status_label->set_text(TTR("AI assistant ready."));
+}
+
+void AIChatPanel::_chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens) {
+	if (is_titling || is_summarizing) {
+		return;
+	}
+	if (!request_conversation_id.is_empty() && request_conversation_id != active_conversation_id) {
+		return;
+	}
+
+	if (!streaming_message) {
+		streaming_message = memnew(AIChatMessage);
+		streaming_message->setup_ai(p_full_content, String(), 0.0, 0, p_completion_tokens);
+		streaming_message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
+		message_list->add_child(streaming_message);
+	} else {
+		streaming_message->set_markdown_content(p_full_content);
+	}
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
+bool AIChatPanel::_looks_like_tool_preamble(const String &p_content) const {
+	if (!active_settings.tools_enabled || pending_tool_round.original_tools.is_empty() || pending_tool_round.executed_tool_calls || in_tool_loop) {
+		return false;
+	}
+
+	const String text = p_content.strip_edges();
+	if (text.is_empty()) {
+		return false;
+	}
+
+	const String lower = text.to_lower();
+	if (lower.contains("read_files") || lower.contains("write_file") || lower.contains("search_files") ||
+			lower.contains("grep_code") || lower.contains("run_build") || lower.contains("tool call")) {
+		return true;
+	}
+
+	if (text.contains(".cpp") || text.contains(".h") || text.contains(".gd") || text.contains(".tscn") || text.contains(".cs")) {
+		return true;
+	}
+
+	if ((lower.contains("read") || lower.contains("inspect") || lower.contains("open")) &&
+			(lower.contains("file") || lower.contains(".cpp") || lower.contains(".h") || lower.contains(".gd"))) {
+		return true;
+	}
+
+	return false;
+}
+
+bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
+	if (pending_tool_round.missing_tool_retry_used || pending_tool_round.original_messages.is_empty() || pending_tool_round.original_tools.is_empty()) {
+		return false;
+	}
+
+	pending_tool_round.missing_tool_retry_used = true;
+
+	Array messages = pending_tool_round.original_messages.duplicate(true);
+
+	Dictionary assistant_msg;
+	assistant_msg["role"] = "assistant";
+	assistant_msg["content"] = p_content;
+	messages.push_back(assistant_msg);
+
+	Dictionary correction_msg;
+	correction_msg["role"] = "user";
+	correction_msg["content"] = TTR("Your previous response described using a tool, but it did not include a structured tool_calls response, so the editor could not execute anything. Do not describe the tool use in prose. Return the appropriate function call now using the available tools. If you need to read a file, call read_files with the exact relative path.");
+	messages.push_back(correction_msg);
+
+	pending_tool_round.original_messages = messages.duplicate(true);
+
+	tool_call_label->set_visible(true);
+	tool_call_label->set_text(TTR("AI described a tool action without calling it. Retrying once with a stricter tool-call instruction..."));
+	status_label->set_text(TTR("Retrying AI request for a real tool call..."));
+
+	chat_service->configure(active_settings);
+	_set_requesting(true);
+	Error err = chat_service->send_messages(messages, pending_tool_round.original_tools);
+	if (err != OK) {
+		_set_requesting(false);
+		status_label->set_text(TTR("Tool-call retry could not start."));
+		return false;
+	}
+
+	return true;
 }
 
 void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
@@ -1330,7 +1297,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			// Extract the summary text from the AI response.
 			_summary_completed(p_content);
 		} else {
-			// Summarization failed — fall back to truncation.
+			// Summarization failed �?fall back to truncation.
 			_summary_completed(String());
 		}
 		return;
@@ -1338,21 +1305,21 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 
 	_set_requesting(false);
 	if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code < HTTPClient::RESPONSE_BAD_REQUEST) {
-		// Check if the response contains tool_calls (Function Calling).
 		if (p_json.has("choices") && p_json["choices"].get_type() == Variant::ARRAY) {
 			Array choices = p_json["choices"];
 			if (choices.size() > 0 && choices[0].get_type() == Variant::DICTIONARY) {
 				Dictionary first = choices[0];
-				// Prefer finish_reason check for robustness; fall back to
-				// inspecting message.tool_calls for providers that omit it.
 				String finish_reason = first.get("finish_reason", String());
 				Dictionary msg = first.get("message", Dictionary());
 				bool has_tool_calls = (finish_reason == "tool_calls") ||
 					(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
 						!((Array)msg["tool_calls"]).is_empty());
 				if (has_tool_calls) {
-					// Enforce maximum iteration limit to prevent infinite loops.
 					if (pending_tool_round.iteration_count >= pending_tool_round.max_iterations) {
+						if (streaming_message) {
+							streaming_message->queue_free();
+							streaming_message = nullptr;
+						}
 						_add_ai_message(vformat(TTR("Maximum tool call iterations (%d) reached. Stopping here to prevent an infinite loop. You can continue manually by asking the AI to proceed."),
 								pending_tool_round.max_iterations),
 								String(), 0.0, p_prompt_tokens, p_completion_tokens);
@@ -1360,7 +1327,15 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 						tool_call_label->set_text(String());
 						in_tool_loop = false;
 						status_label->set_text(TTR("AI tool iteration limit reached."));
+						_serialize_current_messages();
+						_refresh_conversation_list_ui();
+						_save_all_conversations();
+						request_conversation_id = String();
 						return;
+					}
+					if (streaming_message) {
+						streaming_message->queue_free();
+						streaming_message = nullptr;
 					}
 					_execute_tool_calls(p_json);
 					return;
@@ -1368,7 +1343,23 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			}
 		}
 
-		_add_ai_message(p_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+		if (_looks_like_tool_preamble(p_content)) {
+			if (_retry_after_missing_tool_call(p_content)) {
+				return;
+			}
+		}
+
+		String final_content = p_content;
+		if (_looks_like_tool_preamble(p_content) && pending_tool_round.missing_tool_retry_used && !pending_tool_round.executed_tool_calls) {
+			final_content += TTR("\n\n[Tool calling did not run: the model returned normal text instead of a structured tool_calls response. Use a model or API endpoint that supports OpenAI-compatible function calling, and make sure Function Calling tools are enabled.]");
+		}
+
+		if (streaming_message) {
+			streaming_message->setup_ai(final_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+			streaming_message = nullptr;
+		} else {
+			_add_ai_message(final_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+		}
 
 		// Auto-title: if a title request was queued, fire it off now.
 		if (!pending_title_text.is_empty() && !is_titling) {
@@ -1393,18 +1384,19 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		_serialize_current_messages();
 		_refresh_conversation_list_ui();
 		_save_all_conversations();
+		request_conversation_id = String();
 
 		// Parse suggestions from the AI response.
 		const AISettingsData settings = AISettings::load();
 		if (settings.auto_suggest_entries) {
 			Vector<AISuggestion> suggestions;
-			AIChatParser::parse(p_content, suggestions);
+			AIChatParser::parse(final_content, suggestions);
 			if (!suggestions.is_empty()) {
 				_show_suggestions(suggestions);
 			}
 
 			Vector<AIFeatureGateResult> feature_gates;
-			AIChatParser::parse_feature_gates(p_content, feature_gates);
+			AIChatParser::parse_feature_gates(final_content, feature_gates);
 			for (int i = 0; i < feature_gates.size(); i++) {
 				AIFeatureGateResult gate = feature_gates[i];
 				AIFeatureGate::evaluate(gate, settings);
@@ -1412,7 +1404,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			}
 
 			Vector<AIRepairSuggestion> repair_tasks;
-			AIChatParser::parse_repair_tasks(p_content, repair_tasks);
+			AIChatParser::parse_repair_tasks(final_content, repair_tasks);
 			if (!repair_tasks.is_empty()) {
 				_show_repair_tasks(repair_tasks);
 			}
@@ -1421,11 +1413,19 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		return;
 	}
 
+	if (streaming_message) {
+		streaming_message->queue_free();
+		streaming_message = nullptr;
+	}
 	String error_text = p_content;
 	if (error_text.is_empty()) {
 		error_text = vformat(TTR("AI request failed. HTTP %d."), p_response_code);
 	}
 	_add_ai_message(error_text, String(), 0.0, 0, 0);
+	_serialize_current_messages();
+	_refresh_conversation_list_ui();
+	_save_all_conversations();
+	request_conversation_id = String();
 	status_label->set_text(error_text);
 }
 
@@ -1435,40 +1435,9 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	Dictionary msg = first_choice["message"];
 	Array tool_calls = msg["tool_calls"];
 
-	// Rebuild messages array. If continuing from a previous tool round,
-	// reuse the accumulated messages to preserve tool results history.
-	// Use the cached active settings so auto_mode_prompt, context, and
-	// user_extra_instructions from _send_message() are preserved.
-	AISettingsData settings = active_settings;
-	Array messages = pending_tool_round.original_messages;
-
-	if (messages.is_empty()) {
-		// First round: build from scratch using the cached active_settings.
-		// active_settings.system_prompt already contains the auto_mode_prompt,
-		// context, and user_extra_instructions from _send_message(), so we
-		// do NOT rebuild context here to avoid duplication.
-		String system_content = settings.system_prompt;
-
-		Dictionary system_msg;
-		system_msg["role"] = "system";
-		system_msg["content"] = system_content;
-		messages.push_back(system_msg);
-
-		Array history = _build_message_history();
-		for (int i = 0; i < history.size(); i++) {
-			messages.push_back(history[i]);
-		}
-		history.clear();
-	}
-
-	// Add the assistant message with tool_calls (may have null content).
-	Dictionary clean_msg;
-	clean_msg["role"] = "assistant";
-	if (msg.has("content") && msg["content"].get_type() != Variant::NIL) {
-		clean_msg["content"] = msg["content"];
-	}
-	clean_msg["tool_calls"] = tool_calls;
-	messages.push_back(clean_msg);
+	// Store the tool calls JSON for reuse by the execution path.
+	pending_tool_calls_json = p_json;
+	pending_tool_round.executed_tool_calls = true;
 
 	// Increment the iteration counter for multi-round iteration.
 	pending_tool_round.iteration_count++;
@@ -1476,10 +1445,10 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	int max_iterations = pending_tool_round.max_iterations;
 
 	// Show status with iteration progress.
-	status_label->set_text(vformat(TTR("AI tool call round %d of %d: using %d tool(s)..."),
+	status_label->set_text(vformat(TTR("AI tool call round %d of %d: executing %d tool call(s)..."),
 			current_iteration, max_iterations, tool_calls.size()));
 
-	// Build tool call display.
+	// Build tool call display label.
 	String tool_display;
 	for (int i = 0; i < tool_calls.size(); i++) {
 		Dictionary tc = tool_calls[i];
@@ -1498,6 +1467,47 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	}
 	tool_call_label->set_visible(true);
 	tool_call_label->set_text(tool_display);
+
+	// Execute all requested tool calls immediately.
+	_confirm_tool_execute(0);
+}
+
+void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
+	Dictionary p_json = pending_tool_calls_json;
+
+	Array choices = p_json["choices"];
+	Dictionary first_choice = choices[0];
+	Dictionary msg = first_choice["message"];
+	Array tool_calls = msg["tool_calls"];
+
+	// Rebuild messages array using the cached active_settings.
+	AISettingsData settings = active_settings;
+	Array messages = pending_tool_round.original_messages;
+
+	if (messages.is_empty()) {
+		// First round: build from scratch.
+		String system_content = settings.system_prompt;
+
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = system_content;
+		messages.push_back(system_msg);
+
+		Array history = _build_message_history();
+		for (int i = 0; i < history.size(); i++) {
+			messages.push_back(history[i]);
+		}
+		history.clear();
+	}
+
+	// Add the assistant message with tool_calls.
+	Dictionary clean_msg;
+	clean_msg["role"] = "assistant";
+	if (msg.has("content") && msg["content"].get_type() != Variant::NIL) {
+		clean_msg["content"] = msg["content"];
+	}
+	clean_msg["tool_calls"] = tool_calls;
+	messages.push_back(clean_msg);
 
 	// Build tools array.
 	Array tools;
@@ -1518,12 +1528,17 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 		messages.push_back(result);
 	}
 
-	// Save state for continuation on the next round.
+	// Save state for continuation.
 	pending_tool_round.original_messages = messages;
 	pending_tool_round.original_tools = tools;
 	in_tool_loop = true;
 
-	// Send results back to LLM for the next iteration round.
+	// Update status.
+	int current_iteration = pending_tool_round.iteration_count;
+	int max_iterations = pending_tool_round.max_iterations;
+	tool_call_label->set_text(vformat(TTR("Executed %d tool(s). Waiting for response..."), tool_calls.size()));
+
+	// Send results back to LLM.
 	chat_service->configure(settings);
 	_set_requesting(true);
 	Error err = chat_service->send_messages(messages, tools);
@@ -1534,6 +1549,92 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 		String tool_summary = vformat(TTR("[Tool calls executed: %d]"), tool_calls.size());
 		_add_ai_message(tool_summary, String(), 0.0, 0, 0);
 	}
+}
+
+void AIChatPanel::_confirm_tool_skip(int p_tool_index) {
+	// User skipped this tool, continue to next round with empty result.
+	Dictionary p_json = pending_tool_calls_json;
+
+	Array choices = p_json["choices"];
+	Dictionary first_choice = choices[0];
+	Dictionary msg = first_choice["message"];
+	Array tool_calls = msg["tool_calls"];
+
+	AISettingsData settings = active_settings;
+	Array messages = pending_tool_round.original_messages;
+
+	if (messages.is_empty()) {
+		String system_content = settings.system_prompt;
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = system_content;
+		messages.push_back(system_msg);
+
+		Array history = _build_message_history();
+		for (int i = 0; i < history.size(); i++) {
+			messages.push_back(history[i]);
+		}
+		history.clear();
+	}
+
+	// Add the assistant message.
+	Dictionary clean_msg;
+	clean_msg["role"] = "assistant";
+	if (msg.has("content") && msg["content"].get_type() != Variant::NIL) {
+		clean_msg["content"] = msg["content"];
+	}
+	clean_msg["tool_calls"] = tool_calls;
+	messages.push_back(clean_msg);
+
+	// Add skipped tool result.
+	Dictionary skipped_result;
+	skipped_result["role"] = "tool";
+	Dictionary tc = tool_calls[p_tool_index];
+	skipped_result["tool_call_id"] = tc.get("id", "");
+	skipped_result["content"] = "[Skipped by user]";
+	messages.push_back(skipped_result);
+
+	// Build tools array.
+	Array tools;
+	if (settings.tools_enabled) {
+		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
+		if (settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				tools.append_array(mcp_tools);
+			}
+		}
+	}
+
+	// Save state.
+	pending_tool_round.original_messages = messages;
+	pending_tool_round.original_tools = tools;
+	in_tool_loop = true;
+
+	tool_call_label->set_text(TTR("Tool skipped. Waiting for response..."));
+	status_label->set_text(TTR("Tool skipped. Sending result to AI..."));
+
+	// Continue conversation.
+	chat_service->configure(settings);
+	_set_requesting(true);
+	Error err = chat_service->send_messages(messages, tools);
+	if (err != OK) {
+		status_label->set_text(TTR("Continuation failed after skip."));
+		in_tool_loop = false;
+		_set_requesting(false);
+	}
+}
+
+void AIChatPanel::_confirm_tool_cancel_all() {
+	// User cancelled all tool calls.
+	status_label->set_text(TTR("Tool execution cancelled by user."));
+	in_tool_loop = false;
+	_set_requesting(false);
+	tool_call_label->set_visible(false);
+	tool_call_label->set_text(String());
+
+	// Add a message to indicate cancellation.
+	_add_ai_message(TTR("[Tool calls were cancelled by the user.]"), String(), 0.0, 0, 0);
 }
 
 void AIChatPanel::_suggestion_accepted(AISuggestionCard *p_card) {
@@ -1832,7 +1933,9 @@ void AIChatPanel::_repair_rebuild(AIRepairCard *p_card) {
 		status_label->set_text(vformat(TTR("Could not launch PackageBuilder. Please run it manually from %s"), AIBuildBridge::detect_repo_root().path_join("tools/PackageBuilder")));
 	} else {
 		status_label->set_text(TTR("PackageBuilder launched. Complete the build and click 'Publish' when ready."));
-		// Start polling for build completion — will show restart dialog when ready.
+		// Set current task info for post-restart question.
+		AINewBuildNotifier::get_singleton()->set_current_task(task.id, task.patch_summary);
+		// Start polling for build completion �?will show restart dialog when ready.
 		AINewBuildNotifier::start_polling();
 	}
 }
@@ -1843,6 +1946,33 @@ void AIChatPanel::_repair_publish(AIRepairCard *p_card) {
 	AIRepairWorkflow::update_task(task.id, AIRepairTask::STATE_PUBLISHED);
 	p_card->setup(task);
 	status_label->set_text(vformat(TTR("Publish request sent for: %s."), task.title));
+}
+
+void AIChatPanel::send_post_restart_question() {
+	// Ensure AI Chat is visible.
+	TabContainer *parent_tabs = Object::cast_to<TabContainer>(get_parent());
+	if (parent_tabs) {
+		parent_tabs->set_current_tab(get_index());
+
+		EditorDock *dock = Object::cast_to<EditorDock>(parent_tabs->get_parent());
+		if (dock) {
+			dock->make_visible();
+		} else {
+			parent_tabs->show();
+		}
+	}
+	show();
+
+	// Build the question message.
+	String question = TTR("The previous AI repair build has finished. Is the feature working correctly now? Are there any errors?");
+
+	// Add AI message to the chat.
+	_add_ai_message(question, String(), 0.0, 0, 0);
+
+	// Cleanup the state file after sending question.
+	AIRestartHelper::cleanup_state_file();
+
+	status_label->set_text(TTR("Post-restart verification question sent."));
 }
 
 void AIChatPanel::_show_repair_tasks(const Vector<AIRepairSuggestion> &p_repairs) {
@@ -1957,6 +2087,25 @@ AIChatPanel::AIChatPanel() {
 	chat_vbox->add_theme_constant_override("separation", 8 * EDSCALE);
 	hbox->add_child(chat_vbox);
 
+	// Mode switching bar (ENGINE / PROJECT)
+	mode_bar = memnew(HBoxContainer);
+	mode_bar->add_theme_constant_override("separation", 6 * EDSCALE);
+	chat_vbox->add_child(mode_bar);
+
+	engine_mode_btn = memnew(Button);
+	engine_mode_btn->set_flat(true);
+	engine_mode_btn->set_text(TTR("Engine Mode"));
+	engine_mode_btn->set_tooltip_text(TTR("Switch to engine source context mode."));
+	engine_mode_btn->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_switch_to_engine));
+	mode_bar->add_child(engine_mode_btn);
+
+	project_mode_btn = memnew(Button);
+	project_mode_btn->set_flat(true);
+	project_mode_btn->set_text(TTR("Project Mode"));
+	project_mode_btn->set_tooltip_text(TTR("Switch to game project context mode."));
+	project_mode_btn->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_switch_to_project));
+	mode_bar->add_child(project_mode_btn);
+
 	message_scroll = memnew(ScrollContainer);
 	message_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	message_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
@@ -2047,12 +2196,13 @@ AIChatPanel::AIChatPanel() {
 	status_label->set_custom_minimum_size(Size2(0, 24) * EDSCALE);
 	chat_vbox->add_child(status_label);
 
-	// Initialize mode indicator
-	_update_mode_indicator();
+	// Initialize mode indicator �?deferred to NOTIFICATION_READY
+	// (buttons must be in the scene tree before add_theme_color_override)
 
 	// Chat service
 	chat_service = memnew(AIChatService);
 	chat_service->connect(SNAME("chat_completed"), callable_mp(this, &AIChatPanel::_chat_completed));
+	chat_service->connect(SNAME("chat_stream_data"), callable_mp(this, &AIChatPanel::_chat_stream_data));
 	add_child(chat_service, false, INTERNAL_MODE_BACK);
 
 	reference_file_dialog = memnew(EditorFileDialog);
@@ -2080,6 +2230,14 @@ AIChatPanel::AIChatPanel() {
 	usage_agreement_dialog->connect(SNAME("agreement_accepted"), callable_mp(this, &AIChatPanel::_usage_agreement_accepted));
 	usage_agreement_dialog->connect(SNAME("agreement_rejected"), callable_mp(this, &AIChatPanel::_usage_agreement_rejected));
 	add_child(usage_agreement_dialog);
+
+	// Create tool call confirmation dialog.
+	tool_confirmation_dialog = memnew(AIToolConfirmationDialog);
+	tool_confirmation_dialog->set_callbacks(
+			callable_mp(this, &AIChatPanel::_confirm_tool_execute),
+			callable_mp(this, &AIChatPanel::_confirm_tool_skip),
+			callable_mp(this, &AIChatPanel::_confirm_tool_cancel_all));
+	add_child(tool_confirmation_dialog);
 
 	_update_translations();
 	_load_all_conversations();

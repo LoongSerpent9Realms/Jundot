@@ -5911,10 +5911,10 @@ msgstr "Metal"
 msgid "OpenGL"
 msgstr "OpenGL"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Motor físic de Jundot (2D)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Motor físic de Jundot (3D)"
 
 msgid "Text Server: Fallback"
@@ -5947,10 +5947,10 @@ msgstr "Renderització Forward+ per a gràfics 3D avançats."
 msgid "Mobile renderer for less advanced 3D graphics."
 msgstr "Renderització Mòbil per a gràfics menys avançats."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Motor intern de física de Jundot (2D)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Motor intern de física de Jundot (3D)."
 
 msgid "Jolt Physics backend (3D only)."

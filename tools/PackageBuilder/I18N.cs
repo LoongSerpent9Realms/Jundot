@@ -114,7 +114,7 @@ public static class I18N
             ["Check.SkipBuild"] = "跳过构建（仅打包）",
             ["Check.InstallSCons"] = "自动安装 SCons",
             ["Check.CleanDir"] = "构建前清理目录",
-            ["Check.AutoVersion"] = "构建成功后自动更新版本号（patch +1）",
+            ["Check.AutoVersion"] = "构建前自动更新版本号（patch +1）",
             ["Check.GenManifest"] = "生成更新清单 (update-manifest.json) —— 用于线上热更新系统",
 
             // Buttons
@@ -188,7 +188,7 @@ public static class I18N
             ["Status.Ready"] = "就绪",
 
             // Version tab
-            ["Hint.Version"] = "修改版本号后点击「保存版本」写入 version.py。\n若启用了自动更新，每次打包成功后会 patch +1。",
+            ["Hint.Version"] = "修改版本号后点击「保存版本」写入 version.py。\n若启用了自动更新，每次构建前会 patch +1，失败或取消会回滚。",
 
             // Column headers
             ["Col.Name"]    = "名称",
@@ -259,7 +259,7 @@ public static class I18N
             ["Check.SkipBuild"] = "Skip Build (package only)",
             ["Check.InstallSCons"] = "Auto-install SCons",
             ["Check.CleanDir"] = "Clean before build",
-            ["Check.AutoVersion"] = "Auto-increment version (patch +1) on success",
+            ["Check.AutoVersion"] = "Auto-increment version (patch +1) before build",
             ["Check.GenManifest"] = "Generate update manifest (update-manifest.json) — for online hot-update system",
 
             // Buttons
@@ -333,7 +333,7 @@ public static class I18N
             ["Status.Ready"] = "Ready",
 
             // Version tab
-            ["Hint.Version"] = "Edit version numbers, then click 'Save Version' to write to version.py.\nIf auto-update is enabled, patch will increment by 1 after each successful build.",
+            ["Hint.Version"] = "Edit version numbers, then click 'Save Version' to write to version.py.\nIf auto-update is enabled, patch increments before each build and rolls back on failure or cancellation.",
 
             // Column headers
             ["Col.Name"]    = "Name",

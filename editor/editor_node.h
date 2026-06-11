@@ -33,6 +33,7 @@
 #include "core/object/script_language.h"
 #include "core/os/process_id.h"
 #include "core/templates/safe_refcount.h"
+#include "editor/ai/ai_restart_helper.h"
 #include "editor/editor_data.h"
 #include "editor/plugins/editor_plugin.h"
 #include "editor/settings/editor_folding.h"
@@ -659,6 +660,9 @@ private:
 
 	void _save_editor_layout();
 	void _load_editor_layout();
+
+	// Called after AI build restart to trigger post-restart question in AI Chat.
+	void _on_ai_build_restart();
 
 	void _save_central_editor_layout_to_config(Ref<ConfigFile> p_config_file);
 	void _load_central_editor_layout_from_config(Ref<ConfigFile> p_config_file);

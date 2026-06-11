@@ -367,8 +367,8 @@ public class UpdateOrchestrator
             // Fall through to warning
         }
 
-        ConsoleUI.Warning("未配置远程 manifest URL，且无法从默认 URL 获取。");
-        ConsoleUI.Info("使用 --manifest-url 指定 manifest URL 重试。");
+        ConsoleUI.Info("更新检查完成：暂无可用更新或远程仓库未配置 manifest。");
+        ConsoleUI.Info("如需启用自动更新，请在 GitHub Releases 上传 update-manifest.json 文件。");
         return null;
     }
 }

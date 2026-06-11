@@ -49,6 +49,10 @@ class AINewBuildNotifier : public AcceptDialog {
 	int countdown_seconds = 3;
 	String dialog_template_text;
 
+	// Current task info for AI build restart tracking.
+	String current_task_id;
+	String current_task_summary;
+
 	void _on_poll_tick();
 	void _on_countdown_tick();
 	void _on_confirmed();
@@ -58,6 +62,9 @@ public:
 
 	static void start_polling();
 	static void stop_polling();
+
+	// Set the current AI task info for post-restart tracking.
+	void set_current_task(const String &p_task_id, const String &p_task_summary);
 
 protected:
 	static AINewBuildNotifier *singleton;

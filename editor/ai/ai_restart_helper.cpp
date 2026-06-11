@@ -85,28 +85,78 @@ Error AIRestartHelper::save_state() {
 	return OK;
 }
 
-Error AIRestartHelper::restore_state() {
+Error AIRestartHelper::save_state(const String &p_reason, const String &p_task_summary, const String &p_task_id) {
+	// 1. Force editor layout save so session scenes are written to
+	//    editor_layout.cfg. This is what restore_scenes_on_load reads.
+	EditorNode::get_singleton()->save_editor_layout_delayed();
+
+	// 2. Save all unsaved scene changes.
+	EditorNode::get_singleton()->save_all_scenes();
+
+	// 3. Build state with AI build info.
+	RestoreState state;
+	for (int i = 0; i < EditorNode::get_singleton()->get_editor_data().get_edited_scene_count(); i++) {
+		String path = EditorNode::get_singleton()->get_editor_data().get_scene_path(i);
+		if (!path.is_empty()) {
+			state.open_scene_paths.push_back(path);
+		}
+	}
+
+	state.restart_reason = p_reason;
+	state.task_summary = p_task_summary;
+	state.task_id = p_task_id;
+
+	Dictionary root;
+	{
+		Array scenes;
+		for (const String &s : state.open_scene_paths) {
+			scenes.push_back(s);
+		}
+		root["open_scenes"] = scenes;
+		root["restart_reason"] = state.restart_reason;
+		root["task_summary"] = state.task_summary;
+		root["task_id"] = state.task_id;
+		root["saved_at"] = itos(static_cast<int64_t>(OS::get_singleton()->get_unix_time()));
+	}
+
+	JSON json;
+	String raw = json.stringify(root);
+
+	Ref<FileAccess> f = FileAccess::open(_state_path(), FileAccess::WRITE);
+	if (f.is_null()) {
+		return ERR_FILE_CANT_WRITE;
+	}
+	f->store_string(raw);
+	return OK;
+}
+
+AIRestartHelper::RestoreState AIRestartHelper::restore_state() {
 	// Godot's built-in restore_scenes_on_load already handles scene
 	// restoration from editor_layout.cfg. This method is a safety net
 	// that re-opens any scenes missing from the built-in restore.
 
+	RestoreState result;
+	result.restart_reason = "";
+	result.task_summary = "";
+	result.task_id = "";
+
 	String path = _state_path();
 	if (!FileAccess::exists(path)) {
-		return OK;
+		return result;
 	}
 
 	Error read_err = OK;
 	String raw = FileAccess::get_file_as_string(path, &read_err);
 	if (read_err != OK) {
 		cleanup_state_file();
-		return read_err;
+		return result;
 	}
 
 	JSON json;
 	Error parse_err = json.parse(raw);
 	if (parse_err != OK) {
 		cleanup_state_file();
-		return parse_err;
+		return result;
 	}
 
 	Dictionary root = json.get_data();
@@ -131,8 +181,17 @@ Error AIRestartHelper::restore_state() {
 		}
 	}
 
-	cleanup_state_file();
-	return OK;
+	// Read AI build info.
+	result.restart_reason = root.get("restart_reason", String());
+	result.task_summary = root.get("task_summary", String());
+	result.task_id = root.get("task_id", String());
+
+	// Only cleanup if not an AI build restart (let caller decide when to cleanup).
+	if (result.restart_reason != "ai_build") {
+		cleanup_state_file();
+	}
+
+	return result;
 }
 
 void AIRestartHelper::cleanup_state_file() {

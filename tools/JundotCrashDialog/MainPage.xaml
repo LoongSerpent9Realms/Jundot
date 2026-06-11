@@ -1,0 +1,69 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JundotCrashDialog.MainPage"
+             Title="Jundot Engine 崩溃"
+             BackgroundColor="#F0F0F0">
+
+    <Grid Padding="20" RowDefinitions="Auto,Auto,*,Auto,Auto">
+        <!-- Title -->
+        <Frame Grid.Row="0" BackgroundColor="#B40000" CornerRadius="8" Padding="16" Margin="0,0,0,12">
+            <Label Text="⚠  Jundot Engine 发生异常退出" 
+                   FontSize="18" 
+                   FontAttributes="Bold" 
+                   TextColor="White"
+                   HorizontalOptions="Center"/>
+        </Frame>
+
+        <!-- Summary -->
+        <Label Grid.Row="1" 
+               x:Name="SummaryLabel"
+               FontSize="14"
+               TextColor="#333333"
+               Margin="0,0,0,12"/>
+
+        <!-- Details -->
+        <Frame Grid.Row="2" BackgroundColor="White" CornerRadius="8" Margin="0,0,0,12" Padding="0">
+            <ScrollView>
+                <StackLayout Padding="12">
+                    <Label Text="崩溃摘要" FontSize="12" FontAttributes="Bold" TextColor="#993333" Margin="0,0,0,6"/>
+                    <Label x:Name="CrashSummary" FontSize="12" TextColor="#444444" FontFamily="Courier New"/>
+                    <Label Text="&#10;引擎 stderr 输出" FontSize="12" FontAttributes="Bold" TextColor="#333399" Margin="0,8,0,6"/>
+                    <Label x:Name="StderrOutput" FontSize="11" TextColor="#444444" FontFamily="Courier New" LineBreakMode="WordWrap"/>
+                    <Label Text="&#10;检测到的 crashlog 文件" FontSize="12" FontAttributes="Bold" TextColor="#996633" Margin="0,8,0,6"/>
+                    <Label x:Name="CrashLogList" FontSize="11" TextColor="#444444" FontFamily="Courier New"/>
+                    <Label Text="&#10;提示: 点击下方「查看详细日志」查看完整内容。如问题持续，请将完整日志提供给开发者。" 
+                           FontSize="12" 
+                           TextColor="#666666" 
+                           Margin="0,12,0,0"/>
+                </StackLayout>
+            </ScrollView>
+        </Frame>
+
+        <!-- Footer -->
+        <Label Grid.Row="3" 
+               x:Name="FooterLabel"
+               FontSize="11"
+               TextColor="#888888"
+               Margin="0,0,0,12"/>
+
+        <!-- Buttons -->
+        <HorizontalStackLayout Grid.Row="4" Spacing="12" HorizontalOptions="End">
+            <Button Text="查看详细日志" 
+                    x:Name="ViewLogButton"
+                    Clicked="OnViewLogClicked"
+                    FontSize="14"
+                    Padding="16,8"/>
+            <Button Text="重新启动引擎" 
+                    x:Name="RestartButton"
+                    Clicked="OnRestartClicked"
+                    FontSize="14"
+                    Padding="16,8"
+                    BackgroundColor="#3C78D8"
+                    TextColor="White"/>
+            <Button Text="关闭" 
+                    Clicked="OnCloseClicked"
+                    FontSize="14"
+                    Padding="16,8"/>
+        </HorizontalStackLayout>
+    </Grid>
+</ContentPage>

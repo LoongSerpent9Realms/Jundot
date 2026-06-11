@@ -60,6 +60,75 @@ static String _get_json_error(const String &p_text) {
 	return "Failed to parse JSON response. Body preview: " + summary;
 }
 
+static String _string_from_content_variant(const Variant &p_content) {
+	switch (p_content.get_type()) {
+		case Variant::STRING:
+			return p_content;
+		case Variant::ARRAY: {
+			String text;
+			Array content_parts = p_content;
+			for (int i = 0; i < content_parts.size(); i++) {
+				if (content_parts[i].get_type() == Variant::STRING) {
+					text += String(content_parts[i]);
+				} else if (content_parts[i].get_type() == Variant::DICTIONARY) {
+					Dictionary part = content_parts[i];
+					if (part.has("text")) {
+						text += String(part["text"]);
+					} else if (part.has("content")) {
+						text += _string_from_content_variant(part["content"]);
+					}
+				}
+			}
+			return text;
+		}
+		default:
+			return String();
+	}
+}
+
+static String _extract_stream_text_delta(const Dictionary &p_data) {
+	if (p_data.has("choices") && p_data["choices"].get_type() == Variant::ARRAY) {
+		Array choices = p_data["choices"];
+		if (!choices.is_empty() && choices[0].get_type() == Variant::DICTIONARY) {
+			Dictionary first_choice = choices[0];
+			if (first_choice.has("delta") && first_choice["delta"].get_type() == Variant::DICTIONARY) {
+				Dictionary delta = first_choice["delta"];
+				String content_delta = _string_from_content_variant(delta.get("content", Variant()));
+				if (!content_delta.is_empty()) {
+					return content_delta;
+				}
+			}
+			if (first_choice.has("message") && first_choice["message"].get_type() == Variant::DICTIONARY) {
+				Dictionary message = first_choice["message"];
+				String message_content = _string_from_content_variant(message.get("content", Variant()));
+				if (!message_content.is_empty()) {
+					return message_content;
+				}
+			}
+			return _string_from_content_variant(first_choice.get("text", Variant()));
+		}
+	}
+
+	String direct_delta = _string_from_content_variant(p_data.get("delta", Variant()));
+	if (!direct_delta.is_empty()) {
+		return direct_delta;
+	}
+
+	if (p_data.has("content")) {
+		String content = _string_from_content_variant(p_data["content"]);
+		if (!content.is_empty()) {
+			return content;
+		}
+	}
+
+	if (p_data.has("type") && String(p_data["type"]) == "content_block_delta" && p_data.has("delta") && p_data["delta"].get_type() == Variant::DICTIONARY) {
+		Dictionary delta = p_data["delta"];
+		return _string_from_content_variant(delta.get("text", Variant()));
+	}
+
+	return String();
+}
+
 String AIChatService::_build_chat_url() const {
 	String url = settings.base_url.strip_edges();
 	while (url.ends_with("/")) {
@@ -81,10 +150,13 @@ void AIChatService::_ensure_http_request() {
 	http_request->set_use_threads(use_threads);
 	http_request->set_timeout(timeout);
 
-	const String proxy_host = EDITOR_GET("network/http_proxy/host");
-	const int proxy_port = EDITOR_GET("network/http_proxy/port");
-	http_request->set_http_proxy(proxy_host, proxy_port);
-	http_request->set_https_proxy(proxy_host, proxy_port);
+	// Delay EDITOR_GET until EditorSettings is ready
+	if (EditorSettings::get_singleton()) {
+		const String proxy_host = EDITOR_GET("network/http_proxy/host");
+		const int proxy_port = EDITOR_GET("network/http_proxy/port");
+		http_request->set_http_proxy(proxy_host, proxy_port);
+		http_request->set_https_proxy(proxy_host, proxy_port);
+	}
 
 	http_request->connect(SNAME("request_completed"), callable_mp(this, &AIChatService::_request_completed));
 	add_child(http_request, false, INTERNAL_MODE_BACK);
@@ -112,9 +184,9 @@ String AIChatService::_extract_text_from_response(const Variant &p_data) const {
 	Dictionary first_choice = choices[0];
 	if (first_choice.has("message") && first_choice["message"].get_type() == Variant::DICTIONARY) {
 		Dictionary message = first_choice["message"];
-		return message.get("content", String());
+		return _string_from_content_variant(message.get("content", Variant()));
 	}
-	return first_choice.get("text", String());
+	return _string_from_content_variant(first_choice.get("text", Variant()));
 }
 
 void AIChatService::_extract_usage_from_response(const Variant &p_data, int &r_prompt_tokens, int &r_completion_tokens) const {
@@ -186,7 +258,6 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 	String content;
 
 	if (p_result != 0) {
-		// HTTP request itself failed (not a server-side HTTP error).
 		String err = _http_result_to_string(p_result);
 		parse_error = "Request failed: " + err;
 		if (p_result == 8) {
@@ -195,7 +266,6 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 		ERR_PRINT("AIChatService: " + parse_error);
 		content = "Error: " + parse_error;
 	} else if (p_response_code >= 400) {
-		// Server returned an HTTP error status.
 		parse_error = vformat("Server returned HTTP %d.", p_response_code);
 		ERR_PRINT("AIChatService: " + parse_error);
 		if (!body_text.is_empty()) {
@@ -207,29 +277,135 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 		ERR_PRINT("AIChatService: " + parse_error);
 		content = "Error: " + parse_error;
 	} else {
-		parsed = JSON::parse_string(body_text);
-		if (parsed.get_type() == Variant::NIL) {
-			parse_error = _get_json_error(body_text);
-			ERR_PRINT("AIChatService: JSON parse failed. " + parse_error);
-			ERR_PRINT("AIChatService: Raw response body:\n" + body_text.substr(0, 2000));
-			content = "Error: " + parse_error;
+		if (streaming) {
+			// SSE format: data blocks separated by double newlines
+			// Each block may contain multiple lines starting with "data:".
+			String normalized_body = body_text.replace("\r\n", "\n");
+			normalized_body = normalized_body.replace("\r", "\n");
+			Vector<String> blocks = normalized_body.split("\n\n", false);
+			print_line("AIChatService: Processing streaming response with " + itos(blocks.size()) + " blocks");
+
+			for (int i = 0; i < blocks.size(); i++) {
+				String block = blocks[i];
+				if (block.is_empty()) {
+					continue;
+				}
+
+				// If block doesn't start with "data:", try processing as raw JSON line
+				if (!block.begins_with("data: ") && !block.begins_with("data:")) {
+					block = block.strip_edges();
+					if (!block.is_empty() && block.begins_with("{")) {
+						// Raw JSON line, process directly
+						_process_stream_chunk("data: " + block);
+						continue;
+					}
+				}
+
+				Vector<String> lines = block.split("\n", false);
+				for (int j = 0; j < lines.size(); j++) {
+					String line = lines[j].strip_edges();
+					if (line.begins_with("data:")) {
+						_process_stream_chunk(line);
+					} else if (line.begins_with("{") && !line.begins_with("data:")) {
+						// Raw JSON without "data:" prefix
+						_process_stream_chunk("data: " + line);
+					}
+				}
+			}
+
+			content = stream_buffer;
+			print_line("AIChatService: Stream buffer content length: " + itos(content.length()));
+			if (!stream_tool_calls.is_empty()) {
+				// The stream contained tool_calls. Construct a synthetic response
+				// that exposes them so the chat panel can execute them.
+				Dictionary synthetic;
+				Array choices_arr;
+				Dictionary choice;
+				Dictionary msg;
+				msg["role"] = "assistant";
+				msg["content"] = content;
+				msg["tool_calls"] = stream_tool_calls;
+				choice["message"] = msg;
+				choice["finish_reason"] = "tool_calls";
+				choices_arr.push_back(choice);
+				synthetic["choices"] = choices_arr;
+				parsed = synthetic;
+				print_line("AIChatService: Stream contained " + itos(stream_tool_calls.size()) + " tool_call(s), passing through for tool execution.");
+			} else if (content.is_empty() && !body_text.strip_edges().begins_with("data:")) {
+				// Fallback: try to parse as non-streaming response if stream parsing failed
+				parsed = JSON::parse_string(body_text);
+				if (parsed.get_type() == Variant::DICTIONARY) {
+					content = _extract_text_from_response(parsed);
+					print_line("AIChatService: Fallback non-streaming parse succeeded, content length: " + itos(content.length()));
+				} else {
+					print_line("AIChatService: Both stream and fallback parse failed");
+				}
+			} else if (content.is_empty()) {
+				// Check if the response contains tool_calls instead of text content.
+				// This is valid for function-calling models and should not be treated as an error.
+				Variant parsed_check_var = JSON::parse_string(body_text);
+				if (parsed_check_var.get_type() == Variant::DICTIONARY) {
+					Dictionary parsed_check = parsed_check_var;
+					Array choices_check = parsed_check.get("choices", Array());
+					if (!choices_check.is_empty() && choices_check[0].get_type() == Variant::DICTIONARY) {
+						Dictionary first = choices_check[0];
+						Dictionary msg = first.get("message", Dictionary());
+						bool has_tool_calls = msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
+								!((Array)msg["tool_calls"]).is_empty();
+						if (has_tool_calls) {
+							// Construct a minimal valid response with tool_calls for the chat panel to process.
+							parsed = parsed_check;
+							print_line("AIChatService: Stream contained tool_calls without text content, passing through for tool execution.");
+						} else {
+							parse_error = "Streaming response did not contain assistant text.";
+							content = "Error: " + parse_error;
+							ERR_PRINT("AIChatService: " + parse_error);
+						}
+					} else {
+						parse_error = "Streaming response did not contain assistant text.";
+						content = "Error: " + parse_error;
+						ERR_PRINT("AIChatService: " + parse_error);
+					}
+				} else {
+					parse_error = "Streaming response did not contain assistant text.";
+					content = "Error: " + parse_error;
+					ERR_PRINT("AIChatService: " + parse_error);
+				}
+			} else {
+				parsed = JSON::parse_string("{}");
+			}
 		} else {
-			content = _extract_text_from_response(parsed);
+			parsed = JSON::parse_string(body_text);
+			if (parsed.get_type() == Variant::NIL) {
+				parse_error = _get_json_error(body_text);
+				ERR_PRINT("AIChatService: JSON parse failed. " + parse_error);
+				ERR_PRINT("AIChatService: Raw response body:\n" + body_text.substr(0, 2000));
+				content = "Error: " + parse_error;
+			} else {
+				content = _extract_text_from_response(parsed);
+			}
 		}
 	}
 
 	String think_content;
 	_extract_think_from_content(content, think_content);
 
-	int prompt_tokens = 0;
-	int completion_tokens = 0;
-	_extract_usage_from_response(parsed, prompt_tokens, completion_tokens);
+	int prompt_tokens = stream_prompt_tokens;
+	int completion_tokens = stream_completion_tokens;
+	if (!streaming) {
+		_extract_usage_from_response(parsed, prompt_tokens, completion_tokens);
+	}
 
 	Dictionary json;
 	if (parsed.get_type() == Variant::DICTIONARY) {
 		json = parsed;
 	}
 
+	if (streaming) {
+		emit_signal(SNAME("chat_stream_complete"), p_result, p_response_code, content, json, body_text, elapsed, think_content, prompt_tokens, completion_tokens);
+	}
+
+	streaming = false;
 	emit_signal(SNAME("chat_completed"), p_result, p_response_code, content, json, body_text, elapsed, think_content, prompt_tokens, completion_tokens);
 }
 
@@ -243,8 +419,25 @@ void AIChatService::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("send_chat", "message"), &AIChatService::send_chat);
 	ClassDB::bind_method(D_METHOD("cancel_request"), &AIChatService::cancel_request);
 	ClassDB::bind_method(D_METHOD("is_requesting"), &AIChatService::is_requesting);
+	ClassDB::bind_method(D_METHOD("is_streaming"), &AIChatService::is_streaming);
 
 	ADD_SIGNAL(MethodInfo("chat_completed",
+			PropertyInfo(Variant::INT, "result"),
+			PropertyInfo(Variant::INT, "response_code"),
+			PropertyInfo(Variant::STRING, "content"),
+			PropertyInfo(Variant::DICTIONARY, "json"),
+			PropertyInfo(Variant::STRING, "raw_body"),
+			PropertyInfo(Variant::FLOAT, "elapsed_seconds"),
+			PropertyInfo(Variant::STRING, "think_content"),
+			PropertyInfo(Variant::INT, "prompt_tokens"),
+			PropertyInfo(Variant::INT, "completion_tokens")));
+
+	ADD_SIGNAL(MethodInfo("chat_stream_data",
+			PropertyInfo(Variant::STRING, "delta"),
+			PropertyInfo(Variant::STRING, "full_content"),
+			PropertyInfo(Variant::INT, "completion_tokens")));
+
+	ADD_SIGNAL(MethodInfo("chat_stream_complete",
 			PropertyInfo(Variant::INT, "result"),
 			PropertyInfo(Variant::INT, "response_code"),
 			PropertyInfo(Variant::STRING, "content"),
@@ -292,11 +485,19 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 
 	request_start_usec = OS::get_singleton()->get_ticks_usec();
 
+	const bool request_stream = p_tools.is_empty();
+	streaming = request_stream;
+	stream_buffer = String();
+	stream_prompt_tokens = 0;
+	stream_completion_tokens = 0;
+	stream_tool_calls = Array();
+
 	Dictionary payload;
 	payload["model"] = settings.model;
 	payload["messages"] = p_messages;
 	payload["temperature"] = settings.temperature;
 	payload["max_tokens"] = settings.max_tokens;
+	payload["stream"] = request_stream;
 
 	if (!p_tools.is_empty()) {
 		payload["tools"] = p_tools;
@@ -306,11 +507,106 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 	Vector<String> headers;
 	headers.push_back("Content-Type: application/json");
 	headers.push_back("Authorization: Bearer " + settings.api_key);
+	if (request_stream) {
+		headers.push_back("Accept: text/event-stream");
+	}
 
 	return http_request->request(_build_chat_url(), headers, HTTPClient::METHOD_POST, JSON::stringify(payload));
 }
 
+void AIChatService::_process_stream_chunk(const String &p_chunk) {
+	String chunk = p_chunk.strip_edges();
+	if (chunk.is_empty()) {
+		return;
+	}
+
+	if (!chunk.begins_with("data:")) {
+		return;
+	}
+
+	String json_str = chunk.substr(5).strip_edges();
+	if (json_str == "[DONE]") {
+		return;
+	}
+
+	Variant parsed = JSON::parse_string(json_str);
+	if (parsed.get_type() != Variant::DICTIONARY) {
+		ERR_PRINT("AIChatService: Failed to parse stream chunk JSON: " + json_str.substr(0, 200));
+		return;
+	}
+
+	Dictionary chunk_data = parsed;
+	String content_delta = _extract_stream_text_delta(chunk_data);
+
+	if (!content_delta.is_empty()) {
+		stream_buffer += content_delta;
+		stream_completion_tokens += content_delta.length() / 4;
+		emit_signal(SNAME("chat_stream_data"), content_delta, stream_buffer, stream_completion_tokens);
+	}
+
+	// Accumulate tool_calls from stream deltas. In OpenAI-compatible streaming,
+	// tool_calls come incrementally, so we merge them by index.
+	if (chunk_data.has("choices") && chunk_data["choices"].get_type() == Variant::ARRAY) {
+		Array choices = chunk_data["choices"];
+		if (!choices.is_empty() && choices[0].get_type() == Variant::DICTIONARY) {
+			Dictionary first_choice = choices[0];
+			if (first_choice.has("delta") && first_choice["delta"].get_type() == Variant::DICTIONARY) {
+				Dictionary delta = first_choice["delta"];
+				if (delta.has("tool_calls") && delta["tool_calls"].get_type() == Variant::ARRAY) {
+					Array tool_call_deltas = delta["tool_calls"];
+					for (int i = 0; i < tool_call_deltas.size(); i++) {
+						Dictionary tc_delta = tool_call_deltas[i];
+						int index = tc_delta.get("index", -1);
+						if (index < 0) {
+							continue;
+						}
+						// Ensure the accumulated array is large enough.
+						while (stream_tool_calls.size() <= index) {
+							Dictionary new_tc;
+							new_tc["id"] = String();
+							new_tc["type"] = "function";
+							Dictionary func;
+							func["name"] = String();
+							func["arguments"] = String();
+							new_tc["function"] = func;
+							stream_tool_calls.push_back(new_tc);
+						}
+						Dictionary accumulated = stream_tool_calls[index];
+						if (tc_delta.has("id") && !String(tc_delta["id"]).is_empty()) {
+							accumulated["id"] = String(tc_delta["id"]);
+						}
+						if (tc_delta.has("type") && !String(tc_delta["type"]).is_empty()) {
+							accumulated["type"] = String(tc_delta["type"]);
+						}
+						if (tc_delta.has("function") && tc_delta["function"].get_type() == Variant::DICTIONARY) {
+							Dictionary fn_delta = tc_delta["function"];
+							Dictionary fn_acc = accumulated.get("function", Dictionary());
+							if (fn_delta.has("name") && !String(fn_delta["name"]).is_empty()) {
+								fn_acc["name"] = String(fn_delta["name"]);
+							}
+							if (fn_delta.has("arguments")) {
+								String existing_args = fn_acc.get("arguments", String());
+								existing_args += String(fn_delta["arguments"]);
+								fn_acc["arguments"] = existing_args;
+							}
+							accumulated["function"] = fn_acc;
+						}
+						stream_tool_calls[index] = accumulated;
+					}
+				}
+			}
+		}
+	}
+
+	if (chunk_data.has("usage")) {
+		Dictionary usage = chunk_data["usage"];
+		stream_prompt_tokens = usage.get("prompt_tokens", stream_prompt_tokens);
+		stream_completion_tokens = usage.get("completion_tokens", stream_completion_tokens);
+	}
+}
+
 void AIChatService::cancel_request() {
+	streaming = false;
 	if (http_request) {
 		http_request->cancel_request();
 	}
@@ -318,4 +614,8 @@ void AIChatService::cancel_request() {
 
 bool AIChatService::is_requesting() const {
 	return http_request && http_request->get_http_client_status() != HTTPClient::STATUS_DISCONNECTED;
+}
+
+bool AIChatService::is_streaming() const {
+	return streaming;
 }

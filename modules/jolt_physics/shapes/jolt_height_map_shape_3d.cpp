@@ -1,4 +1,4 @@
-/**************************************************************************/
+﻿/**************************************************************************/
 /*  jolt_height_map_shape_3d.cpp                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
@@ -79,7 +79,7 @@ JPH::ShapeRefC JoltHeightMapShape3D::_build_height_field() const {
 	const float offset_x = (float)-quad_count_x / 2.0f;
 	const float offset_y = (float)-quad_count_y / 2.0f;
 
-	// Jolt triangulates the height map differently from how Jundot Physics does it, so we mirror the shape along the
+	// Jolt triangulates the height map differently from how Godot Physics does it, so we mirror the shape along the
 	// Z-axis to get the desired triangulation and reverse the rows to undo the mirroring.
 
 	LocalVector<float> heights_rev;

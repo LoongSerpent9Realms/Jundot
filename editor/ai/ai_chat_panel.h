@@ -36,6 +36,7 @@
 class AIChatMessage;
 class AIChatService;
 class AIRepairCard;
+class AIToolConfirmationDialog;
 class AIUsageAgreementDialog;
 class AISuggestionCard;
 class Button;
@@ -64,6 +65,7 @@ class AIChatPanel : public MarginContainer {
 	};
 
 	AIChatService *chat_service = nullptr;
+	AIChatMessage *streaming_message = nullptr;
 	VBoxContainer *message_list = nullptr;
 	ScrollContainer *message_scroll = nullptr;
 	HBoxContainer *attachment_chips = nullptr;
@@ -93,7 +95,6 @@ class AIChatPanel : public MarginContainer {
 	PopupMenu *conversation_popup = nullptr;
 
 	// Conversation history list.
-	ItemList *conversation_list = nullptr;
 	Vector<Vector<String>> saved_conversations; // Each: [title, timestamp, messages_json].
 	String current_conversation_id;
 
@@ -121,6 +122,7 @@ class AIChatPanel : public MarginContainer {
 	bool is_titling = false;
 	bool has_auto_titled = false;
 	String pending_title_text;
+	String title_request_conversation_id;
 	Vector<ChatAttachment> pending_title_attachments;
 
 	Vector<ChatAttachment> attachments;
@@ -131,10 +133,22 @@ class AIChatPanel : public MarginContainer {
 		Array original_tools;
 		int iteration_count = 0;
 		int max_iterations = 10;
+		bool missing_tool_retry_used = false;
+		bool executed_tool_calls = false;
 	};
 
 	PendingToolRound pending_tool_round;
 	bool in_tool_loop = false;
+	String request_conversation_id;
+
+	// Tool call confirmation dialog.
+	AIToolConfirmationDialog *tool_confirmation_dialog = nullptr;
+	Dictionary pending_tool_calls_json; // Stores the JSON for pending tool calls
+
+	// Tool confirmation callbacks.
+	void _confirm_tool_execute(int p_tool_index);
+	void _confirm_tool_skip(int p_tool_index);
+	void _confirm_tool_cancel_all();
 
 	// Active settings used for the current send, cached so the tool loop
 	// reuses the same system prompt (with auto_mode, context, etc.) instead
@@ -192,6 +206,9 @@ class AIChatPanel : public MarginContainer {
 	void _cancel_request();
 	void _clear_messages();
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
+	void _chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
+	bool _looks_like_tool_preamble(const String &p_content) const;
+	bool _retry_after_missing_tool_call(const String &p_content);
 	void _execute_tool_calls(const Dictionary &p_json);
 	void _add_user_message(const String &p_text);
 	void _add_ai_message(const String &p_content, const String &p_think_content, double p_think_time, int p_prompt_tokens, int p_completion_tokens);
@@ -223,14 +240,6 @@ class AIChatPanel : public MarginContainer {
 	void _switch_to_project();
 	void _update_mode_indicator();
 
-	// Conversation management.
-	void _new_conversation();
-	void _update_conversation_menu();
-	void _select_conversation(int p_index);
-	void _save_current_conversation();
-	void _load_conversation(const String &p_messages_json);
-	void _update_conversation_list();
-
 	// Suggestion card callbacks.
 	void _suggestion_accepted(AISuggestionCard *p_card);
 	void _suggestion_rejected(AISuggestionCard *p_card);
@@ -259,5 +268,7 @@ protected:
 	static void _bind_methods();
 
 public:
+	void send_post_restart_question();
+
 	AIChatPanel();
 };

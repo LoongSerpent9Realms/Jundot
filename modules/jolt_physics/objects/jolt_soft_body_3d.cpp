@@ -1,4 +1,4 @@
-/**************************************************************************/
+﻿/**************************************************************************/
 /*  jolt_soft_body_3d.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
@@ -640,12 +640,12 @@ void JoltSoftBody3D::set_linear_damping(float p_damping) {
 }
 
 float JoltSoftBody3D::get_drag() const {
-	// Drag is not a thing in Jolt, and not supported by Jundot Physics either.
+	// Drag is not a thing in Jolt, and not supported by Godot Physics either.
 	return 0.0f;
 }
 
 void JoltSoftBody3D::set_drag(float p_drag) {
-	// Drag is not a thing in Jolt, and not supported by Jundot Physics either.
+	// Drag is not a thing in Jolt, and not supported by Godot Physics either.
 }
 
 Variant JoltSoftBody3D::get_state(PhysicsServer3D::BodyState p_state) const {

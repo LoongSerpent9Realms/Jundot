@@ -68,6 +68,27 @@
 
 Ref<EditorSettings> EditorSettings::singleton = nullptr;
 
+static String _detect_external_editor_from_environment() {
+	static const char *editor_env_vars[] = {
+		"EDITOR",
+		"VSCODE",
+		"SUBLIME_PATH",
+	};
+
+	for (const char *env_var : editor_env_vars) {
+		if (!OS::get_singleton()->has_environment(env_var)) {
+			continue;
+		}
+
+		const String editor_path = OS::get_singleton()->get_environment(env_var).strip_edges();
+		if (!editor_path.is_empty()) {
+			return editor_path;
+		}
+	}
+
+	return String();
+}
+
 // Properties
 
 bool EditorSettings::_set(const StringName &p_name, const Variant &p_value) {
@@ -873,8 +894,20 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("text_editor/completion/colorize_suggestions", true);
 
 	// External editor (ScriptEditorPlugin)
-	_initial_set("text_editor/external/use_external_editor", false, true);
-	_initial_set("text_editor/external/exec_path", "");
+	const String current_exec_path = String(props["text_editor/external/exec_path"].variant);
+	if (current_exec_path.is_empty()) {
+		const String detected_external_editor = _detect_external_editor_from_environment();
+		if (!detected_external_editor.is_empty()) {
+			_initial_set("text_editor/external/use_external_editor", true, true);
+			_initial_set("text_editor/external/exec_path", detected_external_editor);
+			const String detected_external_editor_flags = _guess_exec_args_for_extenal_editor(detected_external_editor);
+			if (!detected_external_editor_flags.is_empty()) {
+				_initial_set("text_editor/external/exec_flags", detected_external_editor_flags);
+			}
+		} else {
+			_initial_set("text_editor/external/use_external_editor", false, true);
+		}
+	}
 
 	// Help
 	_initial_set("text_editor/help/show_help_index", true);
@@ -1124,6 +1157,31 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	// Platform
 	_initial_set("run/platforms/linuxbsd/prefer_wayland", false, true);
 	set_restart_if_changed("run/platforms/linuxbsd/prefer_wayland", true);
+
+	/* AI Settings */
+
+	String default_ai_source_cache_root;
+	if (OS::get_singleton()) {
+		default_ai_source_cache_root = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+	}
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/provider/base_url", "https://api.openai.com/v1", "https://api.openai.com/v1")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/provider/model", "gpt-4.1", "gpt-4.1")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/provider/api_key", "", "API key")
+	EDITOR_SETTING_BASIC(Variant::FLOAT, PROPERTY_HINT_RANGE, "ai_settings/provider/temperature", 0.7, "0,2,0.05")
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/provider/max_tokens", 40960, "1,262144,1")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_ENUM, "ai_settings/general/output_language", "auto", "auto,English,Simplified Chinese,Traditional Chinese,Japanese,Korean,Spanish,French,German")
+	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/tools/enable_function_calling", true, "")
+	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/tools/enable_mcp_tools", false, "")
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/context/context_char_budget", 12000, "0,262144,256")
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/context/history_char_budget", 16000, "0,262144,256")
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/context/max_tool_call_iterations", 10, "1,1000,1")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_GLOBAL_DIR, "ai_settings/engine_source/source_root", "", "")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_GLOBAL_DIR, "ai_settings/engine_source/cache_root", default_ai_source_cache_root, "")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/engine_source/repository_url", "", "https://github.com/owner/repo.git")
+	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/engine_source/encrypt_cache", false, "")
+	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/external_api/enabled", false, "")
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/external_api/port", 8080, "1,65535,1")
+	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/external_api/bind_address", "127.0.0.1", "127.0.0.1")
 
 	/* Network */
 

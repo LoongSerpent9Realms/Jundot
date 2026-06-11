@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -57,12 +57,12 @@ public class BuildProgressEventArgs : EventArgs
 {
     public string Message   { get; init; } = "";
     public string MessageType { get; init; } = "info";  // info | step | warning | error | success | output
-    /// <summary>Progress value 0.0–1.0, or null for indeterminate.</summary>
+    /// <summary>Progress value 0.0�?.0, or null for indeterminate.</summary>
     public double? Progress { get; init; }
 }
 
 /// <summary>
-/// Core build engine — translates scripts/package-jundot.ps1 logic into C#.
+/// Core build engine �?translates scripts/package-jundot.ps1 logic into C#.
 /// </summary>
 public class BuildEngine
 {
@@ -85,11 +85,16 @@ public class BuildEngine
     private Process? _currentProcess;
     private readonly object _logLock = new();
 
-    /// <summary>爬取 Ninja/SCons 输出的编译进度。</summary>
+    // Normalized target: "editor.dev" �?"editor" (for SCons + file pattern matching)
+    private string _actualTarget = "editor";
+    private string[]? _versionFileBackup;
+    private bool _autoVersionApplied;
+
+    /// <summary>爬取 Ninja/SCons 输出的编译进度�?/summary>
     private double? _ninjaTotal;
     private double _ninjaCurrent;
 
-    /// <summary>Optional — set to enable automatic build history recording.</summary>
+    /// <summary>Optional �?set to enable automatic build history recording.</summary>
     public BuildManager? BuildManager { get; set; }
 
     public BuildConfig Config => _cfg;
@@ -99,12 +104,11 @@ public class BuildEngine
     public BuildEngine(BuildConfig cfg)
     {
         _cfg = cfg;
+        _actualTarget = cfg.Target == "editor.dev" ? "editor" : cfg.Target;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  PUBLIC API
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  PUBLIC API
+    // ══════════════════════════════════════════════════════════════�?
     public async Task<bool> RunAsync(CancellationToken ct)
     {
         _ct = ct;
@@ -115,8 +119,20 @@ public class BuildEngine
             ResolvePaths();
 
             // ── 2. Read version ─────────────────────────────
-            _version = GetJundotVersion();
+            if (_cfg.AutoUpdateVersion)
+            {
+                var oldVer = GetJundotVersion();
+                _versionFileBackup = ReadVersionFileLines();
+                _version = UpdateVersionFile();
+                _autoVersionApplied = true;
+                Report($"Version auto-updated before build: {oldVer} -> {_version}", "success");
+            }
+            else
+            {
+                _version = GetJundotVersion();
+            }
             Report($"Jundot version: {_version}", "info");
+            InvalidateVersionDependentBuildOutputs(_version);
 
             // ── 3. Generate package name ────────────────────
             _packageName = BuildPackageName();
@@ -144,7 +160,9 @@ public class BuildEngine
             }
             else
             {
-                Report("Skipping build — using existing files in bin/", "step");
+                Report("Skipping build �?using existing files in bin/", "step");
+                if (_cfg.AutoUpdateVersion)
+                    Report("Auto-version updated version.py, but Skip Build packages existing binaries; rebuild to embed the new engine version.", "warning");
             }
 
             // ── 5. Package ──────────────────────────────────
@@ -155,29 +173,24 @@ public class BuildEngine
             Report("", "success");
             Report($"Package created: {_zipPath}", "success");
 
-            // ── 6. Auto-update version ──────────────────────
-            if (_cfg.AutoUpdateVersion)
-            {
-                var newVer = UpdateVersionFile();
-                Report($"Version auto-updated for next build: {_version} -> {newVer}", "success");
-                Report($"Version auto-updated: {_version} → {newVer}", "success");
-            }
-
-            // ── 7. Record build history ─────────────────────
             if (!_cfg.AutoUpdateVersion)
                 Report("Auto-update version is disabled; version.py was not changed.", "info");
 
             SaveBuildRecord();
+            _versionFileBackup = null;
+            _autoVersionApplied = false;
 
             return true;
         }
         catch (OperationCanceledException)
         {
+            RestoreVersionFileAfterFailedBuild();
             Report("Build cancelled by user.", "warning");
             return false;
         }
         catch (Exception ex)
         {
+            RestoreVersionFileAfterFailedBuild();
             Report($"ERROR: {ex.Message}", "error");
             return false;
         }
@@ -189,10 +202,8 @@ public class BuildEngine
         try { _currentProcess?.Kill(entireProcessTree: true); } catch { /* best effort */ }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  PATH RESOLUTION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  PATH RESOLUTION
+    // ══════════════════════════════════════════════════════════════�?
     private void ResolvePaths()
     {
         if (!string.IsNullOrWhiteSpace(_cfg.RepoRoot))
@@ -231,10 +242,8 @@ public class BuildEngine
         return $"jundot-{_version}-{_cfg.PlatformName}-{_cfg.Target}-{_cfg.Arch}{monoPart}-{ts}";
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  VERSION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  VERSION
+    // ══════════════════════════════════════════════════════════════�?
     private string GetJundotVersion()
     {
         var vf = Path.Combine(_repoRoot, "version.py");
@@ -259,6 +268,104 @@ public class BuildEngine
             v += $"-{status}";
 
         return v;
+    }
+
+    private string[] ReadVersionFileLines()
+    {
+        var vf = Path.Combine(_repoRoot, "version.py");
+        if (!File.Exists(vf))
+            throw new Exception($"version.py not found at {vf}");
+
+        return File.ReadAllLines(vf);
+    }
+
+    private void RestoreVersionFileAfterFailedBuild()
+    {
+        if (!_autoVersionApplied || _versionFileBackup == null)
+            return;
+
+        try
+        {
+            var vf = Path.Combine(_repoRoot, "version.py");
+            File.WriteAllLines(vf, _versionFileBackup, System.Text.Encoding.UTF8);
+            Report("Auto-updated version.py was restored because the build did not complete.", "warning");
+        }
+        catch (Exception ex)
+        {
+            Report($"Warning: failed to restore version.py after build failure: {ex.Message}", "warning");
+        }
+        finally
+        {
+            _versionFileBackup = null;
+            _autoVersionApplied = false;
+        }
+    }
+
+    private void InvalidateVersionDependentBuildOutputs(string oldVersion)
+    {
+        if (string.IsNullOrWhiteSpace(oldVersion))
+            return;
+
+        var objRoot = Path.Combine(_repoRoot, "bin", "obj");
+        if (!Directory.Exists(objRoot))
+            return;
+
+        var deleted = 0;
+        var oldVersionBytes = Encoding.UTF8.GetBytes(oldVersion);
+        var oldVersionWideBytes = Encoding.Unicode.GetBytes(oldVersion);
+        var versionNameBytes = Encoding.UTF8.GetBytes("Jundot Engine v");
+        var versionNameWideBytes = Encoding.Unicode.GetBytes("Jundot Engine v");
+        var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".obj", ".res", ".lib" };
+
+        foreach (var file in Directory.EnumerateFiles(objRoot, "*", SearchOption.AllDirectories))
+        {
+            if (!extensions.Contains(Path.GetExtension(file)))
+                continue;
+
+            try
+            {
+                var bytes = File.ReadAllBytes(file);
+                if (!ContainsBytes(bytes, oldVersionBytes) &&
+                    !ContainsBytes(bytes, oldVersionWideBytes) &&
+                    !ContainsBytes(bytes, versionNameBytes) &&
+                    !ContainsBytes(bytes, versionNameWideBytes))
+                    continue;
+
+                File.Delete(file);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                Report($"Warning: failed to remove stale version build output '{file}': {ex.Message}", "warning");
+            }
+        }
+
+        if (deleted > 0)
+            Report($"Removed {deleted} stale build output(s) containing old engine version {oldVersion}.", "warning");
+    }
+
+    private static bool ContainsBytes(byte[] haystack, byte[] needle)
+    {
+        if (needle.Length == 0 || haystack.Length < needle.Length)
+            return false;
+
+        for (var i = 0; i <= haystack.Length - needle.Length; i++)
+        {
+            var matched = true;
+            for (var j = 0; j < needle.Length; j++)
+            {
+                if (haystack[i + j] == needle[j])
+                    continue;
+
+                matched = false;
+                break;
+            }
+
+            if (matched)
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -296,13 +403,11 @@ public class BuildEngine
         return GetJundotVersion();
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  TOOL DETECTION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  TOOL DETECTION
+    // ══════════════════════════════════════════════════════════════�?
     private async Task FindPythonAsync()
     {
-        // On Windows, prefer "py" launcher — it is never the Store alias.
+        // On Windows, prefer "py" launcher �?it is never the Store alias.
         // Fall back to "python"/"python3" but verify they are real Python.
         var candidates = new[] { "py", "python", "python3" };
         foreach (var name in candidates)
@@ -420,10 +525,8 @@ public class BuildEngine
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  WINDOWS COMPILER DETECTION
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  WINDOWS COMPILER DETECTION
+    // ══════════════════════════════════════════════════════════════�?
     private async Task AssertWindowsCompilerAsync()
     {
         if (_cfg.PlatformName != "windows") return;
@@ -784,10 +887,8 @@ Install one of these toolchains, then run this tool again:
             throw new Exception("Mono builds require the .NET SDK. Install it and retry.");
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  BUILD
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  BUILD
+    // ══════════════════════════════════════════════════════════════�?
     private async Task BuildAsync()
     {
         // Resolve MinGW prefix
@@ -803,7 +904,7 @@ Install one of these toolchains, then run this tool again:
         var jobs = _cfg.Jobs;
         if (jobs <= 0)
         {
-            // 释放全部 CPU 核心（留一个给系统），不再限制 editor 为 4 线程
+            // 释放全部 CPU 核心（留一个给系统），不再限制 editor �?4 线程
             jobs = Math.Max(1, Environment.ProcessorCount - 1);
         }
 
@@ -824,15 +925,20 @@ Install one of these toolchains, then run this tool again:
             }
         }
 
+        // Normalize editor.dev �?target=editor + dev_build=yes
+        var isDevBuild = _cfg.Target == "editor.dev";
+
         // Build args
         var buildArgs = new List<string>(_sconsPrefix)
         {
             $"platform={_cfg.PlatformName}",
-            $"target={_cfg.Target}",
+            $"target={_actualTarget}",
             $"arch={_cfg.Arch}",
-            "debug_symbols=no",
+            $"debug_symbols={(isDevBuild ? "yes" : "no")}",
             $"-j{jobs}"
         };
+        if (isDevBuild)
+            buildArgs.Add("dev_build=yes");
         buildArgs.AddRange(extraArgs);
 
         // Extra SCons args from UI
@@ -841,17 +947,14 @@ Install one of these toolchains, then run this tool again:
             buildArgs.AddRange(_cfg.ExtraSConsArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         }
 
-        // ── 默认启用加速选项（用户可通过 ExtraSConsArgs 覆盖） ─────────
-        AddIfMissing(buildArgs, "scu_build", "yes");           // 单编译单元：合并源文件减少编译次数
-        AddIfMissing(buildArgs, "fast_unsafe", "yes");         // 隐式缓存 + 最大漂移：加速增量构建
-        buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
+        // ── 默认启用加速选项（用户可通过 ExtraSConsArgs 覆盖�?─────────
+        AddIfMissing(buildArgs, "scu_build", "yes");           // 单编译单元：合并源文件减少编译次�?        AddIfMissing(buildArgs, "fast_unsafe", "yes");         // 隐式缓存 + 最大漂移：加速增量构�?        buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
         AddIfMissing(buildArgs, "fast_unsafe", "yes");
         buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
         buildArgs.Add("ninja=no");
 
-        // 构建缓存目录（用户的项目 gitignore 中应已忽略 .scons_cache）
-        var defaultCache = Path.Combine(_repoRoot, ".scons_cache");
-        AddIfMissing(buildArgs, "cache_path", defaultCache);
+        // 构建缓存目录（用户的项目 gitignore 中应已忽�?.scons_cache�?        var defaultCache = Path.Combine(_repoRoot, ".scons_cache");
+        buildArgs.RemoveAll(a => a.StartsWith("cache_path=", StringComparison.OrdinalIgnoreCase));
 
         // MinGW
         if (_cfg.PlatformName == "windows" && _cfg.UseMinGW)
@@ -908,7 +1011,7 @@ Install one of these toolchains, then run this tool again:
             try
             {
                 var cleanLogPath = Path.Combine(_logRoot, $"{_packageName}-clean.log");
-                await RunAndReportInDirAsync(_sconsCmd, _repoRoot, cleanLogPath, cleanArgs.ToArray());
+                await RunAndReportInDirAsync(_sconsCmd, _repoRoot, cleanLogPath, false, cleanArgs.ToArray());
                 Report("Previous build artifacts cleaned.", "success");
             }
             catch (Exception ex)
@@ -918,7 +1021,7 @@ Install one of these toolchains, then run this tool again:
         }
         else
         {
-            Report("Incremental build (skip clean) — enable 'Clean Build' in Advanced tab for full rebuild.", "info");
+            Report("Incremental build (skip clean) �?enable 'Clean Build' in Advanced tab for full rebuild.", "info");
         }
 
         // Create log directory
@@ -926,7 +1029,7 @@ Install one of these toolchains, then run this tool again:
         var buildLogPath = Path.Combine(_logRoot, $"{_packageName}-build.log");
 
         // Run SCons build
-        await RunAndReportInDirAsync(_sconsCmd, _repoRoot, buildLogPath, buildArgs.ToArray());
+        await RunAndReportInDirAsync(_sconsCmd, _repoRoot, buildLogPath, false, buildArgs.ToArray());
 
         // Mono post-build
         if (_cfg.Mono)
@@ -953,21 +1056,19 @@ Install one of these toolchains, then run this tool again:
 
         // Generate mono glue
         var glueLog = Path.Combine(_logRoot, $"{_packageName}-mono-glue.log");
-        await RunAndReportInDirAsync(monoExe.FullName, _repoRoot, glueLog,
+        await RunAndReportInDirAsync(monoExe.FullName, _repoRoot, glueLog, false,
             new[] { "--headless", "--generate-mono-glue", "./modules/mono/glue" });
 
         // Build assemblies
         var asmLog = Path.Combine(_logRoot, $"{_packageName}-mono-assemblies.log");
-        await RunAndReportInDirAsync(_pythonPath, _repoRoot, asmLog,
+        await RunAndReportInDirAsync(_pythonPath, _repoRoot, asmLog, false,
             new[] { "./modules/mono/build_scripts/build_assemblies.py",
             "--jundot-output-dir=./bin",
             $"--jundot-platform={_cfg.PlatformName}" });
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  WINDOWS OPTIONAL DEPENDENCIES
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  WINDOWS OPTIONAL DEPENDENCIES
+    // ══════════════════════════════════════════════════════════════�?
     /// <summary>
     /// When EnableWindowsOptionalDeps is true, auto-detect whether the
     /// accesskit and d3d12 SDKs are installed. If they are missing,
@@ -985,7 +1086,7 @@ Install one of these toolchains, then run this tool again:
         {
             Report("AccessKit SDK not found. Installing...", "warning");
             var script = Path.Combine(_repoRoot, "misc", "scripts", "install_accesskit.py");
-            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, new[] { script });
+            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, false, new[] { script });
             Report("AccessKit SDK installed successfully.", "success");
         }
         else
@@ -1004,7 +1105,7 @@ Install one of these toolchains, then run this tool again:
         {
             Report("D3D12 SDK not found. Installing...", "warning");
             var script = Path.Combine(_repoRoot, "misc", "scripts", "install_d3d12_sdk_windows.py");
-            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, new[] { script });
+            await RunAndReportInDirAsync(_pythonPath, _repoRoot, null, false, new[] { script });
             Report("D3D12 SDK installed successfully.", "success");
         }
         else
@@ -1013,10 +1114,8 @@ Install one of these toolchains, then run this tool again:
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  PACKAGE
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  PACKAGE
+    // ══════════════════════════════════════════════════════════════�?
     private async Task PackageAsync()
     {
         Directory.CreateDirectory(_packageRoot);
@@ -1047,6 +1146,21 @@ Install one of these toolchains, then run this tool again:
             Report($"  Copied: {product.Name}", "output");
         }
 
+        // Dev build: also copy PDB for crash report symbol resolution
+        if (_cfg.Target == "editor.dev")
+        {
+            foreach (var product in products)
+            {
+                var pdbName = Path.ChangeExtension(product.Name, ".pdb");
+                var pdbPath = Path.Combine(binDir, pdbName);
+                if (File.Exists(pdbPath))
+                {
+                    File.Copy(pdbPath, Path.Combine(_stagingDir, pdbName), overwrite: true);
+                    Report($"  Copied: {pdbName}", "output");
+                }
+            }
+        }
+
         // Mono: copy JundotSharp
         if (_cfg.Mono)
         {
@@ -1059,7 +1173,7 @@ Install one of these toolchains, then run this tool again:
         }
 
         await CopyPackageBuilderAsync();
-        await CopyLauncherAsync();
+        // await CopyLauncherAsync(); // 已禁�?        await CopyCrashDialogAsync();
 
         // Write manifest
         var manifestPath = Path.Combine(_stagingDir, "package-manifest.txt");
@@ -1085,7 +1199,7 @@ Install one of these toolchains, then run this tool again:
         lines.Add("Files:");
         lines.AddRange(products.Select(p => $"  {p.Name}"));
         if (_cfg.Mono) lines.Add("  JundotSharp/");
-        if (_cfg.Target == "editor")
+        if (_actualTarget == "editor")
         {
             lines.Add("  Tools/PackageBuilder/");
             lines.Add("  Tools/Launcher/");
@@ -1093,7 +1207,7 @@ Install one of these toolchains, then run this tool again:
 
         File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);
 
-        // Create zip — prefer 7-Zip for multi-threaded compression (5-10x faster)
+        // Create zip �?prefer 7-Zip for multi-threaded compression (5-10x faster)
         Report("Creating zip package", "step");
         if (File.Exists(_zipPath))
             File.Delete(_zipPath);
@@ -1113,7 +1227,7 @@ Install one of these toolchains, then run this tool again:
             if (updateManifestPath != null)
             {
                 Report($"  Manifest written: {updateManifestPath}", "success");
-                Report($"  Manifest also at: {Path.Combine(_packageRoot, $"{_packageName}-manifest.json")}", "info");
+                Report($"  Manifest also at: {Path.Combine(_packageRoot, "manifest.json")}", "info");
             }
             else
             {
@@ -1122,13 +1236,11 @@ Install one of these toolchains, then run this tool again:
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  HELPERS
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  HELPERS
+    // ══════════════════════════════════════════════════════════════�?
     private async Task CopyPackageBuilderAsync()
     {
-        if (_cfg.PlatformName != "windows" || _cfg.Target != "editor")
+        if (_cfg.PlatformName != "windows" || _actualTarget != "editor")
             return;
 
         var projectPath = Path.Combine(_repoRoot, "tools", "PackageBuilder", "PackageBuilder.csproj");
@@ -1145,7 +1257,7 @@ Install one of these toolchains, then run this tool again:
 
         Report("Embedding AI package builder", "step");
         var logPath = Path.Combine(_logRoot, $"{_packageName}-package-builder.log");
-        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, new[]
+        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, true, new[]
         {
             "publish",
             projectPath,
@@ -1163,7 +1275,7 @@ Install one of these toolchains, then run this tool again:
 
     private async Task CopyLauncherAsync()
     {
-        if (_cfg.Target != "editor")
+        if (_actualTarget != "editor")
             return;
 
         var projectPath = Path.Combine(_repoRoot, "tools", "Launcher", "Launcher.csproj");
@@ -1180,7 +1292,7 @@ Install one of these toolchains, then run this tool again:
 
         Report("Embedding JundotLauncher", "step");
         var logPath = Path.Combine(_logRoot, $"{_packageName}-launcher.log");
-        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, new[]
+        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, true, new[]
         {
             "publish",
             projectPath,
@@ -1189,17 +1301,57 @@ Install one of these toolchains, then run this tool again:
             "-o",
             launcherDir,
             "--self-contained",
-            "false",
-            "/p:UseAppHost=true"
+            "true",
+            "/p:UseAppHost=true",
+            "-r",
+            "win-x64"
         });
 
         Report("  Copied: Tools/Launcher/", "output");
     }
 
+    private async Task CopyCrashDialogAsync()
+    {
+        if (_cfg.PlatformName != "windows" || _actualTarget != "editor")
+            return;
+
+        var projectPath = Path.Combine(_repoRoot, "tools", "JundotCrashDialog", "JundotCrashDialog.csproj");
+        if (!File.Exists(projectPath))
+        {
+            Report("JundotCrashDialog project was not found; skipping crash dialog.", "warning");
+            return;
+        }
+
+        var crashDialogDir = Path.Combine(_stagingDir, "Tools", "CrashDialog");
+        if (Directory.Exists(crashDialogDir))
+            Directory.Delete(crashDialogDir, true);
+        Directory.CreateDirectory(crashDialogDir);
+
+        Report("Embedding JundotCrashDialog", "step");
+        var logPath = Path.Combine(_logRoot, $"{_packageName}-crash-dialog.log");
+        await RunAndReportInDirAsync("dotnet", _repoRoot, logPath, true, new[]
+        {
+            "publish",
+            projectPath,
+            "-c",
+            "Release",
+            "-o",
+            crashDialogDir,
+            "--self-contained",
+            "true",
+            "-r",
+            "win-x64",
+            "/p:UseAppHost=true"
+        });
+
+        Report("  Copied: Tools/CrashDialog/", "output");
+    }
+
     private string GetProductPattern(bool monoBuild)
     {
         var platform = Regex.Escape(_cfg.PlatformName);
-        var target = Regex.Escape(_cfg.Target);
+        // dev_build=yes �?SConstruct 会在文件名中追加 .dev (�?editor �?editor.dev)
+        var target = Regex.Escape(_actualTarget) + @"(\.dev)?";
         var arch = Regex.Escape(_cfg.Arch);
 
         if (_cfg.PlatformName == "windows")
@@ -1397,12 +1549,13 @@ Install one of these toolchains, then run this tool again:
     private async Task RunAndReportAsync(string cmd, params string[] args)
     {
         // Overload 1: no log path
-        await RunAndReportWithLogAsync(cmd, null, args);
+        await RunAndReportWithLogAsync(cmd, null, false, args);
     }
 
-    private async Task RunAndReportInDirAsync(string cmd, string workingDirectory, string? logPath, string[] args)
+    private async Task RunAndReportInDirAsync(string cmd, string workingDirectory, string? logPath, bool forceUtf8 = false, string[]? args = null)
     {
-        var psi = new ProcessStartInfo(cmd, string.Join(" ", args))
+        var argsList = args ?? Array.Empty<string>();
+        var psi = new ProcessStartInfo(cmd, string.Join(" ", argsList))
         {
             WorkingDirectory = workingDirectory,
             RedirectStandardOutput = true,
@@ -1411,10 +1564,11 @@ Install one of these toolchains, then run this tool again:
             CreateNoWindow = true
         };
 
+        ConfigureProcessOutput(psi, forceUtf8);
         await RunProcessAndReportAsync(psi, logPath);
     }
 
-    private async Task RunAndReportWithLogAsync(string cmd, string? logPath, params string[] args)
+    private async Task RunAndReportWithLogAsync(string cmd, string? logPath, bool forceUtf8 = false, params string[] args)
     {
         var psi = new ProcessStartInfo(cmd, string.Join(" ", args))
         {
@@ -1424,12 +1578,14 @@ Install one of these toolchains, then run this tool again:
             CreateNoWindow = true
         };
 
+        ConfigureProcessOutput(psi, forceUtf8);
         await RunProcessAndReportAsync(psi, logPath);
     }
 
     private async Task RunProcessAndReportAsync(ProcessStartInfo psi, string? logPath)
     {
-        ConfigureProcessOutput(psi);
+        // Note: ConfigureProcessOutput should be called by the caller before this method.
+        // This method assumes the encoding is already configured.
 
         _currentProcess = Process.Start(psi);
         if (_currentProcess == null)
@@ -1465,28 +1621,37 @@ Install one of these toolchains, then run this tool again:
         }
     }
 
-    private static void ConfigureProcessOutput(ProcessStartInfo psi)
+    private static void ConfigureProcessOutput(ProcessStartInfo psi, bool forceUtf8 = false)
     {
         // Use the system's active ANSI code page (e.g. GBK/936 on Chinese Windows)
         // so that native tools like MSVC/cl.exe output Chinese correctly.
-        // Falls back to UTF-8 on non-Windows or if the system codepage is unavailable.
-        try
-        {
-            var sysEncoding = Encoding.GetEncoding(0);
-            psi.StandardOutputEncoding = sysEncoding;
-            psi.StandardErrorEncoding  = sysEncoding;
-        }
-        catch
+        // Falls back to UTF-8 on non-Windows, if the system codepage is unavailable,
+        // or if forceUtf8 is true (for .NET tools that always output UTF-8).
+        if (forceUtf8)
         {
             psi.StandardOutputEncoding = Encoding.UTF8;
             psi.StandardErrorEncoding  = Encoding.UTF8;
+        }
+        else
+        {
+            try
+            {
+                var sysEncoding = Encoding.GetEncoding(0);
+                psi.StandardOutputEncoding = sysEncoding;
+                psi.StandardErrorEncoding  = sysEncoding;
+            }
+            catch
+            {
+                psi.StandardOutputEncoding = Encoding.UTF8;
+                psi.StandardErrorEncoding  = Encoding.UTF8;
+            }
         }
 
         // Do NOT set PYTHONUTF8/PYTHONIOENCODING here.
         // Let Python use its system default encoding (GBK on Chinese Windows),
         // which matches the ANSI code page set above. MSVC/cl.exe also outputs
         // GBK, so the whole pipeline stays consistent:
-        //   MSVC(GBK) → scons/Python(GBK) → C# stdout reader(GBK) → UI(Unicode)
+        //   MSVC(GBK) �?scons/Python(GBK) �?C# stdout reader(GBK) �?UI(Unicode)
         // Force Python unbuffered output so Ninja/SCons daemon output is visible
         // in real-time instead of being buffered until process exit.
         psi.Environment["PYTHONUNBUFFERED"] = "1";
@@ -1603,7 +1768,7 @@ Install one of these toolchains, then run this tool again:
         if (reader.GetType() != null)
             return;
 
-        // 匹配 Ninja 的 [N/M] 进度前缀
+        // 匹配 Ninja �?[N/M] 进度前缀
         var ninjaProgress = new Regex(@"^\[(\d+)/(\d+)\].*$");
 
         try
@@ -1639,10 +1804,8 @@ Install one of these toolchains, then run this tool again:
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  BUILD HISTORY
-    // ═══════════════════════════════════════════════════════════════
-
+    // ══════════════════════════════════════════════════════════════�?    //  BUILD HISTORY
+    // ══════════════════════════════════════════════════════════════�?
     private void SaveBuildRecord()
     {
         if (BuildManager == null) return;
@@ -1686,7 +1849,7 @@ Install one of these toolchains, then run this tool again:
 
             BuildManager.SaveRecord(record);
         }
-        catch { /* best effort — don't fail the build over history recording */ }
+        catch { /* best effort �?don't fail the build over history recording */ }
     }
 
     private void Report(string message, string type)

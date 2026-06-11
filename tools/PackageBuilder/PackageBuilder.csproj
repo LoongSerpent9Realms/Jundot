@@ -13,6 +13,8 @@
     <Version>1.0.0</Version>
     <FileVersion>1.0.0</FileVersion>
     <AssemblyVersion>1.0.0</AssemblyVersion>
+    <!-- Ensure UTF-8 encoding for source files with CJK characters -->
+    <Utf8Output>true</Utf8Output>
   </PropertyGroup>
 
 </Project>

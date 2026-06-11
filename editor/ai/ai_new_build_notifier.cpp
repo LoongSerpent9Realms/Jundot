@@ -65,10 +65,22 @@ void AINewBuildNotifier::_on_confirmed() {
 	countdown_timer->stop();
 
 	// Save work state for restoration after restart.
-	AIRestartHelper::save_state();
+	// If we have AI task info, save it for post-restart question.
+	if (!current_task_id.is_empty()) {
+		AIRestartHelper::save_state("ai_build", current_task_summary, current_task_id);
+	} else {
+		AIRestartHelper::save_state();
+	}
 
 	// Trigger editor save and restart.
 	EditorNode::get_singleton()->restart_editor();
+}
+
+void AINewBuildNotifier::set_current_task(const String &p_task_id, const String &p_task_summary) {
+	if (singleton) {
+		singleton->current_task_id = p_task_id;
+		singleton->current_task_summary = p_task_summary;
+	}
 }
 
 AINewBuildNotifier *AINewBuildNotifier::get_singleton() {

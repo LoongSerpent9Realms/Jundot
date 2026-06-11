@@ -1,4 +1,4 @@
-/*  ai_tool_executor.cpp                                                    */
+﻿/*  ai_tool_executor.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -28,11 +28,15 @@
 #include "ai_tool_executor.h"
 #include "ai_tool_defs.h"
 #include "ai_code_fetcher.h"
+#include "ai_code_security_checker.h"
+#include "ai_code_uploader.h"
+#include "ai_feature_gate.h"
 #include "ai_mcp_runtime.h"
 #include "ai_restart_helper.h"
 #include "ai_settings.h"
 #include "ai_tool_registry.h"
 
+#include "core/config/project_settings.h"
 #include "core/error/error_macros.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
@@ -108,6 +112,77 @@ struct BuildState {
 
 static BuildState build_state;
 
+static String _find_sconstruct_root_from(String p_dir, int p_max_depth = 10) {
+	for (int i = 0; i < p_max_depth && !p_dir.is_empty(); i++) {
+		if (FileAccess::exists(p_dir.path_join("SConstruct"))) {
+			return p_dir;
+		}
+
+		String parent = p_dir.get_base_dir();
+		if (parent == p_dir) {
+			break;
+		}
+		p_dir = parent;
+	}
+
+	return String();
+}
+
+static String _get_default_engine_source_cache_root() {
+	String user_data_dir = OS::get_singleton()->get_user_data_dir();
+	if (user_data_dir.is_empty()) {
+		return String();
+	}
+	return user_data_dir.path_join("engine_source");
+}
+
+static String _get_configured_engine_source_cache_root(const AISettingsData &p_settings) {
+	if (!p_settings.engine_source_cache_root.is_empty()) {
+		return p_settings.engine_source_cache_root;
+	}
+	return _get_default_engine_source_cache_root();
+}
+
+static String _get_engine_build_root() {
+	AISettingsData settings = AISettings::load();
+
+	if (!settings.engine_source_root.is_empty() && FileAccess::exists(settings.engine_source_root.path_join("SConstruct"))) {
+		return settings.engine_source_root;
+	}
+
+	String detected = AISettings::get_engine_source_root(settings);
+	if (!detected.is_empty() && FileAccess::exists(detected.path_join("SConstruct"))) {
+		return detected;
+	}
+
+	String exe_path = OS::get_singleton()->get_executable_path();
+	if (!exe_path.is_empty()) {
+		detected = _find_sconstruct_root_from(exe_path.get_base_dir());
+		if (!detected.is_empty()) {
+			return detected;
+		}
+	}
+
+	String cache_root = _get_configured_engine_source_cache_root(settings);
+	if (!cache_root.is_empty() && FileAccess::exists(cache_root.path_join("SConstruct"))) {
+		return cache_root;
+	}
+
+	return _find_sconstruct_root_from(OS::get_singleton()->get_cwd());
+}
+
+static String _source_root_missing_message() {
+	AISettingsData settings = AISettings::load();
+	String cache_root = _get_configured_engine_source_cache_root(settings);
+	String message = "No JunDot engine source checkout is configured. A packaged editor executable does not contain source code.";
+	if (!cache_root.is_empty()) {
+		message += " Clone/download the JunDot source into the default cache directory (" + cache_root + ") or set AI engine_source_root to another source checkout, then retry.";
+	} else {
+		message += " Clone/download the JunDot source into a separate directory, set AI engine_source_root to that directory, then retry.";
+	}
+	return message;
+}
+
 static void _build_thread_callback(void *p_userdata) {
 	String extra_args = String();
 	if (p_userdata) {
@@ -115,7 +190,18 @@ static void _build_thread_callback(void *p_userdata) {
 		delete static_cast<String *>(p_userdata);
 	}
 
-	String project_root = AIToolExecutor::_get_project_root();
+	String project_root = _get_engine_build_root();
+	if (project_root.is_empty()) {
+		build_state.complete("Failed to start build: no JunDot engine source root with SConstruct was found. A packaged editor executable does not contain the engine source. Clone/download the JunDot source into a separate directory, set AI engine_source_root to that directory, then retry run_build.", -1);
+		return;
+	}
+
+	String previous_cwd = OS::get_singleton()->get_cwd();
+	Error cwd_err = OS::get_singleton()->set_cwd(project_root);
+	if (cwd_err != OK) {
+		build_state.complete("Failed to start build: could not switch to project root: " + project_root, -1);
+		return;
+	}
 
 	// Build scons arguments.
 	List<String> scons_args;
@@ -135,38 +221,34 @@ static void _build_thread_callback(void *p_userdata) {
 		}
 	}
 
-	// Clean stale build artifacts from previous (failed) builds.
-	{
-		List<String> clean_args;
-		clean_args.push_back("-c");
-		for (const String &arg : scons_args) {
-			clean_args.push_back(arg);
-		}
-		String clean_out;
-		int clean_exit = -1;
-		OS::get_singleton()->execute("python", clean_args, &clean_out, &clean_exit, true);
-		// Clean exit code is ignored — non-zero on first clean is expected (nothing to clean).
-	}
 
 	// Try python -m SCons first, then scons, then python3 -m SCons.
 	String std_out;
 	int exit_code = -1;
 
-	Error err = OS::get_singleton()->execute("python", scons_args, &std_out, &exit_code, true);
+	// First try: python -m SCons
+	List<String> py_args;
+	py_args.push_back("-m");
+	py_args.push_back("SCons");
+	for (const String &arg : scons_args) {
+		py_args.push_back(arg);
+	}
+	Error err = OS::get_singleton()->execute("python", py_args, &std_out, &exit_code, true);
+
 	if (err != OK) {
-		List<String> py_args;
-		py_args.push_back("-m");
-		py_args.push_back("SCons");
-		for (const String &arg : scons_args) {
-			py_args.push_back(arg);
-		}
-		err = OS::get_singleton()->execute("python3", py_args, &std_out, &exit_code, true);
+		// Second try: scons directly
+		err = OS::get_singleton()->execute("scons", scons_args, &std_out, &exit_code, true);
 		if (err != OK) {
-			std_out = "Failed to start build: neither 'python' nor 'python3' with scons was found.";
-			exit_code = -1;
+			// Third try: python3 -m SCons
+			err = OS::get_singleton()->execute("python3", py_args, &std_out, &exit_code, true);
+			if (err != OK) {
+				std_out = "Failed to start build: neither 'python -m SCons', 'scons', nor 'python3 -m SCons' was found.";
+				exit_code = -1;
+			}
 		}
 	}
 
+	OS::get_singleton()->set_cwd(previous_cwd);
 	build_state.complete(std_out, exit_code);
 }
 
@@ -201,6 +283,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _fetch_url(args);
 	} else if (name == AIToolNames::SHELL_COMMAND) {
 		result = _shell_command(args);
+	} else if (name == AIToolNames::UPLOAD_CODE) {
+		result = _upload_code(args);
 	} else if (name == AIToolNames::RESTART_ENGINE) {
 		result = _restart_engine(args);
 	} else if (name.find_char('.') >= 0) {
@@ -233,22 +317,27 @@ String AIToolExecutor::_get_project_root() {
 	// In PROJECT mode, return the currently-opened project directory.
 	AISettingsData s = AISettings::load();
 	if (s.context_mode == AIContextMode::ENGINE) {
-		return AISettings::get_engine_source_root(s);
+		String engine_root = _get_engine_build_root();
+		if (!engine_root.is_empty()) {
+			return engine_root;
+		}
+		return String();
 	}
-	// Project mode: try project.godot directory, otherwise fall back to the engine source.
+
+	if (ProjectSettings::get_singleton()) {
+		String project_root = ProjectSettings::get_singleton()->get_resource_path();
+		if (!project_root.is_empty() && FileAccess::exists(project_root.path_join("project.godot"))) {
+			return project_root;
+		}
+	}
+
+	// Project mode fallback: try the executable directory, otherwise fall back to cwd.
 	String exe_path = OS::get_singleton()->get_executable_path();
-	String probe = exe_path.get_base_dir().path_join("SConstruct");
-	if (FileAccess::exists(probe)) {
+	if (!exe_path.is_empty() && FileAccess::exists(exe_path.get_base_dir().path_join("project.godot"))) {
 		return exe_path.get_base_dir();
 	}
-	String dir = exe_path.get_base_dir();
-	for (int i = 0; i < 10; i++) {
-		if (FileAccess::exists(dir.path_join("SConstruct"))) {
-			return dir;
-		}
-		dir = dir.get_base_dir();
-	}
-	return exe_path.get_base_dir();
+
+	return OS::get_singleton()->get_cwd();
 }
 
 // ---- Tool implementations ----
@@ -260,6 +349,9 @@ Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
 	}
 
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
 	StringBuilder result;
 
 	for (int i = 0; i < paths.size(); i++) {
@@ -298,25 +390,23 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		return _make_result("No file path provided.", true);
 	}
 
-	String project_root = _get_project_root();
-	String full_path = project_root.path_join(path);
-
-	// Backup existing file.
-	if (FileAccess::exists(full_path)) {
-		String bak_path = full_path + ".bak";
-		// Remove old backup.
-		if (FileAccess::exists(bak_path)) {
-			Ref<DirAccess> da = DirAccess::create_for_path(bak_path);
-			if (da.is_valid()) {
-				da->remove(bak_path);
-			}
-		}
-		// Rename current file to backup.
-		Ref<DirAccess> da = DirAccess::create_for_path(full_path);
-		if (da.is_valid()) {
-			da->rename(full_path, bak_path);
-		}
+	// Validate content: reject Markdown code fences, which usually mean the
+	// model returned a formatted snippet instead of raw file contents.
+	if (content.contains("```")) {
+		return _make_result(vformat("File write rejected: content contains Markdown code fences (```). Please call write_file again with raw file content only.\nPath: %s", path), true);
 	}
+
+	// Reject obviously truncated code (ends mid-statement).
+	String trimmed = content.strip_edges();
+	if (trimmed.ends_with("...") || trimmed.ends_with(",") || trimmed.ends_with("(") || trimmed.ends_with("=")) {
+		return _make_result(vformat("File write rejected: content appears truncated (ends with '%s'). Please regenerate the complete content.\nPath: %s", String::chr(trimmed[trimmed.length() - 1]), path), true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	String full_path = project_root.path_join(path);
 
 	// Create parent directories.
 	Ref<DirAccess> da = DirAccess::create_for_path(full_path);
@@ -325,17 +415,46 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		if (mkdir_err != OK) {
 			return _make_result(vformat("Failed to create directory for %s", path), true);
 		}
+	} else {
+		return _make_result(vformat("Failed to access directory for %s", path), true);
 	}
 
-	// Write file.
+	// Write to a temporary file first so a failed write does not remove the
+	// previous version.
+	String tmp_path = full_path + ".ai_tmp";
 	Error err = OK;
-	Ref<FileAccess> file = FileAccess::open(full_path, FileAccess::WRITE, &err);
+	Ref<FileAccess> file = FileAccess::open(tmp_path, FileAccess::WRITE, &err);
 	if (err != OK || file.is_null()) {
-		return _make_result(vformat("Failed to open file for writing: %s", path), true);
+		return _make_result(vformat("Failed to open temporary file for writing: %s", path), true);
 	}
 
 	file->store_string(content);
 	file.unref();
+
+	String bak_path = full_path + ".bak";
+	if (FileAccess::exists(bak_path)) {
+		Ref<DirAccess> bak_da = DirAccess::create_for_path(bak_path);
+		if (bak_da.is_valid()) {
+			bak_da->remove(bak_path);
+		}
+	}
+
+	if (FileAccess::exists(full_path)) {
+		Error backup_err = da->rename(full_path, bak_path);
+		if (backup_err != OK) {
+			da->remove(tmp_path);
+			return _make_result(vformat("Failed to create backup before writing: %s", path), true);
+		}
+	}
+
+	Error rename_err = da->rename(tmp_path, full_path);
+	if (rename_err != OK) {
+		if (FileAccess::exists(bak_path) && !FileAccess::exists(full_path)) {
+			da->rename(bak_path, full_path);
+		}
+		da->remove(tmp_path);
+		return _make_result(vformat("Failed to replace file after writing temporary content: %s", path), true);
+	}
 
 	return _make_result(vformat("Successfully wrote %s (%d bytes).", path, content.utf8().length()));
 }
@@ -347,6 +466,9 @@ Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
 	}
 
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
 
 	// Use a simple recursive directory walk. Godot's DirAccess doesn't support
 	// globs natively, so we do a manual pattern match.
@@ -361,7 +483,7 @@ Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
 	if (sep >= 0) {
 		String dir_part = pattern.substr(0, sep);
 		if (dir_part == "**") {
-			// ** pattern — search from root.
+			// ** pattern �?search from root.
 			file_filter = pattern.substr(3).trim_prefix("/");
 		} else {
 			base_dir = project_root.path_join(dir_part);
@@ -469,6 +591,9 @@ Dictionary AIToolExecutor::_grep_code(const Dictionary &p_args) {
 	}
 
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
 
 	// Determine which directories to search.
 	Vector<String> search_dirs;
@@ -596,7 +721,7 @@ Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
 		return _make_result("No build has been started yet. Use run_build to start one.");
 	}
 
-	// Build is done — retrieve the result.
+	// Build is done �?retrieve the result.
 	String std_out = r["stdout"];
 	int exit_code = r["exit_code"];
 
@@ -621,6 +746,9 @@ Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
 
 Dictionary AIToolExecutor::_read_build_log(const Dictionary &p_args) {
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
 	String log_dir = project_root.path_join("artifacts").path_join("logs");
 
 	Ref<DirAccess> da = DirAccess::open(log_dir);
@@ -683,6 +811,9 @@ Dictionary AIToolExecutor::_fetch_url(const Dictionary &p_args) {
 	}
 
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
 	String full_dest = project_root.path_join(dest_path);
 
 	String sha256;
@@ -701,6 +832,16 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 	}
 
 	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		project_root = _get_configured_engine_source_cache_root(AISettings::load());
+		if (project_root.is_empty()) {
+			return _make_result("Project root not detected.", true);
+		}
+		Ref<DirAccess> da = DirAccess::create_for_path(project_root);
+		if (da.is_null() || da->make_dir_recursive(project_root) != OK) {
+			return _make_result("Project root not detected and failed to create engine source cache directory.", true);
+		}
+	}
 
 	// Split command into program and arguments.
 	Vector<String> parts = command.split(" ", false);
@@ -717,6 +858,12 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 	String std_out;
 	int exit_code = -1;
 
+	String previous_cwd = OS::get_singleton()->get_cwd();
+	Error cwd_err = OS::get_singleton()->set_cwd(project_root);
+	if (cwd_err != OK) {
+		return _make_result("Failed to switch command working directory to: " + project_root, true);
+	}
+
 #ifdef WINDOWS_ENABLED
 	// On Windows, use cmd /c for shell commands.
 	List<String> cmd_args;
@@ -726,6 +873,8 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 #else
 	Error err = OS::get_singleton()->execute(program, shell_args, &std_out, &exit_code, true);
 #endif
+
+	OS::get_singleton()->set_cwd(previous_cwd);
 
 	if (err != OK) {
 		return _make_result(vformat("Failed to execute command: %s (err=%d)", command, (int)err), true);
@@ -759,6 +908,79 @@ Dictionary AIToolExecutor::_restart_engine(const Dictionary &p_args) {
 	EditorNode::get_singleton()->restart_editor(false);
 
 	return _make_result("Engine restart initiated. The editor will save open files and relaunch with the new build.");
+}
+
+Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
+	String file_path = p_args.get("file_path", String());
+	String commit_message = p_args.get("commit_message", String());
+
+	if (file_path.is_empty()) {
+		return _make_result("file_path is required.", true);
+	}
+	if (commit_message.is_empty()) {
+		return _make_result("commit_message is required.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("Project root not detected. Make sure you're in ENGINE mode with a valid godot.creator.json or SConstruct in the working directory.", true);
+	}
+
+	String full_path = project_root.path_join(file_path);
+
+	// Step 1: Verify file exists.
+	if (!FileAccess::exists(full_path)) {
+		return _make_result("File not found: " + full_path, true);
+	}
+
+	// Step 2: Read file content.
+	Error read_err;
+	String code = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		return _make_result("Failed to read file: " + full_path, true);
+	}
+
+	// Step 3: Security check - detect suspicious patterns.
+	CodeSecurityReport security = AICodeSecurityChecker::check(code);
+	if (!security.is_safe) {
+		String warning_text = "Upload rejected: security check failed.\n";
+		for (int i = 0; i < security.warnings.size(); i++) {
+			warning_text += "  - " + security.warnings[i] + "\n";
+		}
+		warning_text += "\nPlease review the flagged code or use shell_command to push manually after review.";
+		return _make_result(warning_text, true);
+	}
+
+	// Step 4: Universality estimate (simple heuristic based on code characteristics).
+	double universality_score = 75.0; // default: assume generally useful
+	if (code.length() < 50) {
+		universality_score = 60.0; // tiny snippets are less general
+	} else if (code.find("TODO") >= 0 || code.find("hardcoded") >= 0) {
+		universality_score = 55.0; // code with explicit TODOs/hardcoded markers are lower
+	}
+
+	// Step 5: Check against AIFeatureGate threshold.
+	AISettingsData settings = AISettings::load();
+	if (universality_score < settings.feature_universality_threshold) {
+		return _make_result(
+				"Upload rejected: estimated universality " + String::num(universality_score, 1) +
+						"% below threshold " + String::num(settings.feature_universality_threshold, 1) +
+						"%. Code should be more generally useful before committing.",
+				true);
+	}
+
+	// Step 6: Perform git add / commit / push.
+	String error_msg;
+	Error upload_err = AICodeUploader::upload(file_path, commit_message, project_root, &error_msg);
+	if (upload_err != OK) {
+		return _make_result("Upload failed: " + error_msg, true);
+	}
+
+	return _make_result(
+			"Upload successful: " + file_path +
+					"\n  Commit message: " + commit_message +
+					"\n  Security: PASSED"
+					"\n  Universality: " + String::num(universality_score, 1) + "%");
 }
 
 Dictionary AIToolExecutor::_execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json) {

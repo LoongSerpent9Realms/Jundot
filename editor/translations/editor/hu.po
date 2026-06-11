@@ -10483,10 +10483,10 @@ msgstr "D3D12"
 msgid "Metal"
 msgstr "Metal"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Jundot Fizika (2D)"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Jundot Fizika (3D)"
 
 msgid "Text Server: Fallback"
@@ -10530,10 +10530,10 @@ msgstr ""
 "OpenGL háttérprogram (RenderingDevice háttérprogramra van szükség, ha ki van "
 "kapcsolva)."
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Jundot Fizika háttérprogram (2D)."
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Jundot Fizika háttérprogram (3D)."
 
 msgid "Jolt Physics backend (3D only)."

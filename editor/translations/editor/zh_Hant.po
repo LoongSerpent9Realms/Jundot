@@ -13685,13 +13685,13 @@ msgstr "OpenGL"
 msgid "Physics Server (2D)"
 msgstr "物理伺服器（2D）"
 
-msgid "Jundot Physics (2D)"
+msgid "Godot Physics (2D)"
 msgstr "Jundot 物理（2D）"
 
 msgid "Physics Server (3D)"
 msgstr "物理伺服器（3D）"
 
-msgid "Jundot Physics (3D)"
+msgid "Godot Physics (3D)"
 msgstr "Jundot 物理（3D）"
 
 msgid "Jolt Physics"
@@ -13739,10 +13739,10 @@ msgstr "RenderingDevice 的 Metal 後端（僅限 Apple arm64）。"
 msgid "OpenGL backend (if disabled, the RenderingDevice backend is required)."
 msgstr "OpenGL 後端（若停用則需啟用 RenderingDevice 後端）。"
 
-msgid "Jundot Physics backend (2D)."
+msgid "Godot Physics backend (2D)."
 msgstr "Jundot 物理後端（2D）。"
 
-msgid "Jundot Physics backend (3D)."
+msgid "Godot Physics backend (3D)."
 msgstr "Jundot 物理後端（3D）。"
 
 msgid "Jolt Physics backend (3D only)."

@@ -43,9 +43,73 @@
 #include "scene/gui/grid_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
+#include "scene/gui/option_button.h"
 #include "scene/gui/spin_box.h"
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
+
+static constexpr int OUTPUT_LANGUAGE_AUTO = 0;
+static constexpr int OUTPUT_LANGUAGE_ENGLISH = 1;
+static constexpr int OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE = 2;
+static constexpr int OUTPUT_LANGUAGE_TRADITIONAL_CHINESE = 3;
+static constexpr int OUTPUT_LANGUAGE_JAPANESE = 4;
+static constexpr int OUTPUT_LANGUAGE_KOREAN = 5;
+static constexpr int OUTPUT_LANGUAGE_SPANISH = 6;
+static constexpr int OUTPUT_LANGUAGE_FRENCH = 7;
+static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
+
+static String _output_language_from_id(int p_id) {
+	switch (p_id) {
+		case OUTPUT_LANGUAGE_ENGLISH:
+			return "English";
+		case OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE:
+			return "Simplified Chinese";
+		case OUTPUT_LANGUAGE_TRADITIONAL_CHINESE:
+			return "Traditional Chinese";
+		case OUTPUT_LANGUAGE_JAPANESE:
+			return "Japanese";
+		case OUTPUT_LANGUAGE_KOREAN:
+			return "Korean";
+		case OUTPUT_LANGUAGE_SPANISH:
+			return "Spanish";
+		case OUTPUT_LANGUAGE_FRENCH:
+			return "French";
+		case OUTPUT_LANGUAGE_GERMAN:
+			return "German";
+		case OUTPUT_LANGUAGE_AUTO:
+		default:
+			return "auto";
+	}
+}
+
+static int _output_language_to_id(const String &p_language) {
+	const String language = p_language.strip_edges();
+	if (language == "English") {
+		return OUTPUT_LANGUAGE_ENGLISH;
+	}
+	if (language == "Simplified Chinese") {
+		return OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE;
+	}
+	if (language == "Traditional Chinese") {
+		return OUTPUT_LANGUAGE_TRADITIONAL_CHINESE;
+	}
+	if (language == "Japanese") {
+		return OUTPUT_LANGUAGE_JAPANESE;
+	}
+	if (language == "Korean") {
+		return OUTPUT_LANGUAGE_KOREAN;
+	}
+	if (language == "Spanish") {
+		return OUTPUT_LANGUAGE_SPANISH;
+	}
+	if (language == "French") {
+		return OUTPUT_LANGUAGE_FRENCH;
+	}
+	if (language == "German") {
+		return OUTPUT_LANGUAGE_GERMAN;
+	}
+	return OUTPUT_LANGUAGE_AUTO;
+}
 
 void AIConfigPanel::_bind_methods() {
 }
@@ -85,6 +149,27 @@ SpinBox *AIConfigPanel::_add_spin_box_row(GridContainer *p_grid, Label **r_label
 	return spin;
 }
 
+OptionButton *AIConfigPanel::_add_output_language_row(GridContainer *p_grid, Label **r_label, const String &p_label) {
+	Label *label = memnew(Label);
+	label->set_text(p_label);
+	p_grid->add_child(label);
+	*r_label = label;
+
+	OptionButton *option = memnew(OptionButton);
+	option->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	option->add_item(TTR("System Language (Auto)"), OUTPUT_LANGUAGE_AUTO);
+	option->add_item(TTR("English"), OUTPUT_LANGUAGE_ENGLISH);
+	option->add_item(TTR("Chinese (Simplified)"), OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE);
+	option->add_item(TTR("Chinese (Traditional)"), OUTPUT_LANGUAGE_TRADITIONAL_CHINESE);
+	option->add_item(TTR("Japanese"), OUTPUT_LANGUAGE_JAPANESE);
+	option->add_item(TTR("Korean"), OUTPUT_LANGUAGE_KOREAN);
+	option->add_item(TTR("Spanish"), OUTPUT_LANGUAGE_SPANISH);
+	option->add_item(TTR("French"), OUTPUT_LANGUAGE_FRENCH);
+	option->add_item(TTR("German"), OUTPUT_LANGUAGE_GERMAN);
+	p_grid->add_child(option);
+	return option;
+}
+
 void AIConfigPanel::_update_translations() {
 	set_name(TTRC("Config"));
 	title_label->set_text(TTR("AI Configuration"));
@@ -98,6 +183,7 @@ void AIConfigPanel::_update_translations() {
 	max_tool_iterations_label->set_text(TTR("Max Tool Call Iterations"));
 	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
 	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
+	output_language_label->set_text(TTR("AI Output Language"));
 	system_prompt_label->set_text(TTR("System Prompt"));
 	user_extra_instructions_label->set_text(TTR("Extra Instructions (appended to system prompt)"));
 	include_project_memories_check->set_text(TTR("Include project memories"));
@@ -117,6 +203,15 @@ void AIConfigPanel::_update_translations() {
 	import_button->set_text(TTR("Import Config"));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	model_edit->set_placeholder(AISettings::get_default_model());
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_AUTO), TTR("System Language (Auto)"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_ENGLISH), TTR("English"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE), TTR("Chinese (Simplified)"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_TRADITIONAL_CHINESE), TTR("Chinese (Traditional)"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_JAPANESE), TTR("Japanese"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_KOREAN), TTR("Korean"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_SPANISH), TTR("Spanish"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_FRENCH), TTR("French"));
+	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_GERMAN), TTR("German"));
 }
 
 void AIConfigPanel::_load_settings() {
@@ -131,6 +226,7 @@ void AIConfigPanel::_load_settings() {
 	max_tool_iterations_spin->set_value(settings.max_tool_iterations);
 	feature_universality_threshold_spin->set_value(settings.feature_universality_threshold);
 	feature_necessity_threshold_spin->set_value(settings.feature_necessity_threshold);
+	output_language_option->select(output_language_option->get_item_index(_output_language_to_id(settings.output_language)));
 	include_project_memories_check->set_pressed(settings.include_project_memories);
 	include_tool_context_check->set_pressed(settings.include_tool_context);
 	tools_enabled_check->set_pressed(settings.tools_enabled);
@@ -157,6 +253,7 @@ void AIConfigPanel::_save_settings() {
 	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
@@ -199,6 +296,7 @@ void AIConfigPanel::_test_connection() {
 	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
@@ -267,6 +365,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.max_tool_iterations = max_tool_iterations_spin->get_value();
 	settings.feature_universality_threshold = feature_universality_threshold_spin->get_value();
 	settings.feature_necessity_threshold = feature_necessity_threshold_spin->get_value();
+	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
@@ -290,9 +389,17 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["history_char_budget"] = settings.history_char_budget;
 	root["max_tool_iterations"] = settings.max_tool_iterations;
 	root["auto_suggest_entries"] = settings.auto_suggest_entries;
+	root["output_language"] = settings.output_language;
 	root["feature_universality_threshold"] = settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = settings.feature_necessity_threshold;
 	root["feature_design_philosophy_check"] = settings.feature_design_philosophy_check;
+	root["engine_source_root"] = settings.engine_source_root;
+	root["engine_source_cache_root"] = settings.engine_source_cache_root;
+	root["engine_source_repository_url"] = settings.engine_source_repository_url;
+	root["encrypt_engine_source_cache"] = settings.encrypt_engine_source_cache;
+	root["external_api_enabled"] = settings.external_api_enabled;
+	root["external_api_port"] = settings.external_api_port;
+	root["external_api_bind_address"] = settings.external_api_bind_address;
 	root["schema_version"] = 1;
 
 	Error err;
@@ -367,6 +474,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("feature_necessity_threshold")) {
 		feature_necessity_threshold_spin->set_value(root["feature_necessity_threshold"]);
 	}
+	if (root.has("output_language")) {
+		output_language_option->select(output_language_option->get_item_index(_output_language_to_id(String(root["output_language"]))));
+	}
 	if (root.has("include_project_memories")) {
 		include_project_memories_check->set_pressed(root["include_project_memories"]);
 	}
@@ -390,6 +500,29 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 
 	_save_settings();
+	AISettingsData imported_settings = AISettings::load();
+	if (root.has("engine_source_root")) {
+		imported_settings.engine_source_root = root["engine_source_root"];
+	}
+	if (root.has("engine_source_cache_root")) {
+		imported_settings.engine_source_cache_root = root["engine_source_cache_root"];
+	}
+	if (root.has("engine_source_repository_url")) {
+		imported_settings.engine_source_repository_url = root["engine_source_repository_url"];
+	}
+	if (root.has("encrypt_engine_source_cache")) {
+		imported_settings.encrypt_engine_source_cache = root["encrypt_engine_source_cache"];
+	}
+	if (root.has("external_api_enabled")) {
+		imported_settings.external_api_enabled = root["external_api_enabled"];
+	}
+	if (root.has("external_api_port")) {
+		imported_settings.external_api_port = root["external_api_port"];
+	}
+	if (root.has("external_api_bind_address")) {
+		imported_settings.external_api_bind_address = root["external_api_bind_address"];
+	}
+	AISettings::save(imported_settings);
 	status_label->set_text(vformat(TTR("Config imported from %s and saved."), p_path));
 }
 
@@ -400,11 +533,15 @@ AIConfigPanel::AIConfigPanel() {
 	add_theme_constant_override("margin_right", 8 * EDSCALE);
 	add_theme_constant_override("margin_bottom", 8 * EDSCALE);
 
+	ScrollContainer *scroll = memnew(ScrollContainer);
+	scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	add_child(scroll);
+
 	VBoxContainer *root = memnew(VBoxContainer);
 	root->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	root->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	root->add_theme_constant_override("separation", 8 * EDSCALE);
-	add_child(root);
+	scroll->add_child(root);
 
 	title_label = memnew(Label);
 	title_label->set_theme_type_variation("HeaderSmall");
@@ -425,6 +562,7 @@ AIConfigPanel::AIConfigPanel() {
 	max_tool_iterations_spin = _add_spin_box_row(grid, &max_tool_iterations_label, TTR("Max Tool Call Iterations"), 1, 1000, 1);
 	feature_universality_threshold_spin = _add_spin_box_row(grid, &feature_universality_threshold_label, TTR("Feature Universality Threshold (%)"), 0, 100, 1);
 	feature_necessity_threshold_spin = _add_spin_box_row(grid, &feature_necessity_threshold_label, TTR("Feature Necessity Threshold"), 0, 1, 0.05);
+	output_language_option = _add_output_language_row(grid, &output_language_label, TTR("AI Output Language"));
 
 	include_project_memories_check = memnew(CheckBox);
 	root->add_child(include_project_memories_check);
