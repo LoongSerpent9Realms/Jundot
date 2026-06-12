@@ -6,7 +6,7 @@ major = 0
 
 minor = 2
 
-patch = 23
+patch = 31
 
 status = "alpha"
 

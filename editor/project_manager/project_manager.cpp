@@ -40,6 +40,8 @@
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/version.h"
+#include "editor/ai/ai_settings.h"
+#include "editor/project_manager/ai_source_manager.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
 #include "editor/doc/editor_help.h"
 #include "editor/editor_string_names.h"
@@ -88,6 +90,47 @@ constexpr int JUNDOT4_CONFIG_VERSION = 5;
 
 ProjectManager *ProjectManager::singleton = nullptr;
 
+static String _get_default_ai_source_cache_root() {
+	if (!OS::get_singleton()) {
+		return String();
+	}
+	const String user_data_dir = OS::get_singleton()->get_user_data_dir();
+	if (user_data_dir.is_empty()) {
+		return String();
+	}
+	return user_data_dir.path_join("engine_source");
+}
+
+static bool _is_ai_engine_source_root(const String &p_path) {
+	return !p_path.is_empty() && FileAccess::exists(p_path.path_join("SConstruct"));
+}
+
+static String _find_ai_engine_source_root_in_cache(const String &p_cache_path) {
+	if (_is_ai_engine_source_root(p_cache_path)) {
+		return p_cache_path;
+	}
+
+	Ref<DirAccess> dir = DirAccess::open(p_cache_path);
+	if (dir.is_null()) {
+		return String();
+	}
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (dir->current_is_dir() && !name.begins_with(".")) {
+			const String candidate = p_cache_path.path_join(name);
+			if (_is_ai_engine_source_root(candidate)) {
+				dir->list_dir_end();
+				return candidate;
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+	return String();
+}
+
 // Notifications.
 
 void ProjectManager::_notification(int p_what) {
@@ -114,6 +157,7 @@ void ProjectManager::_notification(int p_what) {
 			_select_main_view(MAIN_VIEW_PROJECTS);
 			_update_list_placeholder();
 			_titlebar_resized();
+			callable_mp(this, &ProjectManager::_maybe_prompt_ai_source_cache).call_deferred();
 		} break;
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
@@ -483,7 +527,7 @@ void ProjectManager::_restart_confirmed() {
 	get_tree()->quit();
 }
 
-// ── Hot-update system handlers ──────────────────────────────
+// Hot-update system handlers.
 
 void ProjectManager::_on_update_download_requested(const String &p_version, const String &p_url) {
 	if (!update_dialog || !update_manager) {
@@ -516,6 +560,41 @@ void ProjectManager::_on_update_now_requested() {
 void ProjectManager::_on_skip_version_requested() {
 	// Save skipped version so EngineUpdateLabel doesn't nag again.
 	// For now, just dismiss. Persistence can be added via UpdateStateStore.
+}
+
+void ProjectManager::_maybe_prompt_ai_source_cache() {
+	if (ai_source_prompt_shown) {
+		return;
+	}
+	ai_source_prompt_shown = true;
+
+	AISettingsData settings = AISettings::load();
+	String cache_path = settings.engine_source_cache_root.strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = _get_default_ai_source_cache_root();
+	}
+
+	const String cached_source_root = _find_ai_engine_source_root_in_cache(cache_path);
+	if (!cached_source_root.is_empty()) {
+		settings.engine_source_root = cached_source_root;
+		settings.engine_source_cache_root = cache_path;
+		settings.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+		settings.encrypt_engine_source_cache = true;
+		AISettings::save(settings);
+		return;
+	}
+
+	ai_source_prompt_dialog->popup_centered(Size2(520, 150) * EDSCALE);
+}
+
+void ProjectManager::_open_ai_source_manager_from_prompt() {
+	_show_ai_source_manager();
+}
+
+void ProjectManager::_show_ai_source_manager() {
+	if (ai_source_manager_dialog) {
+		ai_source_manager_dialog->popup_centered_on_parent(get_window());
+	}
 }
 
 // Project list.
@@ -1806,8 +1885,9 @@ ProjectManager::ProjectManager() {
 		quick_settings_dialog = memnew(QuickSettingsDialog);
 		add_child(quick_settings_dialog);
 		quick_settings_dialog->connect("restart_required", callable_mp(this, &ProjectManager::_restart_confirmed));
+		quick_settings_dialog->connect("ai_source_manager_requested", callable_mp(this, &ProjectManager::_show_ai_source_manager));
 
-		// ── Hot-update system ────────────────────────────────
+		// Hot-update system.
 		update_dialog = memnew(UpdateDialog);
 		add_child(update_dialog);
 		update_dialog->connect("update_now_requested", callable_mp(this, &ProjectManager::_on_update_now_requested));
@@ -1904,6 +1984,26 @@ ProjectManager::ProjectManager() {
 		error_dialog = memnew(AcceptDialog);
 		error_dialog->set_title(TTRC("Error"));
 		add_child(error_dialog);
+
+		ai_source_prompt_dialog = memnew(ConfirmationDialog);
+		ai_source_prompt_dialog->set_title(TTRC("AI Engine Source Cache"));
+		ai_source_prompt_dialog->set_ok_button_text(TTRC("Manage Cache"));
+		add_child(ai_source_prompt_dialog);
+
+		VBoxContainer *ai_source_prompt_vb = memnew(VBoxContainer);
+		ai_source_prompt_vb->add_theme_constant_override("separation", 8 * EDSCALE);
+		ai_source_prompt_dialog->add_child(ai_source_prompt_vb);
+
+		Label *ai_source_prompt_label = memnew(Label);
+		ai_source_prompt_label->set_text(TTRC("JunDot AI can read and modify engine source code when a local Git source cache is available. The published editor does not include engine source code. Use the source manager to clone or update the fixed JunDot engine repository for AI use. The cache will be encrypted automatically after Git updates."));
+		ai_source_prompt_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		ai_source_prompt_label->set_custom_minimum_size(Size2(460, 0) * EDSCALE);
+		ai_source_prompt_vb->add_child(ai_source_prompt_label);
+
+		ai_source_prompt_dialog->connect(SceneStringName(confirmed), callable_mp(this, &ProjectManager::_open_ai_source_manager_from_prompt));
+
+		ai_source_manager_dialog = memnew(AISourceManager);
+		add_child(ai_source_manager_dialog);
 
 		about_dialog = memnew(EditorAbout);
 		add_child(about_dialog);

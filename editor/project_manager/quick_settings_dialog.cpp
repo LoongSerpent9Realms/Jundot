@@ -273,6 +273,11 @@ void QuickSettingsDialog::_request_restart() {
 	emit_signal("restart_required");
 }
 
+void QuickSettingsDialog::_on_ai_source_manager_button_pressed() {
+	hide();
+	emit_signal("ai_source_manager_requested");
+}
+
 void QuickSettingsDialog::update_size_limits(const Size2 &p_max_popup_size) {
 #ifndef ANDROID_ENABLED
 	language_option_button->get_popup()->set_max_size(p_max_popup_size);
@@ -298,6 +303,7 @@ void QuickSettingsDialog::_notification(int p_what) {
 
 void QuickSettingsDialog::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("restart_required"));
+	ADD_SIGNAL(MethodInfo("ai_source_manager_requested"));
 }
 
 QuickSettingsDialog::QuickSettingsDialog() {
@@ -430,6 +436,15 @@ QuickSettingsDialog::QuickSettingsDialog() {
 		}
 
 		_update_current_values();
+	}
+
+	// AI Source Manager button.
+	{
+		ai_source_manager_button = memnew(Button);
+		ai_source_manager_button->set_text(TTR("Manage AI Engine Source"));
+		ai_source_manager_button->set_h_size_flags(Control::SIZE_SHRINK_END);
+		settings_list->add_child(ai_source_manager_button);
+		ai_source_manager_button->connect(SceneStringName(pressed), callable_mp(this, &QuickSettingsDialog::_on_ai_source_manager_button_pressed));
 	}
 
 	// Full settings button.

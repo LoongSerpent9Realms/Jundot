@@ -93,6 +93,9 @@ class QuickSettingsDialog : public AcceptDialog {
 
 	void _request_restart();
 
+	Button *ai_source_manager_button = nullptr;
+	void _on_ai_source_manager_button_pressed();
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();

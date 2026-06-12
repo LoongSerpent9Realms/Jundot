@@ -7,11 +7,66 @@
 
 #include "ai_mcp_http_server.h"
 
+#include "ai_settings.h"
 #include "ai_tool_executor.h"
 #include "ai_tool_defs.h"
 #include "ai_tool_registry.h"
 #include "core/io/json.h"
 #include "core/os/os.h"
+
+static Dictionary _external_mcp_str_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "string";
+	prop["description"] = p_description;
+	return prop;
+}
+
+static Dictionary _external_mcp_bool_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "boolean";
+	prop["description"] = p_description;
+	return prop;
+}
+
+static Dictionary _external_mcp_int_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "integer";
+	prop["description"] = p_description;
+	return prop;
+}
+
+static Dictionary _external_mcp_number_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "number";
+	prop["description"] = p_description;
+	return prop;
+}
+
+static Dictionary _external_mcp_tool(const String &p_name, const String &p_description, const Dictionary &p_properties) {
+	Dictionary params;
+	params["type"] = "object";
+	params["properties"] = p_properties;
+
+	Dictionary fn;
+	fn["name"] = p_name;
+	fn["description"] = p_description;
+	fn["parameters"] = params;
+
+	Dictionary tool;
+	tool["type"] = "function";
+	tool["function"] = fn;
+	tool["x_mcp_server_name"] = "ai_settings";
+	tool["x_builtin"] = true;
+	return tool;
+}
+
+static Array _external_mcp_protected_fields() {
+	Array fields;
+	fields.push_back("system_prompt");
+	fields.push_back("engine_source_repository_url");
+	fields.push_back("encrypt_engine_source_cache");
+	return fields;
+}
 
 void AIMCPHTTPServer::_server_thread_poll(void *data) {
 	AIMCPHTTPServer *mcp_server = static_cast<AIMCPHTTPServer *>(data);
@@ -121,6 +176,80 @@ void AIMCPHTTPServer::_send_response(Ref<StreamPeerTCP> p_client, int p_status_c
 	p_client->put_data((const uint8_t *)cs.get_data(), cs.size());
 }
 
+Array AIMCPHTTPServer::_get_ai_settings_tools() const {
+	Array tools;
+
+	tools.push_back(_external_mcp_tool(
+			"ai_settings.get_config",
+			"Read the current JunDot AI settings that external AI clients are allowed to inspect. Secret values are redacted; the fixed engine source repository URL and source cache encryption policy are read-only.",
+			Dictionary()));
+
+	Dictionary update_props;
+	update_props["base_url"] = _external_mcp_str_property("OpenAI-compatible API base URL.");
+	update_props["model"] = _external_mcp_str_property("Model name used by the built-in AI assistant.");
+	update_props["api_key"] = _external_mcp_str_property("API key to store. Passing an empty string clears it.");
+	update_props["temperature"] = _external_mcp_number_property("Sampling temperature.");
+	update_props["max_tokens"] = _external_mcp_int_property("Maximum response token budget.");
+	update_props["output_language"] = _external_mcp_str_property("Output language, such as auto, English, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, or German.");
+	update_props["tools_enabled"] = _external_mcp_bool_property("Enable built-in function calling tools.");
+	update_props["mcp_tools_enabled"] = _external_mcp_bool_property("Enable configured external MCP server tools.");
+	update_props["context_char_budget"] = _external_mcp_int_property("Compressed context character budget.");
+	update_props["history_char_budget"] = _external_mcp_int_property("Conversation history character budget.");
+	update_props["max_tool_iterations"] = _external_mcp_int_property("Maximum tool-call loop iterations.");
+	update_props["user_extra_instructions"] = _external_mcp_str_property("User-editable extra instructions appended to the protected system prompt.");
+	update_props["engine_source_root"] = _external_mcp_str_property("Absolute path to a local JunDot engine source checkout.");
+	update_props["engine_source_cache_root"] = _external_mcp_str_property("Absolute path to the local encrypted engine source cache.");
+	update_props["external_api_enabled"] = _external_mcp_bool_property("Enable the external MCP HTTP API server.");
+	update_props["external_api_port"] = _external_mcp_int_property("External MCP HTTP API port.");
+	update_props["external_api_bind_address"] = _external_mcp_str_property("External MCP HTTP API bind address.");
+	tools.push_back(_external_mcp_tool(
+			"ai_settings.update_config",
+			"Update allowed JunDot AI settings. The system prompt, engine source repository URL, and source cache encryption policy cannot be changed through this tool.",
+			update_props));
+
+	tools.push_back(_external_mcp_tool(
+			"ai_settings.reset_config",
+			"Reset JunDot AI settings to product defaults. The protected system prompt, fixed repository URL, and source cache encryption policy remain enforced.",
+			Dictionary()));
+
+	return tools;
+}
+
+Dictionary AIMCPHTTPServer::_get_ai_settings_server_info() const {
+	Dictionary s;
+	s["name"] = "ai_settings";
+	s["enabled"] = true;
+	s["builtin"] = true;
+	s["description"] = "Built-in JunDot AI settings service.";
+	return s;
+}
+
+Dictionary AIMCPHTTPServer::_get_ai_settings_snapshot() const {
+	const AISettingsData settings = AISettings::load();
+	Dictionary d;
+	d["base_url"] = settings.base_url;
+	d["model"] = settings.model;
+	d["api_key_configured"] = !settings.api_key.is_empty();
+	d["temperature"] = settings.temperature;
+	d["max_tokens"] = settings.max_tokens;
+	d["output_language"] = settings.output_language;
+	d["tools_enabled"] = settings.tools_enabled;
+	d["mcp_tools_enabled"] = settings.mcp_tools_enabled;
+	d["context_char_budget"] = settings.context_char_budget;
+	d["history_char_budget"] = settings.history_char_budget;
+	d["max_tool_iterations"] = settings.max_tool_iterations;
+	d["user_extra_instructions"] = settings.user_extra_instructions;
+	d["engine_source_root"] = settings.engine_source_root;
+	d["engine_source_cache_root"] = settings.engine_source_cache_root;
+	d["engine_source_repository_url"] = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	d["encrypt_engine_source_cache"] = true;
+	d["external_api_enabled"] = settings.external_api_enabled;
+	d["external_api_port"] = settings.external_api_port;
+	d["external_api_bind_address"] = settings.external_api_bind_address;
+	d["protected_fields"] = _external_mcp_protected_fields();
+	return d;
+}
+
 String AIMCPHTTPServer::_execute_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json) {
 	Dictionary tool_call;
 	Dictionary fn;
@@ -134,6 +263,114 @@ String AIMCPHTTPServer::_execute_tool(const String &p_server_name, const String 
 	return result.get("content", "Unknown error").operator String();
 }
 
+String AIMCPHTTPServer::_execute_ai_settings_tool(const String &p_tool_name, const String &p_args_json) {
+	Dictionary response;
+
+	if (p_tool_name == "get_config") {
+		response["settings"] = _get_ai_settings_snapshot();
+		return JSON::stringify(response);
+	}
+
+	if (p_tool_name == "reset_config") {
+		const Error err = AISettings::reset_to_defaults();
+		response["ok"] = err == OK;
+		if (err != OK) {
+			response["error"] = "Failed to reset AI settings.";
+		}
+		response["settings"] = _get_ai_settings_snapshot();
+		return JSON::stringify(response);
+	}
+
+	if (p_tool_name != "update_config") {
+		response["ok"] = false;
+		response["error"] = "Unknown ai_settings tool.";
+		return JSON::stringify(response);
+	}
+
+	Variant parsed = JSON::parse_string(p_args_json);
+	if (parsed.get_type() != Variant::DICTIONARY) {
+		response["ok"] = false;
+		response["error"] = "Invalid JSON arguments.";
+		return JSON::stringify(response);
+	}
+
+	Dictionary args = parsed;
+	AISettingsData settings = AISettings::load();
+	const bool external_api_runtime_changed =
+			args.has("external_api_enabled") ||
+			args.has("external_api_port") ||
+			args.has("external_api_bind_address");
+
+	if (args.has("base_url")) {
+		settings.base_url = String(args["base_url"]).strip_edges();
+	}
+	if (args.has("model")) {
+		settings.model = String(args["model"]).strip_edges();
+	}
+	if (args.has("api_key")) {
+		settings.api_key = String(args["api_key"]);
+	}
+	if (args.has("temperature")) {
+		settings.temperature = double(args["temperature"]);
+	}
+	if (args.has("max_tokens")) {
+		settings.max_tokens = int(args["max_tokens"]);
+	}
+	if (args.has("output_language")) {
+		settings.output_language = String(args["output_language"]).strip_edges();
+	}
+	if (args.has("tools_enabled")) {
+		settings.tools_enabled = bool(args["tools_enabled"]);
+	}
+	if (args.has("mcp_tools_enabled")) {
+		settings.mcp_tools_enabled = bool(args["mcp_tools_enabled"]);
+	}
+	if (args.has("context_char_budget")) {
+		settings.context_char_budget = int(args["context_char_budget"]);
+	}
+	if (args.has("history_char_budget")) {
+		settings.history_char_budget = int(args["history_char_budget"]);
+	}
+	if (args.has("max_tool_iterations")) {
+		settings.max_tool_iterations = int(args["max_tool_iterations"]);
+	}
+	if (args.has("user_extra_instructions")) {
+		settings.user_extra_instructions = String(args["user_extra_instructions"]);
+	}
+	if (args.has("engine_source_root")) {
+		settings.engine_source_root = String(args["engine_source_root"]).strip_edges();
+	}
+	if (args.has("engine_source_cache_root")) {
+		settings.engine_source_cache_root = String(args["engine_source_cache_root"]).strip_edges();
+	}
+	if (args.has("external_api_enabled")) {
+		settings.external_api_enabled = bool(args["external_api_enabled"]);
+	}
+	if (args.has("external_api_port")) {
+		settings.external_api_port = int(args["external_api_port"]);
+	}
+	if (args.has("external_api_bind_address")) {
+		settings.external_api_bind_address = String(args["external_api_bind_address"]).strip_edges();
+	}
+
+	settings.system_prompt = AISettings::get_default_system_prompt();
+	settings.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	settings.encrypt_engine_source_cache = true;
+
+	const Error err = AISettings::save(settings);
+	response["ok"] = err == OK;
+	if (err != OK) {
+		response["error"] = "Failed to save AI settings.";
+	}
+	response["settings"] = _get_ai_settings_snapshot();
+	response["protected_fields"] = _external_mcp_protected_fields();
+	if (external_api_runtime_changed) {
+		response["external_api_restart_required"] = true;
+		response["note"] = "External API server runtime changes are applied from the editor settings flow or after restart.";
+	}
+	return JSON::stringify(response);
+}
+
 void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String &p_method, const String &p_path, const String &p_body) {
 	if (p_method == "OPTIONS") {
 		_send_response(p_client, 200, "text/plain", "");
@@ -142,6 +379,7 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 
 	if (p_method == "GET" && p_path == "/api/mcp/tools") {
 		Array tools = AIToolDefs::get_mcp_tools();
+		tools.append_array(_get_ai_settings_tools());
 		String json = JSON::stringify(tools);
 		_send_response(p_client, 200, "application/json", json);
 		return;
@@ -150,8 +388,9 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 	if (p_method == "GET" && p_path == "/api/mcp/servers") {
 		Vector<AISkillEntry> skills;
 		Vector<AIMCPServerEntry> mcp_servers_list;
+		Array server_list;
+		server_list.push_back(_get_ai_settings_server_info());
 		if (AIToolRegistry::load(skills, mcp_servers_list) == OK) {
-			Array server_list;
 			for (const AIMCPServerEntry &mcp_entry : mcp_servers_list) {
 				Dictionary s;
 				s["name"] = mcp_entry.name;
@@ -163,7 +402,10 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 			String json = JSON::stringify(server_list);
 			_send_response(p_client, 200, "application/json", json);
 		} else {
-			_send_response(p_client, 500, "application/json", "{\"error\": \"Failed to load server registry\"}");
+			Dictionary warning;
+			warning["warning"] = "Failed to load configured MCP server registry.";
+			warning["servers"] = server_list;
+			_send_response(p_client, 200, "application/json", JSON::stringify(warning));
 		}
 		return;
 	}
@@ -178,14 +420,28 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 		Dictionary req = parsed;
 		String server_name = req.get("server", String());
 		String tool_name = req.get("tool", String());
-		String args_json = req.get("arguments", "{}");
+		if (tool_name.contains(".") && (server_name.is_empty() || tool_name.begins_with(server_name + "."))) {
+			const int dot = tool_name.find(".");
+			server_name = tool_name.substr(0, dot);
+			tool_name = tool_name.substr(dot + 1);
+		}
+		Variant args_value = req.get("arguments", "{}");
+		String args_json;
+		if (args_value.get_type() == Variant::DICTIONARY || args_value.get_type() == Variant::ARRAY) {
+			args_json = JSON::stringify(args_value);
+		} else {
+			args_json = String(args_value);
+		}
+		if (args_json.is_empty()) {
+			args_json = "{}";
+		}
 
 		if (server_name.is_empty() || tool_name.is_empty()) {
 			_send_response(p_client, 400, "application/json", "{\"error\": \"Missing server or tool name\"}");
 			return;
 		}
 
-		String result = _execute_tool(server_name, tool_name, args_json);
+		String result = server_name == "ai_settings" ? _execute_ai_settings_tool(tool_name, args_json) : _execute_tool(server_name, tool_name, args_json);
 		Dictionary response;
 		response["result"] = result;
 		_send_response(p_client, 200, "application/json", JSON::stringify(response));

@@ -44,13 +44,16 @@ class MarginContainer;
 class OptionButton;
 class PanelContainer;
 class PopupMenu;
+class ProgressBar;
 class ProjectDialog;
 class ProjectList;
 class QuickSettingsDialog;
 class RichTextLabel;
 class TabContainer;
+class TextEdit;
 class UpdateDialog;
 class UpdateManager;
+class AISourceManager;
 class VBoxContainer;
 
 class ProjectManager : public Control {
@@ -142,6 +145,16 @@ class ProjectManager : public Control {
 	void _on_update_download_requested(const String &p_version, const String &p_url);
 	void _on_update_now_requested();
 	void _on_skip_version_requested();
+
+	// AI engine source cache bootstrap.
+
+	ConfirmationDialog *ai_source_prompt_dialog = nullptr;
+	bool ai_source_prompt_shown = false;
+	AISourceManager *ai_source_manager_dialog = nullptr;
+
+	void _maybe_prompt_ai_source_cache();
+	void _open_ai_source_manager_from_prompt();
+	void _show_ai_source_manager();
 
 	// Project list.
 

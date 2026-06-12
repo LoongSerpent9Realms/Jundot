@@ -1177,8 +1177,6 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/context/max_tool_call_iterations", 10, "1,1000,1")
 	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_GLOBAL_DIR, "ai_settings/engine_source/source_root", "", "")
 	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_GLOBAL_DIR, "ai_settings/engine_source/cache_root", default_ai_source_cache_root, "")
-	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/engine_source/repository_url", "", "https://github.com/owner/repo.git")
-	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/engine_source/encrypt_cache", false, "")
 	EDITOR_SETTING_BASIC(Variant::BOOL, PROPERTY_HINT_NONE, "ai_settings/external_api/enabled", false, "")
 	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_RANGE, "ai_settings/external_api/port", 8080, "1,65535,1")
 	EDITOR_SETTING_BASIC(Variant::STRING, PROPERTY_HINT_PLACEHOLDER_TEXT, "ai_settings/external_api/bind_address", "127.0.0.1", "127.0.0.1")

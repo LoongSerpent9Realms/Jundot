@@ -21099,3 +21099,254 @@ msgstr "复制消息"
 
 msgid "Edit message"
 msgstr "编辑消息"
+msgid "Model"
+msgstr "模型"
+
+msgid "Compressed Context Size"
+msgstr "压缩上下文大小"
+
+msgid "Max Tool Call Iterations"
+msgstr "最大工具调用轮数"
+
+msgid "Feature Universality Threshold (%)"
+msgstr "功能通用性阈值（%）"
+
+msgid "Feature Necessity Threshold"
+msgstr "功能必要性阈值"
+
+msgid "AI Output Language"
+msgstr "AI 输出语言"
+
+msgid "Extra Instructions (appended to system prompt)"
+msgstr "额外指令（追加到系统提示词）"
+
+msgid "Enable Function Calling tools (read/write files, build, etc.)"
+msgstr "启用函数调用工具（读写文件、构建等）"
+
+msgid "Enable MCP server tools (external services)"
+msgstr "启用 MCP 服务器工具（外部服务）"
+
+msgid "Require Jundot design philosophy check for feature expansion"
+msgstr "功能扩展时要求进行 Jundot 设计理念检查"
+
+msgid "Enable External API Server (for remote MCP tool calls)"
+msgstr "启用外部 API 服务器（用于远程 MCP 工具调用）"
+
+msgid "AI requests can consume additional API tokens when project context, attachments, logs, or repair analysis are included."
+msgstr "包含项目上下文、附件、日志或修复分析时，AI 请求可能消耗更多 API 令牌。"
+
+msgid "External API Port"
+msgstr "外部 API 端口"
+
+msgid "Bind Address"
+msgstr "绑定地址"
+
+msgid "Export AI Config"
+msgstr "导出 AI 配置"
+
+msgid "Import AI Config"
+msgstr "导入 AI 配置"
+
+msgid "JSON Files"
+msgstr "JSON 文件"
+
+msgid "Connection test succeeded. Settings saved."
+msgstr "连接测试成功。设置已保存。"
+
+msgid "AI settings could not be saved."
+msgstr "无法保存 AI 设置。"
+
+msgid "AI settings could not be reset."
+msgstr "无法重置 AI 设置。"
+
+msgid "External AI MCP Config"
+msgstr "外部 AI MCP 配置"
+
+msgid "Auto Configure External MCP Apps"
+msgstr "自动配置外部 MCP 应用"
+
+msgid "No supported external AI app config directories were found."
+msgstr "未找到支持的外部 AI 应用配置目录。"
+
+msgid "Configured external MCP for %s."
+msgstr "已为 %s 配置外部 MCP。"
+
+msgid "Failed to configure external MCP for %s."
+msgstr "未能为 %s 配置外部 MCP。"
+
+msgid "Configured external MCP for %s. Failed: %s."
+msgstr "已为 %s 配置外部 MCP。失败：%s。"
+
+msgid "Download Engine Source for AI"
+msgstr "为 AI 下载引擎源码"
+
+msgid "JunDot AI can read and modify engine source code when a local source cache is available. Download the fixed JunDot engine source repository now for AI use?\n\nThe downloaded cache will be encrypted automatically after extraction."
+msgstr "本地源码缓存可用时，JunDot AI 可以读取和修改引擎源码。是否现在下载固定的 JunDot 引擎源码仓库供 AI 使用？\n\n下载的缓存会在解压后自动加密。"
+
+msgid "Select Engine Source Cache Folder"
+msgstr "选择引擎源码缓存文件夹"
+
+msgid "Engine Source Download"
+msgstr "引擎源码下载"
+
+msgid "Available space: %s. Download package size will be shown when the connection starts. Recommended free space: at least 8 GB."
+msgstr "可用空间：%s。连接开始后会显示下载包大小。建议可用空间：至少 8 GB。"
+
+msgid "Available space: unknown. Download package size will be shown when the connection starts. Recommended free space: at least 8 GB."
+msgstr "可用空间：未知。连接开始后会显示下载包大小。建议可用空间：至少 8 GB。"
+
+msgid "Please choose an engine source cache path before downloading."
+msgstr "下载前请选择引擎源码缓存路径。"
+
+msgid "The selected cache path may not have enough free space. Available: %s. Recommended: at least 8 GB."
+msgstr "所选缓存路径可用空间可能不足。可用：%s。建议：至少 8 GB。"
+
+msgid "Could not create the selected engine source cache directory."
+msgstr "无法创建所选引擎源码缓存目录。"
+
+msgid "Could not start engine source download."
+msgstr "无法启动引擎源码下载。"
+
+msgid "Downloading JunDot engine source for AI... Package size: calculating."
+msgstr "正在为 AI 下载 JunDot 引擎源码……下载包大小：正在计算。"
+
+msgid "Not enough space for engine source cache. Package size: %s. Available: %s. Required: %s."
+msgstr "引擎源码缓存空间不足。下载包大小：%s。可用：%s。需要：%s。"
+
+msgid "Downloading JunDot engine source for AI... Package size: %s. Available: %s. Downloaded: %s / %s."
+msgstr "正在为 AI 下载 JunDot 引擎源码……下载包大小：%s。可用：%s。已下载：%s / %s。"
+
+msgid "Downloading JunDot engine source for AI... Package size: calculating. Available: %s. Downloaded: %s."
+msgstr "正在为 AI 下载 JunDot 引擎源码……下载包大小：正在计算。可用：%s。已下载：%s。"
+
+msgid "Engine source download failed. HTTP %d."
+msgstr "引擎源码下载失败。HTTP %d。"
+
+msgid "Extracting engine source..."
+msgstr "正在解压引擎源码……"
+
+msgid "Engine source downloaded, but extraction failed."
+msgstr "引擎源码已下载，但解压失败。"
+
+msgid "Encrypting engine source cache..."
+msgstr "正在加密引擎源码缓存……"
+
+msgid "Engine source extracted, but cache encryption failed: %s"
+msgstr "引擎源码已解压，但缓存加密失败：%s"
+
+msgid "Engine source is ready for AI and the cache has been encrypted."
+msgstr "引擎源码已可供 AI 使用，缓存已加密。"
+
+msgid "Working..."
+msgstr "正在处理……"
+
+msgid "Status: Updating with Git..."
+msgstr "状态：正在使用 Git 更新……"
+
+msgid "Status: Processing..."
+msgstr "状态：正在处理……"
+
+msgid "Updating JunDot engine source with Git..."
+msgstr "正在使用 Git 更新 JunDot 引擎源码……"
+
+msgid "Git was not found. Falling back to full zip download..."
+msgstr "未找到 Git，正在回退到完整 zip 下载……"
+
+msgid "Git is not available."
+msgstr "Git 不可用。"
+
+msgid "Git clone failed."
+msgstr "Git clone 失败。"
+
+msgid "Git fetch failed."
+msgstr "Git fetch 失败。"
+
+msgid "Git reset failed."
+msgstr "Git reset 失败。"
+
+msgid "Git cache does not contain a valid engine source root."
+msgstr "Git 缓存中没有有效的引擎源码根目录。"
+
+msgid "Git update failed."
+msgstr "Git 更新失败。"
+
+msgid "AI Engine Source Cache"
+msgstr "AI 引擎源码缓存"
+
+msgid "Manage Cache"
+msgstr "管理缓存"
+
+msgid "JunDot AI can read and modify engine source code when a local Git source cache is available. The published editor does not include engine source code. Use the source manager to clone or update the fixed JunDot engine repository for AI use. The cache will be encrypted automatically after Git updates."
+msgstr "本地 Git 源码缓存可用时，JunDot AI 可以读取和修改引擎源码。发布版编辑器不包含引擎源码。请使用源码管理器克隆或更新固定的 JunDot 引擎仓库供 AI 使用。Git 更新完成后会自动加密缓存。"
+
+msgid "Manage AI Engine Source"
+msgstr "管理 AI 引擎源码"
+
+msgid "Download / Update"
+msgstr "下载 / 更新"
+
+msgid "Status: Downloading ZIP fallback..."
+msgstr "状态：正在使用 ZIP 备用下载..."
+
+msgid "Preparing Git source cache update..."
+msgstr "正在准备 Git 源码缓存更新..."
+
+msgid "Checking Git availability..."
+msgstr "正在检查 Git 是否可用..."
+
+msgid "Preparing Git source cache directory..."
+msgstr "正在准备 Git 源码缓存目录..."
+
+msgid "Cloning JunDot engine source with Git..."
+msgstr "正在使用 Git 克隆 JunDot 引擎源码..."
+
+msgid "Fetching latest JunDot engine source with Git..."
+msgstr "正在使用 Git 获取最新 JunDot 引擎源码..."
+
+msgid "Resetting Git source cache to the latest revision..."
+msgstr "正在将 Git 源码缓存重置到最新版本..."
+
+msgid "Git source cache update complete. Encrypting cache..."
+msgstr "Git 源码缓存更新完成，正在加密缓存..."
+
+msgid "Engine source cache is ready."
+msgstr "引擎源码缓存已就绪。"
+
+msgid "Git installer page opened. Install Git, restart JunDot, then try Download / Update again."
+msgstr "已打开 Git 安装页面。安装 Git 后重启 JunDot，然后再次尝试下载 / 更新。"
+
+msgid "Git was not found. Falling back to ZIP download..."
+msgstr "未找到 Git，正在使用 ZIP 备用下载..."
+
+msgid "Downloading ZIP fallback... %s / %s (%d connections)"
+msgstr "正在使用 ZIP 备用下载... %s / %s（%d 个连接）"
+
+msgid "Downloading ZIP fallback... %s (calculating...)"
+msgstr "正在使用 ZIP 备用下载... %s（正在计算...）"
+
+msgid "ZIP download complete. Extracting..."
+msgstr "ZIP 下载完成，正在解压..."
+
+msgid "Status: Extracting ZIP fallback..."
+msgstr "状态：正在解压 ZIP 备用下载..."
+
+msgid "Extracting engine source ZIP..."
+msgstr "正在解压引擎源码 ZIP..."
+
+msgid "ZIP extraction failed."
+msgstr "ZIP 解压失败。"
+
+msgid "Source cache updated, but encryption failed: %s"
+msgstr "源码缓存已更新，但加密失败：%s"
+
+msgid "Git Not Found"
+msgstr "未找到 Git"
+
+msgid "Install Git"
+msgstr "安装 Git"
+
+msgid "Use ZIP"
+msgstr "使用 ZIP"
+
+msgid "Git is not installed or is not available in PATH. Install Git for faster engine source updates?\n\nIf you choose ZIP, JunDot will download the full source archive as a fallback."
+msgstr "Git 未安装，或不在 PATH 中。是否安装 Git 以获得更快的引擎源码更新？\n\n如果选择 ZIP，JunDot 会下载完整源码压缩包作为备用方案。"

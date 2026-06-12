@@ -87,4 +87,4 @@ Jundot 首先是 Godot 生态的一个派生项目，因此大部分学习资源
 - Godot 示例项目：[godot-demo-projects](https://github.com/godotengine/godot-demo-projects)
 - Jundot 发布说明：[RELEASE_NOTES_1.7.4_beta.md](RELEASE_NOTES_1.7.4_beta.md)
 
-![Screenshot of a 3D scene in the Godot Engine editor](https://raw.githubusercontent.com/godotengine/godot-design/master/screenshots/editor_tps_demo_1920x1080.jpg)
+<!-- Godot editor screenshot removed temporarily. -->

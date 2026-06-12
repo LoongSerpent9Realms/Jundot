@@ -16,6 +16,6 @@
   "CleanPackageDir": false,
   "CleanBuild": true,
   "ExtraSConsArgs": "debug_symbols=yes",
-  "AutoUpdateVersion": true,
+  "AutoUpdateVersion": false,
   "GenerateUpdateManifest": true
 }

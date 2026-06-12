@@ -12648,3 +12648,54 @@ msgstr "VRS 强度"
 
 msgid "VRS Render Region"
 msgstr "VRS 渲染区域"
+
+msgid "AI Settings"
+msgstr "AI 设置"
+
+msgid "Provider"
+msgstr "服务提供商"
+
+msgid "Context"
+msgstr "上下文"
+
+msgid "Engine Source"
+msgstr "引擎源码"
+
+msgid "Source Root"
+msgstr "源码根目录"
+
+msgid "Cache Root"
+msgstr "缓存根目录"
+
+msgid "External API"
+msgstr "外部 API"
+
+msgid "Base URL"
+msgstr "基础 URL"
+
+msgid "Model"
+msgstr "模型"
+
+msgid "Max Tokens"
+msgstr "最大令牌数"
+
+msgid "Output Language"
+msgstr "输出语言"
+
+msgid "Enable Function Calling"
+msgstr "启用函数调用"
+
+msgid "Enable MCP Tools"
+msgstr "启用 MCP 工具"
+
+msgid "Context Char Budget"
+msgstr "上下文字符预算"
+
+msgid "History Char Budget"
+msgstr "历史字符预算"
+
+msgid "Max Tool Call Iterations"
+msgstr "最大工具调用轮数"
+
+msgid "Bind Address"
+msgstr "绑定地址"

@@ -33,9 +33,12 @@
 #include "ai_mcp_manager.h"
 
 #include "core/io/file_access.h"
+#include "core/io/dir_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
+#include "core/os/os.h"
 #include "editor/themes/editor_scale.h"
+#include "editor/gui/editor_file_dialog.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
@@ -57,6 +60,18 @@ static constexpr int OUTPUT_LANGUAGE_KOREAN = 5;
 static constexpr int OUTPUT_LANGUAGE_SPANISH = 6;
 static constexpr int OUTPUT_LANGUAGE_FRENCH = 7;
 static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
+
+struct ExternalMCPAppTarget {
+	String name;
+	String path;
+};
+
+static void _append_external_mcp_target(Vector<ExternalMCPAppTarget> &r_targets, const String &p_name, const String &p_path) {
+	ExternalMCPAppTarget target;
+	target.name = p_name;
+	target.path = p_path;
+	r_targets.push_back(target);
+}
 
 static String _output_language_from_id(int p_id) {
 	switch (p_id) {
@@ -109,6 +124,70 @@ static int _output_language_to_id(const String &p_language) {
 		return OUTPUT_LANGUAGE_GERMAN;
 	}
 	return OUTPUT_LANGUAGE_AUTO;
+}
+
+static String _get_external_mcp_base_url(const String &p_bind_address, int p_port) {
+	const String host = p_bind_address.strip_edges().is_empty() ? String("127.0.0.1") : p_bind_address.strip_edges();
+	return vformat("http://%s:%d/api/mcp", host, p_port);
+}
+
+static Dictionary _make_external_mcp_config_root(const String &p_base_url, bool p_enabled) {
+	Dictionary mcp;
+	mcp["http"] = p_base_url;
+	mcp["health"] = p_base_url + "/health";
+	mcp["tools"] = p_base_url + "/tools";
+	mcp["servers"] = p_base_url + "/servers";
+	mcp["call"] = p_base_url + "/call";
+
+	Dictionary jundot_server;
+	jundot_server["type"] = "http";
+	jundot_server["url"] = p_base_url;
+	jundot_server["enabled"] = p_enabled;
+
+	Dictionary mcp_servers;
+	mcp_servers["jundot"] = jundot_server;
+
+	Dictionary root;
+	root["mcp"] = mcp;
+	root["mcpServers"] = mcp_servers;
+	root["enabled"] = p_enabled;
+	return root;
+}
+
+static Error _write_external_ai_mcp_config(const String &p_path, const String &p_base_url) {
+	Dictionary root;
+	if (FileAccess::exists(p_path)) {
+		Error read_err = OK;
+		const String content = FileAccess::get_file_as_string(p_path, &read_err);
+		if (read_err == OK && !content.is_empty()) {
+			JSON json;
+			if (json.parse(content) == OK && json.get_data().get_type() == Variant::DICTIONARY) {
+				root = json.get_data();
+			}
+		}
+	}
+
+	Variant existing_servers = root.get("mcpServers", Dictionary());
+	Dictionary mcp_servers;
+	if (existing_servers.get_type() == Variant::DICTIONARY) {
+		mcp_servers = existing_servers;
+	}
+
+	Dictionary jundot_server;
+	jundot_server["type"] = "http";
+	jundot_server["url"] = p_base_url;
+	jundot_server["enabled"] = true;
+	mcp_servers["jundot"] = jundot_server;
+	root["mcpServers"] = mcp_servers;
+
+	Error err = DirAccess::make_dir_recursive_absolute(p_path.get_base_dir());
+	ERR_FAIL_COND_V(err != OK, err);
+
+	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE, &err);
+	ERR_FAIL_COND_V(err != OK || file.is_null(), err != OK ? err : ERR_CANT_OPEN);
+
+	file->store_string(JSON::stringify(root, "\t"));
+	return OK;
 }
 
 void AIConfigPanel::_bind_methods() {
@@ -184,7 +263,6 @@ void AIConfigPanel::_update_translations() {
 	feature_universality_threshold_label->set_text(TTR("Feature Universality Threshold (%)"));
 	feature_necessity_threshold_label->set_text(TTR("Feature Necessity Threshold"));
 	output_language_label->set_text(TTR("AI Output Language"));
-	system_prompt_label->set_text(TTR("System Prompt"));
 	user_extra_instructions_label->set_text(TTR("Extra Instructions (appended to system prompt)"));
 	include_project_memories_check->set_text(TTR("Include project memories"));
 	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
@@ -193,6 +271,7 @@ void AIConfigPanel::_update_translations() {
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
 	external_api_enabled_check->set_text(TTR("Enable External API Server (for remote MCP tool calls)"));
+	external_mcp_config_label->set_text(TTR("External AI MCP Config"));
 	usage_notice_label->set_text(TTR("AI requests can consume additional API tokens when project context, attachments, logs, or repair analysis are included."));
 	save_button->set_text(TTR("Save"));
 	reset_button->set_text(TTR("Reset"));
@@ -201,6 +280,7 @@ void AIConfigPanel::_update_translations() {
 	reset_agreement_button->set_text(TTR("Reset Agreement Consent"));
 	export_button->set_text(TTR("Export Config"));
 	import_button->set_text(TTR("Import Config"));
+	auto_configure_mcp_button->set_text(TTR("Auto Configure External MCP Apps"));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	model_edit->set_placeholder(AISettings::get_default_model());
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_AUTO), TTR("System Language (Auto)"));
@@ -212,6 +292,141 @@ void AIConfigPanel::_update_translations() {
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_SPANISH), TTR("Spanish"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_FRENCH), TTR("French"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_GERMAN), TTR("German"));
+	_update_external_mcp_config();
+}
+
+void AIConfigPanel::_update_external_mcp_config() {
+	if (!external_mcp_config_edit) {
+		return;
+	}
+
+	const String bind_address = external_api_bind_address_edit ? external_api_bind_address_edit->get_text().strip_edges() : String("127.0.0.1");
+	const int port = external_api_port_spin ? int(external_api_port_spin->get_value()) : 8080;
+	const bool enabled = external_api_enabled_check && external_api_enabled_check->is_pressed();
+	const String base_url = _get_external_mcp_base_url(bind_address, port);
+	external_mcp_config_edit->set_text(JSON::stringify(_make_external_mcp_config_root(base_url, enabled), "\t"));
+}
+
+void AIConfigPanel::_update_engine_source_status() {
+	AISettingsData settings = AISettings::load();
+	String cache_path = settings.engine_source_cache_root.strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+	}
+
+	// Find if source root exists.
+	String source_root;
+	if (!cache_path.is_empty() && DirAccess::dir_exists_absolute(cache_path)) {
+		Ref<DirAccess> dir = DirAccess::open(cache_path);
+		if (dir.is_valid()) {
+			dir->list_dir_begin();
+			String name = dir->get_next();
+			while (!name.is_empty()) {
+				if (dir->current_is_dir() && !name.begins_with(".")) {
+					String candidate = cache_path.path_join(name);
+					if (FileAccess::exists(candidate.path_join("SConstruct"))) {
+						source_root = candidate;
+						break;
+					}
+				}
+				name = dir->get_next();
+			}
+			dir->list_dir_end();
+		}
+	}
+
+	if (!source_root.is_empty()) {
+		engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s"), source_root));
+		engine_source_download_button->set_text(TTR("Re-download"));
+		engine_source_delete_button->set_disabled(false);
+	} else {
+		engine_source_status_label->set_text(TTR("Status: Not Downloaded"));
+		engine_source_download_button->set_text(TTR("Download"));
+		engine_source_delete_button->set_disabled(true);
+	}
+
+	engine_source_cache_path_edit->set_text(cache_path);
+}
+
+void AIConfigPanel::_on_engine_source_browse_button_pressed() {
+	// Use a simple FileDialog approach since we don't have EditorFileDialog here.
+	// For now, just save the current path.
+	AISettingsData settings = AISettings::load();
+	settings.engine_source_cache_root = engine_source_cache_path_edit->get_text().strip_edges();
+	AISettings::save(settings);
+	_update_engine_source_status();
+}
+
+void AIConfigPanel::_on_engine_source_download_button_pressed() {
+	String cache_path = engine_source_cache_path_edit->get_text().strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+	}
+
+	Error err = DirAccess::make_dir_recursive_absolute(cache_path);
+	if (err != OK) {
+		status_label->set_text(TTR("Could not create cache directory."));
+		return;
+	}
+
+	AISettingsData settings = AISettings::load();
+	settings.engine_source_cache_root = cache_path;
+	AISettings::save(settings);
+
+	// Launch external browser to download or show instructions.
+	status_label->set_text(vformat(TTR("Please download engine source from:\nhttps://github.com/LoongSerpent9Realms/Jundot\n\nCache path set to: %s"), cache_path));
+}
+
+void AIConfigPanel::_on_engine_source_delete_button_pressed() {
+	AISettingsData settings = AISettings::load();
+	String cache_path = settings.engine_source_cache_root.strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+	}
+
+	// Find the source root to delete.
+	String source_root;
+	Ref<DirAccess> dir = DirAccess::open(cache_path);
+	if (dir.is_valid()) {
+		dir->list_dir_begin();
+		String name = dir->get_next();
+		while (!name.is_empty()) {
+			if (dir->current_is_dir() && !name.begins_with(".")) {
+				String candidate = cache_path.path_join(name);
+				if (FileAccess::exists(candidate.path_join("SConstruct"))) {
+					source_root = candidate;
+					break;
+				}
+			}
+			name = dir->get_next();
+		}
+		dir->list_dir_end();
+	}
+
+	if (source_root.is_empty()) {
+		status_label->set_text(TTR("No source cache to delete."));
+		return;
+	}
+
+	Error err = DirAccess::remove_absolute(source_root);
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Failed to delete cache: error %d"), err));
+		return;
+	}
+
+	settings.engine_source_root = "";
+	AISettings::save(settings);
+
+	status_label->set_text(TTR("Engine source cache deleted."));
+	_update_engine_source_status();
+}
+
+void AIConfigPanel::_on_engine_source_cache_path_selected(const String &p_path) {
+	engine_source_cache_path_edit->set_text(p_path);
+	AISettingsData settings = AISettings::load();
+	settings.engine_source_cache_root = p_path;
+	AISettings::save(settings);
+	_update_engine_source_status();
 }
 
 void AIConfigPanel::_load_settings() {
@@ -236,9 +451,10 @@ void AIConfigPanel::_load_settings() {
 	external_api_enabled_check->set_pressed(settings.external_api_enabled);
 	external_api_port_spin->set_value(settings.external_api_port);
 	external_api_bind_address_edit->set_text(settings.external_api_bind_address);
-	system_prompt_edit->set_text(settings.system_prompt);
+	_update_external_mcp_config();
 	user_extra_instructions_edit->set_text(settings.user_extra_instructions);
 	status_label->set_text(TTR("AI settings loaded."));
+	_update_engine_source_status();
 }
 
 void AIConfigPanel::_save_settings() {
@@ -260,7 +476,6 @@ void AIConfigPanel::_save_settings() {
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
-	settings.system_prompt = system_prompt_edit->get_text();
 	settings.user_extra_instructions = user_extra_instructions_edit->get_text();
 	settings.external_api_enabled = external_api_enabled_check->is_pressed();
 	settings.external_api_port = external_api_port_spin->get_value();
@@ -271,6 +486,7 @@ void AIConfigPanel::_save_settings() {
 		return;
 	}
 	AIMCPManager::get_singleton()->update_settings(settings);
+	_update_external_mcp_config();
 	status_label->set_text(TTR("AI settings saved."));
 }
 
@@ -303,7 +519,7 @@ void AIConfigPanel::_test_connection() {
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
-	settings.system_prompt = system_prompt_edit->get_text();
+	settings.system_prompt = AISettings::get_default_system_prompt();
 
 	if (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty()) {
 		status_label->set_text(TTR("Base URL, model, and API key are required before testing the connection."));
@@ -372,7 +588,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
-	settings.system_prompt = system_prompt_edit->get_text();
+	settings.system_prompt = AISettings::get_default_system_prompt();
 
 	Dictionary root;
 	root["base_url"] = settings.base_url;
@@ -380,7 +596,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["api_key"] = settings.api_key;
 	root["temperature"] = settings.temperature;
 	root["max_tokens"] = settings.max_tokens;
-	root["system_prompt"] = settings.system_prompt;
+	root["system_prompt"] = AISettings::get_default_system_prompt();
 	root["include_project_memories"] = settings.include_project_memories;
 	root["include_tool_context"] = settings.include_tool_context;
 	root["tools_enabled"] = settings.tools_enabled;
@@ -415,6 +631,62 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 
 void AIConfigPanel::_import_config() {
 	import_dialog->popup_file_dialog();
+}
+
+void AIConfigPanel::_auto_configure_external_mcp_apps() {
+	if (external_api_enabled_check) {
+		external_api_enabled_check->set_pressed(true);
+	}
+	_update_external_mcp_config();
+	_save_settings();
+
+	const String bind_address = external_api_bind_address_edit ? external_api_bind_address_edit->get_text().strip_edges() : String("127.0.0.1");
+	const int port = external_api_port_spin ? int(external_api_port_spin->get_value()) : 8080;
+	const String base_url = _get_external_mcp_base_url(bind_address, port);
+
+	Vector<ExternalMCPAppTarget> targets;
+	const String appdata = OS::get_singleton()->has_environment("APPDATA") ? OS::get_singleton()->get_environment("APPDATA") : String();
+	if (!appdata.is_empty()) {
+		_append_external_mcp_target(targets, "Claude Desktop", appdata.path_join("Claude").path_join("claude_desktop_config.json"));
+		_append_external_mcp_target(targets, "Cursor", appdata.path_join("Cursor").path_join("User").path_join("mcp.json"));
+		_append_external_mcp_target(targets, "Visual Studio Code", appdata.path_join("Code").path_join("User").path_join("mcp.json"));
+		_append_external_mcp_target(targets, "Windsurf", appdata.path_join("Windsurf").path_join("User").path_join("mcp.json"));
+	}
+
+	String configured;
+	String failed;
+	for (const ExternalMCPAppTarget &target : targets) {
+		if (!DirAccess::dir_exists_absolute(target.path.get_base_dir())) {
+			continue;
+		}
+
+		const Error err = _write_external_ai_mcp_config(target.path, base_url);
+		if (err == OK) {
+			if (!configured.is_empty()) {
+				configured += ", ";
+			}
+			configured += target.name;
+		} else {
+			if (!failed.is_empty()) {
+				failed += ", ";
+			}
+			failed += target.name;
+		}
+	}
+
+	if (configured.is_empty() && failed.is_empty()) {
+		status_label->set_text(TTR("No supported external AI app config directories were found."));
+		return;
+	}
+	if (configured.is_empty()) {
+		status_label->set_text(vformat(TTR("Failed to configure external MCP for %s."), failed));
+		return;
+	}
+	if (!failed.is_empty()) {
+		status_label->set_text(vformat(TTR("Configured external MCP for %s. Failed: %s."), configured, failed));
+		return;
+	}
+	status_label->set_text(vformat(TTR("Configured external MCP for %s."), configured));
 }
 
 void AIConfigPanel::_import_config_confirmed(const String &p_path) {
@@ -495,10 +767,6 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("feature_design_philosophy_check")) {
 		feature_design_philosophy_check->set_pressed(root["feature_design_philosophy_check"]);
 	}
-	if (root.has("system_prompt")) {
-		system_prompt_edit->set_text(root["system_prompt"]);
-	}
-
 	_save_settings();
 	AISettingsData imported_settings = AISettings::load();
 	if (root.has("engine_source_root")) {
@@ -506,12 +774,6 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	if (root.has("engine_source_cache_root")) {
 		imported_settings.engine_source_cache_root = root["engine_source_cache_root"];
-	}
-	if (root.has("engine_source_repository_url")) {
-		imported_settings.engine_source_repository_url = root["engine_source_repository_url"];
-	}
-	if (root.has("encrypt_engine_source_cache")) {
-		imported_settings.encrypt_engine_source_cache = root["encrypt_engine_source_cache"];
 	}
 	if (root.has("external_api_enabled")) {
 		imported_settings.external_api_enabled = root["external_api_enabled"];
@@ -583,21 +845,81 @@ AIConfigPanel::AIConfigPanel() {
 	root->add_child(feature_design_philosophy_check);
 
 	external_api_enabled_check = memnew(CheckBox);
+	external_api_enabled_check->connect(SceneStringName(toggled), callable_mp(this, &AIConfigPanel::_update_external_mcp_config).unbind(1));
 	root->add_child(external_api_enabled_check);
 
 	external_api_port_spin = _add_spin_box_row(grid, &external_api_port_label, TTR("External API Port"), 1, 65535, 1);
+	external_api_port_spin->connect(SceneStringName(value_changed), callable_mp(this, &AIConfigPanel::_update_external_mcp_config).unbind(1));
 	external_api_bind_address_edit = _add_line_edit_row(grid, &external_api_bind_address_label, TTR("Bind Address"), "127.0.0.1");
+	external_api_bind_address_edit->connect(SceneStringName(text_changed), callable_mp(this, &AIConfigPanel::_update_external_mcp_config).unbind(1));
+
+	external_mcp_config_label = memnew(Label);
+	root->add_child(external_mcp_config_label);
+
+	external_mcp_config_edit = memnew(TextEdit);
+	external_mcp_config_edit->set_editable(false);
+	external_mcp_config_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	external_mcp_config_edit->set_custom_minimum_size(Size2(0, 140) * EDSCALE);
+	root->add_child(external_mcp_config_edit);
+
+	auto_configure_mcp_button = memnew(Button);
+	auto_configure_mcp_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_auto_configure_external_mcp_apps));
+	root->add_child(auto_configure_mcp_button);
+
+	// Engine Source section.
+	{
+		Label *engine_source_header = memnew(Label);
+		engine_source_header->set_theme_type_variation("HeaderMedium");
+		engine_source_header->set_text(TTR("AI Engine Source Cache"));
+		root->add_child(engine_source_header);
+
+		engine_source_status_label = memnew(Label);
+		engine_source_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		root->add_child(engine_source_status_label);
+
+		HBoxContainer *engine_source_path_hb = memnew(HBoxContainer);
+		engine_source_path_hb->add_theme_constant_override("separation", 6 * EDSCALE);
+		root->add_child(engine_source_path_hb);
+
+		engine_source_cache_path_edit = memnew(LineEdit);
+		engine_source_cache_path_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		engine_source_path_hb->add_child(engine_source_cache_path_edit);
+
+		engine_source_browse_button = memnew(Button);
+		engine_source_browse_button->set_text(TTR("Browse"));
+		engine_source_browse_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_browse_button_pressed));
+		engine_source_path_hb->add_child(engine_source_browse_button);
+
+		HBoxContainer *engine_source_btn_hb = memnew(HBoxContainer);
+		engine_source_btn_hb->add_theme_constant_override("separation", 6 * EDSCALE);
+		root->add_child(engine_source_btn_hb);
+
+		engine_source_download_button = memnew(Button);
+		engine_source_download_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_download_button_pressed));
+		engine_source_btn_hb->add_child(engine_source_download_button);
+
+		engine_source_delete_button = memnew(Button);
+		engine_source_delete_button->set_text(TTR("Delete Cache"));
+		engine_source_delete_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_delete_button_pressed));
+		engine_source_btn_hb->add_child(engine_source_delete_button);
+
+		Label *engine_source_spacer = memnew(Label);
+		engine_source_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
+		root->add_child(engine_source_spacer);
+	}
 
 	usage_notice_label = memnew(Label);
 	usage_notice_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	root->add_child(usage_notice_label);
 
 	system_prompt_label = memnew(Label);
+	system_prompt_label->hide();
 	root->add_child(system_prompt_label);
 
 	system_prompt_edit = memnew(TextEdit);
 	system_prompt_edit->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	system_prompt_edit->set_custom_minimum_size(Size2(0, 120) * EDSCALE);
+	system_prompt_edit->hide();
 	root->add_child(system_prompt_edit);
 
 	// User extra instructions — a customizable prompt that appends to system message.

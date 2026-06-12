@@ -51,6 +51,7 @@ class PanelContainer;
 class PopupMenu;
 class ScrollContainer;
 class TextEdit;
+class Timer;
 class VBoxContainer;
 class PanelContainer;
 class ItemList;
@@ -140,6 +141,8 @@ class AIChatPanel : public MarginContainer {
 	PendingToolRound pending_tool_round;
 	bool in_tool_loop = false;
 	String request_conversation_id;
+	Timer *build_status_poll_timer = nullptr;
+	int build_status_poll_count = 0;
 
 	// Tool call confirmation dialog.
 	AIToolConfirmationDialog *tool_confirmation_dialog = nullptr;
@@ -262,6 +265,13 @@ class AIChatPanel : public MarginContainer {
 	void _repair_publish(AIRepairCard *p_card);
 	void _show_repair_tasks(const Vector<AIRepairSuggestion> &p_repairs);
 	void _clear_repair_cards();
+
+	bool _tool_result_needs_build_poll(const String &p_content) const;
+	void _start_build_status_poll();
+	void _stop_build_status_poll();
+	void _on_build_status_poll_timeout();
+	void _append_forced_build_status_check();
+	void _continue_after_build_poll();
 
 protected:
 	void _notification(int p_what);

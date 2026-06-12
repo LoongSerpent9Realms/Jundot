@@ -42,7 +42,6 @@ static constexpr const char *LEGACY_MODEL_KEY = "ai_assistant/model";
 static constexpr const char *LEGACY_API_KEY_KEY = "ai_assistant/api_key";
 static constexpr const char *LEGACY_TEMPERATURE_KEY = "ai_assistant/temperature";
 static constexpr const char *LEGACY_MAX_TOKENS_KEY = "ai_assistant/max_tokens";
-static constexpr const char *LEGACY_SYSTEM_PROMPT_KEY = "ai_assistant/system_prompt";
 
 static constexpr const char *EDITOR_AI_BASE_URL_KEY = "ai_settings/provider/base_url";
 static constexpr const char *EDITOR_AI_MODEL_KEY = "ai_settings/provider/model";
@@ -57,8 +56,6 @@ static constexpr const char *EDITOR_AI_HISTORY_CHAR_BUDGET_KEY = "ai_settings/co
 static constexpr const char *EDITOR_AI_MAX_TOOL_ITERATIONS_KEY = "ai_settings/context/max_tool_call_iterations";
 static constexpr const char *EDITOR_AI_ENGINE_SOURCE_ROOT_KEY = "ai_settings/engine_source/source_root";
 static constexpr const char *EDITOR_AI_ENGINE_SOURCE_CACHE_ROOT_KEY = "ai_settings/engine_source/cache_root";
-static constexpr const char *EDITOR_AI_ENGINE_SOURCE_REPOSITORY_URL_KEY = "ai_settings/engine_source/repository_url";
-static constexpr const char *EDITOR_AI_ENCRYPT_ENGINE_SOURCE_CACHE_KEY = "ai_settings/engine_source/encrypt_cache";
 static constexpr const char *EDITOR_AI_EXTERNAL_API_ENABLED_KEY = "ai_settings/external_api/enabled";
 static constexpr const char *EDITOR_AI_EXTERNAL_API_PORT_KEY = "ai_settings/external_api/port";
 static constexpr const char *EDITOR_AI_EXTERNAL_API_BIND_ADDRESS_KEY = "ai_settings/external_api/bind_address";
@@ -186,12 +183,6 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	if (_should_read_editor_setting(EDITOR_AI_ENGINE_SOURCE_CACHE_ROOT_KEY, p_only_changed)) {
 		r_settings.engine_source_cache_root = editor_settings->get_setting(EDITOR_AI_ENGINE_SOURCE_CACHE_ROOT_KEY);
 	}
-	if (_should_read_editor_setting(EDITOR_AI_ENGINE_SOURCE_REPOSITORY_URL_KEY, p_only_changed)) {
-		r_settings.engine_source_repository_url = editor_settings->get_setting(EDITOR_AI_ENGINE_SOURCE_REPOSITORY_URL_KEY);
-	}
-	if (_should_read_editor_setting(EDITOR_AI_ENCRYPT_ENGINE_SOURCE_CACHE_KEY, p_only_changed)) {
-		r_settings.encrypt_engine_source_cache = editor_settings->get_setting(EDITOR_AI_ENCRYPT_ENGINE_SOURCE_CACHE_KEY);
-	}
 	if (_should_read_editor_setting(EDITOR_AI_EXTERNAL_API_ENABLED_KEY, p_only_changed)) {
 		r_settings.external_api_enabled = editor_settings->get_setting(EDITOR_AI_EXTERNAL_API_ENABLED_KEY);
 	}
@@ -222,8 +213,6 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	editor_settings->set_setting(EDITOR_AI_MAX_TOOL_ITERATIONS_KEY, p_settings.max_tool_iterations);
 	editor_settings->set_setting(EDITOR_AI_ENGINE_SOURCE_ROOT_KEY, p_settings.engine_source_root);
 	editor_settings->set_setting(EDITOR_AI_ENGINE_SOURCE_CACHE_ROOT_KEY, p_settings.engine_source_cache_root);
-	editor_settings->set_setting(EDITOR_AI_ENGINE_SOURCE_REPOSITORY_URL_KEY, p_settings.engine_source_repository_url);
-	editor_settings->set_setting(EDITOR_AI_ENCRYPT_ENGINE_SOURCE_CACHE_KEY, p_settings.encrypt_engine_source_cache);
 	editor_settings->set_setting(EDITOR_AI_EXTERNAL_API_ENABLED_KEY, p_settings.external_api_enabled);
 	editor_settings->set_setting(EDITOR_AI_EXTERNAL_API_PORT_KEY, p_settings.external_api_port);
 	editor_settings->set_setting(EDITOR_AI_EXTERNAL_API_BIND_ADDRESS_KEY, p_settings.external_api_bind_address);
@@ -308,10 +297,8 @@ AISettingsData AISettings::load() {
 			if (editor_settings->has_setting(LEGACY_MAX_TOKENS_KEY)) {
 				settings.max_tokens = editor_settings->get(LEGACY_MAX_TOKENS_KEY);
 			}
-			if (editor_settings->has_setting(LEGACY_SYSTEM_PROMPT_KEY)) {
-				settings.system_prompt = editor_settings->get(LEGACY_SYSTEM_PROMPT_KEY);
-			}
 		}
+		settings.system_prompt = get_default_system_prompt();
 		_apply_editor_settings(settings, false);
 		return settings;
 	}
@@ -339,7 +326,7 @@ AISettingsData AISettings::load() {
 	settings.api_key = root.get("api_key", String());
 	settings.temperature = root.get("temperature", 0.7);
 	settings.max_tokens = root.get("max_tokens", 40960);
-	settings.system_prompt = root.get("system_prompt", get_default_system_prompt());
+	settings.system_prompt = get_default_system_prompt();
 	settings.include_project_memories = root.get("include_project_memories", true);
 	settings.include_tool_context = root.get("include_tool_context", true);
 	settings.tools_enabled = root.get("tools_enabled", true);
@@ -360,8 +347,8 @@ AISettingsData AISettings::load() {
 	settings.context_mode = (mode_int == 1) ? AIContextMode::ENGINE : AIContextMode::PROJECT;
 	settings.engine_source_root = root.get("engine_source_root", "");
 	settings.engine_source_cache_root = root.get("engine_source_cache_root", "");
-	settings.engine_source_repository_url = root.get("engine_source_repository_url", "");
-	settings.encrypt_engine_source_cache = root.get("encrypt_engine_source_cache", false);
+	settings.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	settings.encrypt_engine_source_cache = true;
 	settings.external_api_enabled = root.get("external_api_enabled", false);
 	settings.external_api_port = root.get("external_api_port", 8080);
 	settings.external_api_bind_address = root.get("external_api_bind_address", "127.0.0.1");
@@ -381,7 +368,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["api_key"] = p_settings.api_key;
 	root["temperature"] = p_settings.temperature;
 	root["max_tokens"] = p_settings.max_tokens;
-	root["system_prompt"] = p_settings.system_prompt;
+	root["system_prompt"] = get_default_system_prompt();
 	root["include_project_memories"] = p_settings.include_project_memories;
 	root["include_tool_context"] = p_settings.include_tool_context;
 	root["tools_enabled"] = p_settings.tools_enabled;
@@ -401,8 +388,8 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["context_mode"] = (p_settings.context_mode == AIContextMode::ENGINE) ? 1 : 0;
 	root["engine_source_root"] = p_settings.engine_source_root;
 	root["engine_source_cache_root"] = p_settings.engine_source_cache_root;
-	root["engine_source_repository_url"] = p_settings.engine_source_repository_url;
-	root["encrypt_engine_source_cache"] = p_settings.encrypt_engine_source_cache;
+	root["engine_source_repository_url"] = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	root["encrypt_engine_source_cache"] = true;
 	root["external_api_enabled"] = p_settings.external_api_enabled;
 	root["external_api_port"] = p_settings.external_api_port;
 	root["external_api_bind_address"] = p_settings.external_api_bind_address;
@@ -423,6 +410,7 @@ Error AISettings::reset_to_defaults() {
 	AISettingsData defaults;
 	defaults.system_prompt = get_default_system_prompt();
 	defaults.engine_source_cache_root = _get_default_engine_source_cache_root();
+	defaults.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
 	return save(defaults);
 }
 
@@ -448,14 +436,14 @@ String AISettings::get_effective_system_prompt(const AISettingsData &p_settings)
 		case AIContextMode::ENGINE:
 			prompt = p_settings.engine_system_prompt;
 			if (prompt.is_empty()) {
-				prompt = p_settings.system_prompt;
+				prompt = get_default_system_prompt();
 			}
 			break;
 		case AIContextMode::PROJECT:
 		default:
 			prompt = p_settings.project_system_prompt;
 			if (prompt.is_empty()) {
-				prompt = p_settings.system_prompt;
+				prompt = get_default_system_prompt();
 			}
 			break;
 	}

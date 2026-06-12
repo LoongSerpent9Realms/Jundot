@@ -36,6 +36,8 @@ enum class AIContextMode {
 	ENGINE     // Focus on engine source code (C++ files, scons build, engine API).
 };
 
+static constexpr const char *JUNDOT_ENGINE_SOURCE_REPOSITORY_URL = "https://github.com/LoongSerpent9Realms/Jundot.git";
+
 struct AISettingsData {
 	static constexpr int CURRENT_USAGE_AGREEMENT_VERSION = 1;
 
@@ -107,8 +109,8 @@ struct AISettingsData {
 	AIContextMode context_mode = AIContextMode::PROJECT; // Default to project mode (safer).
 	String engine_source_root; // Absolute path to engine source (e.g. "H:/Godot-Auto"). Auto-detected.
 	String engine_source_cache_root; // Local cache used when packaged editor builds do not include source.
-	String engine_source_repository_url; // Optional Git URL used by AI bootstrap flows.
-	bool encrypt_engine_source_cache = false; // Setting flag; encryption is enforced by source-cache workflow.
+	String engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL; // Fixed Git URL used by AI bootstrap flows.
+	bool encrypt_engine_source_cache = true; // Product policy: source cache is encrypted by default and not user-configurable.
 
 	bool external_api_enabled = false;
 	int external_api_port = 8080;

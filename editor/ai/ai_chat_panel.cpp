@@ -71,6 +71,7 @@
 #include "scene/gui/tab_container.h"
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
+#include "scene/main/timer.h"
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
 
@@ -222,6 +223,8 @@ void AIChatPanel::_serialize_current_messages() {
 }
 
 void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
+	_stop_build_status_poll();
+
 	// Clear existing UI messages.
 	for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
 		message_list->get_child(i)->queue_free();
@@ -1148,6 +1151,8 @@ void AIChatPanel::_title_completed(int p_result, int p_response_code, const Stri
 }
 
 void AIChatPanel::_cancel_request() {
+	_stop_build_status_poll();
+
 	if (is_summarizing) {
 		is_summarizing = false;
 		pending_user_message = String();
@@ -1170,6 +1175,8 @@ void AIChatPanel::_cancel_request() {
 }
 
 void AIChatPanel::_clear_messages() {
+	_stop_build_status_poll();
+
 	is_summarizing = false;
 	is_titling = false;
 	pending_user_message = String();
@@ -1472,6 +1479,104 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	_confirm_tool_execute(0);
 }
 
+bool AIChatPanel::_tool_result_needs_build_poll(const String &p_content) const {
+	const String lower = p_content.to_lower();
+	return lower.contains("build started in background") ||
+			lower.contains("a build is already running in the background") ||
+			lower.contains("build is still running in the background");
+}
+
+void AIChatPanel::_start_build_status_poll() {
+	if (!build_status_poll_timer) {
+		build_status_poll_timer = memnew(Timer);
+		build_status_poll_timer->set_wait_time(5.0);
+		build_status_poll_timer->set_one_shot(false);
+		build_status_poll_timer->connect("timeout", callable_mp(this, &AIChatPanel::_on_build_status_poll_timeout));
+		add_child(build_status_poll_timer, false, INTERNAL_MODE_BACK);
+	}
+
+	build_status_poll_count = 0;
+	build_status_poll_timer->start();
+	status_label->set_text(TTR("Build is running in the background. Monitoring until it completes..."));
+	tool_call_label->set_visible(true);
+	tool_call_label->set_text(TTR("Build started. Waiting for build status..."));
+	_set_requesting(true);
+}
+
+void AIChatPanel::_stop_build_status_poll() {
+	if (build_status_poll_timer) {
+		build_status_poll_timer->stop();
+	}
+	build_status_poll_count = 0;
+}
+
+void AIChatPanel::_append_forced_build_status_check() {
+	build_status_poll_count++;
+	String call_id = vformat("auto_check_build_status_%d", build_status_poll_count);
+
+	Dictionary fn;
+	fn["name"] = AIToolNames::CHECK_BUILD_STATUS;
+	fn["arguments"] = "{}";
+
+	Dictionary tool_call;
+	tool_call["id"] = call_id;
+	tool_call["type"] = "function";
+	tool_call["function"] = fn;
+
+	Array tool_calls;
+	tool_calls.push_back(tool_call);
+
+	Dictionary assistant_msg;
+	assistant_msg["role"] = "assistant";
+	assistant_msg["content"] = String();
+	assistant_msg["tool_calls"] = tool_calls;
+	pending_tool_round.original_messages.push_back(assistant_msg);
+
+	Dictionary result = AIToolExecutor::execute(tool_call);
+	pending_tool_round.original_messages.push_back(result);
+
+	String content = result.get("content", String());
+	if (_tool_result_needs_build_poll(content)) {
+		tool_call_label->set_text(vformat(TTR("Build is still running. Status check #%d..."), build_status_poll_count));
+		status_label->set_text(TTR("Build is still running in the background..."));
+		return;
+	}
+
+	_stop_build_status_poll();
+	tool_call_label->set_text(TTR("Build finished. Sending result to AI..."));
+	_continue_after_build_poll();
+}
+
+void AIChatPanel::_on_build_status_poll_timeout() {
+	_append_forced_build_status_check();
+}
+
+void AIChatPanel::_continue_after_build_poll() {
+	AISettingsData settings = active_settings;
+	Array tools = pending_tool_round.original_tools;
+	if (tools.is_empty() && settings.tools_enabled) {
+		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
+		if (settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				tools.append_array(mcp_tools);
+			}
+		}
+		pending_tool_round.original_tools = tools;
+	}
+
+	in_tool_loop = true;
+	chat_service->configure(settings);
+	_set_requesting(true);
+	Error err = chat_service->send_messages(pending_tool_round.original_messages, tools);
+	if (err != OK) {
+		status_label->set_text(TTR("Build-status continuation failed."));
+		in_tool_loop = false;
+		_set_requesting(false);
+		_add_ai_message(TTR("[Build completed, but the AI continuation request could not start. Please ask the AI to continue or inspect the build status manually.]"), String(), 0.0, 0, 0);
+	}
+}
+
 void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
 	Dictionary p_json = pending_tool_calls_json;
 
@@ -1522,10 +1627,15 @@ void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
 	}
 
 	// Execute each tool call and append results.
+	bool build_poll_needed = false;
 	for (int i = 0; i < tool_calls.size(); i++) {
 		Dictionary tc = tool_calls[i];
 		Dictionary result = AIToolExecutor::execute(tc);
 		messages.push_back(result);
+		String result_content = result.get("content", String());
+		if (_tool_result_needs_build_poll(result_content)) {
+			build_poll_needed = true;
+		}
 	}
 
 	// Save state for continuation.
@@ -1537,6 +1647,11 @@ void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
 	int current_iteration = pending_tool_round.iteration_count;
 	int max_iterations = pending_tool_round.max_iterations;
 	tool_call_label->set_text(vformat(TTR("Executed %d tool(s). Waiting for response..."), tool_calls.size()));
+
+	if (build_poll_needed) {
+		_start_build_status_poll();
+		return;
+	}
 
 	// Send results back to LLM.
 	chat_service->configure(settings);

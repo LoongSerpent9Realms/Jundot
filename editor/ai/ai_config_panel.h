@@ -81,11 +81,13 @@ class AIConfigPanel : public MarginContainer {
 	Label *status_label = nullptr;
 	Label *external_api_port_label = nullptr;
 	Label *external_api_bind_address_label = nullptr;
+	Label *external_mcp_config_label = nullptr;
 	AIChatService *test_service = nullptr;
 	AIUsageAgreementDialog *usage_agreement_dialog = nullptr;
 	CheckBox *external_api_enabled_check = nullptr;
 	SpinBox *external_api_port_spin = nullptr;
 	LineEdit *external_api_bind_address_edit = nullptr;
+	TextEdit *external_mcp_config_edit = nullptr;
 	Button *save_button = nullptr;
 	Button *reset_button = nullptr;
 	Button *test_button = nullptr;
@@ -93,6 +95,12 @@ class AIConfigPanel : public MarginContainer {
 	Button *reset_agreement_button = nullptr;
 	Button *export_button = nullptr;
 	Button *import_button = nullptr;
+	Button *auto_configure_mcp_button = nullptr;
+	Button *engine_source_download_button = nullptr;
+	Button *engine_source_delete_button = nullptr;
+	Button *engine_source_browse_button = nullptr;
+	Label *engine_source_status_label = nullptr;
+	LineEdit *engine_source_cache_path_edit = nullptr;
 	FileDialog *export_dialog = nullptr;
 	FileDialog *import_dialog = nullptr;
 
@@ -104,10 +112,17 @@ class AIConfigPanel : public MarginContainer {
 	void _reset_usage_agreement();
 	void _export_config();
 	void _import_config();
+	void _auto_configure_external_mcp_apps();
 	void _export_config_confirmed(const String &p_path);
 	void _import_config_confirmed(const String &p_path);
 	void _test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _update_translations();
+	void _update_external_mcp_config();
+	void _update_engine_source_status();
+	void _on_engine_source_download_button_pressed();
+	void _on_engine_source_delete_button_pressed();
+	void _on_engine_source_browse_button_pressed();
+	void _on_engine_source_cache_path_selected(const String &p_path);
 
 	LineEdit *_add_line_edit_row(GridContainer *p_grid, Label **r_label, const String &p_label, const String &p_placeholder = String(), bool p_secret = false);
 	SpinBox *_add_spin_box_row(GridContainer *p_grid, Label **r_label, const String &p_label, double p_min, double p_max, double p_step);
