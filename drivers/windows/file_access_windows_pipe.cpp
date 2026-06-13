@@ -107,7 +107,25 @@ uint64_t FileAccessWindowsPipe::get_length() const {
 	ERR_FAIL_COND_V_MSG(fd[0] == nullptr, -1, "Pipe must be opened before use.");
 
 	DWORD buf_rem = 0;
-	ERR_FAIL_COND_V(!PeekNamedPipe(fd[0], nullptr, 0, nullptr, &buf_rem, nullptr), 0);
+	// PeekNamedPipe() can legitimately fail on anonymous pipes (created by
+	// CreatePipe()) in several normal circumstances: when the buffer is empty,
+	// when the write end has been closed (ERROR_BROKEN_PIPE), when no data is
+	// available on a non-blocking pipe (ERROR_NO_DATA), or when the pipe has
+	// not been connected yet. Treat all such failures as "no bytes available"
+	// rather than fatal errors so callers can poll the pipe without triggering
+	// spurious error messages.
+	if (!PeekNamedPipe(fd[0], nullptr, 0, nullptr, &buf_rem, nullptr)) {
+		DWORD err = GetLastError();
+		switch (err) {
+			case ERROR_NO_DATA:
+			case ERROR_BROKEN_PIPE:
+			case ERROR_PIPE_NOT_CONNECTED:
+			case ERROR_INVALID_HANDLE:
+				return 0;
+			default:
+				return 0;
+		}
+	}
 	return buf_rem;
 }
 
@@ -115,9 +133,24 @@ uint64_t FileAccessWindowsPipe::get_buffer(uint8_t *p_dst, uint64_t p_length) co
 	ERR_FAIL_COND_V_MSG(fd[0] == nullptr, -1, "Pipe must be opened before use.");
 	ERR_FAIL_COND_V(!p_dst && p_length > 0, -1);
 
+	// Clamp to DWORD to avoid truncation on huge requests.
+	DWORD to_read = p_length > (uint64_t)MAXDWORD ? MAXDWORD : (DWORD)p_length;
 	DWORD read = 0;
-	if (!ReadFile(fd[0], p_dst, p_length, &read, nullptr) || read != p_length) {
-		last_error = ERR_FILE_CANT_READ;
+	BOOL ok = ReadFile(fd[0], p_dst, to_read, &read, nullptr);
+	if (!ok) {
+		DWORD err = GetLastError();
+		// ERROR_NO_DATA is expected for non-blocking pipes with nothing to read.
+		// ERROR_BROKEN_PIPE means the write end closed (child exited). Both
+		// are normal pipe lifecycle events, not hard read failures.
+		if (err == ERROR_NO_DATA || err == ERROR_BROKEN_PIPE) {
+			last_error = ERR_FILE_EOF;
+		} else {
+			last_error = ERR_FILE_CANT_READ;
+		}
+	} else if (read != to_read) {
+		// Short read is acceptable for pipes; signal EOF only when nothing at
+		// all was delivered.
+		last_error = read == 0 ? ERR_FILE_EOF : OK;
 	} else {
 		last_error = OK;
 	}

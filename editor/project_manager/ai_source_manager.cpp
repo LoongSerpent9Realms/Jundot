@@ -1,4 +1,4 @@
-﻿/*  ai_source_manager.cpp                                                  */
+/*  ai_source_manager.cpp                                                  */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -42,6 +42,12 @@
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/scroll_container.h"
+#include "scene/gui/scroll_bar.h"
+
+#ifdef WINDOWS_ENABLED
+#include <windows.h>
+#undef FAILED
+#endif
 
 const char *JUNDOT_ENGINE_SOURCE_ZIP_URL = "https://github.com/LoongSerpent9Realms/Jundot/archive/refs/heads/master.zip";
 
@@ -53,13 +59,6 @@ void AISourceManager::_cleanup_on_close() {
 		downloader->cancel();
 		is_downloading = false;
 		set_process(false);
-	}
-
-	if (is_processing && worker_thread) {
-		is_processing = false;
-		worker_thread->wait_to_finish();
-		memdelete(worker_thread);
-		worker_thread = nullptr;
 	}
 }
 
@@ -129,12 +128,113 @@ static bool _dir_has_entries(const String &p_path) {
 	return false;
 }
 
+static Error _remove_directory_recursive_absolute(const String &p_path, String *r_failed_path = nullptr) {
+	if (p_path.is_empty()) {
+		return ERR_INVALID_PARAMETER;
+	}
+	if (r_failed_path) {
+		r_failed_path->clear();
+	}
+
+	Error open_error = OK;
+	Ref<DirAccess> dir = DirAccess::open(p_path, &open_error);
+	if (dir.is_null()) {
+		FileAccess::set_read_only_attribute(p_path, false);
+		const Error err = DirAccess::remove_absolute(p_path);
+		if (err != OK && r_failed_path) {
+			*r_failed_path = p_path;
+		}
+		return err;
+	}
+
+	List<String> dirs;
+	List<String> files;
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (name != "." && name != "..") {
+			if (dir->current_is_dir() && !dir->is_link(name)) {
+				dirs.push_back(name);
+			} else {
+				files.push_back(name);
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+
+	for (const String &E : dirs) {
+		const String child_path = p_path.path_join(E);
+		Error err = _remove_directory_recursive_absolute(child_path, r_failed_path);
+		if (err != OK) {
+			return err;
+		}
+	}
+
+	for (const String &E : files) {
+		const String child_path = p_path.path_join(E);
+		FileAccess::set_read_only_attribute(child_path, false);
+		Error err = DirAccess::remove_absolute(child_path);
+		if (err != OK) {
+			if (r_failed_path) {
+				*r_failed_path = child_path;
+			}
+			return err;
+		}
+	}
+
+	FileAccess::set_read_only_attribute(p_path, false);
+	const Error err = DirAccess::remove_absolute(p_path);
+	if (err != OK && r_failed_path) {
+		*r_failed_path = p_path;
+	}
+	return err;
+}
+
+static Error _collect_encryption_entries(const String &p_path, List<String> &r_dirs, List<String> &r_files) {
+	Error open_error = OK;
+	Ref<DirAccess> dir = DirAccess::open(p_path, &open_error);
+	if (dir.is_null()) {
+		if (FileAccess::exists(p_path)) {
+			r_files.push_back(p_path);
+			return OK;
+		}
+		return open_error != OK ? open_error : ERR_FILE_NOT_FOUND;
+	}
+
+	r_dirs.push_back(p_path);
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (name != "." && name != "..") {
+			const String child_path = p_path.path_join(name);
+			if (dir->current_is_dir() && !dir->is_link(name)) {
+				Error err = _collect_encryption_entries(child_path, r_dirs, r_files);
+				if (err != OK) {
+					dir->list_dir_end();
+					return err;
+				}
+			} else {
+				r_files.push_back(child_path);
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+	return OK;
+}
+
 AISourceManager::SourceStatus AISourceManager::_get_current_status() const {
 	if (is_downloading) {
 		return SourceStatus::DOWNLOADING;
 	}
 	if (is_processing) {
 		return SourceStatus::EXTRACTING;
+	}
+	if (!current_error.is_empty()) {
+		return SourceStatus::ERROR;
 	}
 
 	AISettingsData settings = AISettings::load();
@@ -170,34 +270,157 @@ bool AISourceManager::_is_git_available() const {
 	return err == OK && exit_code == 0;
 }
 
-Error AISourceManager::_run_git_command(const String &p_working_dir, const List<String> &p_args, String &r_output) const {
+Error AISourceManager::_run_git_process(const List<String> &p_args, const String &p_command, String &r_output, int *r_exit_code) {
+	r_output.clear();
+	if (r_exit_code) {
+		*r_exit_code = -1;
+	}
+
+	_defer_git_log(p_command, String(), OK);
+
+	Dictionary pipe_info = OS::get_singleton()->execute_with_pipe("git", p_args, false);
+	if (pipe_info.is_empty() || !pipe_info.has("pid")) {
+		_defer_git_log(String(), TTR("Failed to start Git process."), FAILED);
+		return ERR_CANT_FORK;
+	}
+
+	const ProcessID pid = pipe_info["pid"];
+	Ref<FileAccess> stdio_pipe = pipe_info.get("stdio", Ref<FileAccess>());
+	Ref<FileAccess> stderr_pipe = pipe_info.get("stderr", Ref<FileAccess>());
+	if (pid == 0 || stdio_pipe.is_null() || stderr_pipe.is_null()) {
+		_defer_git_log(String(), TTR("Git process returned invalid pipe handles."), FAILED);
+		return ERR_CANT_OPEN;
+	}
+
+	while (!shutdown_requested.is_set()) {
+		bool read_any = false;
+
+		const uint64_t stdout_available = stdio_pipe->get_length();
+		if (stdout_available > 0) {
+			PackedByteArray buffer;
+			buffer.resize(stdout_available);
+			const uint64_t bytes_read = stdio_pipe->get_buffer(buffer.ptrw(), buffer.size());
+			if (bytes_read > 0) {
+				String chunk;
+				chunk.append_utf8((const char *)buffer.ptr(), bytes_read);
+				r_output += chunk;
+				_defer_git_log(String(), chunk, OK);
+				read_any = true;
+			}
+		}
+
+		const uint64_t stderr_available = stderr_pipe->get_length();
+		if (stderr_available > 0) {
+			PackedByteArray buffer;
+			buffer.resize(stderr_available);
+			const uint64_t bytes_read = stderr_pipe->get_buffer(buffer.ptrw(), buffer.size());
+			if (bytes_read > 0) {
+				String chunk;
+				chunk.append_utf8((const char *)buffer.ptr(), bytes_read);
+				r_output += chunk;
+				_defer_git_log(String(), chunk, OK);
+				read_any = true;
+			}
+		}
+
+		if (!OS::get_singleton()->is_process_running(pid)) {
+			break;
+		}
+		if (!read_any) {
+			OS::get_singleton()->delay_usec(50000);
+		}
+	}
+
+	// Drain any remaining buffered output after the process exits.
+	for (int i = 0; i < 8; i++) {
+		bool read_any = false;
+
+		const uint64_t stdout_available = stdio_pipe->get_length();
+		if (stdout_available > 0) {
+			PackedByteArray buffer;
+			buffer.resize(stdout_available);
+			const uint64_t bytes_read = stdio_pipe->get_buffer(buffer.ptrw(), buffer.size());
+			if (bytes_read > 0) {
+				String chunk;
+				chunk.append_utf8((const char *)buffer.ptr(), bytes_read);
+				r_output += chunk;
+				_defer_git_log(String(), chunk, OK);
+				read_any = true;
+			}
+		}
+
+		const uint64_t stderr_available = stderr_pipe->get_length();
+		if (stderr_available > 0) {
+			PackedByteArray buffer;
+			buffer.resize(stderr_available);
+			const uint64_t bytes_read = stderr_pipe->get_buffer(buffer.ptrw(), buffer.size());
+			if (bytes_read > 0) {
+				String chunk;
+				chunk.append_utf8((const char *)buffer.ptr(), bytes_read);
+				r_output += chunk;
+				_defer_git_log(String(), chunk, OK);
+				read_any = true;
+			}
+		}
+
+		if (!read_any) {
+			break;
+		}
+	}
+
+	const int exit_code = OS::get_singleton()->get_process_exit_code(pid);
+	if (r_exit_code) {
+		*r_exit_code = exit_code;
+	}
+	if (shutdown_requested.is_set()) {
+		OS::get_singleton()->kill(pid);
+		return ERR_SKIP;
+	}
+	if (exit_code != 0) {
+		_defer_git_log(String(), vformat("[exit: %d]", exit_code), OK);
+		return FAILED;
+	}
+	return OK;
+}
+
+Error AISourceManager::_run_git_command(const String &p_working_dir, const List<String> &p_args, String &r_output, int *r_exit_code) {
 	List<String> args;
 	args.push_back("-C");
 	args.push_back(p_working_dir);
+	String command = "git -C " + p_working_dir;
 	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
 		args.push_back(E->get());
+		command += " " + E->get();
 	}
 
 	int exit_code = 0;
-	const Error err = OS::get_singleton()->execute("git", args, &r_output, &exit_code, true);
+	const Error err = _run_git_process(args, command, r_output, &exit_code);
+	if (r_exit_code) {
+		*r_exit_code = exit_code;
+	}
 	if (err != OK) {
 		return err;
 	}
 	return exit_code == 0 ? OK : FAILED;
 }
 
-Error AISourceManager::_update_git_cache(const String &p_cache_path, String &r_source_root, String &r_error) {
-	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(0, TTR("Checking Git availability..."));
+Error AISourceManager::_update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_error) {
+	_defer_processing_progress(0, TTR("Checking Git availability..."));
 	if (!_is_git_available()) {
 		r_error = TTR("Git is not available.");
 		return ERR_UNAVAILABLE;
 	}
 
-	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(1, TTR("Preparing Git source cache directory..."));
+	_defer_processing_progress(1, TTR("Preparing Git source cache directory..."));
 	Error err = DirAccess::make_dir_recursive_absolute(p_cache_path);
 	if (err != OK) {
 		r_error = TTR("Could not create cache directory.");
 		return err;
+	}
+
+	String repo_url = p_repository_url.strip_edges();
+	if (repo_url.is_empty()) {
+		repo_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
 	}
 
 	String repo_path = p_cache_path;
@@ -206,17 +429,58 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, String &r_s
 		DirAccess::make_dir_recursive_absolute(repo_path);
 	}
 
+	// Shallow clone + partial-blob filter reduces initial download while
+	// still producing a complete working-tree checkout.
+	//   --depth=1:         only the latest commit; no history needed.
+	//   --filter=blob:none: blob content streamed on-demand during checkout
+	//                       (trees are small and fetched up front).
 	String output;
-	if (!FileAccess::exists(repo_path.path_join(".git"))) {
-		callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(2, TTR("Cloning JunDot engine source with Git..."));
+	bool requires_full_clone = !FileAccess::exists(repo_path.path_join(".git"));
+	if (!requires_full_clone) {
+		// Existing cache: check whether the configured repository URL
+		// still matches the local origin. If not, treat this as a
+		// "first-time clone" and wipe the old cache to start fresh.
+		String current_origin;
+		{
+			List<String> get_url_args;
+			get_url_args.push_back("remote");
+			get_url_args.push_back("get-url");
+			get_url_args.push_back("origin");
+			int url_exit = 0;
+			_run_git_command(repo_path, get_url_args, output, &url_exit);
+			if (url_exit == 0) {
+				current_origin = output.strip_edges();
+			}
+		}
+
+		if (!current_origin.is_empty() && current_origin != repo_url) {
+			_defer_processing_indeterminate(vformat(TTR("Repository URL changed. Removing old cache and cloning from %s..."), repo_url));
+			DirAccess::remove_absolute(repo_path);
+			// Re-create an empty cache directory so the clone target exists.
+			DirAccess::make_dir_recursive_absolute(repo_path);
+			requires_full_clone = true;
+		}
+	}
+
+	if (requires_full_clone) {
+		_defer_processing_indeterminate(TTR("Cloning engine source with Git... This may take several minutes."));
 		List<String> clone_args;
+		clone_args.push_back("-c");
+		clone_args.push_back("protocol.version=2");
+		clone_args.push_back("-c");
+		clone_args.push_back("core.compression=1");
 		clone_args.push_back("clone");
 		clone_args.push_back("--depth=1");
-		clone_args.push_back(JUNDOT_ENGINE_SOURCE_REPOSITORY_URL);
+		clone_args.push_back("--single-branch");
+		clone_args.push_back("--branch");
+		clone_args.push_back("master");
+		clone_args.push_back("--no-tags");
+		clone_args.push_back("--filter=blob:none");
+		clone_args.push_back(repo_url);
 		clone_args.push_back(repo_path);
 
 		int exit_code = 0;
-		err = OS::get_singleton()->execute("git", clone_args, &output, &exit_code, true);
+		err = _run_git_process(clone_args, "git -c protocol.version=2 -c core.compression=1 clone --depth=1 --single-branch --branch master --no-tags --filter=blob:none " + repo_url + " " + repo_path, output, &exit_code);
 		if (err != OK || exit_code != 0) {
 			r_error = output.strip_edges();
 			if (r_error.is_empty()) {
@@ -225,10 +489,35 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, String &r_s
 			return err != OK ? err : FAILED;
 		}
 	} else {
-		callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(2, TTR("Fetching latest JunDot engine source with Git..."));
+		// Ensure the local origin remote matches the configured repository URL.
+		{
+			List<String> set_url_args;
+			set_url_args.push_back("remote");
+			set_url_args.push_back("set-url");
+			set_url_args.push_back("origin");
+			set_url_args.push_back(repo_url);
+			int set_url_exit = 0;
+			_run_git_command(repo_path, set_url_args, output, &set_url_exit);
+			// Non-fatal: if 'origin' doesn't exist yet, add it.
+			if (set_url_exit != 0) {
+				List<String> add_url_args;
+				add_url_args.push_back("remote");
+				add_url_args.push_back("add");
+				add_url_args.push_back("origin");
+				add_url_args.push_back(repo_url);
+				_run_git_command(repo_path, add_url_args, output, &set_url_exit);
+			}
+		}
+
+		_defer_processing_indeterminate(TTR("Fetching latest JunDot engine source with Git..."));
 		List<String> fetch_args;
+		fetch_args.push_back("-c");
+		fetch_args.push_back("protocol.version=2");
 		fetch_args.push_back("fetch");
 		fetch_args.push_back("--depth=1");
+		fetch_args.push_back("--no-tags");
+		fetch_args.push_back("--prune");
+		fetch_args.push_back("--filter=blob:none");
 		fetch_args.push_back("origin");
 		fetch_args.push_back("master");
 		err = _run_git_command(repo_path, fetch_args, output);
@@ -240,7 +529,7 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, String &r_s
 			return err;
 		}
 
-		callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(3, TTR("Resetting Git source cache to the latest revision..."));
+		_defer_processing_indeterminate(TTR("Resetting Git source cache to the latest revision..."));
 		List<String> reset_args;
 		reset_args.push_back("reset");
 		reset_args.push_back("--hard");
@@ -260,7 +549,8 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, String &r_s
 		r_error = TTR("Git cache does not contain a valid engine source root.");
 		return ERR_FILE_NOT_FOUND;
 	}
-	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(4, TTR("Git source cache update complete. Encrypting cache..."));
+	_defer_processing_progress(3, TTR("Git source cache update complete."));
+	_defer_processing_progress(4, TTR("Git source cache update complete. Encrypting cache..."));
 	return OK;
 }
 
@@ -272,18 +562,33 @@ void AISourceManager::_update_ui() {
 		cache_path = _get_default_cache_root();
 	}
 
+	String repo_url = settings.engine_source_repository_url.strip_edges();
+	if (repo_url.is_empty()) {
+		repo_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	}
+
 	cache_path_edit->set_text(cache_path);
+	if (repository_url_edit) {
+		repository_url_edit->set_text(repo_url);
+	}
 
 	switch (status) {
 		case SourceStatus::NOT_DOWNLOADED:
 			status_label->set_text(TTR("Status: Not Downloaded"));
-			download_button->set_text(TTR("Download / Update"));
+			download_button->set_text(TTR("Clone Engine Source"));
 			download_button->set_disabled(false);
 			delete_button->set_disabled(true);
 			browse_button->set_disabled(false);
 			cache_path_edit->set_editable(true);
+			if (repository_url_edit) {
+				repository_url_edit->set_editable(true);
+			}
+			download_progress->set_indeterminate(false);
 			download_progress->set_visible(false);
 			download_status_label->set_visible(false);
+			if (git_log_scroll) {
+				git_log_scroll->set_visible(false);
+			}
 			break;
 
 		case SourceStatus::DOWNLOADING:
@@ -293,8 +598,15 @@ void AISourceManager::_update_ui() {
 			delete_button->set_disabled(true);
 			browse_button->set_disabled(true);
 			cache_path_edit->set_editable(false);
+			if (repository_url_edit) {
+				repository_url_edit->set_editable(false);
+			}
+			download_progress->set_indeterminate(false);
 			download_progress->set_visible(true);
 			download_status_label->set_visible(true);
+			if (git_log_scroll) {
+				git_log_scroll->set_visible(false);
+			}
 			break;
 
 		case SourceStatus::EXTRACTING:
@@ -305,36 +617,87 @@ void AISourceManager::_update_ui() {
 			delete_button->set_disabled(true);
 			browse_button->set_disabled(true);
 			cache_path_edit->set_editable(false);
+			if (repository_url_edit) {
+				repository_url_edit->set_editable(false);
+			}
 			download_progress->set_visible(true);
 			download_status_label->set_visible(true);
+			if (git_log_scroll && !worker_git_log.is_empty()) {
+				git_log_scroll->set_visible(true);
+			}
 			break;
 
 		case SourceStatus::DOWNLOADED: {
 			status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s"), _get_source_root()));
-			download_button->set_text(TTR("Update"));
+			String saved_url = settings.engine_source_repository_url.strip_edges();
+			if (saved_url.is_empty()) {
+				saved_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+			}
+			// If the user changed the repository URL since the last clone,
+			// the next "Update" will actually wipe and re-clone, so reflect
+			// that in the button label.
+			if (saved_url != repo_url) {
+				download_button->set_text(TTR("Re-clone with New URL"));
+			} else {
+				download_button->set_text(TTR("Update"));
+			}
 			download_button->set_disabled(false);
 			delete_button->set_disabled(false);
 			browse_button->set_disabled(false);
 			cache_path_edit->set_editable(true);
+			if (repository_url_edit) {
+				repository_url_edit->set_editable(true);
+			}
+			download_progress->set_indeterminate(false);
 			download_progress->set_visible(false);
 			download_status_label->set_visible(false);
+			if (git_log_scroll) {
+				git_log_scroll->set_visible(false);
+			}
 		} break;
 
 		case SourceStatus::ERROR:
-			status_label->set_text(vformat(TTR("Status: Error - %s"), current_error));
+			status_label->set_text(TTR("Status: Error"));
 			download_button->set_text(TTR("Retry"));
 			download_button->set_disabled(false);
 			delete_button->set_disabled(false);
 			browse_button->set_disabled(false);
 			cache_path_edit->set_editable(true);
+			if (repository_url_edit) {
+				repository_url_edit->set_editable(true);
+			}
+			download_progress->set_indeterminate(false);
 			download_progress->set_visible(false);
 			download_status_label->set_visible(true);
-			download_status_label->set_text(current_error);
+			download_status_label->set_text(TTR("Operation failed. See details below."));
+			if (git_log_label) {
+				git_log_label->set_text(current_error);
+			}
+			if (git_log_scroll) {
+				git_log_scroll->set_visible(true);
+			}
 			break;
 
 		default:
 			break;
 	}
+
+	_fit_to_contents();
+}
+
+void AISourceManager::_fit_to_contents() {
+	if (!is_visible() || !main_vbox) {
+		return;
+	}
+
+	const Size2i base_size = Size2(640, 360) * EDSCALE;
+	const Size2i content_size = main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE;
+	Size2i desired_size = base_size.max(content_size);
+	const Rect2i usable_parent_rect = get_usable_parent_rect();
+	if (usable_parent_rect.size != Size2i()) {
+		desired_size = desired_size.min(Size2i(usable_parent_rect.size * 0.9));
+	}
+	set_size(desired_size);
 }
 
 void AISourceManager::_notification(int p_what) {
@@ -350,6 +713,20 @@ void AISourceManager::_notification(int p_what) {
 		case NOTIFICATION_PROCESS: {
 			_update_download_progress();
 		} break;
+
+		case NOTIFICATION_PREDELETE: {
+			shutdown_requested.set();
+			if (is_downloading && downloader) {
+				downloader->cancel();
+				is_downloading = false;
+				set_process(false);
+			}
+			if (worker_thread) {
+				worker_thread->wait_to_finish();
+				memdelete(worker_thread);
+				worker_thread = nullptr;
+			}
+		} break;
 	}
 }
 
@@ -359,6 +736,7 @@ void AISourceManager::_on_browse_button_pressed() {
 }
 
 void AISourceManager::_on_cache_dir_selected(const String &p_path) {
+	current_error.clear();
 	cache_path_edit->set_text(p_path);
 	AISettingsData settings = AISettings::load();
 	settings.engine_source_cache_root = p_path;
@@ -366,7 +744,15 @@ void AISourceManager::_on_cache_dir_selected(const String &p_path) {
 	_update_ui();
 }
 
+void AISourceManager::_on_reset_url_button_pressed() {
+	if (repository_url_edit) {
+		repository_url_edit->set_text(JUNDOT_ENGINE_SOURCE_REPOSITORY_URL);
+	}
+}
+
 void AISourceManager::_on_download_button_pressed() {
+	current_error.clear();
+
 	if (is_downloading) {
 		if (downloader) {
 			downloader->cancel();
@@ -384,6 +770,14 @@ void AISourceManager::_on_download_button_pressed() {
 		cache_path = _get_default_cache_root();
 	}
 
+	String repo_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	if (repository_url_edit) {
+		String user_url = repository_url_edit->get_text().strip_edges();
+		if (!user_url.is_empty()) {
+			repo_url = user_url;
+		}
+	}
+
 	Error err = DirAccess::make_dir_recursive_absolute(cache_path);
 	if (err != OK) {
 		current_error = TTR("Could not create cache directory.");
@@ -393,15 +787,17 @@ void AISourceManager::_on_download_button_pressed() {
 
 	AISettingsData settings = AISettings::load();
 	settings.engine_source_cache_root = cache_path;
+	settings.engine_source_repository_url = repo_url;
 	AISettings::save(settings);
 
 	if (_is_git_available()) {
-		_start_git_update(cache_path);
+		_start_git_update(cache_path, repo_url);
 		return;
 	}
 
 	pending_zip_cache_path = cache_path;
-	git_install_prompt_dialog->popup_centered(Size2(460, 140) * EDSCALE);
+	pending_zip_url = repo_url;
+	git_install_prompt_dialog->popup_centered_clamped(Size2(520, 180) * EDSCALE, 0.9);
 }
 
 void AISourceManager::_on_git_install_confirmed() {
@@ -417,11 +813,20 @@ void AISourceManager::_on_git_install_declined() {
 	if (pending_zip_cache_path.is_empty()) {
 		pending_zip_cache_path = _get_default_cache_root();
 	}
-	_start_zip_fallback(pending_zip_cache_path);
+	if (pending_zip_url.is_empty()) {
+		if (repository_url_edit) {
+			pending_zip_url = repository_url_edit->get_text().strip_edges();
+		}
+		if (pending_zip_url.is_empty()) {
+			pending_zip_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+		}
+	}
+	_start_zip_fallback(pending_zip_cache_path, pending_zip_url);
 }
 
-void AISourceManager::_start_zip_fallback(const String &p_cache_path) {
+void AISourceManager::_start_zip_fallback(const String &p_cache_path, const String &p_repository_url) {
 	download_zip_path = p_cache_path.path_join("jundot_engine_source.zip");
+	download_progress->set_indeterminate(false);
 	download_progress->set_min(0);
 	download_progress->set_max(1);
 	download_progress->set_value(0);
@@ -429,7 +834,18 @@ void AISourceManager::_start_zip_fallback(const String &p_cache_path) {
 	download_status_label->set_text(TTR("Git was not found. Falling back to ZIP download..."));
 	download_status_label->set_visible(true);
 
-	const Error err = downloader->start(JUNDOT_ENGINE_SOURCE_ZIP_URL, download_zip_path, 6);
+	String zip_url = JUNDOT_ENGINE_SOURCE_ZIP_URL;
+	String repo_url = p_repository_url.strip_edges();
+	if (!repo_url.is_empty()) {
+		// Derive ZIP archive URL from the Git URL (GitHub-style).
+		String base = repo_url;
+		if (base.ends_with(".git")) {
+			base = base.substr(0, base.length() - 4);
+		}
+		zip_url = base + "/archive/refs/heads/master.zip";
+	}
+
+	const Error err = downloader->start(zip_url, download_zip_path, 16);
 	if (err != OK) {
 		current_error = TTR("Could not start ZIP download.");
 		download_progress->set_visible(false);
@@ -444,16 +860,30 @@ void AISourceManager::_start_zip_fallback(const String &p_cache_path) {
 }
 
 void AISourceManager::_on_delete_button_pressed() {
-	String source_root = _get_source_root();
+	String cache_path = cache_path_edit ? cache_path_edit->get_text().strip_edges() : String();
+	if (cache_path.is_empty()) {
+		AISettingsData settings = AISettings::load();
+		cache_path = settings.engine_source_cache_root.strip_edges();
+	}
+	if (cache_path.is_empty()) {
+		cache_path = _get_default_cache_root();
+	}
+
+	String source_root = _find_engine_source_root_in_cache(cache_path);
 	if (source_root.is_empty()) {
 		current_error = TTR("No source cache to delete.");
 		_update_ui();
 		return;
 	}
 
-	Error err = DirAccess::remove_absolute(source_root);
+	String failed_path;
+	Error err = _remove_directory_recursive_absolute(cache_path, &failed_path);
 	if (err != OK) {
-		current_error = vformat(TTR("Failed to delete cache: error %d"), err);
+		if (failed_path.is_empty()) {
+			current_error = vformat(TTR("Failed to delete cache: error %d"), err);
+		} else {
+			current_error = vformat(TTR("Failed to delete cache: error %d\nPath: %s"), err, failed_path);
+		}
 		_update_ui();
 		return;
 	}
@@ -532,21 +962,31 @@ void AISourceManager::_on_download_failed(const String &p_reason) {
 	_update_ui();
 }
 
-void AISourceManager::_start_git_update(const String &p_cache_path) {
+void AISourceManager::_start_git_update(const String &p_cache_path, const String &p_repository_url) {
+	shutdown_requested.clear();
 	is_processing = true;
 	worker_git_mode = true;
 	worker_cache_path = p_cache_path;
+	worker_repository_url = p_repository_url;
 	worker_error = OK;
 	worker_error_msg = "";
 	worker_source_root = "";
+	worker_git_log = "";
 
 	status_label->set_text(TTR("Status: Updating with Git..."));
+	download_progress->set_indeterminate(false);
 	download_progress->set_min(0);
 	download_progress->set_max(5);
 	download_progress->set_value(0);
 	download_progress->set_visible(true);
 	download_status_label->set_text(TTR("Preparing Git source cache update..."));
 	download_status_label->set_visible(true);
+	if (git_log_scroll) {
+		git_log_scroll->set_visible(false);
+	}
+	if (git_log_label) {
+		git_log_label->set_text("");
+	}
 
 	worker_thread = memnew(Thread);
 	worker_thread->start(_worker_thread_static_func, this);
@@ -600,20 +1040,57 @@ Error AISourceManager::_extract_zip(const String &p_zip_path, const String &p_ca
 
 Error AISourceManager::_encrypt_cache(const String &p_cache_path, String &r_error) {
 #ifdef WINDOWS_ENABLED
-	List<String> args;
-	args.push_back("/E");
-	args.push_back("/S:" + p_cache_path);
-
-	String output;
-	int exit_code = 0;
-	Error err = OS::get_singleton()->execute("cipher", args, &output, &exit_code, true);
-	if (err != OK || exit_code != 0) {
-		r_error = output.strip_edges();
-		if (r_error.is_empty()) {
-			r_error = vformat("cipher exited with code %d.", exit_code);
-		}
-		return err != OK ? err : FAILED;
+	List<String> dirs;
+	List<String> files;
+	Error err = _collect_encryption_entries(p_cache_path, dirs, files);
+	if (err != OK) {
+		r_error = vformat(TTR("Could not scan source cache before encryption: error %d"), err);
+		return err;
 	}
+
+	const int total = dirs.size() + files.size();
+	if (total == 0) {
+		return OK;
+	}
+
+	int processed = 0;
+	uint64_t last_progress_msec = 0;
+	_defer_processing_progress_units(processed, total, vformat(TTR("Encrypting engine source cache... %d / %d"), processed, total));
+
+	auto encrypt_path = [&](const String &p_path) -> Error {
+		if (shutdown_requested.is_set()) {
+			return ERR_SKIP;
+		}
+
+		const Char16String path_utf16 = p_path.utf16();
+		if (!EncryptFileW((LPCWSTR)path_utf16.get_data())) {
+			const DWORD windows_error = GetLastError();
+			r_error = vformat(TTR("Could not encrypt path: %s (Windows error %d)"), p_path, (int)windows_error);
+			return FAILED;
+		}
+
+		processed++;
+		const uint64_t now = OS::get_singleton()->get_ticks_msec();
+		if (processed == total || processed % 25 == 0 || now - last_progress_msec >= 250) {
+			last_progress_msec = now;
+			_defer_processing_progress_units(processed, total, vformat(TTR("Encrypting engine source cache... %d / %d"), processed, total));
+		}
+		return OK;
+	};
+
+	for (const String &E : dirs) {
+		err = encrypt_path(E);
+		if (err != OK) {
+			return err;
+		}
+	}
+	for (const String &E : files) {
+		err = encrypt_path(E);
+		if (err != OK) {
+			return err;
+		}
+	}
+
 	return OK;
 #else
 	r_error = "Automatic encrypted source cache is only implemented on Windows.";
@@ -622,14 +1099,17 @@ Error AISourceManager::_encrypt_cache(const String &p_cache_path, String &r_erro
 }
 
 void AISourceManager::_start_post_download_processing(const String &p_cache_path) {
+	shutdown_requested.clear();
 	is_processing = true;
 	worker_git_mode = false;
 	worker_cache_path = p_cache_path;
 	worker_error = OK;
 	worker_error_msg = "";
 	worker_source_root = "";
+	worker_git_log = "";
 
 	status_label->set_text(TTR("Status: Extracting ZIP fallback..."));
+	download_progress->set_indeterminate(false);
 	download_progress->set_min(0);
 	download_progress->set_max(3);
 	download_progress->set_value(1);
@@ -652,11 +1132,11 @@ void AISourceManager::_worker_thread_func() {
 
 	if (worker_git_mode) {
 		String git_error;
-		err = _update_git_cache(worker_cache_path, source_root, git_error);
+		err = _update_git_cache(worker_cache_path, worker_repository_url, source_root, git_error);
 		if (err != OK || source_root.is_empty()) {
 			worker_error = err != OK ? err : FAILED;
 			worker_error_msg = git_error.is_empty() ? TTR("Git update failed.") : git_error;
-			callable_mp(this, &AISourceManager::_on_processing_completed).call_deferred();
+			_defer_processing_completed();
 			return;
 		}
 	} else {
@@ -664,25 +1144,25 @@ void AISourceManager::_worker_thread_func() {
 		if (err != OK || source_root.is_empty()) {
 			worker_error = err != OK ? err : FAILED;
 			worker_error_msg = TTR("ZIP extraction failed.");
-			callable_mp(this, &AISourceManager::_on_processing_completed).call_deferred();
+			_defer_processing_completed();
 			return;
 		}
 		DirAccess::remove_absolute(download_zip_path);
 	}
 
 	String encryption_error;
-	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(worker_git_mode ? 4 : 2, TTR("Encrypting engine source cache..."));
+	_defer_processing_progress(worker_git_mode ? 4 : 2, TTR("Encrypting engine source cache..."));
 	err = _encrypt_cache(worker_cache_path, encryption_error);
 	if (err != OK) {
 		worker_error = err;
 		worker_error_msg = vformat(TTR("Source cache updated, but encryption failed: %s"), encryption_error);
-		callable_mp(this, &AISourceManager::_on_processing_completed).call_deferred();
+		_defer_processing_completed();
 		return;
 	}
 
 	worker_source_root = source_root;
-	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(worker_git_mode ? 5 : 3, TTR("Engine source cache is ready."));
-	callable_mp(this, &AISourceManager::_on_processing_completed).call_deferred();
+	_defer_processing_progress(worker_git_mode ? 5 : 3, TTR("Engine source cache is ready."));
+	_defer_processing_completed();
 }
 
 void AISourceManager::_set_processing_progress(int p_step, const String &p_status) {
@@ -691,15 +1171,130 @@ void AISourceManager::_set_processing_progress(int p_step, const String &p_statu
 	}
 
 	download_progress->set_visible(true);
+	download_progress->set_indeterminate(false);
 	if (download_progress->get_max() < p_step) {
 		download_progress->set_max(p_step);
 	}
 	download_progress->set_value(p_step);
 	download_status_label->set_text(p_status);
 	download_status_label->set_visible(true);
+	_fit_to_contents();
+}
+
+void AISourceManager::_set_processing_progress_units(int p_current, int p_total, const String &p_status) {
+	if (!download_progress || !download_status_label) {
+		return;
+	}
+
+	download_progress->set_visible(true);
+	download_progress->set_indeterminate(false);
+	download_progress->set_min(0);
+	download_progress->set_max(MAX(1, p_total));
+	download_progress->set_value(CLAMP(p_current, 0, MAX(1, p_total)));
+	download_status_label->set_text(p_status);
+	download_status_label->set_visible(true);
+	_fit_to_contents();
+}
+
+void AISourceManager::_set_processing_indeterminate(const String &p_status) {
+	if (!download_progress || !download_status_label) {
+		return;
+	}
+
+	download_progress->set_visible(true);
+	download_progress->set_indeterminate(true);
+	download_status_label->set_text(p_status);
+	download_status_label->set_visible(true);
+	_fit_to_contents();
+}
+
+void AISourceManager::_append_git_log(const String &p_log) {
+	if (p_log.is_empty()) {
+		return;
+	}
+
+	if (!worker_git_log.is_empty()) {
+		worker_git_log += "\n";
+	}
+	worker_git_log += p_log;
+
+	const int max_log_chars = 6000;
+	if (worker_git_log.length() > max_log_chars) {
+		worker_git_log = "... log truncated ...\n" + worker_git_log.right(max_log_chars);
+	}
+
+	if (git_log_label) {
+		git_log_label->set_text(worker_git_log);
+	}
+	if (git_log_scroll) {
+		const bool was_visible = git_log_scroll->is_visible();
+		git_log_scroll->set_visible(true);
+		git_log_scroll->set_deferred(SNAME("scroll_vertical"), git_log_scroll->get_v_scroll_bar()->get_max());
+		if (!was_visible) {
+			_fit_to_contents();
+		}
+	}
+}
+
+void AISourceManager::_defer_processing_progress(int p_step, const String &p_status) {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_set_processing_progress).call_deferred(p_step, p_status);
+}
+
+void AISourceManager::_defer_processing_progress_units(int p_current, int p_total, const String &p_status) {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_set_processing_progress_units).call_deferred(p_current, p_total, p_status);
+}
+
+void AISourceManager::_defer_processing_indeterminate(const String &p_status) {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_set_processing_indeterminate).call_deferred(p_status);
+}
+
+void AISourceManager::_defer_git_log(const String &p_command, const String &p_output, Error p_error) {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
+
+	String log;
+	if (!p_command.is_empty()) {
+		log = "$ " + p_command;
+	}
+	if (!p_output.strip_edges().is_empty()) {
+		if (!log.is_empty()) {
+			log += "\n";
+		}
+		log += p_output.strip_edges();
+	}
+	if (p_error != OK) {
+		if (!log.is_empty()) {
+			log += "\n";
+		}
+		log += vformat("[error: %d]", (int)p_error);
+	}
+	if (log.is_empty()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_append_git_log).call_deferred(log);
+}
+
+void AISourceManager::_defer_processing_completed() {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_on_processing_completed).call_deferred();
 }
 
 void AISourceManager::_on_processing_completed() {
+	if (shutdown_requested.is_set()) {
+		return;
+	}
 	is_processing = false;
 
 	if (worker_thread) {
@@ -719,25 +1314,35 @@ void AISourceManager::_on_processing_completed() {
 	AISettingsData settings = AISettings::load();
 	settings.engine_source_root = worker_source_root;
 	settings.engine_source_cache_root = worker_cache_path;
-	settings.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	String saved_url = worker_repository_url.strip_edges();
+	if (saved_url.is_empty()) {
+		saved_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	}
+	settings.engine_source_repository_url = saved_url;
 	settings.encrypt_engine_source_cache = true;
 	AISettings::save(settings);
 
+	current_error.clear();
 	status_label->set_text(TTR("Status: Ready"));
+	download_progress->set_indeterminate(false);
 	download_progress->set_visible(false);
 	download_status_label->set_visible(false);
 	_update_ui();
 }
 
 void AISourceManager::popup_centered_on_parent(const Window *p_parent) {
-	popup_centered(Size2i(480, 240));
+	(void)p_parent;
+	_update_ui();
+	const Size2i base_size = Size2(640, 360) * EDSCALE;
+	const Size2i content_size = main_vbox ? main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE : Size2i();
+	popup_centered_clamped(base_size.max(content_size), 0.9);
 }
 
 AISourceManager::AISourceManager() {
 	set_title(TTR("AI Engine Source Manager"));
 	set_ok_button_text(TTR("Close"));
 
-	VBoxContainer *main_vbox = memnew(VBoxContainer);
+	main_vbox = memnew(VBoxContainer);
 	main_vbox->add_theme_constant_override("separation", 6);
 	add_child(main_vbox);
 
@@ -745,8 +1350,30 @@ AISourceManager::AISourceManager() {
 	{
 		status_label = memnew(Label);
 		status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-		status_label->set_custom_minimum_size(Size2(0, 36));
+		status_label->set_custom_minimum_size(Size2(0, 36) * EDSCALE);
 		main_vbox->add_child(status_label);
+	}
+
+	// Repository URL section (user-configurable, defaults to Jundot).
+	{
+		HBoxContainer *url_hbox = memnew(HBoxContainer);
+		url_hbox->add_theme_constant_override("separation", 6);
+		main_vbox->add_child(url_hbox);
+
+		Label *url_label = memnew(Label(TTR("Repository URL:")));
+		url_label->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
+		url_hbox->add_child(url_label);
+
+		repository_url_edit = memnew(LineEdit);
+		repository_url_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		repository_url_edit->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
+		repository_url_edit->set_placeholder(JUNDOT_ENGINE_SOURCE_REPOSITORY_URL);
+		url_hbox->add_child(repository_url_edit);
+
+		Button *reset_url_button = memnew(Button);
+		reset_url_button->set_text(TTR("Reset"));
+		reset_url_button->connect(SceneStringName(pressed), callable_mp(this, &AISourceManager::_on_reset_url_button_pressed));
+		url_hbox->add_child(reset_url_button);
 	}
 
 	// Cache path section.
@@ -778,9 +1405,24 @@ AISourceManager::AISourceManager() {
 		main_vbox->add_child(download_progress);
 
 		download_status_label = memnew(Label);
+		download_status_label->set_custom_minimum_size(Size2(0, 24) * EDSCALE);
 		download_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 		download_status_label->set_visible(false);
 		main_vbox->add_child(download_status_label);
+
+		git_log_scroll = memnew(ScrollContainer);
+		git_log_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		git_log_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+		git_log_scroll->set_custom_minimum_size(Size2(0, 140) * EDSCALE);
+		git_log_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED);
+		git_log_scroll->set_visible(false);
+		main_vbox->add_child(git_log_scroll);
+
+		git_log_label = memnew(Label);
+		git_log_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		git_log_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		git_log_label->set_auto_translate_mode(AUTO_TRANSLATE_MODE_DISABLED);
+		git_log_scroll->add_child(git_log_label);
 	}
 
 	// Buttons section.
@@ -816,7 +1458,5 @@ AISourceManager::AISourceManager() {
 	cache_dir_dialog->set_title(TTR("Select Engine Source Cache Folder"));
 	cache_dir_dialog->connect("dir_selected", callable_mp(this, &AISourceManager::_on_cache_dir_selected));
 	add_child(cache_dir_dialog);
-
-	_update_ui();
 }
 

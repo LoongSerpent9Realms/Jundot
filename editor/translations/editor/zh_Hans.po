@@ -14046,6 +14046,11 @@ msgid ""
 msgstr "注意：内置脚本有其局限性，并且不能使用外部编辑器编辑。"
 
 msgid ""
+"Note: C++ scripts are native source files. They must be compiled as an "
+"engine module or GDExtension before they run."
+msgstr "注意：C++ 脚本是原生源码文件。必须先编译为引擎模块或 GDExtension，运行时才能生效。"
+
+msgid ""
 "Warning: Having the script name be the same as a built-in type is usually not "
 "desired."
 msgstr "警告：脚本名称通常不能与内置类型一致。"
@@ -21300,6 +21305,9 @@ msgstr "正在准备 Git 源码缓存目录..."
 msgid "Cloning JunDot engine source with Git..."
 msgstr "正在使用 Git 克隆 JunDot 引擎源码..."
 
+msgid "Cloning JunDot engine source with Git... This may take several minutes."
+msgstr "正在使用 Git 克隆 JunDot 引擎源码... 这可能需要几分钟。"
+
 msgid "Fetching latest JunDot engine source with Git..."
 msgstr "正在使用 Git 获取最新 JunDot 引擎源码..."
 
@@ -21308,6 +21316,9 @@ msgstr "正在将 Git 源码缓存重置到最新版本..."
 
 msgid "Git source cache update complete. Encrypting cache..."
 msgstr "Git 源码缓存更新完成，正在加密缓存..."
+
+msgid "Git source cache update complete."
+msgstr "Git 源码缓存更新完成。"
 
 msgid "Engine source cache is ready."
 msgstr "引擎源码缓存已就绪。"
@@ -21350,3 +21361,21 @@ msgstr "使用 ZIP"
 
 msgid "Git is not installed or is not available in PATH. Install Git for faster engine source updates?\n\nIf you choose ZIP, JunDot will download the full source archive as a fallback."
 msgstr "Git 未安装，或不在 PATH 中。是否安装 Git 以获得更快的引擎源码更新？\n\n如果选择 ZIP，JunDot 会下载完整源码压缩包作为备用方案。"
+
+msgid "Status: Error"
+msgstr "状态：错误"
+
+msgid "Operation failed. See details below."
+msgstr "操作失败。请查看下方详细信息。"
+
+msgid "Failed to delete cache: error %d\nPath: %s"
+msgstr "删除缓存失败：错误 %d\n路径：%s"
+
+msgid "Could not scan source cache before encryption: error %d"
+msgstr "加密前无法扫描源码缓存：错误 %d"
+
+msgid "Encrypting engine source cache... %d / %d"
+msgstr "正在加密引擎源码缓存... %d / %d"
+
+msgid "Could not encrypt path: %s (Windows error %d)"
+msgstr "无法加密路径：%s（Windows 错误 %d）"

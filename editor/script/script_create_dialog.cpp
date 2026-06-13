@@ -667,6 +667,8 @@ void ScriptCreateDialog::_update_dialog() {
 
 	if (is_built_in) {
 		validation_panel->set_message(MSG_ID_BUILT_IN, TTRC("Note: Built-in scripts have some limitations and can't be edited using an external editor."), EditorValidationPanel::MSG_INFO, false);
+	} else if (language != nullptr && language->get_name() == "C++") {
+		validation_panel->set_message(MSG_ID_BUILT_IN, TTRC("Note: C++ scripts are native source files. They must be compiled as an engine module or GDExtension before they run."), EditorValidationPanel::MSG_INFO, false);
 	} else if (file_path->get_text().get_file().get_basename() == parent_name->get_text()) {
 		validation_panel->set_message(MSG_ID_BUILT_IN, TTRC("Warning: Having the script name be the same as a built-in type is usually not desired."), EditorValidationPanel::MSG_WARNING, false);
 	}

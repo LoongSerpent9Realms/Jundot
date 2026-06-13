@@ -1377,7 +1377,7 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             View = View.Details,
             FullRowSelect = true,
-            MultiSelect = false,
+            MultiSelect = true,
             GridLines = true,
             Font = new Font("Segoe UI", 9f)
         };
@@ -1392,6 +1392,7 @@ public partial class MainForm : Form
         _lvBuilds.DoubleClick += LvBuilds_DoubleClick;
         _lvBuilds.MouseClick += LvBuilds_MouseClick;
         _lvBuilds.KeyDown += LvBuilds_KeyDown;
+        _lvBuilds.SelectedIndexChanged += (s, e) => UpdateBuildActionButtons();
 
         // ── Action Buttons ────────────────────────────────────
         var actionBar = new FlowLayoutPanel
@@ -1523,17 +1524,27 @@ public partial class MainForm : Form
 
     private void UpdateBuildActionButtons()
     {
-        var hasSelection = _lvBuilds.SelectedItems.Count > 0;
-        var record = hasSelection ? (BuildRecord?)_lvBuilds.SelectedItems[0].Tag : null;
+        var selectedCount = _lvBuilds.SelectedItems.Count;
+        var hasSelection = selectedCount > 0;
+        var singleSelection = selectedCount == 1;
+        var record = singleSelection ? (BuildRecord?)_lvBuilds.SelectedItems[0].Tag : null;
 
-        _btnLaunch.Enabled = hasSelection && record?.ExeExists == true;
+        _btnLaunch.Enabled = singleSelection && record?.ExeExists == true;
         _btnOpenFolder.Enabled = hasSelection;
-        _btnViewLog.Enabled = hasSelection && !string.IsNullOrEmpty(record?.BuildLogPath) && File.Exists(record.BuildLogPath);
+        _btnViewLog.Enabled = singleSelection && !string.IsNullOrEmpty(record?.BuildLogPath) && File.Exists(record.BuildLogPath);
         _btnDeleteBuild.Enabled = hasSelection;
     }
 
     private BuildRecord? SelectedBuild =>
         _lvBuilds.SelectedItems.Count > 0 ? (BuildRecord?)_lvBuilds.SelectedItems[0].Tag : null;
+
+    private List<BuildRecord> SelectedBuilds =>
+        _lvBuilds.SelectedItems
+            .Cast<ListViewItem>()
+            .Select(item => (BuildRecord?)item.Tag)
+            .Where(record => record != null)
+            .Cast<BuildRecord>()
+            .ToList();
 
     // ──  Event Handlers  ────────────────────────────────────────
 
@@ -1546,7 +1557,7 @@ public partial class MainForm : Form
     {
         UpdateBuildActionButtons();
 
-        if (e.Button == MouseButtons.Right && SelectedBuild != null)
+        if (e.Button == MouseButtons.Right && SelectedBuilds.Count > 0)
         {
             var ctxMenu = new ContextMenuStrip();
             ctxMenu.Items.Add("▶ Launch", null, (s, a) => LaunchSelectedBuild());
@@ -1573,6 +1584,8 @@ public partial class MainForm : Form
 
     private void LaunchSelectedBuild()
     {
+        if (_lvBuilds.SelectedItems.Count != 1) return;
+
         var record = SelectedBuild;
         if (record == null || string.IsNullOrEmpty(record.ExePath) || !File.Exists(record.ExePath))
         {
@@ -1599,19 +1612,31 @@ public partial class MainForm : Form
 
     private void OpenBuildFolder()
     {
-        var record = SelectedBuild;
-        if (record == null) return;
+        var records = SelectedBuilds;
+        if (records.Count == 0) return;
 
-        var dir = !string.IsNullOrEmpty(record.PackageDir) && Directory.Exists(record.PackageDir)
-            ? record.PackageDir
-            : Path.GetDirectoryName(record.ExePath);
-
-        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        var openedAny = false;
+        foreach (var record in records)
         {
-            try { System.Diagnostics.Process.Start("explorer", $"\"{dir}\""); }
-            catch (Exception ex) { MessageBox.Show($"Failed to open folder: {ex.Message}", "Error"); }
+            var dir = !string.IsNullOrEmpty(record.PackageDir) && Directory.Exists(record.PackageDir)
+                ? record.PackageDir
+                : Path.GetDirectoryName(record.ExePath);
+
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start("explorer", $"\"{dir}\"");
+                    openedAny = true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to open folder: {ex.Message}", "Error");
+                }
+            }
         }
-        else
+
+        if (!openedAny)
         {
             MessageBox.Show("Folder not found.", "Cannot Open", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -1619,6 +1644,8 @@ public partial class MainForm : Form
 
     private void ViewBuildLog()
     {
+        if (_lvBuilds.SelectedItems.Count != 1) return;
+
         var record = SelectedBuild;
         if (record == null || string.IsNullOrEmpty(record.BuildLogPath) || !File.Exists(record.BuildLogPath))
         {
@@ -1638,12 +1665,14 @@ public partial class MainForm : Form
 
     private void DeleteSelectedBuild()
     {
-        var record = SelectedBuild;
-        if (record == null) return;
+        var records = SelectedBuilds;
+        if (records.Count == 0) return;
 
-        var msg = $"Delete build:\n\n{record.PackageName}\n\n" +
-                  "This will remove the package folder, zip, and logs.\n" +
-                  "The bin/ executable will be kept.\n\nContinue?";
+        var msg = records.Count == 1
+            ? $"Delete build:\n\n{records[0].PackageName}\n\n"
+            : $"Delete {records.Count} builds:\n\n{string.Join("\n", records.Select(r => $"  - {r.PackageName}"))}\n\n";
+        msg += "This will remove the package folder, zip, and logs.\n" +
+               "The bin/ executable will be kept.\n\nContinue?";
 
         var result = MessageBox.Show(msg, "Confirm Delete",
             MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
@@ -1652,9 +1681,12 @@ public partial class MainForm : Form
 
         try
         {
-            _buildManager?.DeleteBuild(record, keepExe: true);
+            foreach (var record in records)
+            {
+                _buildManager?.DeleteBuild(record, keepExe: true);
+            }
             RefreshBuildList();
-            UpdateStatus($"Deleted: {record.PackageName}", Color.Orange);
+            UpdateStatus(records.Count == 1 ? $"Deleted: {records[0].PackageName}" : $"Deleted {records.Count} builds", Color.Orange);
         }
         catch (Exception ex)
         {
