@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Reflection;
+using System.Text;
 
 namespace JundotPackageBuilder;
 
@@ -62,6 +63,8 @@ public partial class MainForm : Form
     private Button _btnDeleteBuild = null!;
     private Button _btnRefreshBuilds = null!;
     private Label _lblBuildCount = null!;
+    private Button _btnPublishToGitHub = null!;
+    private Button _btnGenerateAiSummary = null!;
 
     // Console output
     private RichTextBox _rtbConsole = null!;
@@ -939,7 +942,228 @@ public partial class MainForm : Form
         };
         layout.Controls.Add(cbAppLang, 1, 1);
 
-        // Row 2: Info label
+        // Row 2: AI / Release settings section
+        var aiSection = new Panel
+        {
+            AutoSize = true,
+            Padding = new Padding(0, 16, 0, 4)
+        };
+        var aiTitle = new Label
+        {
+            Text = "── AI Release Summary + GitHub Publish ──",
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(80, 80, 80),
+            Margin = new Padding(0, 0, 0, 8)
+        };
+        aiSection.Controls.Add(aiTitle);
+        layout.Controls.Add(aiSection, 1, 2);
+        layout.SetColumnSpan(aiSection, 2);
+
+        var aiLayout = new TableLayoutPanel
+        {
+            AutoSize = true,
+            ColumnCount = 3,
+            Padding = new Padding(0, 4, 0, 0)
+        };
+        aiLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+        aiLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        aiLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+
+        // Use AI summary
+        var chkUseAi = new CheckBox { Text = "Use AI to generate release summary", AutoSize = true, Checked = true };
+        chkUseAi.CheckedChanged += (s, e) =>
+        {
+            // Update saved config immediately on edit
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.UseAiSummary = chkUseAi.Checked;
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        };
+        aiLayout.Controls.Add(chkUseAi, 1, 0);
+
+        // AI Base URL
+        var txtAiBase = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "http://127.0.0.1:4096/v1" };
+        txtAiBase.Leave += (s, e) =>
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.AiBaseUrl = txtAiBase.Text.Trim();
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        };
+        var lblBase = new Label { Text = "AI Base URL", AutoSize = true, ForeColor = Color.Gray };
+        aiLayout.Controls.Add(lblBase, 0, 1);
+        aiLayout.Controls.Add(txtAiBase, 1, 1);
+
+        // AI Model
+        var txtAiModel = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "mimocode-jundot / gpt-4.1-mini" };
+        txtAiModel.Leave += (s, e) =>
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.AiModel = txtAiModel.Text.Trim();
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        };
+        var lblModel = new Label { Text = "AI Model", AutoSize = true, ForeColor = Color.Gray };
+        aiLayout.Controls.Add(lblModel, 0, 2);
+        aiLayout.Controls.Add(txtAiModel, 1, 2);
+
+        // AI API Key
+        var txtAiKey = new TextBox { Dock = DockStyle.Fill, PasswordChar = '*', PlaceholderText = "(optional, or set MIMOCODE_API_KEY env var)" };
+        txtAiKey.Leave += (s, e) =>
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.AiApiKey = txtAiKey.Text.Trim();
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        };
+        var lblKey = new Label { Text = "AI API Key", AutoSize = true, ForeColor = Color.Gray };
+        aiLayout.Controls.Add(lblKey, 0, 3);
+        aiLayout.Controls.Add(txtAiKey, 1, 3);
+
+        // GitHub Owner/Repo
+        var txtGhOwner = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "LoongSerpent9Realms" };
+        var txtGhRepo = new TextBox { Dock = DockStyle.Fill, PlaceholderText = "Jundot" };
+        void PersistGh()
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.Owner = string.IsNullOrWhiteSpace(txtGhOwner.Text) ? "LoongSerpent9Realms" : txtGhOwner.Text.Trim();
+            cfg.Repo = string.IsNullOrWhiteSpace(txtGhRepo.Text) ? "Jundot" : txtGhRepo.Text.Trim();
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        }
+        txtGhOwner.Leave += (s, e) => PersistGh();
+        txtGhRepo.Leave += (s, e) => PersistGh();
+        var lblOwner = new Label { Text = "GitHub Owner", AutoSize = true, ForeColor = Color.Gray };
+        var lblRepo = new Label { Text = "GitHub Repo", AutoSize = true, ForeColor = Color.Gray };
+        aiLayout.Controls.Add(lblOwner, 0, 4);
+        aiLayout.Controls.Add(txtGhOwner, 1, 4);
+        aiLayout.Controls.Add(lblRepo, 0, 5);
+        aiLayout.Controls.Add(txtGhRepo, 1, 5);
+
+        // GitHub Token (password input) + Test button
+        var tokenLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1
+        };
+        tokenLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        tokenLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        tokenLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var txtGhToken = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            PasswordChar = '*',
+            PlaceholderText = "(ghp_... token) or leave blank to use GITHUB_TOKEN env var"
+        };
+        var lblToken = new Label { Text = "GitHub Token", AutoSize = true, ForeColor = Color.Gray, Margin = new Padding(0, 6, 0, 0) };
+
+        var btnTestToken = new Button
+        {
+            Text = "Test",
+            AutoSize = true,
+            Margin = new Padding(4, 4, 0, 0)
+        };
+
+        async void BtnTestToken_Click(object? sender, EventArgs e)
+        {
+            var root = _txtRepoRoot.Text.Trim();
+            if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+            {
+                MessageBox.Show("Set the repo root first.", "Missing Repo Root",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnTestToken.Enabled = false;
+            btnTestToken.Text = "Testing...";
+            try
+            {
+                // Persist the token first, then validate
+                if (!string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()))
+                {
+                    var cfg = PublishConfig.Load(root);
+                    cfg.Token = txtGhToken.Text.Trim();
+                    cfg.Save(root);
+                }
+
+                var cfg2 = PublishConfig.Load(root);
+                var publisher = new GitHubReleasePublisher(root, cfg2);
+                var (ok, message) = await publisher.ValidateTokenAsync(CancellationToken.None);
+
+                if (ok)
+                {
+                    AppendConsole($"[GitHub] Token OK — {message}", "success");
+                    MessageBox.Show(message, "Token Valid",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    AppendConsole($"[GitHub] Token failed: {message}", "error");
+                    MessageBox.Show(message, "Token Invalid",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendConsole($"[GitHub] Test connection error: {ex.Message}", "error");
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnTestToken.Enabled = true;
+                btnTestToken.Text = "Test";
+            }
+        }
+
+        btnTestToken.Click += BtnTestToken_Click;
+
+        void PersistGhToken()
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.Token = txtGhToken.Text.Trim();
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        }
+        txtGhToken.Leave += (s, e) => PersistGhToken();
+
+        tokenLayout.Controls.Add(lblToken, 0, 0);
+        tokenLayout.Controls.Add(txtGhToken, 1, 0);
+        tokenLayout.Controls.Add(btnTestToken, 2, 0);
+
+        aiLayout.Controls.Add(new Label { Text = "", AutoSize = true }, 0, 6); // spacer
+        aiLayout.Controls.Add(tokenLayout, 1, 6);
+
+        // Load current config into inputs
+        void LoadPublishInputs()
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            chkUseAi.Checked = cfg.UseAiSummary;
+            txtAiBase.Text = cfg.AiBaseUrl;
+            txtAiModel.Text = cfg.AiModel;
+            txtAiKey.Text = cfg.AiApiKey;
+            txtGhOwner.Text = cfg.Owner;
+            txtGhRepo.Text = cfg.Repo;
+            txtGhToken.Text = cfg.Token;
+        }
+        _txtRepoRoot.TextChanged += (s, e) => LoadPublishInputs();
+        // Re-read on first paint
+        LoadPublishInputs();
+
+        layout.Controls.Add(aiLayout, 1, 3);
+        layout.SetColumnSpan(aiLayout, 2);
+
+        // Row 4: Info label
         var infoLabel = new Label
         {
             Text = "This tool wraps scripts/package-jundot.ps1 into a GUI.\n" +
@@ -947,13 +1171,20 @@ public partial class MainForm : Form
                    "Requirements:\n" +
                    "  • Python 3.x with SCons\n" +
                    "  • Visual Studio 2022 (MSVC) or MinGW-w64 (Windows)\n" +
-                   "  • .NET SDK (for C# / Mono builds)",
+                   "  • .NET SDK (for C# / Mono builds)\n\n" +
+                   "Publishing:\n" +
+                   "  • Paste your GitHub token into the 'GitHub Token' field above,\n" +
+                   "    or leave it blank to read from the GITHUB_TOKEN environment var.\n" +
+                   "    Click 'Test' to verify the token has the 'repo' scope needed to\n" +
+                   "    create releases and upload assets.\n" +
+                   "  • 'AI Summary' uses MiMo-Code-jundot or any OpenAI-compatible\n" +
+                   "    endpoint to auto-write release notes from build metadata.",
             AutoSize = true,
             Font = new Font("Segoe UI", 9f),
             ForeColor = Color.Gray,
             Padding = new Padding(0, 12, 0, 0)
         };
-        layout.Controls.Add(infoLabel, 1, 2);
+        layout.Controls.Add(infoLabel, 1, 4);
         layout.SetColumnSpan(infoLabel, 2);
 
         wrapper.Controls.Add(layout);
@@ -1158,13 +1389,6 @@ public partial class MainForm : Form
     {
         if (_isRunning) return;
 
-        // Persist config before building
-        SaveConfig();
-
-        _isRunning = true;
-        SetRunningState(true);
-        _rtbConsole.Clear();
-
         var cfg = new BuildConfig
         {
             Target = _cbTarget.SelectedItem?.ToString() ?? "editor",
@@ -1187,6 +1411,41 @@ public partial class MainForm : Form
             AutoUpdateVersion = _chkAutoVersion?.Checked ?? false,
             GenerateUpdateManifest = _chkGenManifest?.Checked ?? true
         };
+
+        // Pre-flight: target platform must match the host OS. Skip if the
+        // user said "Skip build" — they may be packaging existing binaries
+        // (but we still let them try).
+        if (!cfg.SkipBuild)
+        {
+            var platformMismatch = cfg.PlatformName switch
+            {
+                "linuxbsd" => !OperatingSystem.IsLinux(),
+                "macos" => !OperatingSystem.IsMacOS(),
+                "windows" => !OperatingSystem.IsWindows(),
+                "ios" => !OperatingSystem.IsMacOS(),
+                _ => false
+            };
+            if (platformMismatch)
+            {
+                var host = OperatingSystem.IsWindows() ? "Windows"
+                          : OperatingSystem.IsMacOS() ? "macOS"
+                          : OperatingSystem.IsLinux() ? "Linux"
+                          : "unknown";
+                var msg = $"Target platform '{cfg.PlatformName}' cannot be built on this {host} host.\n\n" +
+                          $"Switch Platform to 'windows' (or 'linuxbsd' / 'macos') or run on the matching OS.";
+                AppendConsole(msg, "error");
+                UpdateStatus("Build cancelled: platform mismatch.", Color.OrangeRed);
+                MessageBox.Show(msg, "Platform Mismatch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+        }
+
+        // Persist config before building
+        SaveConfig();
+
+        _isRunning = true;
+        SetRunningState(true);
+        _rtbConsole.Clear();
 
         _cts = new CancellationTokenSource();
         _engine = new BuildEngine(cfg);
@@ -1451,6 +1710,35 @@ public partial class MainForm : Form
         _btnDeleteBuild.Click += BtnDeleteBuild_Click;
         actionBar.Controls.Add(_btnDeleteBuild);
 
+        // ── AI + GitHub Release buttons ───────────────
+        _btnGenerateAiSummary = new Button
+        {
+            Text = "AI Summary",
+            Tag  = "i18n:Button.AiSummary",
+            Size = new Size(110, 30),
+            Enabled = false,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(120, 70, 200),
+            ForeColor = Color.White
+        };
+        _btnGenerateAiSummary.FlatAppearance.BorderSize = 0;
+        _btnGenerateAiSummary.Click += BtnGenerateAiSummary_Click;
+        actionBar.Controls.Add(_btnGenerateAiSummary);
+
+        _btnPublishToGitHub = new Button
+        {
+            Text = "Publish GitHub Release",
+            Tag  = "i18n:Button.PublishToGitHub",
+            Size = new Size(180, 30),
+            Enabled = false,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(46, 160, 67),
+            ForeColor = Color.White
+        };
+        _btnPublishToGitHub.FlatAppearance.BorderSize = 0;
+        _btnPublishToGitHub.Click += BtnPublishToGitHub_Click;
+        actionBar.Controls.Add(_btnPublishToGitHub);
+
         // ── Layout ────────────────────────────────────────────
         panel.Controls.Add(_lvBuilds);
         panel.Controls.Add(toolbar);
@@ -1528,11 +1816,40 @@ public partial class MainForm : Form
         var hasSelection = selectedCount > 0;
         var singleSelection = selectedCount == 1;
         var record = singleSelection ? (BuildRecord?)_lvBuilds.SelectedItems[0].Tag : null;
+        var hasSinglePackage = singleSelection && !string.IsNullOrEmpty(record?.ZipPath) && File.Exists(record.ZipPath);
 
-        _btnLaunch.Enabled = singleSelection && record?.ExeExists == true;
+        // Multi-select publishing: every selected build must have a .zip file
+        var allHavePackages = hasSelection && SelectedBuilds
+            .All(r => !string.IsNullOrEmpty(r.ZipPath) && File.Exists(r.ZipPath));
+
+        // Launch: only enable for editor targets. Template targets need
+        // a .pck (project data) file to run – they are game runtimes, not
+        // standalone tools.
+        var isEditorTarget = string.Equals(record?.Target, "editor", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(record?.Target, "editor.dev", StringComparison.OrdinalIgnoreCase);
+        _btnLaunch.Enabled = singleSelection && record?.ExeExists == true && isEditorTarget;
         _btnOpenFolder.Enabled = hasSelection;
         _btnViewLog.Enabled = singleSelection && !string.IsNullOrEmpty(record?.BuildLogPath) && File.Exists(record.BuildLogPath);
         _btnDeleteBuild.Enabled = hasSelection;
+        _btnGenerateAiSummary.Enabled = hasSinglePackage;
+        _btnPublishToGitHub.Enabled = allHavePackages;
+
+        if (_btnPublishToGitHub.Enabled && selectedCount > 1)
+        {
+            var versions = SelectedBuilds
+                .Select(r => r.Version)
+                .Where(v => !string.IsNullOrEmpty(v))
+                .Distinct()
+                .ToList();
+
+            _btnPublishToGitHub.Text = versions.Count == 1
+                ? $"Publish {selectedCount} to GitHub (v{versions[0]})"
+                : $"Publish {selectedCount} to GitHub";
+        }
+        else
+        {
+            _btnPublishToGitHub.Text = "Publish GitHub Release";
+        }
     }
 
     private BuildRecord? SelectedBuild =>
@@ -1581,6 +1898,226 @@ public partial class MainForm : Form
     private void BtnOpenFolder_Click(object? sender, EventArgs e) => OpenBuildFolder();
     private void BtnViewLog_Click(object? sender, EventArgs e) => ViewBuildLog();
     private void BtnDeleteBuild_Click(object? sender, EventArgs e) => DeleteSelectedBuild();
+    private async void BtnGenerateAiSummary_Click(object? sender, EventArgs e) => await GenerateAiReleaseSummaryAsync();
+    private async void BtnPublishToGitHub_Click(object? sender, EventArgs e) => await PublishSelectedBuildToGitHubAsync();
+
+    // ──  AI Release Summary + GitHub Publish  ─────────────
+
+    private async Task GenerateAiReleaseSummaryAsync()
+    {
+        var record = SelectedBuild;
+        if (record == null || string.IsNullOrEmpty(record.ZipPath) || !File.Exists(record.ZipPath))
+        {
+            MessageBox.Show("Select a packaged build first (one that has a .zip and a manifest).",
+                "Cannot Generate Summary", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var repoRoot = _txtRepoRoot.Text.Trim();
+        if (string.IsNullOrEmpty(repoRoot) || !Directory.Exists(repoRoot))
+        {
+            MessageBox.Show("Repo root not configured. Switch to the Advanced tab and set it.",
+                "Missing Repo Root", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var publishConfig = PublishConfig.Load(repoRoot);
+        if (!publishConfig.UseAiSummary)
+        {
+            MessageBox.Show("AI summary is disabled in publish-config.json. Enable UseAiSummary and try again.",
+                "AI Disabled", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        AppendConsole("--- AI Release Summary ---", "info");
+        AppendConsole($"Target: {record.PackageName}  ({record.Version})", "info");
+
+        var manifestPath = Path.ChangeExtension(record.ZipPath, ".json");
+        if (!File.Exists(manifestPath))
+        {
+            // Fallback: look for manifest.json next to the zip, or in the package dir.
+            var dir = Path.GetDirectoryName(record.ZipPath) ?? "";
+            manifestPath = Path.Combine(dir, "manifest.json");
+        }
+
+        var evaluationPath = Path.Combine(repoRoot, "artifacts", "reports",
+            $"{record.PackageName}-change-evaluation.md");
+
+        try
+        {
+            var summarizer = new AiReleaseSummarizer(publishConfig);
+            summarizer.LogMessage += (s, e) => AppendConsole(e, "info");
+
+            var body = await summarizer.SummarizeAsync(
+                record.Version ?? "?",
+                record.PackageName,
+                evaluationPath,
+                manifestPath,
+                publishConfig.Changelog ?? "");
+
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                AppendConsole("AI returned an empty summary. Check endpoint / key.", "warning");
+                return;
+            }
+
+            // Persist into the publish config's ReleaseBody so the publish step re-uses it.
+            publishConfig.ReleaseBody = body;
+            publishConfig.Save(repoRoot);
+
+            AppendConsole("AI summary generated and saved. Use 'Publish GitHub Release' next.", "success");
+
+            // Also show it to the user in a read-only dialog.
+            var previewForm = new Form
+            {
+                Text = "AI Generated Release Body",
+                Size = new Size(780, 540),
+                StartPosition = FormStartPosition.CenterParent
+            };
+            var tb = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Both,
+                Dock = DockStyle.Fill,
+                Text = body,
+                Font = new Font("Consolas", 10f)
+            };
+            previewForm.Controls.Add(tb);
+            previewForm.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            AppendConsole($"AI summary failed: {ex.Message}", "error");
+            MessageBox.Show(ex.Message, "AI Summary Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task PublishSelectedBuildToGitHubAsync()
+    {
+        var records = SelectedBuilds;
+        if (records.Count == 0)
+        {
+            MessageBox.Show("Select one or more packaged builds first.",
+                "Cannot Publish", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var invalid = records.FirstOrDefault(r =>
+            string.IsNullOrEmpty(r.ZipPath) || !File.Exists(r.ZipPath));
+        if (invalid != null)
+        {
+            MessageBox.Show($"Build '{invalid.PackageName} ({invalid.Version})' has no .zip file on disk.",
+                "Cannot Publish", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var repoRoot = _txtRepoRoot.Text.Trim();
+        if (string.IsNullOrEmpty(repoRoot) || !Directory.Exists(repoRoot))
+        {
+            MessageBox.Show("Repo root not configured. Switch to the Advanced tab and set it.",
+                "Missing Repo Root", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var publishConfig = PublishConfig.Load(repoRoot);
+
+        // Resolve manifest + evaluation paths for every record
+        var manifestByRecord = new Dictionary<BuildRecord, string>();
+        var evalByRecord = new Dictionary<BuildRecord, string>();
+        foreach (var r in records)
+        {
+            var manifestPath = Path.ChangeExtension(r.ZipPath, ".json");
+            if (!File.Exists(manifestPath))
+            {
+                var dir = Path.GetDirectoryName(r.ZipPath) ?? "";
+                manifestPath = Path.Combine(dir, "manifest.json");
+            }
+            manifestByRecord[r] = manifestPath;
+
+            var evaluationPath = Path.Combine(repoRoot, "artifacts", "reports",
+                $"{r.PackageName}-change-evaluation.md");
+            evalByRecord[r] = evaluationPath;
+        }
+
+        // Check: warn if multiple versions are selected (they cannot be collapsed into a single release).
+        var versions = records
+            .Select(r => r.Version ?? "?")
+            .Distinct()
+            .ToList();
+
+        var askText = new StringBuilder();
+        askText.AppendLine("Publish the following builds to a single GitHub Release?");
+        askText.AppendLine();
+        askText.AppendLine($"  Repo:    {publishConfig.Owner}/{publishConfig.Repo}");
+        if (versions.Count == 1)
+        {
+            var tag = string.IsNullOrEmpty(publishConfig.ReleaseTag)
+                ? "v" + versions[0]
+                : publishConfig.ReleaseTag;
+            askText.AppendLine($"  Tag:     {tag}");
+        }
+        else
+        {
+            askText.AppendLine($"  ⚠ Versions: {string.Join(", ", versions)} — will be merged under one release.");
+        }
+        askText.AppendLine($"  AI Summary: {(publishConfig.UseAiSummary ? "ON" : "OFF")}");
+        askText.AppendLine();
+        askText.AppendLine("  Builds:");
+        foreach (var r in records.Take(15))
+            askText.AppendLine($"    - {r.PackageName} ({r.Version}) {r.Platform}/{r.Arch}");
+        if (records.Count > 15)
+            askText.AppendLine($"    (... plus {records.Count - 15} more)");
+        askText.AppendLine();
+        askText.Append("Proceed?");
+
+        var ask = MessageBox.Show(
+            askText.ToString(),
+            "Confirm Release",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+
+        if (ask != DialogResult.Yes) return;
+
+        AppendConsole("--- Publish to GitHub Release ---", "info");
+        AppendConsole($"Selected {records.Count} build(s).", "info");
+
+        try
+        {
+            var publisher = new GitHubReleasePublisher(repoRoot, publishConfig);
+            publisher.LogMessage += (s, e) => AppendConsole(e, "info");
+
+            var ct = CancellationToken.None;
+
+            var args = records.Select(r => (
+                PackageName:       r.PackageName,
+                Version:           r.Version ?? "1.0.0",
+                ZipPath:           r.ZipPath,
+                ManifestPath:      manifestByRecord[r],
+                Platform:          r.Platform ?? "win",
+                Arch:              r.Arch ?? "x64",
+                ChangeEvaluationPath: evalByRecord[r]
+            ));
+
+            var ok = await publisher.PublishManyAsync(args, aiOverrideBody: null, ct);
+
+            if (ok)
+            {
+                UpdateStatus("Release published successfully", Color.Green);
+                AppendConsole($"Release posted to https://github.com/{publishConfig.Owner}/{publishConfig.Repo}/releases", "success");
+            }
+            else
+            {
+                UpdateStatus("Release publish failed (see console)", Color.OrangeRed);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendConsole($"Publish failed: {ex.Message}", "error");
+            MessageBox.Show(ex.Message, "Publish Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
 
     private void LaunchSelectedBuild()
     {
@@ -1591,6 +2128,20 @@ public partial class MainForm : Form
         {
             MessageBox.Show("Executable not found on disk. It may have been moved or deleted.",
                 "Cannot Launch", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // Template targets (template_release, template_debug) are game
+        // runtimes that need a project .pck file to run. They are not
+        // standalone executables.
+        var target = (record.Target ?? "").ToLowerInvariant();
+        if (target.StartsWith("template_"))
+        {
+            MessageBox.Show(
+                $"'{record.Target}' is a game runtime template and cannot be launched standalone.\n\n" +
+                $"It requires a .pck project data file. Build 'editor' instead for a standalone editor,\n" +
+                $"or export a project using this template to produce a runnable game.",
+                "Cannot Launch Template", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 

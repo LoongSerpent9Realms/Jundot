@@ -72,8 +72,20 @@
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
 #include "scene/main/timer.h"
+#include "scene/resources/style_box_flat.h"
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
+
+static Ref<StyleBoxFlat> _ai_chat_make_panel_style(const Color &p_bg, const Color &p_border, float p_radius = 8.0f, float p_margin = 8.0f) {
+	Ref<StyleBoxFlat> style;
+	style.instantiate();
+	style->set_bg_color(p_bg);
+	style->set_corner_radius_all(p_radius * EDSCALE);
+	style->set_border_width_all(1);
+	style->set_border_color(p_border);
+	style->set_content_margin_all(p_margin * EDSCALE);
+	return style;
+}
 
 void AIChatPanel::_bind_methods() {
 }
@@ -479,6 +491,32 @@ void AIChatPanel::_notification(int p_what) {
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
 	}
+	if (p_what == NOTIFICATION_THEME_CHANGED) {
+		Color base = get_theme_color(SNAME("base_color"), SNAME("Editor"));
+		Color dark = get_theme_color(SNAME("dark_color_1"), SNAME("Editor"));
+		Color accent = get_theme_color(SNAME("accent_color"), SNAME("Editor"));
+		Color font = get_theme_color(SNAME("font_color"), SNAME("Editor"));
+
+		if (sidebar_panel) {
+			sidebar_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(dark.darkened(0.08f), base.lightened(0.08f), 8.0f, 10.0f));
+		}
+		if (chat_surface_panel) {
+			chat_surface_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(base.darkened(0.03f), base.lightened(0.06f), 8.0f, 0.0f));
+		}
+		if (composer_panel) {
+			composer_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(base.lightened(0.04f), accent * Color(1, 1, 1, 0.35f), 8.0f, 10.0f));
+		}
+		if (input) {
+			Ref<StyleBoxFlat> input_style = _ai_chat_make_panel_style(base.darkened(0.02f), base.lightened(0.12f), 8.0f, 8.0f);
+			input->add_theme_style_override(CoreStringName(normal), input_style);
+			input->add_theme_color_override(SNAME("font_color"), font);
+		}
+	}
+	if (p_what == NOTIFICATION_PREDELETE) {
+		if (tool_execution_thread.is_started()) {
+			tool_execution_thread.wait_to_finish();
+		}
+	}
 }
 
 Array AIChatPanel::_build_message_history() const {
@@ -580,6 +618,29 @@ void AIChatPanel::_update_translations() {
 	clear_button->set_text(TTR("Clear"));
 	cancel_button->set_text(TTR("Cancel"));
 	send_button->set_text(TTR("Send"));
+	if (tool_limit_toggle_button) {
+		tool_limit_toggle_button->set_text(TTR("^"));
+		tool_limit_toggle_button->set_tooltip_text(TTR("Show next-step options"));
+	}
+	if (tool_limit_options_title) {
+		if (tool_limit_options_due_to_limit) {
+			tool_limit_options_title->set_text(TTR("The AI stopped because the tool call limit was reached. What would you like to do next?"));
+		} else {
+			tool_limit_options_title->set_text(TTR("The AI response has finished. What would you like to do next?"));
+		}
+	}
+	if (tool_limit_continue_button) {
+		tool_limit_continue_button->set_text(TTR("Continue"));
+	}
+	if (tool_limit_custom_button) {
+		tool_limit_custom_button->set_text(TTR("Send Another Message"));
+	}
+	if (tool_limit_stop_button) {
+		tool_limit_stop_button->set_text(TTR("Stop Here"));
+	}
+	if (tool_limit_collapse_button) {
+		tool_limit_collapse_button->set_text(TTR("Collapse"));
+	}
 	reference_file_dialog->set_title(TTR("Reference Project File"));
 	upload_file_dialog->set_title(TTR("Upload Text File"));
 	import_file_dialog->set_title(TTR("Import Skill / MCP / Memory"));
@@ -627,6 +688,56 @@ void AIChatPanel::_usage_agreement_rejected() {
 	status_label->set_text(TTR("AI message was not sent because the usage agreement was not accepted."));
 }
 
+void AIChatPanel::_show_tool_limit_options(bool p_due_to_limit) {
+	if (!tool_limit_options_panel || !tool_limit_toggle_button) {
+		return;
+	}
+
+	tool_limit_options_due_to_limit = p_due_to_limit;
+	_update_translations();
+	tool_limit_options_panel->set_visible(true);
+	tool_limit_toggle_button->set_visible(false);
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
+void AIChatPanel::_hide_tool_limit_options() {
+	if (tool_limit_options_panel) {
+		tool_limit_options_panel->set_visible(false);
+	}
+	if (tool_limit_toggle_button) {
+		tool_limit_toggle_button->set_visible(false);
+	}
+}
+
+void AIChatPanel::_set_tool_limit_options_collapsed(bool p_collapsed) {
+	if (!tool_limit_options_panel || !tool_limit_toggle_button) {
+		return;
+	}
+
+	tool_limit_options_panel->set_visible(!p_collapsed);
+	tool_limit_toggle_button->set_visible(p_collapsed);
+	if (!p_collapsed) {
+		message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+	}
+}
+
+void AIChatPanel::_continue_after_tool_limit() {
+	_hide_tool_limit_options();
+	input->set_text(TTR("Please continue from where you stopped."));
+	_send_message();
+}
+
+void AIChatPanel::_focus_custom_tool_limit_message() {
+	_set_tool_limit_options_collapsed(true);
+	status_label->set_text(TTR("Type the next message, then send it to continue the conversation."));
+	input->grab_focus();
+}
+
+void AIChatPanel::_dismiss_tool_limit_options() {
+	_hide_tool_limit_options();
+	status_label->set_text(TTR("AI tool iteration limit options dismissed."));
+}
+
 void AIChatPanel::_add_user_message(const String &p_text) {
 	AIChatMessage *message = memnew(AIChatMessage);
 	message->setup_user(p_text);
@@ -640,6 +751,32 @@ void AIChatPanel::_add_ai_message(const String &p_content, const String &p_think
 	message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
 	message_list->add_child(message);
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+}
+
+void AIChatPanel::_show_task_plans(const Vector<AITaskPlan> &p_task_plans) {
+	for (int i = 0; i < p_task_plans.size(); i++) {
+		const AITaskPlan &plan = p_task_plans[i];
+		if (plan.steps.is_empty()) {
+			continue;
+		}
+
+		String content = TTR("Task Breakdown");
+		if (!plan.title.strip_edges().is_empty()) {
+			content += ": " + plan.title.strip_edges();
+		}
+		content += "\n";
+
+		for (int j = 0; j < plan.steps.size(); j++) {
+			const AITaskPlan::Step &step = plan.steps[j];
+			const String status = step.status.strip_edges().is_empty() ? String("pending") : step.status.strip_edges();
+			content += vformat("\n%d. [%s] %s", j + 1, status, step.title.strip_edges());
+			if (!step.detail.strip_edges().is_empty()) {
+				content += "\n   " + step.detail.strip_edges();
+			}
+		}
+
+		_add_ai_message(content, String(), 0.0, 0, 0);
+	}
 }
 
 void AIChatPanel::_on_edit_requested(const String &p_content) {
@@ -759,10 +896,15 @@ void AIChatPanel::_send_message() {
 	if (text.is_empty()) {
 		return;
 	}
+	_hide_tool_limit_options();
 
 	AISettingsData settings = AISettings::load();
-	if (settings.api_key.is_empty()) {
+	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && settings.api_key.is_empty()) {
 		status_label->set_text(TTR("Configure an API key before sending AI messages."));
+		return;
+	}
+	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.strip_edges().is_empty() || settings.jundot_ai_plugin_url.strip_edges().is_empty())) {
+		status_label->set_text(TTR("Configure the jundot AI plugin before sending AI messages."));
 		return;
 	}
 
@@ -1163,6 +1305,10 @@ void AIChatPanel::_cancel_request() {
 		title_request_conversation_id = String();
 	}
 	chat_service->cancel_request();
+	if (tool_execution_running) {
+		tool_execution_cancelled = true;
+	}
+	_hide_tool_limit_options();
 	if (streaming_message) {
 		streaming_message->queue_free();
 		streaming_message = nullptr;
@@ -1191,6 +1337,10 @@ void AIChatPanel::_clear_messages() {
 	_clear_repair_cards();
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
+	if (tool_execution_running) {
+		tool_execution_cancelled = true;
+	}
+	_hide_tool_limit_options();
 	if (conversation_name_edit) {
 		conversation_name_edit->set_text("");
 	}
@@ -1252,6 +1402,146 @@ bool AIChatPanel::_looks_like_tool_preamble(const String &p_content) const {
 	}
 
 	return false;
+}
+
+bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const {
+	if (!active_settings.tools_enabled || pending_tool_round.executed_tool_calls || in_tool_loop) {
+		return false;
+	}
+
+	Array available_tools = pending_tool_round.original_tools;
+	if (available_tools.is_empty()) {
+		available_tools = AIToolDefs::get_tools_for_mode(active_settings.context_mode);
+		if (active_settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				available_tools.append_array(mcp_tools);
+			}
+		}
+	}
+	if (available_tools.is_empty()) {
+		return false;
+	}
+
+	int search_pos = 0;
+	while (true) {
+		const int block_start = p_content.find("<tool_call", search_pos);
+		if (block_start == -1) {
+			break;
+		}
+
+		const int block_open_end = p_content.find(">", block_start);
+		const int block_end = p_content.find("</tool_call>", block_open_end + 1);
+		if (block_open_end == -1 || block_end == -1) {
+			break;
+		}
+
+		const String block = p_content.substr(block_open_end + 1, block_end - block_open_end - 1);
+		const int fn_start = block.find("<function=");
+		if (fn_start == -1) {
+			search_pos = block_end + 12;
+			continue;
+		}
+
+		const int fn_name_start = fn_start + String("<function=").length();
+		const int fn_open_end = block.find(">", fn_name_start);
+		const int fn_end = block.find("</function>", fn_open_end + 1);
+		if (fn_open_end == -1 || fn_end == -1) {
+			search_pos = block_end + 12;
+			continue;
+		}
+
+		String fn_name = block.substr(fn_name_start, fn_open_end - fn_name_start).strip_edges();
+		fn_name = fn_name.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'");
+		if (fn_name.is_empty()) {
+			search_pos = block_end + 12;
+			continue;
+		}
+
+		bool tool_available = false;
+		for (int i = 0; i < available_tools.size(); i++) {
+			if (available_tools[i].get_type() != Variant::DICTIONARY) {
+				continue;
+			}
+			Dictionary tool = available_tools[i];
+			Dictionary fn_def = tool.get("function", Dictionary());
+			if (String(fn_def.get("name", String())) == fn_name) {
+				tool_available = true;
+				break;
+			}
+		}
+		if (!tool_available) {
+			search_pos = block_end + 12;
+			continue;
+		}
+
+		const String fn_body = block.substr(fn_open_end + 1, fn_end - fn_open_end - 1);
+		Dictionary args;
+		int param_pos = 0;
+		while (true) {
+			const int param_start = fn_body.find("<parameter=", param_pos);
+			if (param_start == -1) {
+				break;
+			}
+
+			const int param_name_start = param_start + String("<parameter=").length();
+			const int param_open_end = fn_body.find(">", param_name_start);
+			if (param_open_end == -1) {
+				break;
+			}
+
+			String param_name = fn_body.substr(param_name_start, param_open_end - param_name_start).strip_edges();
+			param_name = param_name.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'");
+			const String close_tag = "</parameter>";
+			const int param_end = fn_body.find(close_tag, param_open_end + 1);
+			if (param_end == -1) {
+				break;
+			}
+
+			const String raw_value = fn_body.substr(param_open_end + 1, param_end - param_open_end - 1).strip_edges();
+			Variant parsed_value = JSON::parse_string(raw_value);
+			if (parsed_value.get_type() == Variant::NIL && raw_value != "null") {
+				args[param_name] = raw_value;
+			} else {
+				args[param_name] = parsed_value;
+			}
+
+			param_pos = param_end + close_tag.length();
+		}
+
+		Dictionary fn;
+		fn["name"] = fn_name;
+		fn["arguments"] = JSON::stringify(args);
+
+		Dictionary tool_call;
+		tool_call["id"] = "text-tool-" + itos(r_tool_calls.size());
+		tool_call["type"] = "function";
+		tool_call["function"] = fn;
+		r_tool_calls.push_back(tool_call);
+
+		search_pos = block_end + String("</tool_call>").length();
+	}
+
+	return !r_tool_calls.is_empty();
+}
+
+String AIChatPanel::_strip_text_tool_call_blocks(const String &p_content) const {
+	String result = p_content;
+	while (true) {
+		const int block_start = result.find("<tool_call");
+		if (block_start == -1) {
+			break;
+		}
+
+		const int block_open_end = result.find(">", block_start);
+		const int block_end = result.find("</tool_call>", block_open_end + 1);
+		if (block_open_end == -1 || block_end == -1) {
+			break;
+		}
+
+		result = result.substr(0, block_start) + result.substr(block_end + String("</tool_call>").length());
+	}
+	return result.strip_edges();
 }
 
 bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
@@ -1322,26 +1612,60 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 					(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
 						!((Array)msg["tool_calls"]).is_empty());
 				if (has_tool_calls) {
+					Vector<AITaskPlan> task_plans;
+					AIChatParser::parse_task_plans(p_content, task_plans);
+					String visible_content = AIChatParser::strip_task_plan_blocks(p_content);
+					if (!visible_content.strip_edges().is_empty()) {
+						if (streaming_message) {
+							streaming_message->setup_ai(visible_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+							streaming_message = nullptr;
+						} else {
+							_add_ai_message(visible_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+						}
+					}
+					if (!task_plans.is_empty()) {
+						_show_task_plans(task_plans);
+					}
 					if (pending_tool_round.iteration_count >= pending_tool_round.max_iterations) {
 						if (streaming_message) {
-							streaming_message->queue_free();
+							if (streaming_message->get_content().strip_edges().is_empty()) {
+								streaming_message->queue_free();
+							}
 							streaming_message = nullptr;
 						}
-						_add_ai_message(vformat(TTR("Maximum tool call iterations (%d) reached. Stopping here to prevent an infinite loop. You can continue manually by asking the AI to proceed."),
-								pending_tool_round.max_iterations),
-								String(), 0.0, p_prompt_tokens, p_completion_tokens);
-						tool_call_label->set_visible(false);
-						tool_call_label->set_text(String());
+						Array final_messages = pending_tool_round.original_messages.duplicate(true);
+						Dictionary final_request;
+						final_request["role"] = "user";
+						final_request["content"] = TTR("The tool-call iteration limit has been reached. Stop requesting tools now. Based only on the tool results already in this conversation, provide a clear final response: summarize what you found, what was changed or should be changed, and any remaining next steps. Do not request or describe more tool calls.");
+						final_messages.push_back(final_request);
+
+						tool_call_label->set_visible(true);
+						tool_call_label->set_text(TTR("Tool iteration limit reached. Asking AI to summarize results..."));
 						in_tool_loop = false;
-						status_label->set_text(TTR("AI tool iteration limit reached."));
-						_serialize_current_messages();
-						_refresh_conversation_list_ui();
-						_save_all_conversations();
-						request_conversation_id = String();
+						pending_tool_round = PendingToolRound();
+						chat_service->configure(active_settings);
+						_set_requesting(true);
+						Error err = chat_service->send_messages(final_messages, Array());
+						if (err != OK) {
+							_set_requesting(false);
+							_add_ai_message(vformat(TTR("Maximum tool call iterations (%d) reached, and the final summary request could not start. Please ask the AI to summarize the results manually."),
+									active_settings.max_tool_iterations),
+									String(), 0.0, p_prompt_tokens, p_completion_tokens);
+							tool_call_label->set_visible(false);
+							tool_call_label->set_text(String());
+							status_label->set_text(TTR("AI tool iteration limit reached."));
+							_show_tool_limit_options(true);
+							_serialize_current_messages();
+							_refresh_conversation_list_ui();
+							_save_all_conversations();
+							request_conversation_id = String();
+						}
 						return;
 					}
 					if (streaming_message) {
-						streaming_message->queue_free();
+						if (streaming_message->get_content().strip_edges().is_empty()) {
+							streaming_message->queue_free();
+						}
 						streaming_message = nullptr;
 					}
 					_execute_tool_calls(p_json);
@@ -1350,13 +1674,47 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			}
 		}
 
+		Array text_tool_calls;
+		if (_extract_text_tool_calls(p_content, text_tool_calls)) {
+			if (streaming_message) {
+				streaming_message->queue_free();
+				streaming_message = nullptr;
+			}
+
+			Dictionary fn_msg;
+			fn_msg["role"] = "assistant";
+			fn_msg["content"] = String();
+			fn_msg["tool_calls"] = text_tool_calls;
+
+			Dictionary choice;
+			choice["finish_reason"] = "tool_calls";
+			choice["message"] = fn_msg;
+
+			Array choices;
+			choices.push_back(choice);
+
+			Dictionary synthetic_json;
+			synthetic_json["choices"] = choices;
+
+			tool_call_label->set_visible(true);
+			tool_call_label->set_text(TTR("AI returned a text tool call. Converting it to an executable tool call..."));
+			_execute_tool_calls(synthetic_json);
+			return;
+		}
+
 		if (_looks_like_tool_preamble(p_content)) {
 			if (_retry_after_missing_tool_call(p_content)) {
 				return;
 			}
 		}
 
-		String final_content = p_content;
+		Vector<AITaskPlan> task_plans;
+		AIChatParser::parse_task_plans(p_content, task_plans);
+
+		String final_content = _strip_text_tool_call_blocks(AIChatParser::strip_task_plan_blocks(p_content));
+		if (final_content.is_empty() && p_content.find("<tool_call") != -1) {
+			final_content = TTR("AI returned a text tool call, but Function Calling tools are disabled or unavailable for this mode. Enable tools in AI settings and try again.");
+		}
 		if (_looks_like_tool_preamble(p_content) && pending_tool_round.missing_tool_retry_used && !pending_tool_round.executed_tool_calls) {
 			final_content += TTR("\n\n[Tool calling did not run: the model returned normal text instead of a structured tool_calls response. Use a model or API endpoint that supports OpenAI-compatible function calling, and make sure Function Calling tools are enabled.]");
 		}
@@ -1364,8 +1722,11 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		if (streaming_message) {
 			streaming_message->setup_ai(final_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
 			streaming_message = nullptr;
-		} else {
+		} else if (!final_content.strip_edges().is_empty()) {
 			_add_ai_message(final_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
+		}
+		if (!task_plans.is_empty()) {
+			_show_task_plans(task_plans);
 		}
 
 		// Auto-title: if a title request was queued, fire it off now.
@@ -1417,6 +1778,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			}
 		}
 		status_label->set_text(TTR("AI response received."));
+		_show_tool_limit_options(false);
 		return;
 	}
 
@@ -1461,16 +1823,11 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 		Dictionary tc = tool_calls[i];
 		Dictionary fn = tc.get("function", Dictionary());
 		String name = fn.get("name", "?");
-		String args_preview = fn.get("arguments", "{}");
-		// Truncate long arguments for display.
-		if (args_preview.length() > 80) {
-			args_preview = args_preview.substr(0, 77) + "...";
-		}
 		if (i > 0) {
 			tool_display += "\n";
 		}
-		tool_display += vformat(TTR("[Round %d/%d] \xe2\x9a\x99 %s(%s)"),
-				current_iteration, max_iterations, name, args_preview);
+		tool_display += vformat(TTR("Calling tool %d/%d: %s (round %d/%d)"),
+				i + 1, tool_calls.size(), name, current_iteration, max_iterations);
 	}
 	tool_call_label->set_visible(true);
 	tool_call_label->set_text(tool_display);
@@ -1543,7 +1900,8 @@ void AIChatPanel::_append_forced_build_status_check() {
 	}
 
 	_stop_build_status_poll();
-	tool_call_label->set_text(TTR("Build finished. Sending result to AI..."));
+	tool_call_label->set_visible(false);
+	tool_call_label->set_text(String());
 	_continue_after_build_poll();
 }
 
@@ -1626,43 +1984,89 @@ void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
 		}
 	}
 
-	// Execute each tool call and append results.
+	if (tool_execution_running) {
+		status_label->set_text(TTR("AI tools are already running. Please wait..."));
+		return;
+	}
+	if (tool_execution_thread.is_started()) {
+		tool_execution_thread.wait_to_finish();
+	}
+
+	tool_execution_messages = messages;
+	tool_execution_tools = tools;
+	tool_execution_tool_calls = tool_calls;
+	tool_execution_build_poll_needed = false;
+	tool_execution_cancelled = false;
+	tool_execution_running = true;
+	in_tool_loop = true;
+
+	tool_call_label->set_text(vformat(TTR("Executing %d tool(s)..."), tool_calls.size()));
+	status_label->set_text(TTR("Executing AI tools in the background..."));
+	_set_requesting(true);
+
+	tool_execution_thread.start(_tool_execution_thread_func, this);
+}
+
+void AIChatPanel::_tool_execution_thread_func(void *p_userdata) {
+	AIChatPanel *panel = static_cast<AIChatPanel *>(p_userdata);
+	Array tool_calls = panel->tool_execution_tool_calls;
+	Array messages = panel->tool_execution_messages;
 	bool build_poll_needed = false;
 	for (int i = 0; i < tool_calls.size(); i++) {
 		Dictionary tc = tool_calls[i];
 		Dictionary result = AIToolExecutor::execute(tc);
 		messages.push_back(result);
 		String result_content = result.get("content", String());
-		if (_tool_result_needs_build_poll(result_content)) {
+		if (panel->_tool_result_needs_build_poll(result_content)) {
 			build_poll_needed = true;
 		}
 	}
 
-	// Save state for continuation.
+	panel->tool_execution_messages = messages;
+	panel->tool_execution_build_poll_needed = build_poll_needed;
+	callable_mp(panel, &AIChatPanel::_finish_tool_execution_thread).call_deferred();
+}
+
+void AIChatPanel::_finish_tool_execution_thread() {
+	if (tool_execution_thread.is_started()) {
+		tool_execution_thread.wait_to_finish();
+	}
+	tool_execution_running = false;
+
+	if (tool_execution_cancelled) {
+		tool_execution_cancelled = false;
+		tool_execution_messages.clear();
+		tool_execution_tools.clear();
+		tool_execution_tool_calls.clear();
+		status_label->set_text(TTR("AI request cancelled."));
+		_set_requesting(false);
+		return;
+	}
+
+	Array messages = tool_execution_messages;
+	Array tools = tool_execution_tools;
+	const bool build_poll_needed = tool_execution_build_poll_needed;
+
 	pending_tool_round.original_messages = messages;
 	pending_tool_round.original_tools = tools;
 	in_tool_loop = true;
 
-	// Update status.
-	int current_iteration = pending_tool_round.iteration_count;
-	int max_iterations = pending_tool_round.max_iterations;
-	tool_call_label->set_text(vformat(TTR("Executed %d tool(s). Waiting for response..."), tool_calls.size()));
+	tool_call_label->set_visible(false);
+	tool_call_label->set_text(String());
 
 	if (build_poll_needed) {
 		_start_build_status_poll();
 		return;
 	}
 
-	// Send results back to LLM.
-	chat_service->configure(settings);
+	chat_service->configure(active_settings);
 	_set_requesting(true);
 	Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
 		status_label->set_text(TTR("Tool call continuation failed."));
 		in_tool_loop = false;
 		_set_requesting(false);
-		String tool_summary = vformat(TTR("[Tool calls executed: %d]"), tool_calls.size());
-		_add_ai_message(tool_summary, String(), 0.0, 0, 0);
+		_add_ai_message(TTR("[Tool calls executed, but continuation failed.]"), String(), 0.0, 0, 0);
 	}
 }
 
@@ -1726,7 +2130,8 @@ void AIChatPanel::_confirm_tool_skip(int p_tool_index) {
 	pending_tool_round.original_tools = tools;
 	in_tool_loop = true;
 
-	tool_call_label->set_text(TTR("Tool skipped. Waiting for response..."));
+	tool_call_label->set_visible(false);
+	tool_call_label->set_text(String());
 	status_label->set_text(TTR("Tool skipped. Sending result to AI..."));
 
 	// Continue conversation.
@@ -2140,10 +2545,10 @@ void AIChatPanel::_clear_repair_cards() {
 
 AIChatPanel::AIChatPanel() {
 	set_name(TTRC("Chat"));
-	add_theme_constant_override("margin_left", 8 * EDSCALE);
-	add_theme_constant_override("margin_top", 8 * EDSCALE);
-	add_theme_constant_override("margin_right", 8 * EDSCALE);
-	add_theme_constant_override("margin_bottom", 8 * EDSCALE);
+	add_theme_constant_override("margin_left", 6 * EDSCALE);
+	add_theme_constant_override("margin_top", 6 * EDSCALE);
+	add_theme_constant_override("margin_right", 6 * EDSCALE);
+	add_theme_constant_override("margin_bottom", 6 * EDSCALE);
 
 	VBoxContainer *root = memnew(VBoxContainer);
 	root->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -2155,20 +2560,18 @@ AIChatPanel::AIChatPanel() {
 	HBoxContainer *hbox = memnew(HBoxContainer);
 	hbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	hbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	hbox->add_theme_constant_override("separation", 8 * EDSCALE);
+	hbox->add_theme_constant_override("separation", 6 * EDSCALE);
 	root->add_child(hbox);
 
 	// Sidebar with conversation list.
 	sidebar_panel = memnew(PanelContainer);
-	sidebar_panel->set_custom_minimum_size(Size2(220 * EDSCALE, 0));
+	sidebar_panel->set_custom_minimum_size(Size2(208 * EDSCALE, 0));
 	hbox->add_child(sidebar_panel);
 
 	sidebar = memnew(VBoxContainer);
-	sidebar->add_theme_constant_override("separation", 4 * EDSCALE);
-	sidebar->add_theme_constant_override("margin_left", 6 * EDSCALE);
-	sidebar->add_theme_constant_override("margin_top", 6 * EDSCALE);
-	sidebar->add_theme_constant_override("margin_right", 6 * EDSCALE);
-	sidebar->add_theme_constant_override("margin_bottom", 6 * EDSCALE);
+	sidebar->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	sidebar->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	sidebar->add_theme_constant_override("separation", 6 * EDSCALE);
 	sidebar_panel->add_child(sidebar);
 
 	Label *sidebar_title = memnew(Label);
@@ -2183,27 +2586,37 @@ AIChatPanel::AIChatPanel() {
 
 	new_conversation_button = memnew(Button);
 	new_conversation_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	new_conversation_button->set_flat(true);
 	new_conversation_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_new_conversation));
 	sidebar_buttons->add_child(new_conversation_button);
 
 	delete_conversation_button = memnew(Button);
+	delete_conversation_button->set_flat(true);
 	delete_conversation_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_delete_current_conversation));
 	sidebar_buttons->add_child(delete_conversation_button);
 
 	conversation_list = memnew(ItemList);
+	conversation_list->set_auto_height(false);
+	conversation_list->set_fixed_icon_size(Size2(0, 0));
 	conversation_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	conversation_list->connect("item_selected", callable_mp(this, &AIChatPanel::_conversation_selected));
 	sidebar->add_child(conversation_list);
+
+	chat_surface_panel = memnew(PanelContainer);
+	chat_surface_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	chat_surface_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	hbox->add_child(chat_surface_panel);
 
 	// Chat area (the right side) reuses most of the original root layout.
 	VBoxContainer *chat_vbox = memnew(VBoxContainer);
 	chat_vbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	chat_vbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	chat_vbox->add_theme_constant_override("separation", 8 * EDSCALE);
-	hbox->add_child(chat_vbox);
+	chat_vbox->add_theme_constant_override("separation", 6 * EDSCALE);
+	chat_surface_panel->add_child(chat_vbox);
 
 	// Mode switching bar (ENGINE / PROJECT)
 	mode_bar = memnew(HBoxContainer);
+	mode_bar->set_custom_minimum_size(Size2(0, 34) * EDSCALE);
 	mode_bar->add_theme_constant_override("separation", 6 * EDSCALE);
 	chat_vbox->add_child(mode_bar);
 
@@ -2228,7 +2641,7 @@ AIChatPanel::AIChatPanel() {
 
 	message_list = memnew(VBoxContainer);
 	message_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	message_list->add_theme_constant_override("separation", 10 * EDSCALE);
+	message_list->add_theme_constant_override("separation", 6 * EDSCALE);
 	message_scroll->add_child(message_list);
 
 	// Bulk action bar
@@ -2254,16 +2667,65 @@ AIChatPanel::AIChatPanel() {
 	tool_call_label->set_modulate(Color(1, 1, 1, 0.85f));
 	chat_vbox->add_child(tool_call_label);
 
+	HBoxContainer *tool_limit_toggle_row = memnew(HBoxContainer);
+	tool_limit_toggle_row->set_alignment(BoxContainer::ALIGNMENT_CENTER);
+	chat_vbox->add_child(tool_limit_toggle_row);
+
+	tool_limit_toggle_button = memnew(Button);
+	tool_limit_toggle_button->set_custom_minimum_size(Size2(42, 36) * EDSCALE);
+	tool_limit_toggle_button->set_visible(false);
+	tool_limit_toggle_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_set_tool_limit_options_collapsed).bind(false));
+	tool_limit_toggle_row->add_child(tool_limit_toggle_button);
+
+	tool_limit_options_panel = memnew(PanelContainer);
+	tool_limit_options_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_options_panel->set_visible(false);
+	chat_vbox->add_child(tool_limit_options_panel);
+
+	VBoxContainer *tool_limit_options_vb = memnew(VBoxContainer);
+	tool_limit_options_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_options_vb->add_theme_constant_override("separation", 8 * EDSCALE);
+	tool_limit_options_panel->add_child(tool_limit_options_vb);
+
+	tool_limit_options_title = memnew(Label);
+	tool_limit_options_title->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	tool_limit_options_title->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
+	tool_limit_options_vb->add_child(tool_limit_options_title);
+
+	tool_limit_continue_button = memnew(Button);
+	tool_limit_continue_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_continue_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_continue_after_tool_limit));
+	tool_limit_options_vb->add_child(tool_limit_continue_button);
+
+	tool_limit_custom_button = memnew(Button);
+	tool_limit_custom_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_custom_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_focus_custom_tool_limit_message));
+	tool_limit_options_vb->add_child(tool_limit_custom_button);
+
+	HBoxContainer *tool_limit_bottom_row = memnew(HBoxContainer);
+	tool_limit_bottom_row->add_theme_constant_override("separation", 6 * EDSCALE);
+	tool_limit_options_vb->add_child(tool_limit_bottom_row);
+
+	tool_limit_stop_button = memnew(Button);
+	tool_limit_stop_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_stop_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_dismiss_tool_limit_options));
+	tool_limit_bottom_row->add_child(tool_limit_stop_button);
+
+	tool_limit_collapse_button = memnew(Button);
+	tool_limit_collapse_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	tool_limit_collapse_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_set_tool_limit_options_collapsed).bind(true));
+	tool_limit_bottom_row->add_child(tool_limit_collapse_button);
+
 	// === Composer panel ===
-	PanelContainer *composer = memnew(PanelContainer);
-	composer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	composer->set_custom_minimum_size(Size2(0, 180) * EDSCALE);
-	chat_vbox->add_child(composer);
+	composer_panel = memnew(PanelContainer);
+	composer_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	composer_panel->set_custom_minimum_size(Size2(0, 150) * EDSCALE);
+	chat_vbox->add_child(composer_panel);
 
 	VBoxContainer *composer_vb = memnew(VBoxContainer);
 	composer_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	composer_vb->add_theme_constant_override("separation", 6 * EDSCALE);
-	composer->add_child(composer_vb);
+	composer_vb->add_theme_constant_override("separation", 5 * EDSCALE);
+	composer_panel->add_child(composer_vb);
 
 	HBoxContainer *attachment_row = memnew(HBoxContainer);
 	composer_vb->add_child(attachment_row);
@@ -2274,7 +2736,7 @@ AIChatPanel::AIChatPanel() {
 	attachment_row->add_child(attachment_chips);
 
 	input = memnew(TextEdit);
-	input->set_custom_minimum_size(Size2(0, 96) * EDSCALE);
+	input->set_custom_minimum_size(Size2(0, 74) * EDSCALE);
 	input->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	composer_vb->add_child(input);
 
@@ -2283,6 +2745,7 @@ AIChatPanel::AIChatPanel() {
 	composer_vb->add_child(actions);
 
 	add_file_menu = memnew(MenuButton);
+	add_file_menu->set_flat(true);
 	add_file_menu->get_popup()->add_item(TTR("Reference Project File"), FILE_MENU_REFERENCE_PROJECT);
 	add_file_menu->get_popup()->add_item(TTR("Upload Text File"), FILE_MENU_UPLOAD_TEXT);
 	add_file_menu->get_popup()->add_item(TTR("Import Skill / MCP / Memory..."), FILE_MENU_IMPORT);
@@ -2290,6 +2753,7 @@ AIChatPanel::AIChatPanel() {
 	actions->add_child(add_file_menu);
 
 	clear_button = memnew(Button);
+	clear_button->set_flat(true);
 	clear_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_clear_messages));
 	actions->add_child(clear_button);
 
@@ -2298,6 +2762,7 @@ AIChatPanel::AIChatPanel() {
 	actions->add_child(spacer);
 
 	cancel_button = memnew(Button);
+	cancel_button->set_flat(true);
 	cancel_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_cancel_request));
 	actions->add_child(cancel_button);
 
@@ -2308,7 +2773,8 @@ AIChatPanel::AIChatPanel() {
 	// === Status bar ===
 	status_label = memnew(Label);
 	status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	status_label->set_custom_minimum_size(Size2(0, 24) * EDSCALE);
+	status_label->set_custom_minimum_size(Size2(0, 22) * EDSCALE);
+	status_label->add_theme_font_size_override("font_size", 12 * EDSCALE);
 	chat_vbox->add_child(status_label);
 
 	// Initialize mode indicator �?deferred to NOTIFICATION_READY

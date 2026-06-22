@@ -2921,7 +2921,7 @@ void RichTextLabel::gui_input(const Ref<InputEvent> &p_event) {
 				int c_index = 0;
 				bool outside;
 
-				selection.selection_mode = Selection::SINGLE_CLICK;
+				selection.selection_mode = Selection::SELECTION_SINGLE_CLICK;
 				selection.drag_attempt = false;
 
 				// Detect triple-click.
@@ -2954,7 +2954,7 @@ void RichTextLabel::gui_input(const Ref<InputEvent> &p_event) {
 						selection.click_char = c_index;
 
 						selection.active = true;
-						selection.selection_mode = Selection::TRIPLE_CLICK;
+						selection.selection_mode = Selection::SELECTION_TRIPLE_CLICK;
 						if (DisplayServer::get_singleton()->has_feature(DisplayServerEnums::FEATURE_CLIPBOARD_PRIMARY)) {
 							DisplayServer::get_singleton()->clipboard_set_primary(get_selected_text());
 						}
@@ -3044,7 +3044,7 @@ void RichTextLabel::gui_input(const Ref<InputEvent> &p_event) {
 					selection.click_line = c_line;
 					selection.click_char = c_index;
 
-					selection.selection_mode = Selection::DOUBLE_CLICK;
+					selection.selection_mode = Selection::SELECTION_DOUBLE_CLICK;
 					last_double_click = OS::get_singleton()->get_ticks_msec();
 					last_double_click_pos = b->get_position();
 					is_selecting_text = true;
@@ -3351,7 +3351,7 @@ void RichTextLabel::_update_selection() {
 			const Line &l2 = selection.click_frame->lines[selection.click_line];
 			if (l1.char_offset + c_index < l2.char_offset + selection.click_char) {
 				swap = true;
-			} else if (l1.char_offset + c_index == l2.char_offset + selection.click_char && selection.selection_mode == Selection::SINGLE_CLICK) {
+			} else if (l1.char_offset + c_index == l2.char_offset + selection.click_char && selection.selection_mode == Selection::SELECTION_SINGLE_CLICK) {
 				deselect();
 				return;
 			}
@@ -3364,11 +3364,11 @@ void RichTextLabel::_update_selection() {
 			SWAP(selection.from_char, selection.to_char);
 		}
 
-		if (selection.selection_mode == Selection::TRIPLE_CLICK && c_frame) {
+		if (selection.selection_mode == Selection::SELECTION_TRIPLE_CLICK && c_frame) {
 			// Expand the selection to paragraph edges.
 			selection.from_char = 0;
 			selection.to_char = selection.to_frame->lines[selection.to_line].char_count;
-		} else if (selection.selection_mode == Selection::DOUBLE_CLICK && c_frame) {
+		} else if (selection.selection_mode == Selection::SELECTION_DOUBLE_CLICK && c_frame) {
 			// Expand the selection to word edges.
 
 			Line *l = &selection.from_frame->lines[selection.from_line];

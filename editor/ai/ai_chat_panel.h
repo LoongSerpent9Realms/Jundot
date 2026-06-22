@@ -31,6 +31,7 @@
 #include "editor/ai/ai_chat_parser.h"
 
 #include "core/templates/vector.h"
+#include "core/os/thread.h"
 #include "scene/gui/margin_container.h"
 
 class AIChatMessage;
@@ -77,6 +78,14 @@ class AIChatPanel : public MarginContainer {
 	MenuButton *add_file_menu = nullptr;
 	Label *status_label = nullptr;
 	Label *tool_call_label = nullptr;
+	PanelContainer *tool_limit_options_panel = nullptr;
+	Button *tool_limit_toggle_button = nullptr;
+	Label *tool_limit_options_title = nullptr;
+	Button *tool_limit_continue_button = nullptr;
+	Button *tool_limit_custom_button = nullptr;
+	Button *tool_limit_stop_button = nullptr;
+	Button *tool_limit_collapse_button = nullptr;
+	bool tool_limit_options_due_to_limit = false;
 	EditorFileDialog *reference_file_dialog = nullptr;
 	EditorFileDialog *upload_file_dialog = nullptr;
 	EditorFileDialog *import_file_dialog = nullptr;
@@ -147,11 +156,20 @@ class AIChatPanel : public MarginContainer {
 	// Tool call confirmation dialog.
 	AIToolConfirmationDialog *tool_confirmation_dialog = nullptr;
 	Dictionary pending_tool_calls_json; // Stores the JSON for pending tool calls
+	Thread tool_execution_thread;
+	bool tool_execution_running = false;
+	bool tool_execution_cancelled = false;
+	Array tool_execution_messages;
+	Array tool_execution_tools;
+	Array tool_execution_tool_calls;
+	bool tool_execution_build_poll_needed = false;
 
 	// Tool confirmation callbacks.
 	void _confirm_tool_execute(int p_tool_index);
 	void _confirm_tool_skip(int p_tool_index);
 	void _confirm_tool_cancel_all();
+	static void _tool_execution_thread_func(void *p_userdata);
+	void _finish_tool_execution_thread();
 
 	// Active settings used for the current send, cached so the tool loop
 	// reuses the same system prompt (with auto_mode, context, etc.) instead
@@ -185,6 +203,8 @@ class AIChatPanel : public MarginContainer {
 
 	// Sidebar UI.
 	PanelContainer *sidebar_panel = nullptr;
+	PanelContainer *chat_surface_panel = nullptr;
+	PanelContainer *composer_panel = nullptr;
 	VBoxContainer *sidebar = nullptr;
 	Button *new_conversation_button = nullptr;
 	Button *delete_conversation_button = nullptr;
@@ -211,10 +231,13 @@ class AIChatPanel : public MarginContainer {
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
 	bool _looks_like_tool_preamble(const String &p_content) const;
+	bool _extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const;
+	String _strip_text_tool_call_blocks(const String &p_content) const;
 	bool _retry_after_missing_tool_call(const String &p_content);
 	void _execute_tool_calls(const Dictionary &p_json);
 	void _add_user_message(const String &p_text);
 	void _add_ai_message(const String &p_content, const String &p_think_content, double p_think_time, int p_prompt_tokens, int p_completion_tokens);
+	void _show_task_plans(const Vector<AITaskPlan> &p_task_plans);
 	void _on_edit_requested(const String &p_content);
 	void _add_file_menu_id_pressed(int p_id);
 	void _project_file_selected(const String &p_path);
@@ -237,6 +260,12 @@ class AIChatPanel : public MarginContainer {
 	bool _ensure_usage_agreement();
 	void _usage_agreement_accepted();
 	void _usage_agreement_rejected();
+	void _show_tool_limit_options(bool p_due_to_limit);
+	void _hide_tool_limit_options();
+	void _set_tool_limit_options_collapsed(bool p_collapsed);
+	void _continue_after_tool_limit();
+	void _focus_custom_tool_limit_message();
+	void _dismiss_tool_limit_options();
 
 	// Mode switching (PROJECT / ENGINE).
 	void _switch_to_engine();

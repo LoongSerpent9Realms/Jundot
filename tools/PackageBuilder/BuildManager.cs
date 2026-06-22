@@ -243,7 +243,15 @@ public class BuildManager
             if (manifest == null) continue;
 
             var exeFiles = Directory.GetFiles(dir, "*.exe");
-            var mainExe = exeFiles.FirstOrDefault(f => !f.Contains(".console")) ?? exeFiles.FirstOrDefault();
+            // Prefer non-console, non-dev GUI executable (same rule as
+            // BuildEngine.SelectJundotExecutable). Fall back to any
+            // non-console binary, then any file. This prevents picking
+            // e.g. `jundot.windows.editor.dev.x86_64.mono.console.exe`
+            // as the primary executable.
+            var sortedExes = exeFiles
+                .OrderBy(f => f.Contains(".console") ? 2 : (f.Contains(".dev") ? 1 : 0))
+                .ToList();
+            var mainExe = sortedExes.FirstOrDefault();
 
             var record = new BuildRecord
             {

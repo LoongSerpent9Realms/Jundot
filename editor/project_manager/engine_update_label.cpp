@@ -41,8 +41,8 @@
 
 namespace {
 
-const char *JUNDOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Jundot-Auto/releases";
-const char *JUNDOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Jundot-Auto/releases";
+const char *JUNDOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Jundot/releases";
+const char *JUNDOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Jundot/releases";
 
 bool _split_github_release_tag(const String &p_tag, String &r_base_version, String &r_release_status) {
 	String tag = p_tag.strip_edges();
@@ -75,7 +75,7 @@ void EngineUpdateLabel::_check_update() {
 
 	PackedStringArray headers;
 	headers.push_back("Accept: application/vnd.github+json");
-	headers.push_back("User-Agent: Jundot-Auto");
+	headers.push_back("User-Agent: Jundot");
 	http->request(JUNDOT_AUTO_RELEASES_API, headers);
 }
 

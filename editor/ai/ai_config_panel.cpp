@@ -51,6 +51,11 @@
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
 
+#ifdef WINDOWS_ENABLED
+#include <windows.h>
+#undef FAILED
+#endif
+
 static constexpr int OUTPUT_LANGUAGE_AUTO = 0;
 static constexpr int OUTPUT_LANGUAGE_ENGLISH = 1;
 static constexpr int OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE = 2;
@@ -60,6 +65,8 @@ static constexpr int OUTPUT_LANGUAGE_KOREAN = 5;
 static constexpr int OUTPUT_LANGUAGE_SPANISH = 6;
 static constexpr int OUTPUT_LANGUAGE_FRENCH = 7;
 static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
+static constexpr int BACKEND_TYPE_JUNDOT_PLUGIN = 0;
+static constexpr int BACKEND_TYPE_LEGACY_OPENAI = 1;
 
 struct ExternalMCPAppTarget {
 	String name;
@@ -71,6 +78,121 @@ static void _append_external_mcp_target(Vector<ExternalMCPAppTarget> &r_targets,
 	target.name = p_name;
 	target.path = p_path;
 	r_targets.push_back(target);
+}
+
+static bool _is_engine_source_root(const String &p_path) {
+	return !p_path.is_empty() && FileAccess::exists(p_path.path_join("SConstruct"));
+}
+
+static String _find_engine_source_root_in_cache(const String &p_cache_path) {
+	if (_is_engine_source_root(p_cache_path)) {
+		return p_cache_path;
+	}
+
+	Ref<DirAccess> dir = DirAccess::open(p_cache_path);
+	if (dir.is_null()) {
+		return String();
+	}
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (dir->current_is_dir() && !name.begins_with(".")) {
+			const String candidate = p_cache_path.path_join(name);
+			if (_is_engine_source_root(candidate)) {
+				dir->list_dir_end();
+				return candidate;
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+	return String();
+}
+
+static Error _collect_engine_source_cache_entries(const String &p_path, List<String> &r_dirs, List<String> &r_files) {
+	Error open_error = OK;
+	Ref<DirAccess> dir = DirAccess::open(p_path, &open_error);
+	if (dir.is_null()) {
+		if (FileAccess::exists(p_path)) {
+			r_files.push_back(p_path);
+			return OK;
+		}
+		return open_error != OK ? open_error : ERR_FILE_NOT_FOUND;
+	}
+
+	r_dirs.push_back(p_path);
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (name != "." && name != "..") {
+			const String child_path = p_path.path_join(name);
+			if (dir->current_is_dir() && !dir->is_link(name)) {
+				const Error err = _collect_engine_source_cache_entries(child_path, r_dirs, r_files);
+				if (err != OK) {
+					dir->list_dir_end();
+					return err;
+				}
+			} else {
+				r_files.push_back(child_path);
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+	return OK;
+}
+
+static Error _encrypt_engine_source_cache(const String &p_cache_path, String &r_error) {
+#ifdef WINDOWS_ENABLED
+	if (p_cache_path.is_empty()) {
+		r_error = TTR("Engine source cache path is empty.");
+		return ERR_INVALID_PARAMETER;
+	}
+
+	List<String> dirs;
+	List<String> files;
+	Error err = _collect_engine_source_cache_entries(p_cache_path, dirs, files);
+	if (err != OK) {
+		r_error = vformat(TTR("Could not scan source cache before encryption: error %d"), err);
+		return err;
+	}
+
+	auto encrypt_path = [&](const String &p_path) -> Error {
+		const Char16String path_utf16 = p_path.utf16();
+		DWORD encryption_status = 0;
+		if (FileEncryptionStatusW((LPCWSTR)path_utf16.get_data(), &encryption_status) && encryption_status == FILE_IS_ENCRYPTED) {
+			return OK;
+		}
+
+		FileAccess::set_read_only_attribute(p_path, false);
+		if (!EncryptFileW((LPCWSTR)path_utf16.get_data())) {
+			const DWORD windows_error = GetLastError();
+			r_error = vformat(TTR("Could not encrypt path: %s (Windows error %d)"), p_path, (int)windows_error);
+			return FAILED;
+		}
+		return OK;
+	};
+
+	for (const String &E : dirs) {
+		err = encrypt_path(E);
+		if (err != OK) {
+			return err;
+		}
+	}
+	for (const String &E : files) {
+		err = encrypt_path(E);
+		if (err != OK) {
+			return err;
+		}
+	}
+
+	return OK;
+#else
+	r_error = "Automatic encrypted source cache is only implemented on Windows.";
+	return ERR_UNAVAILABLE;
+#endif
 }
 
 static String _output_language_from_id(int p_id) {
@@ -124,6 +246,14 @@ static int _output_language_to_id(const String &p_language) {
 		return OUTPUT_LANGUAGE_GERMAN;
 	}
 	return OUTPUT_LANGUAGE_AUTO;
+}
+
+static AIBackendType _backend_type_from_id(int p_id) {
+	return p_id == BACKEND_TYPE_LEGACY_OPENAI ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+}
+
+static int _backend_type_to_id(AIBackendType p_backend_type) {
+	return p_backend_type == AIBackendType::LEGACY_OPENAI ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN;
 }
 
 static String _get_external_mcp_base_url(const String &p_bind_address, int p_port) {
@@ -228,6 +358,20 @@ SpinBox *AIConfigPanel::_add_spin_box_row(GridContainer *p_grid, Label **r_label
 	return spin;
 }
 
+OptionButton *AIConfigPanel::_add_backend_type_row(GridContainer *p_grid, Label **r_label, const String &p_label) {
+	Label *label = memnew(Label);
+	label->set_text(p_label);
+	p_grid->add_child(label);
+	*r_label = label;
+
+	OptionButton *option = memnew(OptionButton);
+	option->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	option->add_item(TTR("jundot Plugin (MiMoCode)"), BACKEND_TYPE_JUNDOT_PLUGIN);
+	option->add_item(TTR("Legacy OpenAI-Compatible"), BACKEND_TYPE_LEGACY_OPENAI);
+	p_grid->add_child(option);
+	return option;
+}
+
 OptionButton *AIConfigPanel::_add_output_language_row(GridContainer *p_grid, Label **r_label, const String &p_label) {
 	Label *label = memnew(Label);
 	label->set_text(p_label);
@@ -252,6 +396,9 @@ OptionButton *AIConfigPanel::_add_output_language_row(GridContainer *p_grid, Lab
 void AIConfigPanel::_update_translations() {
 	set_name(TTRC("Config"));
 	title_label->set_text(TTR("AI Configuration"));
+	backend_type_label->set_text(TTR("AI Backend"));
+	jundot_plugin_id_label->set_text(TTR("jundot AI Plugin ID"));
+	jundot_plugin_url_label->set_text(TTR("jundot AI Plugin URL"));
 	base_url_label->set_text(TTR("Base URL"));
 	model_label->set_text(TTR("Model"));
 	api_key_label->set_text(TTR("API Key"));
@@ -281,8 +428,14 @@ void AIConfigPanel::_update_translations() {
 	export_button->set_text(TTR("Export Config"));
 	import_button->set_text(TTR("Import Config"));
 	auto_configure_mcp_button->set_text(TTR("Auto Configure External MCP Apps"));
+	mimocode_download_button->set_text(TTR("Download MiMoCode"));
+	mimocode_download_button->set_tooltip_text(TTR("Open the packaged MiMoCode jundot plugin download page."));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
+	jundot_plugin_id_edit->set_placeholder(JUNDOT_MIMOCODE_PLUGIN_ID);
+	jundot_plugin_url_edit->set_placeholder("http://127.0.0.1:4096");
 	model_edit->set_placeholder(AISettings::get_default_model());
+	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_JUNDOT_PLUGIN), TTR("jundot Plugin (MiMoCode)"));
+	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_LEGACY_OPENAI), TTR("Legacy OpenAI-Compatible"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_AUTO), TTR("System Language (Auto)"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_ENGLISH), TTR("English"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE), TTR("Chinese (Simplified)"));
@@ -293,6 +446,7 @@ void AIConfigPanel::_update_translations() {
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_FRENCH), TTR("French"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_GERMAN), TTR("German"));
 	_update_external_mcp_config();
+	_update_backend_controls();
 }
 
 void AIConfigPanel::_update_external_mcp_config() {
@@ -307,6 +461,62 @@ void AIConfigPanel::_update_external_mcp_config() {
 	external_mcp_config_edit->set_text(JSON::stringify(_make_external_mcp_config_root(base_url, enabled), "\t"));
 }
 
+void AIConfigPanel::_update_backend_controls() {
+	const bool use_mimocode = backend_type_option && _backend_type_from_id(backend_type_option->get_selected_id()) == AIBackendType::JUNDOT_PLUGIN;
+
+	if (jundot_plugin_id_label) {
+		jundot_plugin_id_label->set_visible(use_mimocode);
+	}
+	if (jundot_plugin_id_edit) {
+		jundot_plugin_id_edit->set_visible(use_mimocode);
+	}
+	if (jundot_plugin_url_label) {
+		jundot_plugin_url_label->set_visible(use_mimocode);
+	}
+	if (jundot_plugin_url_edit) {
+		jundot_plugin_url_edit->set_visible(use_mimocode);
+	}
+	if (mimocode_download_button) {
+		mimocode_download_button->set_visible(use_mimocode);
+	}
+	if (mimocode_download_spacer) {
+		mimocode_download_spacer->set_visible(use_mimocode);
+	}
+
+	if (base_url_label) {
+		base_url_label->set_visible(!use_mimocode);
+	}
+	if (base_url_edit) {
+		base_url_edit->set_visible(!use_mimocode);
+	}
+	if (model_label) {
+		model_label->set_visible(!use_mimocode);
+	}
+	if (model_edit) {
+		model_edit->set_visible(!use_mimocode);
+	}
+	if (api_key_label) {
+		api_key_label->set_visible(!use_mimocode);
+	}
+	if (api_key_edit) {
+		api_key_edit->set_visible(!use_mimocode);
+	}
+}
+
+void AIConfigPanel::_on_backend_type_selected(int p_index) {
+	(void)p_index;
+	_update_backend_controls();
+}
+
+void AIConfigPanel::_on_mimocode_download_button_pressed() {
+	const Error err = OS::get_singleton()->shell_open(JUNDOT_MIMOCODE_RELEASES_URL);
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Could not open MiMoCode download page: %s"), JUNDOT_MIMOCODE_RELEASES_URL));
+		return;
+	}
+	status_label->set_text(TTR("Opened the MiMoCode packaged plugin download page."));
+}
+
 void AIConfigPanel::_update_engine_source_status() {
 	AISettingsData settings = AISettings::load();
 	String cache_path = settings.engine_source_cache_root.strip_edges();
@@ -314,29 +524,23 @@ void AIConfigPanel::_update_engine_source_status() {
 		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
 	}
 
-	// Find if source root exists.
-	String source_root;
-	if (!cache_path.is_empty() && DirAccess::dir_exists_absolute(cache_path)) {
-		Ref<DirAccess> dir = DirAccess::open(cache_path);
-		if (dir.is_valid()) {
-			dir->list_dir_begin();
-			String name = dir->get_next();
-			while (!name.is_empty()) {
-				if (dir->current_is_dir() && !name.begins_with(".")) {
-					String candidate = cache_path.path_join(name);
-					if (FileAccess::exists(candidate.path_join("SConstruct"))) {
-						source_root = candidate;
-						break;
-					}
-				}
-				name = dir->get_next();
-			}
-			dir->list_dir_end();
-		}
-	}
+	String source_root = _find_engine_source_root_in_cache(cache_path);
 
 	if (!source_root.is_empty()) {
-		engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s"), source_root));
+		if (settings.engine_source_root != source_root || settings.engine_source_cache_root != cache_path || !settings.encrypt_engine_source_cache) {
+			settings.engine_source_root = source_root;
+			settings.engine_source_cache_root = cache_path;
+			settings.encrypt_engine_source_cache = true;
+			AISettings::save(settings);
+		}
+
+		String encryption_error;
+		const Error encryption_err = _encrypt_engine_source_cache(cache_path, encryption_error);
+		if (encryption_err == OK) {
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Enabled"), source_root));
+		} else {
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Failed (%s)"), source_root, encryption_error));
+		}
 		engine_source_download_button->set_text(TTR("Re-download"));
 		engine_source_delete_button->set_disabled(false);
 	} else {
@@ -349,12 +553,27 @@ void AIConfigPanel::_update_engine_source_status() {
 }
 
 void AIConfigPanel::_on_engine_source_browse_button_pressed() {
-	// Use a simple FileDialog approach since we don't have EditorFileDialog here.
-	// For now, just save the current path.
+	String cache_path = engine_source_cache_path_edit->get_text().strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+		engine_source_cache_path_edit->set_text(cache_path);
+	}
+
+	const Error mkdir_err = DirAccess::make_dir_recursive_absolute(cache_path);
+	if (mkdir_err != OK) {
+		status_label->set_text(vformat(TTR("Could not create cache directory: error %d"), mkdir_err));
+		return;
+	}
+
 	AISettingsData settings = AISettings::load();
-	settings.engine_source_cache_root = engine_source_cache_path_edit->get_text().strip_edges();
+	settings.engine_source_cache_root = cache_path;
 	AISettings::save(settings);
 	_update_engine_source_status();
+
+	const Error open_err = OS::get_singleton()->shell_open(cache_path);
+	if (open_err != OK) {
+		status_label->set_text(vformat(TTR("Could not open cache directory: %s"), cache_path));
+	}
 }
 
 void AIConfigPanel::_on_engine_source_download_button_pressed() {
@@ -384,24 +603,7 @@ void AIConfigPanel::_on_engine_source_delete_button_pressed() {
 		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
 	}
 
-	// Find the source root to delete.
-	String source_root;
-	Ref<DirAccess> dir = DirAccess::open(cache_path);
-	if (dir.is_valid()) {
-		dir->list_dir_begin();
-		String name = dir->get_next();
-		while (!name.is_empty()) {
-			if (dir->current_is_dir() && !name.begins_with(".")) {
-				String candidate = cache_path.path_join(name);
-				if (FileAccess::exists(candidate.path_join("SConstruct"))) {
-					source_root = candidate;
-					break;
-				}
-			}
-			name = dir->get_next();
-		}
-		dir->list_dir_end();
-	}
+	String source_root = _find_engine_source_root_in_cache(cache_path);
 
 	if (source_root.is_empty()) {
 		status_label->set_text(TTR("No source cache to delete."));
@@ -431,6 +633,9 @@ void AIConfigPanel::_on_engine_source_cache_path_selected(const String &p_path) 
 
 void AIConfigPanel::_load_settings() {
 	const AISettingsData settings = AISettings::load();
+	backend_type_option->select(backend_type_option->get_item_index(_backend_type_to_id(settings.backend_type)));
+	jundot_plugin_id_edit->set_text(settings.jundot_ai_plugin_id);
+	jundot_plugin_url_edit->set_text(settings.jundot_ai_plugin_url);
 	base_url_edit->set_text(settings.base_url);
 	model_edit->set_text(settings.model);
 	api_key_edit->set_text(settings.api_key);
@@ -452,6 +657,7 @@ void AIConfigPanel::_load_settings() {
 	external_api_port_spin->set_value(settings.external_api_port);
 	external_api_bind_address_edit->set_text(settings.external_api_bind_address);
 	_update_external_mcp_config();
+	_update_backend_controls();
 	user_extra_instructions_edit->set_text(settings.user_extra_instructions);
 	status_label->set_text(TTR("AI settings loaded."));
 	_update_engine_source_status();
@@ -459,6 +665,9 @@ void AIConfigPanel::_load_settings() {
 
 void AIConfigPanel::_save_settings() {
 	AISettingsData settings = AISettings::load();
+	settings.backend_type = _backend_type_from_id(backend_type_option->get_selected_id());
+	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
+	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
 	settings.model = model_edit->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
@@ -502,6 +711,9 @@ void AIConfigPanel::_reset_settings() {
 
 void AIConfigPanel::_test_connection() {
 	AISettingsData settings = AISettings::load();
+	settings.backend_type = _backend_type_from_id(backend_type_option->get_selected_id());
+	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
+	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
 	settings.model = model_edit->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
@@ -521,7 +733,12 @@ void AIConfigPanel::_test_connection() {
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
 
-	if (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty()) {
+	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.is_empty() || settings.jundot_ai_plugin_url.is_empty())) {
+		status_label->set_text(TTR("MiMoCode plugin ID and URL are required before testing the connection."));
+		return;
+	}
+
+	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty())) {
 		status_label->set_text(TTR("Base URL, model, and API key are required before testing the connection."));
 		return;
 	}
@@ -571,6 +788,9 @@ void AIConfigPanel::_export_config() {
 
 void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	AISettingsData settings = AISettings::load();
+	settings.backend_type = _backend_type_from_id(backend_type_option->get_selected_id());
+	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
+	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
 	settings.model = model_edit->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
@@ -591,6 +811,10 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.system_prompt = AISettings::get_default_system_prompt();
 
 	Dictionary root;
+	root["backend_type"] = settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin";
+	root["jundot_ai_plugin_id"] = settings.jundot_ai_plugin_id;
+	root["jundot_ai_plugin_url"] = settings.jundot_ai_plugin_url;
+	root["allow_legacy_openai_backend"] = settings.allow_legacy_openai_backend;
 	root["base_url"] = settings.base_url;
 	root["model"] = settings.model;
 	root["api_key"] = settings.api_key;
@@ -716,6 +940,15 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 
 	const Dictionary root = json_data;
+	if (root.has("backend_type")) {
+		backend_type_option->select(backend_type_option->get_item_index(String(root["backend_type"]) == "legacy_openai" ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN));
+	}
+	if (root.has("jundot_ai_plugin_id")) {
+		jundot_plugin_id_edit->set_text(root["jundot_ai_plugin_id"]);
+	}
+	if (root.has("jundot_ai_plugin_url")) {
+		jundot_plugin_url_edit->set_text(root["jundot_ai_plugin_url"]);
+	}
 	if (root.has("base_url")) {
 		base_url_edit->set_text(root["base_url"]);
 	}
@@ -813,6 +1046,19 @@ AIConfigPanel::AIConfigPanel() {
 	grid->set_columns(2);
 	grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	root->add_child(grid);
+
+	backend_type_option = _add_backend_type_row(grid, &backend_type_label, TTR("AI Backend"));
+	backend_type_option->connect(SceneStringName(item_selected), callable_mp(this, &AIConfigPanel::_on_backend_type_selected));
+	jundot_plugin_id_edit = _add_line_edit_row(grid, &jundot_plugin_id_label, TTR("jundot AI Plugin ID"), JUNDOT_MIMOCODE_PLUGIN_ID);
+	jundot_plugin_url_edit = _add_line_edit_row(grid, &jundot_plugin_url_label, TTR("jundot AI Plugin URL"), "http://127.0.0.1:4096");
+
+	mimocode_download_spacer = memnew(Label);
+	grid->add_child(mimocode_download_spacer);
+
+	mimocode_download_button = memnew(Button);
+	mimocode_download_button->set_h_size_flags(Control::SIZE_SHRINK_BEGIN);
+	mimocode_download_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_mimocode_download_button_pressed));
+	grid->add_child(mimocode_download_button);
 
 	base_url_edit = _add_line_edit_row(grid, &base_url_label, TTR("Base URL"), AISettings::get_default_base_url());
 	model_edit = _add_line_edit_row(grid, &model_label, TTR("Model"), AISettings::get_default_model());

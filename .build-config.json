@@ -1,5 +1,5 @@
 ﻿{
-  "Target": "editor.dev",
+  "Target": "editor",
   "PlatformName": "windows",
   "Arch": "x86_64",
   "RepoRoot": "H:\\Godot-Auto",
@@ -14,8 +14,8 @@
   "MingwPrefix": "",
   "EnableWindowsOptionalDeps": false,
   "CleanPackageDir": false,
-  "CleanBuild": true,
-  "ExtraSConsArgs": "debug_symbols=yes",
-  "AutoUpdateVersion": false,
+  "CleanBuild": false,
+  "ExtraSConsArgs": "",
+  "AutoUpdateVersion": true,
   "GenerateUpdateManifest": true
 }

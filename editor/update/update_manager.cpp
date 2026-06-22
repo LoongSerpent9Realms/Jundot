@@ -143,6 +143,69 @@ void UpdateManager::_http_request_completed(int p_result, int p_response_code, c
 		return;
 	}
 
+	// v1.1: if platform_downloads[] is present, replace the top-level
+	// download_url / package_size / sha256 / platform / arch with the
+	// entry that best matches the runtime OS + CPU architecture. This
+	// ensures users on Windows/Linux/macOS (and x86_64 vs arm64) always
+	// get the correct binary from a multi-architecture Release.
+	if (manifest.platform_downloads.size() > 0) {
+		String runtime_platform;
+		String runtime_arch;
+
+#if defined(WINDOWS_ENABLED) || defined(_WIN32) || defined(_WIN64)
+		runtime_platform = "windows";
+#elif defined(MACOS_ENABLED) || defined(__APPLE__)
+		runtime_platform = "macos";
+#elif defined(LINUX_ENABLED) || defined(__linux__)
+		runtime_platform = "linux";
+#elif defined(__FreeBSD__)
+		runtime_platform = "freebsd";
+#elif defined(__OpenBSD__)
+		runtime_platform = "openbsd";
+#else
+		runtime_platform = OS::get_singleton()->get_name().to_lower();
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64__)
+		runtime_arch = "arm64";
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__x86_64)
+		runtime_arch = "x86_64";
+#elif defined(__i386__) || defined(_M_IX86)
+		runtime_arch = "x86";
+#else
+		// Fallback: inspect the OS executable path / info.
+		runtime_arch = "x86_64";
+#endif
+
+		PlatformDownload resolved;
+		if (manifest.resolve_platform_download(runtime_platform, runtime_arch, resolved)) {
+			// Only override if the resolved entry has non-empty values.
+			if (!resolved.download_url.is_empty()) {
+				manifest.download_url = resolved.download_url;
+			}
+			if (resolved.package_size > 0) {
+				manifest.package_size = resolved.package_size;
+			}
+			if (!resolved.sha256.is_empty()) {
+				manifest.sha256 = resolved.sha256;
+			}
+			if (!resolved.platform.is_empty()) {
+				manifest.platform = resolved.platform;
+			}
+			if (!resolved.arch.is_empty()) {
+				manifest.arch = resolved.arch;
+			}
+		} else {
+			// The manifest lists other platforms but not ours. Treat as
+			// "no update available for this platform" so the user doesn't
+			// get a (wrong) update notification.
+			WARN_PRINT(vformat("Update manifest has platform_downloads[] but no entry for %s-%s; suppressing update notification.",
+					runtime_platform, runtime_arch));
+			_set_check_status(CHECK_UP_TO_DATE);
+			return;
+		}
+	}
+
 	// Evaluate: should we notify?
 	if (_should_notify_update()) {
 		_set_check_status(CHECK_UPDATE_AVAILABLE);

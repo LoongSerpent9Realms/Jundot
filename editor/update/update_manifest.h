@@ -14,7 +14,24 @@
 #include "core/typedefs.h"
 #include "core/variant/dictionary.h"
 
-/// C++ mirror of the update-manifest.json schema (v1).
+/// <summary>
+/// Per-platform download entry inside the unified update-manifest.json.
+/// When the engine UpdateManager sees platform_downloads[], it resolves to
+/// the entry matching the runtime OS + CPU architecture instead of using the
+/// top-level download_url.
+/// </summary>
+struct PlatformDownload {
+	String package_name;
+	String platform;
+	String arch;
+	String key; // "windows-x86_64", "linux-arm64", "macos-arm64", ...
+	String download_url;
+	String manifest_url;
+	int64_t package_size = 0;
+	String sha256;
+};
+
+/// C++ mirror of the update-manifest.json schema (v1 / v1.1).
 /// Used by UpdateManager to parse and evaluate remote manifests.
 struct UpdateManifest {
 	// ── Mandatory fields ────────────────────────────────────
@@ -64,6 +81,9 @@ struct UpdateManifest {
 	};
 	Vector<FileEntry> files;
 
+	// ── v1.1: multi-platform publishing ─────────────────────
+	Vector<PlatformDownload> platform_downloads;
+
 	// ── Parsing ─────────────────────────────────────────────
 	/// Parse from a JSON string. Returns true on success.
 	bool parse(const String &p_json);
@@ -76,6 +96,12 @@ struct UpdateManifest {
 
 	/// Format file size for display (e.g. "512 MB").
 	static String format_size(int64_t p_bytes);
+
+	/// Find the PlatformDownload entry that best matches the runtime OS/CPU.
+	/// Returns true and fills p_out on success.
+	/// The "key" field in each entry is compared as "{platform}-{arch}" (e.g. "windows-x86_64").
+	/// Falls back to exact key match, then platform-only match, then false.
+	bool resolve_platform_download(const String &p_runtime_platform, const String &p_runtime_arch, PlatformDownload &p_out) const;
 };
 
 /// Evaluate whether the current machine should receive a grayscale update.

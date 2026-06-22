@@ -88,6 +88,28 @@ bool UpdateManifest::parse(const String &p_json) {
 		files.push_back(entry);
 	}
 
+	// Parse platform_downloads (v1.1; multi-platform release assets)
+	Array downloads_arr = root.get("platform_downloads", Array());
+	platform_downloads.clear();
+	for (int i = 0; i < downloads_arr.size(); i++) {
+		Dictionary dl_dict = downloads_arr[i];
+		PlatformDownload entry;
+		entry.package_name = dl_dict.get("package_name", String());
+		entry.platform = dl_dict.get("platform", String());
+		entry.arch = dl_dict.get("arch", String());
+		entry.key = dl_dict.get("key", String());
+		entry.download_url = dl_dict.get("download_url", String());
+		entry.manifest_url = dl_dict.get("manifest_url", String());
+		entry.package_size = int64_t(dl_dict.get("package_size", 0));
+		entry.sha256 = dl_dict.get("sha256", String());
+
+		// Backfill a derived key if the publisher didn't supply one.
+		if (entry.key.is_empty() && !entry.platform.is_empty()) {
+			entry.key = entry.platform + "-" + (entry.arch.is_empty() ? String("x86_64") : entry.arch);
+		}
+		platform_downloads.push_back(entry);
+	}
+
 	return true;
 }
 
@@ -111,6 +133,7 @@ void UpdateManifest::clear() {
 	rollback_to = String();
 	grayscale = Grayscale();
 	files.clear();
+	platform_downloads.clear();
 }
 
 String UpdateManifest::get_version_string() const {
@@ -318,4 +341,88 @@ bool meets_min_version(const String &p_current, const String &p_minimum) {
 		return true;
 	}
 	return compare_versions(p_current, p_minimum) >= 0;
+}
+
+// ── platform_downloads resolution (v1.1) ─────────────────
+
+static String _normalize_platform(const String &p) {
+	String s = p.to_lower().strip_edges();
+	if (s == "win" || s == "win32" || s == "win64" || s == "mswindows") {
+		return "windows";
+	}
+	if (s == "osx" || s == "darwin" || s == "apple") {
+		return "macos";
+	}
+	if (s == "ubuntu" || s == "debian" || s == "fedora") {
+		return "linux";
+	}
+	return s;
+}
+
+static String _normalize_arch(const String &a) {
+	String s = a.to_lower().strip_edges();
+	if (s == "x64" || s == "amd64" || s == "x8664" || s == "x86-64") {
+		return "x86_64";
+	}
+	if (s == "arm64" || s == "aarch64") {
+		return "arm64";
+	}
+	if (s == "x86" || s == "i386" || s == "i686" || s == "win32") {
+		return "x86";
+	}
+	return s;
+}
+
+bool UpdateManifest::resolve_platform_download(const String &p_runtime_platform, const String &p_runtime_arch, PlatformDownload &p_out) const {
+	if (platform_downloads.is_empty()) {
+		return false;
+	}
+
+	const String runtime_platform = _normalize_platform(p_runtime_platform);
+	const String runtime_arch = _normalize_arch(p_runtime_arch);
+	const String combined_key = runtime_platform + "-" + runtime_arch;
+
+	// Pass 1: exact combined key match ("windows-x86_64")
+	for (int i = 0; i < platform_downloads.size(); i++) {
+		const PlatformDownload &d = platform_downloads[i];
+		String d_key = d.key.to_lower().strip_edges();
+		if (d_key == combined_key) {
+			p_out = d;
+			return true;
+		}
+	}
+
+	// Pass 2: individual platform + arch fields match
+	for (int i = 0; i < platform_downloads.size(); i++) {
+		const PlatformDownload &d = platform_downloads[i];
+		String d_platform = _normalize_platform(d.platform);
+		String d_arch = _normalize_arch(d.arch);
+		if (d_platform == runtime_platform && d_arch == runtime_arch) {
+			p_out = d;
+			return true;
+		}
+	}
+
+	// Pass 3: same platform, any arch (best effort)
+	for (int i = 0; i < platform_downloads.size(); i++) {
+		const PlatformDownload &d = platform_downloads[i];
+		String d_platform = _normalize_platform(d.platform);
+		if (d_platform == runtime_platform) {
+			p_out = d;
+			return true;
+		}
+	}
+
+	// Pass 4: match by key containing the runtime platform string (e.g.
+	// "windows" matches key "windows-x86_64") — best effort fallback.
+	for (int i = 0; i < platform_downloads.size(); i++) {
+		const PlatformDownload &d = platform_downloads[i];
+		String d_key = d.key.to_lower().strip_edges();
+		if (d_key.contains(runtime_platform)) {
+			p_out = d;
+			return true;
+		}
+	}
+
+	return false;
 }

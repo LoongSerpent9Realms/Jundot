@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -153,6 +153,39 @@ public class BuildEngine
                 await FindSConsRunnerAsync();
                 await AssertWindowsCompilerAsync();
                 await CheckMonoToolsAsync();
+
+                // Host platform guard: Jundot's SCons build can only build a
+                // target platform on a matching host without a full cross-
+                // compile toolchain. Surface a clear error early instead of
+                // letting SCons fail with `Invalid target platform "linuxbsd"`.
+                var hostPlatform = Environment.OSVersion.Platform.ToString().ToLowerInvariant();
+                var isWindowsHost = OperatingSystem.IsWindows();
+                var isMacOSHost   = OperatingSystem.IsMacOS();
+                var isLinuxHost   = OperatingSystem.IsLinux();
+
+                bool platformOk = _cfg.PlatformName switch
+                {
+                    "windows" => isWindowsHost,
+                    "linuxbsd" => isLinuxHost,
+                    "macos" => isMacOSHost,
+                    "android" => isWindowsHost || isLinuxHost || isMacOSHost, // requires NDK
+                    "ios" => isMacOSHost,                                    // requires Xcode
+                    "web" => isWindowsHost || isLinuxHost || isMacOSHost,    // requires emscripten
+                    _ => true
+                };
+
+                if (!platformOk)
+                {
+                    var hostDesc =
+                          isWindowsHost ? "Windows"
+                        : isMacOSHost   ? "macOS"
+                        : isLinuxHost   ? "Linux"
+                        : hostPlatform;
+                    throw new InvalidOperationException(
+                        $"Target platform '{_cfg.PlatformName}' cannot be built on this {hostDesc} host. " +
+                        $"Switch the Platform dropdown to '{(isWindowsHost ? "windows" : isLinuxHost ? "linuxbsd" : "macos")}' " +
+                        $"or run the build on the matching host OS.");
+                }
 
                 Report("", "step");
                 Report("Building Jundot", "step");
@@ -1054,10 +1087,20 @@ Install one of these toolchains, then run this tool again:
         var monoExe = SelectJundotExecutable(monoProducts)!;
         Report($"Using Mono executable: {monoExe.FullName}", "info");
 
-        // Generate mono glue
-        var glueLog = Path.Combine(_logRoot, $"{_packageName}-mono-glue.log");
-        await RunAndReportInDirAsync(monoExe.FullName, _repoRoot, glueLog, false,
-            new[] { "--headless", "--generate-mono-glue", "./modules/mono/glue" });
+        // The --generate-mono-glue step requires the engine to load project data
+        // (a .pck file) which only the editor target provides.  Template builds
+        // (template_release / template_debug) use pre-built glue or don't need it.
+        if (_actualTarget == "editor")
+        {
+            Report("Generating Mono glue (editor target)", "step");
+            var glueLog = Path.Combine(_logRoot, $"{_packageName}-mono-glue.log");
+            await RunAndReportInDirAsync(monoExe.FullName, _repoRoot, glueLog, false,
+                new[] { "--headless", "--generate-mono-glue", "./modules/mono/glue" });
+        }
+        else
+        {
+            Report($"Skipping --generate-mono-glue for target '{_actualTarget}' (editor-only step).", "info");
+        }
 
         // Build assemblies
         var asmLog = Path.Combine(_logRoot, $"{_packageName}-mono-assemblies.log");
@@ -1366,10 +1409,35 @@ Install one of these toolchains, then run this tool again:
         return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..+)?$";
     }
 
+    /// <summary>
+    /// From a list of candidate Jundot binaries in bin/, pick the single exe
+    /// that should actually be run (for --generate-mono-glue / as the primary
+    /// binary in the record). Rule:
+    ///   - Prefer the non-.console, non-.dev GUI executable.
+    ///   - Next: pick non-.console (may be .dev).
+    ///   - Fall back to the first in the list.
+    /// This fixes cases where the builder previously selected
+    /// `jundot.windows.editor.dev.x86_64.mono.console.exe` just because it
+    /// existed alongside the GUI editor binary.
+    /// </summary>
     private static FileInfo SelectJundotExecutable(List<FileInfo> products)
     {
-        var consoleExe = products.FirstOrDefault(f => f.Name.Contains(".console.exe"));
-        return consoleExe ?? products.First();
+        if (products == null || products.Count == 0)
+            return null!;
+
+        // 1) Prefer GUI editor (not .console, not .dev)
+        var guiEditor = products.FirstOrDefault(f =>
+            !f.Name.Contains(".console", StringComparison.OrdinalIgnoreCase) &&
+            !f.Name.Contains(".dev", StringComparison.OrdinalIgnoreCase));
+        if (guiEditor != null) return guiEditor;
+
+        // 2) Fall back to any non-console binary (e.g. editor.dev, template)
+        var nonConsole = products.FirstOrDefault(f =>
+            !f.Name.Contains(".console", StringComparison.OrdinalIgnoreCase));
+        if (nonConsole != null) return nonConsole;
+
+        // 3) Last resort: first in the list
+        return products.First();
     }
 
     private static bool HasArg(string args, string name)
@@ -1823,8 +1891,13 @@ Install one of these toolchains, then run this tool again:
                     .Where(f => regex.IsMatch(Path.GetFileName(f)))
                     .ToList();
 
-                // Prefer non-console exe, then any
-                var mainExe = exes.FirstOrDefault(f => !f.Contains(".console")) ?? exes.FirstOrDefault();
+                // Prefer non-console, non-dev GUI exe (matches the actual
+                // Jundot editor the user will run); fall back to any
+                // non-console binary, then any file.
+                var sortedExes = exes
+                    .OrderBy(f => f.Contains(".console") ? 2 : (f.Contains(".dev") ? 1 : 0))
+                    .ToList();
+                var mainExe = sortedExes.FirstOrDefault();
                 if (mainExe != null) exePath = mainExe;
             }
 

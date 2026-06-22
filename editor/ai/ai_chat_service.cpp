@@ -27,6 +27,8 @@
 
 #include "ai_chat_service.h"
 
+#include "ai_http_response_text.h"
+#include "ai_jundot_plugin_backend.h"
 #include "ai_settings.h"
 
 #include "core/io/json.h"
@@ -86,6 +88,113 @@ static String _string_from_content_variant(const Variant &p_content) {
 	}
 }
 
+static String _variant_to_visible_text(const Variant &p_value) {
+	switch (p_value.get_type()) {
+		case Variant::NIL:
+			return String();
+		case Variant::STRING:
+			return String(p_value).strip_edges();
+		case Variant::ARRAY: {
+			Array arr = p_value;
+			String text;
+			for (int i = 0; i < arr.size(); i++) {
+				String item_text = _variant_to_visible_text(arr[i]);
+				if (item_text.is_empty()) {
+					continue;
+				}
+				if (!text.is_empty()) {
+					text += "\n";
+				}
+				text += item_text;
+			}
+			return text;
+		}
+		case Variant::DICTIONARY: {
+			Dictionary dict = p_value;
+			if (dict.has("text")) {
+				return _variant_to_visible_text(dict["text"]);
+			}
+			if (dict.has("content")) {
+				return _variant_to_visible_text(dict["content"]);
+			}
+			if (dict.has("message")) {
+				return _variant_to_visible_text(dict["message"]);
+			}
+			return JSON::stringify(dict, "\t");
+		}
+		default:
+			return String(p_value).strip_edges();
+	}
+}
+
+static void _append_visible_process_field(String &r_process, const Dictionary &p_dict, const String &p_key, const String &p_label) {
+	if (!p_dict.has(p_key)) {
+		return;
+	}
+	String value = _variant_to_visible_text(p_dict[p_key]);
+	if (value.is_empty()) {
+		return;
+	}
+	if (!r_process.is_empty()) {
+		r_process += "\n\n";
+	}
+	r_process += "[" + p_label + "]\n" + value;
+}
+
+static String _extract_visible_process_from_message(const Dictionary &p_message) {
+	String process;
+	_append_visible_process_field(process, p_message, "reasoning", "Intermediate");
+	_append_visible_process_field(process, p_message, "reasoning_content", "Intermediate");
+	_append_visible_process_field(process, p_message, "thinking", "Intermediate");
+	_append_visible_process_field(process, p_message, "think", "Intermediate");
+	_append_visible_process_field(process, p_message, "intermediate", "Intermediate");
+	_append_visible_process_field(process, p_message, "process", "Process");
+	_append_visible_process_field(process, p_message, "build", "Build");
+	_append_visible_process_field(process, p_message, "build_log", "Build");
+	_append_visible_process_field(process, p_message, "tool_process", "Tool");
+	_append_visible_process_field(process, p_message, "events", "Process");
+	_append_visible_process_field(process, p_message, "steps", "Process");
+	return process;
+}
+
+static String _extract_visible_process_from_response(const Variant &p_data) {
+	if (p_data.get_type() != Variant::DICTIONARY) {
+		return String();
+	}
+	Dictionary root = p_data;
+	String process = _extract_visible_process_from_message(root);
+
+	if (root.has("choices") && root["choices"].get_type() == Variant::ARRAY) {
+		Array choices = root["choices"];
+		for (int i = 0; i < choices.size(); i++) {
+			if (choices[i].get_type() != Variant::DICTIONARY) {
+				continue;
+			}
+			Dictionary choice = choices[i];
+			String choice_process = _extract_visible_process_from_message(choice);
+			if (choice.has("message") && choice["message"].get_type() == Variant::DICTIONARY) {
+				Dictionary message = choice["message"];
+				String message_process = _extract_visible_process_from_message(message);
+				if (!message_process.is_empty()) {
+					if (!choice_process.is_empty()) {
+						choice_process += "\n\n";
+					}
+					choice_process += message_process;
+				}
+			}
+			if (choice_process.is_empty()) {
+				continue;
+			}
+			if (!process.is_empty()) {
+				process += "\n\n";
+			}
+			process += choice_process;
+		}
+	}
+
+	return process;
+}
+
 static String _extract_stream_text_delta(const Dictionary &p_data) {
 	if (p_data.has("choices") && p_data["choices"].get_type() == Variant::ARRAY) {
 		Array choices = p_data["choices"];
@@ -105,6 +214,10 @@ static String _extract_stream_text_delta(const Dictionary &p_data) {
 					return message_content;
 				}
 			}
+			String process_delta = _extract_visible_process_from_message(first_choice);
+			if (!process_delta.is_empty()) {
+				return process_delta + "\n";
+			}
 			return _string_from_content_variant(first_choice.get("text", Variant()));
 		}
 	}
@@ -123,7 +236,11 @@ static String _extract_stream_text_delta(const Dictionary &p_data) {
 
 	if (p_data.has("type") && String(p_data["type"]) == "content_block_delta" && p_data.has("delta") && p_data["delta"].get_type() == Variant::DICTIONARY) {
 		Dictionary delta = p_data["delta"];
-		return _string_from_content_variant(delta.get("text", Variant()));
+		String text = _string_from_content_variant(delta.get("text", Variant()));
+		if (!text.is_empty()) {
+			return text;
+		}
+		return _extract_visible_process_from_message(delta);
 	}
 
 	return String();
@@ -160,6 +277,22 @@ void AIChatService::_ensure_http_request() {
 
 	http_request->connect(SNAME("request_completed"), callable_mp(this, &AIChatService::_request_completed));
 	add_child(http_request, false, INTERNAL_MODE_BACK);
+}
+
+void AIChatService::_ensure_jundot_plugin_backend() {
+	if (jundot_plugin_backend) {
+		return;
+	}
+
+	jundot_plugin_backend = memnew(AIJundotPluginBackend);
+	jundot_plugin_backend->set_name("AIJundotPluginBackend");
+	jundot_plugin_backend->connect(SNAME("chat_completed"), callable_mp(this, &AIChatService::_jundot_plugin_chat_completed));
+	jundot_plugin_backend->connect(SNAME("chat_stream_data"), callable_mp(this, &AIChatService::_jundot_plugin_stream_data));
+	add_child(jundot_plugin_backend, false, INTERNAL_MODE_BACK);
+}
+
+bool AIChatService::_should_use_jundot_plugin_backend() const {
+	return settings.backend_type == AIBackendType::JUNDOT_PLUGIN;
 }
 
 String AIChatService::_extract_text_from_response(const Variant &p_data) const {
@@ -250,7 +383,7 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 
 	String body_text;
 	if (!p_body.is_empty()) {
-		body_text = String::utf8((const char *)p_body.ptr(), p_body.size());
+		body_text = ai_decode_http_response_text(p_body, p_headers);
 	}
 
 	Variant parsed;
@@ -388,6 +521,13 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 	}
 
 	String think_content;
+	String visible_process = _extract_visible_process_from_response(parsed);
+	if (!visible_process.is_empty()) {
+		if (!content.strip_edges().is_empty()) {
+			content += "\n\n";
+		}
+		content += visible_process;
+	}
 	_extract_think_from_content(content, think_content);
 
 	int prompt_tokens = stream_prompt_tokens;
@@ -409,9 +549,26 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 	emit_signal(SNAME("chat_completed"), p_result, p_response_code, content, json, body_text, elapsed, think_content, prompt_tokens, completion_tokens);
 }
 
+void AIChatService::_jundot_plugin_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
+	String content = p_content;
+	String visible_process = _extract_visible_process_from_response(p_json);
+	if (!visible_process.is_empty()) {
+		if (!content.strip_edges().is_empty()) {
+			content += "\n\n";
+		}
+		content += visible_process;
+	}
+	emit_signal(SNAME("chat_completed"), p_result, p_response_code, content, p_json, p_raw_body, p_elapsed_seconds, p_think_content, p_prompt_tokens, p_completion_tokens);
+}
+
+void AIChatService::_jundot_plugin_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens) {
+	emit_signal(SNAME("chat_stream_data"), p_delta, p_full_content, p_completion_tokens);
+}
+
 void AIChatService::_notification(int p_what) {
 	if (p_what == NOTIFICATION_ENTER_TREE) {
 		_ensure_http_request();
+		_ensure_jundot_plugin_backend();
 	}
 }
 
@@ -451,6 +608,9 @@ void AIChatService::_bind_methods() {
 
 void AIChatService::configure(const AISettingsData &p_settings) {
 	settings = p_settings;
+	if (jundot_plugin_backend) {
+		jundot_plugin_backend->configure(settings);
+	}
 }
 
 Error AIChatService::send_chat(const String &p_message) {
@@ -477,6 +637,13 @@ Error AIChatService::send_messages(const Array &p_messages) {
 
 Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools) {
 	ERR_FAIL_COND_V_MSG(!is_inside_tree(), ERR_UNCONFIGURED, "AIChatService must be inside the scene tree before sending a request.");
+
+	if (_should_use_jundot_plugin_backend()) {
+		_ensure_jundot_plugin_backend();
+		jundot_plugin_backend->configure(settings);
+		return jundot_plugin_backend->send_messages(p_messages, p_tools);
+	}
+
 	ERR_FAIL_COND_V_MSG(settings.base_url.strip_edges().is_empty(), ERR_UNCONFIGURED, "AI base URL is empty.");
 	ERR_FAIL_COND_V_MSG(settings.model.strip_edges().is_empty(), ERR_UNCONFIGURED, "AI model is empty.");
 	ERR_FAIL_COND_V_MSG(settings.api_key.is_empty(), ERR_UNCONFIGURED, "AI API key is empty.");
@@ -505,8 +672,9 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 	}
 
 	Vector<String> headers;
-	headers.push_back("Content-Type: application/json");
+	headers.push_back("Content-Type: application/json; charset=utf-8");
 	headers.push_back("Authorization: Bearer " + settings.api_key);
+	headers.push_back("Accept-Charset: utf-8");
 	if (request_stream) {
 		headers.push_back("Accept: text/event-stream");
 	}
@@ -607,12 +775,19 @@ void AIChatService::_process_stream_chunk(const String &p_chunk) {
 
 void AIChatService::cancel_request() {
 	streaming = false;
+	if (_should_use_jundot_plugin_backend() && jundot_plugin_backend) {
+		jundot_plugin_backend->cancel_request();
+		return;
+	}
 	if (http_request) {
 		http_request->cancel_request();
 	}
 }
 
 bool AIChatService::is_requesting() const {
+	if (_should_use_jundot_plugin_backend()) {
+		return jundot_plugin_backend && jundot_plugin_backend->is_requesting();
+	}
 	return http_request && http_request->get_http_client_status() != HTTPClient::STATUS_DISCONNECTED;
 }
 

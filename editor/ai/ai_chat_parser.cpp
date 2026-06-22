@@ -284,6 +284,30 @@ AIFeatureGateResult AIChatParser::_parse_feature_gate_from_comment(const String 
 	return result;
 }
 
+AITaskPlan AIChatParser::_parse_task_plan_from_comment(const String &p_block) {
+	AITaskPlan plan;
+	plan.title = _extract_field(p_block, "TITLE");
+
+	const Vector<String> lines = _split_lines(p_block);
+	for (int i = 0; i < lines.size(); i++) {
+		String step_text = _strip_field_prefix(lines[i], "STEP:");
+		if (step_text.is_empty()) {
+			continue;
+		}
+
+		Vector<String> parts = step_text.split("|");
+		AITaskPlan::Step step;
+		step.title = parts.size() > 0 ? parts[0].strip_edges() : String();
+		step.detail = parts.size() > 1 ? parts[1].strip_edges() : String();
+		step.status = parts.size() > 2 ? parts[2].strip_edges() : String("pending");
+		if (!step.title.is_empty()) {
+			plan.steps.push_back(step);
+		}
+	}
+
+	return plan;
+}
+
 AISkillEntry AIChatParser::_parse_skill_from_json(const Dictionary &p_dict) {
 	AISkillEntry entry = AIToolRegistry::make_skill();
 	entry.name = p_dict.get("name", String());
@@ -375,6 +399,33 @@ AIFeatureGateResult AIChatParser::_parse_feature_gate_from_json(const Dictionary
 	return result;
 }
 
+AITaskPlan AIChatParser::_parse_task_plan_from_json(const Dictionary &p_dict) {
+	AITaskPlan plan;
+	plan.title = p_dict.get("title", String());
+
+	const Variant steps_var = p_dict.get("steps", Array());
+	if (steps_var.get_type() == Variant::ARRAY) {
+		Array steps = steps_var;
+		for (int i = 0; i < steps.size(); i++) {
+			AITaskPlan::Step step;
+			if (steps[i].get_type() == Variant::DICTIONARY) {
+				Dictionary step_dict = steps[i];
+				step.title = step_dict.get("title", String());
+				step.detail = step_dict.get("detail", String());
+				step.status = step_dict.get("status", String("pending"));
+			} else {
+				step.title = String(steps[i]);
+				step.status = "pending";
+			}
+			if (!step.title.strip_edges().is_empty()) {
+				plan.steps.push_back(step);
+			}
+		}
+	}
+
+	return plan;
+}
+
 void AIChatParser::parse(const String &p_response, Vector<AISuggestion> &r_suggestions) {
 	r_suggestions.clear();
 
@@ -437,6 +488,56 @@ void AIChatParser::parse(const String &p_response, Vector<AISuggestion> &r_sugge
 			r_suggestions.push_back(s);
 		}
 	}
+}
+
+void AIChatParser::parse_task_plans(const String &p_response, Vector<AITaskPlan> &r_task_plans) {
+	r_task_plans.clear();
+
+	const Vector<String> task_blocks = _extract_comment_blocks(p_response, "TASK_PLAN");
+	for (int i = 0; i < task_blocks.size() && r_task_plans.size() < MAX_SUGGESTIONS_PER_RESPONSE; i++) {
+		AITaskPlan plan = _parse_task_plan_from_comment(task_blocks[i]);
+		if (!plan.steps.is_empty()) {
+			r_task_plans.push_back(plan);
+		}
+	}
+
+	const Vector<String> json_blocks = _extract_json_blocks(p_response);
+	for (int i = 0; i < json_blocks.size() && r_task_plans.size() < MAX_SUGGESTIONS_PER_RESPONSE; i++) {
+		JSON json;
+		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		const Variant data = json.get_data();
+		const Dictionary dict = data;
+		const String type = String(dict.get("type", String())).to_lower();
+		if (type == "task_plan" || type == "plan") {
+			AITaskPlan plan = _parse_task_plan_from_json(dict);
+			if (!plan.steps.is_empty()) {
+				r_task_plans.push_back(plan);
+			}
+		}
+	}
+}
+
+String AIChatParser::strip_task_plan_blocks(const String &p_response) {
+	String result = p_response;
+	const String open_tag = "<!-- TASK_PLAN -->";
+	const String close_tag = "<!-- END_TASK_PLAN -->";
+
+	int from = 0;
+	while (from < result.length()) {
+		const int start = result.find(open_tag, from);
+		if (start < 0) {
+			break;
+		}
+		const int end = result.find(close_tag, start + open_tag.length());
+		if (end < 0) {
+			break;
+		}
+		result = result.substr(0, start) + result.substr(end + close_tag.length());
+		from = start;
+	}
+	return result.strip_edges();
 }
 
 void AIChatParser::parse_repair_tasks(const String &p_response, Vector<AIRepairSuggestion> &r_repairs) {
