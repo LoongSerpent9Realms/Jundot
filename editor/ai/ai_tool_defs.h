@@ -36,6 +36,7 @@ namespace AIToolNames {
 constexpr const char *READ_FILES = "read_files";
 constexpr const char *WRITE_FILE = "write_file";
 constexpr const char *SEARCH_FILES = "search_files";
+constexpr const char *LIST_FILES = "list_files";
 constexpr const char *GREP_CODE = "grep_code";
 constexpr const char *RUN_BUILD = "run_build";
 constexpr const char *READ_BUILD_LOG = "read_build_log";
@@ -44,6 +45,7 @@ constexpr const char *SHELL_COMMAND = "shell_command";
 constexpr const char *RESTART_ENGINE = "restart_engine";
 constexpr const char *CHECK_BUILD_STATUS = "check_build_status";
 constexpr const char *UPLOAD_CODE = "upload_code";
+constexpr const char *BATCH_TOOLS = "batch_tools";
 } // namespace AIToolNames
 
 // Returns the built-in tool definitions as an Array of Dictionary,

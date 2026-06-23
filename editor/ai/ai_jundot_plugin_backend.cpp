@@ -15,6 +15,10 @@
 #include "core/os/os.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
+#include "scene/main/timer.h"
+
+static constexpr uint64_t JUNDOT_PLUGIN_MIN_REQUEST_INTERVAL_USEC = 2500000;
+static constexpr uint64_t JUNDOT_PLUGIN_RATE_LIMIT_BACKOFF_USEC = 30000000;
 
 void AIJundotPluginBackend::_ensure_http_request() {
 	if (http_request) {
@@ -37,6 +41,18 @@ void AIJundotPluginBackend::_ensure_http_request() {
 	add_child(http_request, false, INTERNAL_MODE_BACK);
 }
 
+void AIJundotPluginBackend::_ensure_cooldown_timer() {
+	if (cooldown_timer) {
+		return;
+	}
+
+	cooldown_timer = memnew(Timer);
+	cooldown_timer->set_name("AIJundotPluginCooldownTimer");
+	cooldown_timer->set_one_shot(true);
+	cooldown_timer->connect("timeout", callable_mp(this, &AIJundotPluginBackend::_send_pending_request));
+	add_child(cooldown_timer, false, INTERNAL_MODE_BACK);
+}
+
 String AIJundotPluginBackend::_build_plugin_url() const {
 	String url = settings.jundot_ai_plugin_url.strip_edges();
 	while (url.ends_with("/")) {
@@ -50,6 +66,10 @@ String AIJundotPluginBackend::_build_plugin_url() const {
 
 void AIJundotPluginBackend::_emit_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds) {
 	requesting = false;
+	last_request_end_usec = OS::get_singleton()->get_ticks_usec();
+	if (p_response_code == HTTPClient::RESPONSE_TOO_MANY_REQUESTS || p_content.to_lower().contains("too many requests")) {
+		rate_limit_backoff_until_usec = last_request_end_usec + JUNDOT_PLUGIN_RATE_LIMIT_BACKOFF_USEC;
+	}
 	emit_signal(SNAME("chat_completed"), p_result, p_response_code, p_content, p_json, p_raw_body, p_elapsed_seconds, String(), 0, 0);
 }
 
@@ -101,17 +121,29 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 	Dictionary openai_compatible = root.get("openai_compatible", Dictionary());
 
 	if (openai_compatible.is_empty()) {
-		Dictionary message;
-		message["role"] = "assistant";
-		message["content"] = content;
+		if (root.has("choices") && root["choices"].get_type() == Variant::ARRAY) {
+			openai_compatible = root;
+			Array choices = root["choices"];
+			if (!choices.is_empty() && choices[0].get_type() == Variant::DICTIONARY) {
+				Dictionary first = choices[0];
+				if (first.has("message") && first["message"].get_type() == Variant::DICTIONARY) {
+					Dictionary msg = first["message"];
+					content = msg.get("content", content);
+				}
+			}
+		} else {
+			Dictionary message;
+			message["role"] = "assistant";
+			message["content"] = content;
 
-		Dictionary choice;
-		choice["message"] = message;
-		choice["finish_reason"] = root.get("finish_reason", String("stop"));
+			Dictionary choice;
+			choice["message"] = message;
+			choice["finish_reason"] = root.get("finish_reason", String("stop"));
 
-		Array choices;
-		choices.push_back(choice);
-		openai_compatible["choices"] = choices;
+			Array choices;
+			choices.push_back(choice);
+			openai_compatible["choices"] = choices;
+		}
 	}
 
 	_emit_completed(HTTPRequest::RESULT_SUCCESS, p_response_code, content, openai_compatible, body_text, elapsed);
@@ -154,7 +186,38 @@ Error AIJundotPluginBackend::send_messages(const Array &p_messages, const Array 
 	ERR_FAIL_COND_V_MSG(settings.jundot_ai_plugin_url.strip_edges().is_empty(), ERR_UNCONFIGURED, "AI jundot plugin URL is empty.");
 
 	_ensure_http_request();
+	ERR_FAIL_COND_V_MSG(is_requesting(), ERR_BUSY, "AI jundot plugin backend is already handling a request.");
 
+	const uint64_t now_usec = OS::get_singleton()->get_ticks_usec();
+	if (rate_limit_backoff_until_usec > now_usec) {
+		_ensure_cooldown_timer();
+		pending_messages = p_messages.duplicate(true);
+		pending_tools = p_tools.duplicate(true);
+		pending_request = true;
+		requesting = true;
+		const double wait_seconds = double(rate_limit_backoff_until_usec - now_usec) / 1000000.0;
+		cooldown_timer->start(wait_seconds);
+		return OK;
+	}
+
+	if (last_request_end_usec > 0 && now_usec > last_request_end_usec) {
+		const uint64_t elapsed_usec = now_usec - last_request_end_usec;
+		if (elapsed_usec < JUNDOT_PLUGIN_MIN_REQUEST_INTERVAL_USEC) {
+			_ensure_cooldown_timer();
+			pending_messages = p_messages.duplicate(true);
+			pending_tools = p_tools.duplicate(true);
+			pending_request = true;
+			requesting = true;
+			const double wait_seconds = double(JUNDOT_PLUGIN_MIN_REQUEST_INTERVAL_USEC - elapsed_usec) / 1000000.0;
+			cooldown_timer->start(wait_seconds);
+			return OK;
+		}
+	}
+
+	return _send_messages_now(p_messages, p_tools);
+}
+
+Error AIJundotPluginBackend::_send_messages_now(const Array &p_messages, const Array &p_tools) {
 	Dictionary payload;
 	payload["plugin_id"] = settings.jundot_ai_plugin_id;
 	payload["action"] = "send_message";
@@ -178,7 +241,30 @@ Error AIJundotPluginBackend::send_messages(const Array &p_messages, const Array 
 	return err;
 }
 
+void AIJundotPluginBackend::_send_pending_request() {
+	if (!pending_request) {
+		return;
+	}
+
+	Array messages = pending_messages;
+	Array tools = pending_tools;
+	pending_messages.clear();
+	pending_tools.clear();
+	pending_request = false;
+
+	const Error err = _send_messages_now(messages, tools);
+	if (err != OK) {
+		_emit_completed(HTTPRequest::RESULT_CANT_CONNECT, 0, "MiMoCode jundot plugin request could not start after waiting for the local request cooldown.", Dictionary(), String(), 0.0);
+	}
+}
+
 void AIJundotPluginBackend::cancel_request() {
+	pending_request = false;
+	pending_messages.clear();
+	pending_tools.clear();
+	if (cooldown_timer) {
+		cooldown_timer->stop();
+	}
 	requesting = false;
 	if (http_request) {
 		http_request->cancel_request();

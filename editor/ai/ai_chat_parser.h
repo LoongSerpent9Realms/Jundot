@@ -98,8 +98,10 @@ class AIChatParser {
 
 public:
 	static void parse(const String &p_response, Vector<AISuggestion> &r_suggestions);
+	static void parse_next_questions(const String &p_response, Vector<String> &r_questions);
 	static void parse_repair_tasks(const String &p_response, Vector<AIRepairSuggestion> &r_repairs);
 	static void parse_feature_gates(const String &p_response, Vector<AIFeatureGateResult> &r_features);
 	static void parse_task_plans(const String &p_response, Vector<AITaskPlan> &r_task_plans);
 	static String strip_task_plan_blocks(const String &p_response);
+	static String strip_next_question_blocks(const String &p_response);
 };

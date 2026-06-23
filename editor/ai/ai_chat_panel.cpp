@@ -76,6 +76,15 @@
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
 
+static String _ai_chat_next_question_protocol() {
+	return String("=== Next Question Options Protocol ===\n"
+			"- At the end of every final assistant response, suggest 2 to 4 likely next questions the user may want to ask.\n"
+			"- Put each question in a hidden machine-readable block so the editor can show it as a clickable option:\n"
+			"<!-- NEXT_QUESTION -->\nQUESTION: <one concise user question>\n<!-- END_NEXT_QUESTION -->\n"
+			"- Keep each question specific to the current conversation and useful as the user's next message.\n"
+			"- Do not mention these hidden blocks in the visible response.");
+}
+
 static Ref<StyleBoxFlat> _ai_chat_make_panel_style(const Color &p_bg, const Color &p_border, float p_radius = 8.0f, float p_margin = 8.0f) {
 	Ref<StyleBoxFlat> style;
 	style.instantiate();
@@ -100,6 +109,14 @@ Dictionary AIChatPanel::Conversation::to_dict(const Conversation &p_conv) {
 	d["title"] = p_conv.title;
 	d["created_at"] = (int64_t)p_conv.created_at;
 	d["updated_at"] = (int64_t)p_conv.updated_at;
+	d["tool_limit_options_available"] = p_conv.tool_limit_options_available;
+	d["tool_limit_options_collapsed"] = p_conv.tool_limit_options_collapsed;
+	d["tool_limit_options_due_to_limit"] = p_conv.tool_limit_options_due_to_limit;
+	Array next_questions;
+	for (int i = 0; i < p_conv.next_question_options.size(); i++) {
+		next_questions.push_back(p_conv.next_question_options[i]);
+	}
+	d["next_question_options"] = next_questions;
 
 	Array msgs;
 	for (int i = 0; i < p_conv.messages.size(); i++) {
@@ -124,6 +141,16 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 	conv.title = p_dict.get("title", TTR("Untitled Chat"));
 	conv.created_at = (uint64_t)p_dict.get("created_at", 0);
 	conv.updated_at = (uint64_t)p_dict.get("updated_at", 0);
+	conv.tool_limit_options_available = p_dict.get("tool_limit_options_available", false);
+	conv.tool_limit_options_collapsed = p_dict.get("tool_limit_options_collapsed", false);
+	conv.tool_limit_options_due_to_limit = p_dict.get("tool_limit_options_due_to_limit", false);
+	Array next_questions = p_dict.get("next_question_options", Array());
+	for (int i = 0; i < next_questions.size(); i++) {
+		const String question = String(next_questions[i]).strip_edges();
+		if (!question.is_empty()) {
+			conv.next_question_options.push_back(question);
+		}
+	}
 
 	Array msgs = p_dict.get("messages", Array());
 	for (int i = 0; i < msgs.size(); i++) {
@@ -207,6 +234,12 @@ void AIChatPanel::_serialize_current_messages() {
 
 	Conversation &conv = conversations.write[conv_idx];
 	conv.messages.clear();
+	if (tool_limit_options_panel && tool_limit_toggle_button) {
+		conv.tool_limit_options_available = tool_limit_options_panel->is_visible() || tool_limit_toggle_button->is_visible();
+		conv.tool_limit_options_collapsed = tool_limit_toggle_button->is_visible();
+		conv.tool_limit_options_due_to_limit = tool_limit_options_due_to_limit;
+		conv.next_question_options = next_question_options;
+	}
 
 	for (int i = 0; i < message_list->get_child_count(); i++) {
 		// Skip suggestion cards and repair cards.
@@ -255,6 +288,8 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 	attachments.clear();
 	_refresh_attachment_chips();
 	input->clear();
+	next_question_options = p_conv.next_question_options;
+	_render_next_question_options();
 
 	// Re-populate messages.
 	for (int i = 0; i < p_conv.messages.size(); i++) {
@@ -267,6 +302,8 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 			_add_ai_message(cm.content, cm.think_content, cm.think_time_seconds, cm.prompt_tokens, cm.completion_tokens);
 		}
 	}
+
+	_apply_tool_limit_options_state(p_conv);
 }
 
 void AIChatPanel::_select_conversation(const String &p_id) {
@@ -693,10 +730,16 @@ void AIChatPanel::_show_tool_limit_options(bool p_due_to_limit) {
 		return;
 	}
 
+	if (!p_due_to_limit && next_question_options.is_empty()) {
+		_hide_tool_limit_options();
+		return;
+	}
+
 	tool_limit_options_due_to_limit = p_due_to_limit;
 	_update_translations();
 	tool_limit_options_panel->set_visible(true);
 	tool_limit_toggle_button->set_visible(false);
+	_store_tool_limit_options_state();
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
@@ -707,6 +750,7 @@ void AIChatPanel::_hide_tool_limit_options() {
 	if (tool_limit_toggle_button) {
 		tool_limit_toggle_button->set_visible(false);
 	}
+	_store_tool_limit_options_state();
 }
 
 void AIChatPanel::_set_tool_limit_options_collapsed(bool p_collapsed) {
@@ -716,15 +760,194 @@ void AIChatPanel::_set_tool_limit_options_collapsed(bool p_collapsed) {
 
 	tool_limit_options_panel->set_visible(!p_collapsed);
 	tool_limit_toggle_button->set_visible(p_collapsed);
+	_store_tool_limit_options_state();
 	if (!p_collapsed) {
 		message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 	}
 }
 
-void AIChatPanel::_continue_after_tool_limit() {
+void AIChatPanel::_store_tool_limit_options_state(bool p_save) {
+	if (active_conversation_id.is_empty() || !tool_limit_options_panel || !tool_limit_toggle_button) {
+		return;
+	}
+
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conversations.write[i].tool_limit_options_available = tool_limit_options_panel->is_visible() || tool_limit_toggle_button->is_visible();
+			conversations.write[i].tool_limit_options_collapsed = tool_limit_toggle_button->is_visible();
+			conversations.write[i].tool_limit_options_due_to_limit = tool_limit_options_due_to_limit;
+			conversations.write[i].next_question_options = next_question_options;
+			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
+			if (p_save) {
+				_save_all_conversations();
+			}
+			break;
+		}
+	}
+}
+
+void AIChatPanel::_apply_tool_limit_options_state(const Conversation &p_conv) {
+	if (!tool_limit_options_panel || !tool_limit_toggle_button) {
+		return;
+	}
+
+	next_question_options = p_conv.next_question_options;
+	_render_next_question_options();
+	tool_limit_options_due_to_limit = p_conv.tool_limit_options_due_to_limit;
+	_update_translations();
+	if (!p_conv.tool_limit_options_available) {
+		tool_limit_options_panel->set_visible(false);
+		tool_limit_toggle_button->set_visible(false);
+		return;
+	}
+
+	tool_limit_options_panel->set_visible(!p_conv.tool_limit_options_collapsed);
+	tool_limit_toggle_button->set_visible(p_conv.tool_limit_options_collapsed);
+	if (!p_conv.tool_limit_options_collapsed) {
+		message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
+	}
+}
+
+void AIChatPanel::_set_next_question_options(const Vector<String> &p_questions, bool p_save) {
+	next_question_options.clear();
+	for (int i = 0; i < p_questions.size() && next_question_options.size() < 4; i++) {
+		const String question = p_questions[i].strip_edges();
+		if (!question.is_empty()) {
+			next_question_options.push_back(question);
+		}
+	}
+	_render_next_question_options();
+
+	if (active_conversation_id.is_empty()) {
+		return;
+	}
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conversations.write[i].next_question_options = next_question_options;
+			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
+			if (p_save) {
+				_save_all_conversations();
+			}
+			break;
+		}
+	}
+}
+
+void AIChatPanel::_render_next_question_options() {
+	if (!next_question_options_box) {
+		return;
+	}
+
+	for (int i = next_question_options_box->get_child_count() - 1; i >= 0; i--) {
+		next_question_options_box->get_child(i)->queue_free();
+	}
+
+	next_question_options_box->set_visible(!next_question_options.is_empty());
+	for (int i = 0; i < next_question_options.size(); i++) {
+		Button *question_button = memnew(Button);
+		question_button->set_text(next_question_options[i]);
+		question_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		question_button->set_tooltip_text(next_question_options[i]);
+		question_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_use_next_question_option).bind(next_question_options[i]));
+		next_question_options_box->add_child(question_button);
+	}
+}
+
+void AIChatPanel::_use_next_question_option(const String &p_question) {
+	if (!input) {
+		return;
+	}
+	input->set_text(p_question);
+	input->grab_focus();
 	_hide_tool_limit_options();
-	input->set_text(TTR("Please continue from where you stopped."));
-	_send_message();
+	_set_next_question_options(Vector<String>(), true);
+}
+
+void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
+	if (chat_service && chat_service->is_requesting()) {
+		status_label->set_text(TTR("Wait for the current AI request to finish before continuing."));
+		return;
+	}
+
+	const String instruction = p_instruction.strip_edges();
+	if (instruction.is_empty()) {
+		return;
+	}
+
+	AISettingsData settings = AISettings::load();
+	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && settings.api_key.is_empty()) {
+		status_label->set_text(TTR("Configure an API key before sending AI messages."));
+		return;
+	}
+	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.strip_edges().is_empty() || settings.jundot_ai_plugin_url.strip_edges().is_empty())) {
+		status_label->set_text(TTR("Configure the jundot AI plugin before sending AI messages."));
+		return;
+	}
+	if (!_ensure_usage_agreement()) {
+		return;
+	}
+
+	_hide_tool_limit_options();
+	request_conversation_id = active_conversation_id;
+
+	String configured_system_prompt = AISettings::get_effective_system_prompt(settings);
+	settings.system_prompt = configured_system_prompt;
+	settings.system_prompt += "\n\n" + _ai_chat_next_question_protocol();
+	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
+	if (!ai_context.is_empty()) {
+		settings.system_prompt += "\n\n" + ai_context;
+	}
+
+	Array messages;
+	{
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = settings.system_prompt;
+		messages.push_back(system_msg);
+	}
+
+	Array history = _build_message_history();
+	for (int i = 0; i < history.size(); i++) {
+		messages.push_back(history[i]);
+	}
+
+	Dictionary followup_msg;
+	followup_msg["role"] = "user";
+	followup_msg["content"] = instruction;
+	messages.push_back(followup_msg);
+
+	Array tools;
+	if (settings.tools_enabled) {
+		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
+		if (settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				tools.append_array(mcp_tools);
+			}
+		}
+	}
+
+	chat_service->configure(settings);
+	active_settings = settings;
+	pending_tool_round = PendingToolRound();
+	pending_tool_round.max_iterations = settings.max_tool_iterations > 0 ? settings.max_tool_iterations : 10;
+	pending_tool_round.original_messages = messages.duplicate(true);
+	pending_tool_round.original_tools = tools.duplicate(true);
+	in_tool_loop = false;
+
+	const Error err = chat_service->send_messages(messages, tools);
+	if (err != OK) {
+		status_label->set_text(err == ERR_UNAUTHORIZED ? TTR("Please check and accept the AI usage agreement before continuing.") : TTR("AI continuation request could not start."));
+		request_conversation_id = String();
+		return;
+	}
+
+	status_label->set_text(TTR("Continuing AI response..."));
+	_set_requesting(true);
+}
+
+void AIChatPanel::_continue_after_tool_limit() {
+	_send_hidden_followup(TTR("Please continue from where you stopped. Do not repeat earlier content; continue the same task from the current conversation context."));
 }
 
 void AIChatPanel::_focus_custom_tool_limit_message() {
@@ -969,6 +1192,7 @@ void AIChatPanel::_send_message() {
 	// Build system prompt + context. Use the effective prompt based on the current context mode.
 	String configured_system_prompt = AISettings::get_effective_system_prompt(settings);
 	settings.system_prompt = configured_system_prompt;
+	settings.system_prompt += "\n\n" + _ai_chat_next_question_protocol();
 	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
 	if (!ai_context.is_empty()) {
 		settings.system_prompt += "\n\n" + ai_context;
@@ -1018,7 +1242,7 @@ void AIChatPanel::_send_message() {
 
 	const Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
-		status_label->set_text(TTR("AI request could not start."));
+		status_label->set_text(err == ERR_UNAUTHORIZED ? TTR("Please check and accept the AI usage agreement before sending messages.") : TTR("AI request could not start."));
 		request_conversation_id = String();
 		return;
 	}
@@ -1172,74 +1396,38 @@ void AIChatPanel::_add_summary_message(const String &p_content) {
 }
 
 void AIChatPanel::_try_auto_title(const String &p_user_first_message, const Array &p_history) {
-	// Use the first user message (and up to the first AI reply if available)
-	// to ask the AI for a short conversation title. The request is sent as
-	// a low-cost chat call; the result overwrites conversation_name_edit.
+	(void)p_history;
 
-	// If the user already manually typed a title since we queued the request,
-	// skip the auto-title call.
 	if (conversation_name_edit && !conversation_name_edit->get_text().strip_edges().is_empty()) {
 		has_auto_titled = true;
 		return;
 	}
 
-	Array title_messages;
-
-	// System prompt: short title summariser.
-	{
-		Dictionary sys;
-		sys["role"] = "system";
-		sys["content"] = TTR("You are a conversation title generator. Generate a very short title (under 12 words) that summarises the user's question or goal. Respond with ONLY the title text: no quotes, no prefix, no explanation.");
-		title_messages.push_back(sys);
+	String title = p_user_first_message.strip_edges();
+	const int newline_pos = title.find_char('\n');
+	if (newline_pos >= 0) {
+		title = title.substr(0, newline_pos).strip_edges();
+	}
+	if (title.length() > 60) {
+		title = title.substr(0, 57).strip_edges() + "...";
+	}
+	if (title.is_empty()) {
+		return;
 	}
 
-	// Build a compact representation of the first exchange.
-	String first_user_text = p_user_first_message;
-	String first_ai_text;
-
-	// Prefer the first assistant message from the conversation history if
-	// available (p_history contains the last round).
-	for (int i = 0; i < p_history.size(); i++) {
-		Dictionary entry = p_history[i];
-		String role = entry["role"];
-		String content = entry["content"];
-		if (role == "assistant") {
-			first_ai_text = content;
+	if (conversation_name_edit) {
+		conversation_name_edit->set_text(title);
+	}
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conversations.write[i].title = title;
+			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
 			break;
 		}
 	}
-
-	// Compose the title query: the user message plus, optionally, a short
-	// snippet of the AI reply for better context.
-	String title_body = vformat(TTR("User: %s"), first_user_text);
-	if (!first_ai_text.is_empty()) {
-		// Take the first ~300 chars of the reply to keep it cheap.
-		String ai_snippet = first_ai_text;
-		if (ai_snippet.length() > 300) {
-			ai_snippet = ai_snippet.substr(0, 300) + "...";
-		}
-		title_body += "\n\n" + vformat(TTR("Assistant: %s"), ai_snippet);
-	}
-
-	Dictionary user_msg;
-	user_msg["role"] = "user";
-	user_msg["content"] = title_body;
-	title_messages.push_back(user_msg);
-
-	// Re-load settings with a low token budget and deterministic temperature.
-	AISettingsData title_settings = AISettings::load();
-	title_settings.max_tokens = 64;
-	title_settings.temperature = 0.3;
-	chat_service->configure(title_settings);
-
-	is_titling = true;
-	title_request_conversation_id = active_conversation_id;
-	const Error err = chat_service->send_messages(title_messages);
-	if (err != OK) {
-		// Silent fallback: leave the title empty.
-		is_titling = false;
-		title_request_conversation_id = String();
-	}
+	has_auto_titled = true;
+	_refresh_conversation_list_ui();
+	_save_all_conversations();
 }
 
 void AIChatPanel::_title_completed(int p_result, int p_response_code, const String &p_title_content) {
@@ -1376,8 +1564,22 @@ void AIChatPanel::_chat_stream_data(const String &p_delta, const String &p_full_
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
+Array AIChatPanel::_get_available_tools_for_active_settings() const {
+	Array available_tools = pending_tool_round.original_tools;
+	if (available_tools.is_empty()) {
+		available_tools = AIToolDefs::get_tools_for_mode(active_settings.context_mode);
+		if (active_settings.mcp_tools_enabled) {
+			Array mcp_tools = AIToolDefs::get_mcp_tools();
+			if (!mcp_tools.is_empty()) {
+				available_tools.append_array(mcp_tools);
+			}
+		}
+	}
+	return available_tools;
+}
+
 bool AIChatPanel::_looks_like_tool_preamble(const String &p_content) const {
-	if (!active_settings.tools_enabled || pending_tool_round.original_tools.is_empty() || pending_tool_round.executed_tool_calls || in_tool_loop) {
+	if (!active_settings.tools_enabled || pending_tool_round.executed_tool_calls || in_tool_loop || _get_available_tools_for_active_settings().is_empty()) {
 		return false;
 	}
 
@@ -1387,8 +1589,8 @@ bool AIChatPanel::_looks_like_tool_preamble(const String &p_content) const {
 	}
 
 	const String lower = text.to_lower();
-	if (lower.contains("read_files") || lower.contains("write_file") || lower.contains("search_files") ||
-			lower.contains("grep_code") || lower.contains("run_build") || lower.contains("tool call")) {
+	if (lower.contains("read_files") || lower.contains("write_file") || lower.contains("search_files") || lower.contains("list_files") ||
+			lower.contains("grep_code") || lower.contains("run_build") || lower.contains("batch_tools") || lower.contains("tool call")) {
 		return true;
 	}
 
@@ -1405,38 +1607,36 @@ bool AIChatPanel::_looks_like_tool_preamble(const String &p_content) const {
 }
 
 bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const {
-	if (!active_settings.tools_enabled || pending_tool_round.executed_tool_calls || in_tool_loop) {
+	if (!active_settings.tools_enabled) {
 		return false;
 	}
 
-	Array available_tools = pending_tool_round.original_tools;
-	if (available_tools.is_empty()) {
-		available_tools = AIToolDefs::get_tools_for_mode(active_settings.context_mode);
-		if (active_settings.mcp_tools_enabled) {
-			Array mcp_tools = AIToolDefs::get_mcp_tools();
-			if (!mcp_tools.is_empty()) {
-				available_tools.append_array(mcp_tools);
-			}
-		}
-	}
+	Array available_tools = _get_available_tools_for_active_settings();
 	if (available_tools.is_empty()) {
 		return false;
 	}
+
+	String content = p_content;
+	content = content.replace("&lt;", "<");
+	content = content.replace("&gt;", ">");
+	content = content.replace("&quot;", "\"");
+	content = content.replace("&apos;", "'");
+	content = content.replace("&amp;", "&");
 
 	int search_pos = 0;
 	while (true) {
-		const int block_start = p_content.find("<tool_call", search_pos);
+		const int block_start = content.find("<tool_call", search_pos);
 		if (block_start == -1) {
 			break;
 		}
 
-		const int block_open_end = p_content.find(">", block_start);
-		const int block_end = p_content.find("</tool_call>", block_open_end + 1);
+		const int block_open_end = content.find(">", block_start);
+		const int block_end = content.find("</tool_call>", block_open_end + 1);
 		if (block_open_end == -1 || block_end == -1) {
 			break;
 		}
 
-		const String block = p_content.substr(block_open_end + 1, block_end - block_open_end - 1);
+		const String block = content.substr(block_open_end + 1, block_end - block_open_end - 1);
 		const int fn_start = block.find("<function=");
 		if (fn_start == -1) {
 			search_pos = block_end + 12;
@@ -1453,6 +1653,9 @@ bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_too
 
 		String fn_name = block.substr(fn_name_start, fn_open_end - fn_name_start).strip_edges();
 		fn_name = fn_name.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'");
+		if (fn_name == "read_file") {
+			fn_name = "read_files";
+		}
 		if (fn_name.is_empty()) {
 			search_pos = block_end + 12;
 			continue;
@@ -1501,12 +1704,34 @@ bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_too
 			const String raw_value = fn_body.substr(param_open_end + 1, param_end - param_open_end - 1).strip_edges();
 			Variant parsed_value = JSON::parse_string(raw_value);
 			if (parsed_value.get_type() == Variant::NIL && raw_value != "null") {
-				args[param_name] = raw_value;
+				String scalar = raw_value;
+				if ((scalar.begins_with("\"") && scalar.ends_with("\"")) || (scalar.begins_with("'") && scalar.ends_with("'"))) {
+					scalar = scalar.substr(1, scalar.length() - 2);
+					scalar = scalar.replace("\\\\", "\\");
+					scalar = scalar.replace("\\\"", "\"");
+					scalar = scalar.replace("\\'", "'");
+				}
+				args[param_name] = scalar;
 			} else {
 				args[param_name] = parsed_value;
 			}
 
 			param_pos = param_end + close_tag.length();
+		}
+
+		// Be permissive with text-form tool calls generated by models. The
+		// read_files tool requires an array named "paths", but models often emit
+		// a single string or use "path" when producing XML-like pseudo calls.
+		if (fn_name == "read_files") {
+			if (!args.has("paths") && args.has("path")) {
+				args["paths"] = args["path"];
+				args.erase("path");
+			}
+			if (args.has("paths") && args["paths"].get_type() == Variant::STRING) {
+				Array paths;
+				paths.push_back(String(args["paths"]));
+				args["paths"] = paths;
+			}
 		}
 
 		Dictionary fn;
@@ -1545,11 +1770,17 @@ String AIChatPanel::_strip_text_tool_call_blocks(const String &p_content) const 
 }
 
 bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
-	if (pending_tool_round.missing_tool_retry_used || pending_tool_round.original_messages.is_empty() || pending_tool_round.original_tools.is_empty()) {
+	if (pending_tool_round.missing_tool_retry_used || pending_tool_round.original_messages.is_empty()) {
+		return false;
+	}
+
+	Array available_tools = _get_available_tools_for_active_settings();
+	if (available_tools.is_empty()) {
 		return false;
 	}
 
 	pending_tool_round.missing_tool_retry_used = true;
+	pending_tool_round.original_tools = available_tools;
 
 	Array messages = pending_tool_round.original_messages.duplicate(true);
 
@@ -1560,7 +1791,7 @@ bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
 
 	Dictionary correction_msg;
 	correction_msg["role"] = "user";
-	correction_msg["content"] = TTR("Your previous response described using a tool, but it did not include a structured tool_calls response, so the editor could not execute anything. Do not describe the tool use in prose. Return the appropriate function call now using the available tools. If you need to read a file, call read_files with the exact relative path.");
+	correction_msg["content"] = TTR("Your previous response described using a tool, but it did not include a structured tool_calls response, so the editor could not execute anything. Do not describe the tool use in prose. Return the appropriate function call now using the available tools. If you need to inspect directories, call list_files with path and depth. If you need to read a file, call read_files with the exact relative path.");
 	messages.push_back(correction_msg);
 
 	pending_tool_round.original_messages = messages.duplicate(true);
@@ -1571,7 +1802,7 @@ bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
 
 	chat_service->configure(active_settings);
 	_set_requesting(true);
-	Error err = chat_service->send_messages(messages, pending_tool_round.original_tools);
+	Error err = chat_service->send_messages(messages, available_tools);
 	if (err != OK) {
 		_set_requesting(false);
 		status_label->set_text(TTR("Tool-call retry could not start."));
@@ -1614,7 +1845,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 				if (has_tool_calls) {
 					Vector<AITaskPlan> task_plans;
 					AIChatParser::parse_task_plans(p_content, task_plans);
-					String visible_content = AIChatParser::strip_task_plan_blocks(p_content);
+					String visible_content = AIChatParser::strip_next_question_blocks(AIChatParser::strip_task_plan_blocks(p_content));
 					if (!visible_content.strip_edges().is_empty()) {
 						if (streaming_message) {
 							streaming_message->setup_ai(visible_content, p_think_content, p_elapsed_seconds, p_prompt_tokens, p_completion_tokens);
@@ -1654,6 +1885,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 							tool_call_label->set_visible(false);
 							tool_call_label->set_text(String());
 							status_label->set_text(TTR("AI tool iteration limit reached."));
+							_set_next_question_options(Vector<String>(), false);
 							_show_tool_limit_options(true);
 							_serialize_current_messages();
 							_refresh_conversation_list_ui();
@@ -1710,10 +1942,18 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 
 		Vector<AITaskPlan> task_plans;
 		AIChatParser::parse_task_plans(p_content, task_plans);
+		Vector<String> generated_next_questions;
+		AIChatParser::parse_next_questions(p_content, generated_next_questions);
 
-		String final_content = _strip_text_tool_call_blocks(AIChatParser::strip_task_plan_blocks(p_content));
+		String final_content = _strip_text_tool_call_blocks(AIChatParser::strip_next_question_blocks(AIChatParser::strip_task_plan_blocks(p_content)));
 		if (final_content.is_empty() && p_content.find("<tool_call") != -1) {
-			final_content = TTR("AI returned a text tool call, but Function Calling tools are disabled or unavailable for this mode. Enable tools in AI settings and try again.");
+			if (!active_settings.tools_enabled) {
+				final_content = TTR("AI returned a text tool call, but Function Calling tools are disabled. Enable tools in AI settings and try again.");
+			} else if (_get_available_tools_for_active_settings().is_empty()) {
+				final_content = TTR("AI returned a text tool call, but no tools are available for the current mode.");
+			} else {
+				final_content = TTR("AI returned a text tool call, but it could not be parsed or the requested tool is not available. Please try again with a valid tool call.");
+			}
 		}
 		if (_looks_like_tool_preamble(p_content) && pending_tool_round.missing_tool_retry_used && !pending_tool_round.executed_tool_calls) {
 			final_content += TTR("\n\n[Tool calling did not run: the model returned normal text instead of a structured tool_calls response. Use a model or API endpoint that supports OpenAI-compatible function calling, and make sure Function Calling tools are enabled.]");
@@ -1749,6 +1989,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 
 		// Persist the conversation (and refresh the sidebar title since new
 		// user + AI messages may have changed the auto title).
+		_set_next_question_options(generated_next_questions, false);
 		_serialize_current_messages();
 		_refresh_conversation_list_ui();
 		_save_all_conversations();
@@ -2691,6 +2932,12 @@ AIChatPanel::AIChatPanel() {
 	tool_limit_options_title->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 	tool_limit_options_title->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
 	tool_limit_options_vb->add_child(tool_limit_options_title);
+
+	next_question_options_box = memnew(VBoxContainer);
+	next_question_options_box->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	next_question_options_box->add_theme_constant_override("separation", 6 * EDSCALE);
+	next_question_options_box->set_visible(false);
+	tool_limit_options_vb->add_child(next_question_options_box);
 
 	tool_limit_continue_button = memnew(Button);
 	tool_limit_continue_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);

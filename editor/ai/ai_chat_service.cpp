@@ -637,6 +637,7 @@ Error AIChatService::send_messages(const Array &p_messages) {
 
 Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools) {
 	ERR_FAIL_COND_V_MSG(!is_inside_tree(), ERR_UNCONFIGURED, "AIChatService must be inside the scene tree before sending a request.");
+	ERR_FAIL_COND_V_MSG(!AISettings::is_usage_agreement_current(AISettings::load()), ERR_UNAUTHORIZED, "AI usage agreement must be accepted before sending requests.");
 
 	if (_should_use_jundot_plugin_backend()) {
 		_ensure_jundot_plugin_backend();

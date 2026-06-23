@@ -63,6 +63,28 @@ static Dictionary _array_str_property(const String &p_description) {
 	return prop;
 }
 
+static Dictionary _array_object_property(const String &p_description, const Dictionary &p_item_properties, const Array &p_required) {
+	Dictionary item;
+	item["type"] = "object";
+	item["properties"] = p_item_properties;
+	if (!p_required.is_empty()) {
+		item["required"] = p_required;
+	}
+
+	Dictionary prop;
+	prop["type"] = "array";
+	prop["description"] = p_description;
+	prop["items"] = item;
+	return prop;
+}
+
+static Dictionary _number_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "number";
+	prop["description"] = p_description;
+	return prop;
+}
+
 static Dictionary _tool(const String &p_name, const String &p_description, const Dictionary &p_fn) {
 	Dictionary tool;
 	tool["type"] = "function";
@@ -114,7 +136,21 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SEARCH_FILES, "", fn));
 	}
 
-	// 4. grep_code
+	// 4. list_files
+	{
+		Dictionary props;
+		props["path"] = _str_property("Directory path relative to the project root to list. Use '.' for the root.");
+		props["depth"] = _number_property("Maximum directory depth to include. Defaults to 1 and is capped at 5.");
+		Array required;
+		required.push_back("path");
+		Dictionary fn = _make_fn(
+				AIToolNames::LIST_FILES,
+				"List files and directories under a directory in the current tool root. Use this to inspect project structure before choosing exact files to read.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::LIST_FILES, "", fn));
+	}
+
+	// 5. grep_code
 	{
 		Dictionary props;
 		props["pattern"] = _str_property("Regular expression pattern to search for in file contents.");
@@ -128,7 +164,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::GREP_CODE, "", fn));
 	}
 
-	// 5. run_build
+	// 6. run_build
 	{
 		Dictionary props;
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
@@ -139,7 +175,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
 
-	// 6. read_build_log
+	// 7. read_build_log
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -149,7 +185,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::READ_BUILD_LOG, "", fn));
 	}
 
-	// 7. fetch_url
+	// 8. fetch_url
 	{
 		Dictionary props;
 		props["url"] = _str_property("The full URL to download from.");
@@ -164,7 +200,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::FETCH_URL, "", fn));
 	}
 
-	// 8. shell_command
+	// 9. shell_command
 	{
 		Dictionary props;
 		props["command"] = _str_property("Shell command to execute in the project root directory.");
@@ -177,7 +213,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SHELL_COMMAND, "", fn));
 	}
 
-	// 9. restart_engine
+	// 10. restart_engine
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -187,7 +223,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RESTART_ENGINE, "", fn));
 	}
 
-	// 10. check_build_status
+	// 11. check_build_status
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -197,7 +233,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_BUILD_STATUS, "", fn));
 	}
 
-	// 11. upload_code
+	// 12. upload_code
 	{
 		Dictionary props;
 		props["file_path"] = _str_property("File path relative to the project root to upload to the git remote repository.");
@@ -210,6 +246,28 @@ Array AIToolDefs::get_builtin_tools() {
 				"Upload a modified file to the git remote repository. Runs security and universality checks before committing and pushing. Only works in ENGINE mode with a valid git repository.",
 				props, required);
 		tools.push_back(_tool(AIToolNames::UPLOAD_CODE, "", fn));
+	}
+
+	// 13. batch_tools
+	{
+		Dictionary op_props;
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, shell_command.");
+		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
+
+		Array op_required;
+		op_required.push_back("name");
+		op_required.push_back("arguments");
+
+		Dictionary props;
+		props["operations"] = _array_object_property("Ordered tool operations to execute in one editor-side batch. Use this to combine independent reads/searches/writes and reduce AI request round trips.", op_props, op_required);
+
+		Array required;
+		required.push_back("operations");
+		Dictionary fn = _make_fn(
+				AIToolNames::BATCH_TOOLS,
+				"Execute multiple editor tools locally in one tool call and return all results together. Prefer this for independent exploration steps such as list_files + grep_code + read_files, or multiple write_file operations. The arguments field of each operation must be a JSON object encoded as a string. Do not nest batch_tools inside itself.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::BATCH_TOOLS, "", fn));
 	}
 
 	return tools;

@@ -47,6 +47,7 @@ private:
 	static Dictionary _read_files(const Dictionary &p_args);
 	static Dictionary _write_file(const Dictionary &p_args);
 	static Dictionary _search_files(const Dictionary &p_args);
+	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
 	static Dictionary _check_build_status(const Dictionary &p_args);
@@ -55,6 +56,7 @@ private:
 	static Dictionary _shell_command(const Dictionary &p_args);
 	static Dictionary _restart_engine(const Dictionary &p_args);
 	static Dictionary _upload_code(const Dictionary &p_args);
+	static Dictionary _batch_tools(const Dictionary &p_args);
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 
 	static Dictionary _make_result(const String &p_content, bool p_is_error = false);

@@ -490,6 +490,48 @@ void AIChatParser::parse(const String &p_response, Vector<AISuggestion> &r_sugge
 	}
 }
 
+void AIChatParser::parse_next_questions(const String &p_response, Vector<String> &r_questions) {
+	r_questions.clear();
+
+	const Vector<String> question_blocks = _extract_comment_blocks(p_response, "NEXT_QUESTION");
+	for (int i = 0; i < question_blocks.size() && r_questions.size() < 4; i++) {
+		const String question = _extract_field(question_blocks[i], "QUESTION").strip_edges();
+		if (!question.is_empty()) {
+			r_questions.push_back(question);
+		}
+	}
+
+	const Vector<String> json_blocks = _extract_json_blocks(p_response);
+	for (int i = 0; i < json_blocks.size() && r_questions.size() < 4; i++) {
+		JSON json;
+		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		const Variant data = json.get_data();
+		const Dictionary dict = data;
+		const String type = String(dict.get("type", String())).to_lower();
+		if (type != "next_questions" && type != "next_question") {
+			continue;
+		}
+
+		const Variant questions_var = dict.get("questions", Array());
+		if (questions_var.get_type() == Variant::ARRAY) {
+			const Array questions = questions_var;
+			for (int j = 0; j < questions.size() && r_questions.size() < 4; j++) {
+				const String question = String(questions[j]).strip_edges();
+				if (!question.is_empty()) {
+					r_questions.push_back(question);
+				}
+			}
+		} else {
+			const String question = String(dict.get("question", String())).strip_edges();
+			if (!question.is_empty()) {
+				r_questions.push_back(question);
+			}
+		}
+	}
+}
+
 void AIChatParser::parse_task_plans(const String &p_response, Vector<AITaskPlan> &r_task_plans) {
 	r_task_plans.clear();
 
@@ -523,6 +565,27 @@ String AIChatParser::strip_task_plan_blocks(const String &p_response) {
 	String result = p_response;
 	const String open_tag = "<!-- TASK_PLAN -->";
 	const String close_tag = "<!-- END_TASK_PLAN -->";
+
+	int from = 0;
+	while (from < result.length()) {
+		const int start = result.find(open_tag, from);
+		if (start < 0) {
+			break;
+		}
+		const int end = result.find(close_tag, start + open_tag.length());
+		if (end < 0) {
+			break;
+		}
+		result = result.substr(0, start) + result.substr(end + close_tag.length());
+		from = start;
+	}
+	return result.strip_edges();
+}
+
+String AIChatParser::strip_next_question_blocks(const String &p_response) {
+	String result = p_response;
+	const String open_tag = "<!-- NEXT_QUESTION -->";
+	const String close_tag = "<!-- END_NEXT_QUESTION -->";
 
 	int from = 0;
 	while (from < result.length()) {

@@ -271,6 +271,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _write_file(args);
 	} else if (name == AIToolNames::SEARCH_FILES) {
 		result = _search_files(args);
+	} else if (name == AIToolNames::LIST_FILES) {
+		result = _list_files(args);
 	} else if (name == AIToolNames::GREP_CODE) {
 		result = _grep_code(args);
 	} else if (name == AIToolNames::RUN_BUILD) {
@@ -287,6 +289,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _upload_code(args);
 	} else if (name == AIToolNames::RESTART_ENGINE) {
 		result = _restart_engine(args);
+	} else if (name == AIToolNames::BATCH_TOOLS) {
+		result = _batch_tools(args);
 	} else if (name.find_char('.') >= 0) {
 		// Tool names with a dot separator indicate MCP tools (e.g. "server_name.tool_name").
 		int dot = name.find_char('.');
@@ -344,6 +348,12 @@ String AIToolExecutor::_get_project_root() {
 
 Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
 	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(String(p_args.get("path", String())));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(String(p_args["paths"]));
+	}
 	if (paths.is_empty()) {
 		return _make_result("No file paths provided.", true);
 	}
@@ -356,7 +366,14 @@ Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
 
 	for (int i = 0; i < paths.size(); i++) {
 		String rel_path = paths[i];
-		String full_path = project_root.path_join(rel_path);
+		String full_path;
+		if (rel_path.begins_with("res://")) {
+			full_path = ProjectSettings::get_singleton() ? ProjectSettings::get_singleton()->globalize_path(rel_path) : rel_path;
+		} else if (rel_path.is_absolute_path()) {
+			full_path = rel_path;
+		} else {
+			full_path = project_root.path_join(rel_path);
+		}
 
 		if (!FileAccess::exists(full_path)) {
 			result += vformat("[%s] Error: file not found at %s\n", rel_path, full_path);
@@ -457,6 +474,87 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 	}
 
 	return _make_result(vformat("Successfully wrote %s (%d bytes).", path, content.utf8().length()));
+}
+
+Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
+	Array operations = p_args.get("operations", Array());
+	if (operations.is_empty()) {
+		return _make_result("No batch operations provided.", true);
+	}
+
+	const int MAX_BATCH_OPERATIONS = 8;
+	StringBuilder sb;
+	sb += vformat("Batch executed %d operation(s):\n", MIN(operations.size(), MAX_BATCH_OPERATIONS));
+	bool has_error = false;
+
+	for (int i = 0; i < operations.size() && i < MAX_BATCH_OPERATIONS; i++) {
+		if (operations[i].get_type() != Variant::DICTIONARY) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d ---\nError: operation must be an object.\n", i + 1);
+			continue;
+		}
+
+		Dictionary op = operations[i];
+		const String name = String(op.get("name", String())).strip_edges();
+		if (name.is_empty()) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d ---\nError: missing tool name.\n", i + 1);
+			continue;
+		}
+		if (name == AIToolNames::BATCH_TOOLS) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: nested batch_tools calls are not allowed.\n", i + 1, name);
+			continue;
+		}
+		AISettingsData settings = AISettings::load();
+		if (settings.context_mode != AIContextMode::ENGINE &&
+				(name == AIToolNames::RUN_BUILD ||
+						name == AIToolNames::READ_BUILD_LOG ||
+						name == AIToolNames::CHECK_BUILD_STATUS ||
+						name == AIToolNames::RESTART_ENGINE ||
+						name == AIToolNames::FETCH_URL ||
+						name == AIToolNames::UPLOAD_CODE)) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in engine mode.\n", i + 1, name);
+			continue;
+		}
+
+		Dictionary op_args;
+		Variant raw_args = op.get("arguments", op.get("args", Dictionary()));
+		if (raw_args.get_type() == Variant::DICTIONARY) {
+			op_args = raw_args;
+		} else if (raw_args.get_type() == Variant::STRING) {
+			Variant parsed_args = JSON::parse_string(String(raw_args));
+			if (parsed_args.get_type() == Variant::DICTIONARY) {
+				op_args = parsed_args;
+			}
+		}
+
+		Dictionary fn;
+		fn["name"] = name;
+		fn["arguments"] = JSON::stringify(op_args);
+
+		Dictionary tool_call;
+		tool_call["id"] = vformat("batch_%d", i);
+		tool_call["type"] = "function";
+		tool_call["function"] = fn;
+
+		Dictionary result = execute(tool_call);
+		if (result.has("is_error")) {
+			has_error = true;
+		}
+
+		sb += vformat("\n--- Operation %d: %s ---\n", i + 1, name);
+		sb += String(result.get("content", String()));
+		sb += "\n";
+	}
+
+	if (operations.size() > MAX_BATCH_OPERATIONS) {
+		has_error = true;
+		sb += vformat("\nBatch stopped after %d operations. Split remaining work into another batch.\n", MAX_BATCH_OPERATIONS);
+	}
+
+	return _make_result(sb.as_string(), has_error);
 }
 
 Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
@@ -577,6 +675,102 @@ Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
 	sb += vformat("Found %d files matching '%s':\n", results.size(), pattern);
 	for (int i = 0; i < results.size(); i++) {
 		sb += results[i] + "\n";
+	}
+
+	return _make_result(sb.as_string());
+}
+
+Dictionary AIToolExecutor::_list_files(const Dictionary &p_args) {
+	String path = p_args.get("path", ".");
+	if (path.is_empty()) {
+		path = ".";
+	}
+
+	int max_depth = (int)p_args.get("depth", 1);
+	if (max_depth < 0) {
+		max_depth = 0;
+	} else if (max_depth > 5) {
+		max_depth = 5;
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+
+	String rel_root = path.replace("\\", "/").simplify_path();
+	if (rel_root == ".") {
+		rel_root = "";
+	}
+	if (rel_root.is_absolute_path() || rel_root.begins_with("../") || rel_root == ".." || rel_root.contains("/../")) {
+		return _make_result("Directory listing rejected: path must stay inside the project root.", true);
+	}
+
+	String root_dir = rel_root.is_empty() ? project_root : project_root.path_join(rel_root);
+	Ref<DirAccess> root_da = DirAccess::open(root_dir);
+	if (root_da.is_null()) {
+		return _make_result("Directory not found: " + (rel_root.is_empty() ? String(".") : rel_root), true);
+	}
+
+	struct PendingDir {
+		String abs_path;
+		String rel_path;
+		int depth = 0;
+	};
+
+	Vector<String> entries;
+	List<PendingDir> dirs;
+	PendingDir root;
+	root.abs_path = root_dir;
+	root.rel_path = rel_root;
+	root.depth = 0;
+	dirs.push_back(root);
+
+	const int MAX_RESULTS = 200;
+	while (!dirs.is_empty() && entries.size() < MAX_RESULTS) {
+		PendingDir current = dirs.front()->get();
+		dirs.pop_front();
+
+		Ref<DirAccess> da = DirAccess::open(current.abs_path);
+		if (da.is_null()) {
+			continue;
+		}
+
+		da->list_dir_begin();
+		String name = da->get_next();
+		while (!name.is_empty() && entries.size() < MAX_RESULTS) {
+			if (name == "." || name == "..") {
+				name = da->get_next();
+				continue;
+			}
+
+			const bool is_dir = da->current_is_dir();
+			const String rel = current.rel_path.is_empty() ? name : current.rel_path.path_join(name);
+			if (is_dir) {
+				entries.push_back(rel + "/");
+				if (current.depth < max_depth && !name.begins_with(".") && name != "bin" && name != "obj" && name != "__pycache__") {
+					PendingDir child;
+					child.abs_path = current.abs_path.path_join(name);
+					child.rel_path = rel;
+					child.depth = current.depth + 1;
+					dirs.push_back(child);
+				}
+			} else {
+				entries.push_back(rel);
+			}
+
+			name = da->get_next();
+		}
+		da->list_dir_end();
+	}
+
+	StringBuilder sb;
+	sb += vformat("Listed %d item(s) under '%s' (depth %d):\n", entries.size(), rel_root.is_empty() ? String(".") : rel_root, max_depth);
+	for (int i = 0; i < entries.size(); i++) {
+		sb += entries[i] + "\n";
+	}
+	if (entries.size() >= MAX_RESULTS) {
+		sb += "... truncated at 200 items. Use a narrower path or lower depth.\n";
 	}
 
 	return _make_result(sb.as_string());

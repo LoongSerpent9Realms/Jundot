@@ -85,7 +85,9 @@ class AIChatPanel : public MarginContainer {
 	Button *tool_limit_custom_button = nullptr;
 	Button *tool_limit_stop_button = nullptr;
 	Button *tool_limit_collapse_button = nullptr;
+	VBoxContainer *next_question_options_box = nullptr;
 	bool tool_limit_options_due_to_limit = false;
+	Vector<String> next_question_options;
 	EditorFileDialog *reference_file_dialog = nullptr;
 	EditorFileDialog *upload_file_dialog = nullptr;
 	EditorFileDialog *import_file_dialog = nullptr;
@@ -193,6 +195,10 @@ class AIChatPanel : public MarginContainer {
 		Vector<ConversationMessage> messages;
 		uint64_t created_at = 0;
 		uint64_t updated_at = 0;
+		bool tool_limit_options_available = false;
+		bool tool_limit_options_collapsed = false;
+		bool tool_limit_options_due_to_limit = false;
+		Vector<String> next_question_options;
 
 		static Dictionary to_dict(const Conversation &p_conv);
 		static Conversation from_dict(const Dictionary &p_dict);
@@ -230,6 +236,7 @@ class AIChatPanel : public MarginContainer {
 	void _clear_messages();
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
+	Array _get_available_tools_for_active_settings() const;
 	bool _looks_like_tool_preamble(const String &p_content) const;
 	bool _extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const;
 	String _strip_text_tool_call_blocks(const String &p_content) const;
@@ -263,6 +270,12 @@ class AIChatPanel : public MarginContainer {
 	void _show_tool_limit_options(bool p_due_to_limit);
 	void _hide_tool_limit_options();
 	void _set_tool_limit_options_collapsed(bool p_collapsed);
+	void _store_tool_limit_options_state(bool p_save = true);
+	void _apply_tool_limit_options_state(const Conversation &p_conv);
+	void _set_next_question_options(const Vector<String> &p_questions, bool p_save = true);
+	void _render_next_question_options();
+	void _use_next_question_option(const String &p_question);
+	void _send_hidden_followup(const String &p_instruction);
 	void _continue_after_tool_limit();
 	void _focus_custom_tool_limit_message();
 	void _dismiss_tool_limit_options();
