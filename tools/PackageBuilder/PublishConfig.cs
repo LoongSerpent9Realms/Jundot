@@ -31,7 +31,7 @@ public class PublishConfig
     public string ReleaseBody { get; set; } = "";
 
     [JsonPropertyName("draft")]
-    public bool Draft { get; set; } = true;
+    public bool Draft { get; set; } = false;
 
     [JsonPropertyName("prerelease")]
     public bool Prerelease { get; set; } = false;

@@ -1177,6 +1177,7 @@ Install one of these toolchains, then run this tool again:
         var products = Directory.GetFiles(binDir)
             .Select(f => new FileInfo(f))
             .Where(f => regex.IsMatch(f.Name))
+            .Where(f => ShouldPackageProduct(f.Name))
             .ToList();
 
         if (products.Count == 0)
@@ -1393,20 +1394,36 @@ Install one of these toolchains, then run this tool again:
     private string GetProductPattern(bool monoBuild)
     {
         var platform = Regex.Escape(_cfg.PlatformName);
-        // dev_build=yes �?SConstruct 会在文件名中追加 .dev (�?editor �?editor.dev)
-        var target = Regex.Escape(_actualTarget) + @"(\.dev)?";
+        // dev_build=yes appends `.dev` to editor binaries. A normal editor
+        // package must not silently pick stale editor.dev artifacts from bin/.
+        var target = Regex.Escape(_actualTarget);
+        if (string.Equals(_cfg.Target, "editor.dev", StringComparison.OrdinalIgnoreCase))
+            target += @"\.dev";
         var arch = Regex.Escape(_cfg.Arch);
 
         if (_cfg.PlatformName == "windows")
         {
             if (monoBuild)
-                return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?\\.exe$";
-            return $"^jundot\\.{platform}\\.{target}\\.{arch}(?!.*\\.mono)(\\..+)?\\.exe$";
+                return $"^jundot\\.{platform}\\.{target}\\.{arch}(?:\\..*)?\\.mono(?:\\..*)?\\.exe$";
+            return $"^jundot\\.{platform}\\.{target}\\.{arch}(?!.*\\.mono)(?:\\..+)?\\.exe$";
         }
 
         if (monoBuild)
-            return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..*)?\\.mono(\\..*)?$";
-        return $"^jundot\\.{platform}\\.{target}\\.{arch}(\\..+)?$";
+            return $"^jundot\\.{platform}\\.{target}\\.{arch}(?:\\..*)?\\.mono(?:\\..*)?$";
+        return $"^jundot\\.{platform}\\.{target}\\.{arch}(?:\\..+)?$";
+    }
+
+    private bool ShouldPackageProduct(string fileName)
+    {
+        if (fileName.Contains(".console", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var isDevArtifact = fileName.Contains(".editor.dev.", StringComparison.OrdinalIgnoreCase);
+        var wantsDevArtifact = string.Equals(_cfg.Target, "editor.dev", StringComparison.OrdinalIgnoreCase);
+        if (isDevArtifact != wantsDevArtifact && string.Equals(_actualTarget, "editor", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return true;
     }
 
     /// <summary>
@@ -1889,6 +1906,7 @@ Install one of these toolchains, then run this tool again:
                 var regex = new Regex(pattern, RegexOptions.IgnoreCase);
                 var exes = Directory.GetFiles(binDir, "*.exe")
                     .Where(f => regex.IsMatch(Path.GetFileName(f)))
+                    .Where(f => ShouldPackageProduct(Path.GetFileName(f)))
                     .ToList();
 
                 // Prefer non-console, non-dev GUI exe (matches the actual

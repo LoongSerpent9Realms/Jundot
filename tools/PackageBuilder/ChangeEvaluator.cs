@@ -72,10 +72,66 @@ public static class ChangeEvaluator
 
     private static void BuildSourceReport(string repoRoot, StringBuilder sb)
     {
+        var currentTag = GetCurrentVersionTag(repoRoot);
+        var previousTag = FindPreviousVersionTag(repoRoot, currentTag);
+        var head = RunGitCommand(repoRoot, "rev-parse", "--short", "HEAD").FirstOrDefault() ?? "HEAD";
+
+        if (!string.IsNullOrEmpty(previousTag))
+        {
+            sb.AppendLine($"**Compared with previous version tag:** `{previousTag}` → `{head}`");
+            if (!string.IsNullOrEmpty(currentTag))
+                sb.AppendLine($"**Current version tag:** `{currentTag}`");
+            sb.AppendLine();
+
+            var commitLines = RunGitCommand(repoRoot, "log", "--pretty=format:%h\t%s", $"{previousTag}..HEAD");
+            if (commitLines.Length > 0)
+            {
+                sb.AppendLine("### Commits since previous version");
+                sb.AppendLine();
+                foreach (var line in commitLines.Take(80))
+                {
+                    var parts = line.Split('\t', 2);
+                    if (parts.Length == 2)
+                        sb.AppendLine($"- `{parts[0]}` {parts[1]}");
+                    else
+                        sb.AppendLine($"- {line}");
+                }
+                if (commitLines.Length > 80)
+                    sb.AppendLine($"- ... {commitLines.Length - 80} more commit(s)");
+                sb.AppendLine();
+            }
+
+            var rangeDiffLines = RunGitCommand(repoRoot, "diff", "--name-status", $"{previousTag}..HEAD");
+            AppendDiffTable(sb, rangeDiffLines, "Files changed since previous version");
+        }
+
         var diffLines = RunGitCommand(repoRoot, "diff", "--name-status", "HEAD");
+        if (diffLines.Length == 0 && string.IsNullOrEmpty(previousTag))
+        {
+            sb.AppendLine("> No source differences detected.");
+            sb.AppendLine();
+            return;
+        }
+
+        if (diffLines.Length > 0)
+        {
+            AppendDiffTable(sb, diffLines, "Uncommitted working tree changes");
+        }
+        else
+        {
+            sb.AppendLine("> No uncommitted working tree changes detected.");
+            sb.AppendLine();
+        }
+    }
+
+    private static void AppendDiffTable(StringBuilder sb, string[] diffLines, string title)
+    {
+        sb.AppendLine($"### {title}");
+        sb.AppendLine();
+
         if (diffLines.Length == 0)
         {
-            sb.AppendLine("> No source differences detected (clean worktree or no commits).");
+            sb.AppendLine("> No file differences detected.");
             sb.AppendLine();
             return;
         }
@@ -158,7 +214,11 @@ public static class ChangeEvaluator
 
     private static void BuildRiskSummary(string repoRoot, StringBuilder sb)
     {
-        var diffLines = RunGitCommand(repoRoot, "diff", "--name-only", "HEAD");
+        var currentTag = GetCurrentVersionTag(repoRoot);
+        var previousTag = FindPreviousVersionTag(repoRoot, currentTag);
+        var diffLines = !string.IsNullOrEmpty(previousTag)
+            ? RunGitCommand(repoRoot, "diff", "--name-only", $"{previousTag}..HEAD")
+            : RunGitCommand(repoRoot, "diff", "--name-only", "HEAD");
         bool hasCoreChanged = false;
         bool hasEditorChanged = false;
         bool hasToolsChanged = false;
@@ -190,7 +250,7 @@ public static class ChangeEvaluator
     {
         try
         {
-            var psi = new ProcessStartInfo("git", string.Join(" ", args))
+            var psi = new ProcessStartInfo("git")
             {
                 WorkingDirectory = repoRoot,
                 RedirectStandardOutput = true,
@@ -198,6 +258,8 @@ public static class ChangeEvaluator
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
 
             using var proc = Process.Start(psi);
             if (proc == null) return Array.Empty<string>();
@@ -210,6 +272,93 @@ public static class ChangeEvaluator
         {
             return Array.Empty<string>();
         }
+    }
+
+    private static string? GetCurrentVersionTag(string repoRoot)
+    {
+        var version = ReadVersionString(repoRoot);
+        return string.IsNullOrEmpty(version) ? null : $"v{version}";
+    }
+
+    private static string? FindPreviousVersionTag(string repoRoot, string? currentTag)
+    {
+        var tags = RunGitCommand(repoRoot, "tag", "--list", "v*", "--sort=-v:refname");
+        if (tags.Length == 0)
+            return null;
+
+        if (string.IsNullOrEmpty(currentTag))
+            return tags.FirstOrDefault();
+
+        var currentVersion = ParseVersionTag(currentTag);
+        foreach (var tag in tags)
+        {
+            if (string.Equals(tag, currentTag, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var version = ParseVersionTag(tag);
+            if (currentVersion != null && version != null && CompareVersions(version, currentVersion) >= 0)
+                continue;
+
+            return tag;
+        }
+
+        return tags.FirstOrDefault(t => !string.Equals(t, currentTag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ReadVersionString(string repoRoot)
+    {
+        var versionPy = Path.Combine(repoRoot, "version.py");
+        if (!File.Exists(versionPy))
+            return null;
+
+        int? major = null, minor = null, patch = null;
+        string status = "stable";
+        foreach (var line in File.ReadLines(versionPy))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("major = ") && int.TryParse(trimmed["major = ".Length..], out var maj)) major = maj;
+            else if (trimmed.StartsWith("minor = ") && int.TryParse(trimmed["minor = ".Length..], out var min)) minor = min;
+            else if (trimmed.StartsWith("patch = ") && int.TryParse(trimmed["patch = ".Length..], out var pat)) patch = pat;
+            else if (trimmed.StartsWith("status = ")) status = trimmed["status = ".Length..].Trim().Trim('"', '\'');
+        }
+
+        if (major == null || minor == null || patch == null)
+            return null;
+
+        return string.Equals(status, "stable", StringComparison.OrdinalIgnoreCase)
+            ? $"{major}.{minor}.{patch}"
+            : $"{major}.{minor}.{patch}-{status}";
+    }
+
+    private static int[]? ParseVersionTag(string tag)
+    {
+        var text = tag.TrimStart('v', 'V');
+        var dash = text.IndexOf('-');
+        if (dash >= 0)
+            text = text[..dash];
+
+        var parts = text.Split('.');
+        if (parts.Length < 3)
+            return null;
+
+        var values = new int[3];
+        for (var i = 0; i < 3; i++)
+        {
+            if (!int.TryParse(parts[i], out values[i]))
+                return null;
+        }
+        return values;
+    }
+
+    private static int CompareVersions(int[] left, int[] right)
+    {
+        for (var i = 0; i < Math.Min(left.Length, right.Length); i++)
+        {
+            var cmp = left[i].CompareTo(right[i]);
+            if (cmp != 0)
+                return cmp;
+        }
+        return left.Length.CompareTo(right.Length);
     }
 
     private static string ClassifyRisk(string path, string status)

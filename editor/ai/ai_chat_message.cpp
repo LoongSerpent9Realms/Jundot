@@ -661,19 +661,19 @@ void AIChatMessage::_notification(int p_what) {
 		// Apply message surface colors based on editor theme.
 		Ref<StyleBoxFlat> bubble_style;
 		bubble_style.instantiate();
-		bubble_style->set_corner_radius_all(8 * EDSCALE);
-		bubble_style->set_content_margin_all(12 * EDSCALE);
+		bubble_style->set_corner_radius_all(14 * EDSCALE);
+		bubble_style->set_content_margin_all(14 * EDSCALE);
 
 		Color base = get_theme_color(SNAME("base_color"), SNAME("Editor"));
 		Color font = get_theme_color(SNAME("font_color"), SNAME("Editor"));
 		Color accent = get_theme_color(SNAME("accent_color"), SNAME("Editor"));
 
 		if (is_user) {
-			Color user_bg = accent.darkened(0.55f);
-			user_bg.a = 0.30f;
+			Color user_bg = accent.darkened(0.48f);
+			user_bg.a = 0.42f;
 			bubble_style->set_bg_color(user_bg);
 			bubble_style->set_border_width_all(1);
-			bubble_style->set_border_color(accent * Color(1, 1, 1, 0.45f));
+			bubble_style->set_border_color(accent * Color(1, 1, 1, 0.40f));
 			author_label->add_theme_color_override(SNAME("font_color"), accent.lightened(0.35f));
 		} else if (is_summary) {
 			Color summary_bg(0.5f, 0.45f, 0.25f, 0.25f);
@@ -682,11 +682,11 @@ void AIChatMessage::_notification(int p_what) {
 			bubble_style->set_border_color(Color(0.6f, 0.55f, 0.3f, 0.5f));
 			author_label->add_theme_color_override(SNAME("font_color"), Color(0.95f, 0.82f, 0.42f));
 		} else {
-			Color ai_bg = base.lightened(0.015f);
-			ai_bg.a = 0.72f;
+			Color ai_bg = base.lightened(0.02f);
+			ai_bg.a = 0.18f;
 			bubble_style->set_bg_color(ai_bg);
-			bubble_style->set_border_width_all(1);
-			bubble_style->set_border_color(base.lightened(0.09f));
+			bubble_style->set_border_width_all(0);
+			bubble_style->set_border_color(Color(0, 0, 0, 0));
 			author_label->add_theme_color_override(SNAME("font_color"), font * Color(1, 1, 1, 0.72f));
 		}
 		bubble->add_theme_style_override(SNAME("panel"), bubble_style);
@@ -790,7 +790,7 @@ void AIChatMessage::_build_ui() {
 	content_label->set_fit_content(true);
 	content_label->set_selection_enabled(true);
 	content_label->set_deselect_on_focus_loss_enabled(true);
-	content_label->set_custom_minimum_size(Size2(360 * EDSCALE, 0));
+	content_label->set_custom_minimum_size(Size2(420 * EDSCALE, 0));
 	content_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	content_label->set_use_bbcode(true);
 	bubble_content->add_child(content_label);
@@ -852,8 +852,13 @@ void AIChatMessage::setup_user(const String &p_content) {
 	footer->set_visible(true);
 	token_label->set_visible(false);
 
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(true);
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true);
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_SHRINK_END);
 
 	// Ensure edit button is in footer for user messages.
 	if (edit_button && edit_button->get_parent() != footer) {
@@ -879,8 +884,13 @@ void AIChatMessage::setup_ai(const String &p_content, const String &p_think_cont
 		footer->remove_child(edit_button);
 	}
 
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(true);
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true);
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
 	_update_think_visibility();
 	_update_footer();
@@ -907,8 +917,13 @@ void AIChatMessage::setup_summary(const String &p_content) {
 		footer->remove_child(edit_button);
 	}
 
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(true);
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true);
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
 	_update_footer();
 	_update_translations();
@@ -930,6 +945,24 @@ void AIChatMessage::set_content(const String &p_content) {
 void AIChatMessage::set_markdown_content(const String &p_content) {
 	message_content = p_content;
 	content_label->set_text(_markdown_to_bbcode(p_content));
+}
+
+void AIChatMessage::set_display_scale(float p_scale) {
+	const float clamped = CLAMP(p_scale, 0.75f, 1.35f);
+	const int body_size = Math::round(14 * clamped * EDSCALE);
+	const int small_size = Math::round(11 * clamped * EDSCALE);
+	const int mono_size = Math::round(13 * clamped * EDSCALE);
+
+	author_label->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	content_label->add_theme_font_size_override(SNAME("normal_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("bold_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("italics_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("bold_italics_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("mono_font_size"), mono_size);
+	think_label->add_theme_font_size_override(SceneStringName(font_size), Math::round(12 * clamped * EDSCALE));
+	token_label->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	copy_button->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	edit_button->add_theme_font_size_override(SceneStringName(font_size), small_size);
 }
 
 AIChatMessage::AIChatMessage() {

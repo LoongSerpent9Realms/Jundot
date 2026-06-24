@@ -138,6 +138,7 @@ class AIChatPanel : public MarginContainer {
 	Vector<ChatAttachment> pending_title_attachments;
 
 	Vector<ChatAttachment> attachments;
+	float chat_display_scale = 0.92f;
 
 	// Tool call execution.
 	struct PendingToolRound {
@@ -233,6 +234,7 @@ class AIChatPanel : public MarginContainer {
 
 	void _send_message();
 	void _cancel_request();
+	void _clear_input();
 	void _clear_messages();
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
@@ -250,9 +252,15 @@ class AIChatPanel : public MarginContainer {
 	void _project_file_selected(const String &p_path);
 	void _external_file_selected(const String &p_path);
 	void _add_attachment(const String &p_path, bool p_external);
+	void _add_dropped_files(const Vector<String> &p_files);
+	void _window_files_dropped(const Vector<String> &p_files);
+	bool _can_drop_files_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const;
+	void _drop_files_fw(const Point2 &p_point, const Variant &p_data, Control *p_from);
 	void _remove_attachment(int p_index);
 	void _refresh_attachment_chips();
 	String _build_attachment_context() const;
+	void _set_chat_display_scale(float p_scale);
+	void _update_auto_chat_display_scale();
 	Array _build_message_history() const;
 	void _start_summarization(const Array &p_history, int p_budget);
 	void _summary_completed(const String &p_summary_text);

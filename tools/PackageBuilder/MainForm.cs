@@ -1046,6 +1046,26 @@ public partial class MainForm : Form
         aiLayout.Controls.Add(lblRepo, 0, 5);
         aiLayout.Controls.Add(txtGhRepo, 1, 5);
 
+        var chkDraft = new CheckBox { Text = "Create GitHub release as Draft", AutoSize = true, Checked = false };
+        var chkPrerelease = new CheckBox { Text = "Mark as Pre-release", AutoSize = true };
+        void PersistReleaseFlags()
+        {
+            if (string.IsNullOrEmpty(_txtRepoRoot.Text.Trim()) || !Directory.Exists(_txtRepoRoot.Text.Trim()))
+                return;
+            var cfg = PublishConfig.Load(_txtRepoRoot.Text.Trim());
+            cfg.Draft = chkDraft.Checked;
+            cfg.Prerelease = chkPrerelease.Checked;
+            cfg.Save(_txtRepoRoot.Text.Trim());
+        }
+        chkDraft.CheckedChanged += (s, e) => PersistReleaseFlags();
+        chkPrerelease.CheckedChanged += (s, e) => PersistReleaseFlags();
+
+        aiLayout.Controls.Add(new Label { Text = "Release Flags", AutoSize = true, ForeColor = Color.Gray }, 0, 6);
+        var flagsPanel = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
+        flagsPanel.Controls.Add(chkDraft);
+        flagsPanel.Controls.Add(chkPrerelease);
+        aiLayout.Controls.Add(flagsPanel, 1, 6);
+
         // GitHub Token (password input) + Test button
         var tokenLayout = new TableLayoutPanel
         {
@@ -1139,8 +1159,8 @@ public partial class MainForm : Form
         tokenLayout.Controls.Add(txtGhToken, 1, 0);
         tokenLayout.Controls.Add(btnTestToken, 2, 0);
 
-        aiLayout.Controls.Add(new Label { Text = "", AutoSize = true }, 0, 6); // spacer
-        aiLayout.Controls.Add(tokenLayout, 1, 6);
+        aiLayout.Controls.Add(new Label { Text = "", AutoSize = true }, 0, 7); // spacer
+        aiLayout.Controls.Add(tokenLayout, 1, 7);
 
         // Load current config into inputs
         void LoadPublishInputs()
@@ -1155,6 +1175,8 @@ public partial class MainForm : Form
             txtGhOwner.Text = cfg.Owner;
             txtGhRepo.Text = cfg.Repo;
             txtGhToken.Text = cfg.Token;
+            chkDraft.Checked = cfg.Draft;
+            chkPrerelease.Checked = cfg.Prerelease;
         }
         _txtRepoRoot.TextChanged += (s, e) => LoadPublishInputs();
         // Re-read on first paint
@@ -1931,6 +1953,7 @@ public partial class MainForm : Form
 
         AppendConsole("--- AI Release Summary ---", "info");
         AppendConsole($"Target: {record.PackageName}  ({record.Version})", "info");
+        publishConfig.ReleaseBody = "";
 
         var manifestPath = Path.ChangeExtension(record.ZipPath, ".json");
         if (!File.Exists(manifestPath))
@@ -1942,6 +1965,12 @@ public partial class MainForm : Form
 
         var evaluationPath = Path.Combine(repoRoot, "artifacts", "reports",
             $"{record.PackageName}-change-evaluation.md");
+        evaluationPath = ChangeEvaluator.Evaluate(
+            repoRoot,
+            record.PackageName,
+            record.Version ?? "?",
+            manifestPath,
+            publishConfig.Changelog) ?? evaluationPath;
 
         try
         {
@@ -1958,6 +1987,11 @@ public partial class MainForm : Form
             if (string.IsNullOrWhiteSpace(body))
             {
                 AppendConsole("AI returned an empty summary. Check endpoint / key.", "warning");
+                return;
+            }
+            if (!BodyMentionsVersion(body, record.Version ?? ""))
+            {
+                AppendConsole($"AI summary did not mention current version {record.Version}; discarded to avoid stale release notes.", "warning");
                 return;
             }
 
@@ -2022,6 +2056,16 @@ public partial class MainForm : Form
         }
 
         var publishConfig = PublishConfig.Load(repoRoot);
+        if (!string.IsNullOrWhiteSpace(publishConfig.ReleaseBody))
+        {
+            var selectedVersions = records.Select(r => r.Version ?? "").Where(v => !string.IsNullOrWhiteSpace(v)).Distinct().ToList();
+            if (selectedVersions.Count != 1 || !BodyMentionsVersion(publishConfig.ReleaseBody, selectedVersions[0]))
+            {
+                AppendConsole("Saved release body belongs to another version; clearing it before publish.", "warning");
+                publishConfig.ReleaseBody = "";
+                publishConfig.Save(repoRoot);
+            }
+        }
 
         // Resolve manifest + evaluation paths for every record
         var manifestByRecord = new Dictionary<BuildRecord, string>();
@@ -2051,6 +2095,8 @@ public partial class MainForm : Form
         askText.AppendLine("Publish the following builds to a single GitHub Release?");
         askText.AppendLine();
         askText.AppendLine($"  Repo:    {publishConfig.Owner}/{publishConfig.Repo}");
+        askText.AppendLine($"  Draft:   {(publishConfig.Draft ? "YES (not published)" : "NO (published immediately)")}");
+        askText.AppendLine($"  Pre-release: {(publishConfig.Prerelease ? "YES" : "NO")}");
         if (versions.Count == 1)
         {
             var tag = string.IsNullOrEmpty(publishConfig.ReleaseTag)
@@ -2117,6 +2163,14 @@ public partial class MainForm : Form
             MessageBox.Show(ex.Message, "Publish Error",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private static bool BodyMentionsVersion(string body, string version)
+    {
+        if (string.IsNullOrWhiteSpace(body) || string.IsNullOrWhiteSpace(version))
+            return false;
+        return body.Contains(version, StringComparison.OrdinalIgnoreCase) ||
+               body.Contains($"v{version}", StringComparison.OrdinalIgnoreCase);
     }
 
     private void LaunchSelectedBuild()

@@ -70,6 +70,8 @@
 #include "scene/gui/split_container.h"
 #include "scene/gui/tab_container.h"
 #include "scene/gui/text_edit.h"
+#include "scene/main/scene_tree.h"
+#include "scene/main/window.h"
 #include "scene/main/http_request.h"
 #include "scene/main/timer.h"
 #include "scene/resources/style_box_flat.h"
@@ -93,6 +95,20 @@ static Ref<StyleBoxFlat> _ai_chat_make_panel_style(const Color &p_bg, const Colo
 	style->set_border_width_all(1);
 	style->set_border_color(p_border);
 	style->set_content_margin_all(p_margin * EDSCALE);
+	return style;
+}
+
+static Ref<StyleBoxFlat> _ai_chat_make_button_style(const Color &p_bg, const Color &p_border, float p_radius = 8.0f) {
+	Ref<StyleBoxFlat> style;
+	style.instantiate();
+	style->set_bg_color(p_bg);
+	style->set_corner_radius_all(p_radius * EDSCALE);
+	style->set_border_width_all(1);
+	style->set_border_color(p_border);
+	style->set_content_margin(SIDE_LEFT, 12 * EDSCALE);
+	style->set_content_margin(SIDE_RIGHT, 12 * EDSCALE);
+	style->set_content_margin(SIDE_TOP, 7 * EDSCALE);
+	style->set_content_margin(SIDE_BOTTOM, 7 * EDSCALE);
 	return style;
 }
 
@@ -304,6 +320,7 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 	}
 
 	_apply_tool_limit_options_state(p_conv);
+	_update_auto_chat_display_scale();
 }
 
 void AIChatPanel::_select_conversation(const String &p_id) {
@@ -524,32 +541,83 @@ void AIChatPanel::_load_all_conversations() {
 void AIChatPanel::_notification(int p_what) {
 	if (p_what == NOTIFICATION_READY) {
 		callable_mp(this, &AIChatPanel::_update_mode_indicator).call_deferred();
+		Window *root_window = get_tree() ? get_tree()->get_root() : nullptr;
+		if (root_window && !root_window->is_connected(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped))) {
+			root_window->connect(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped));
+		}
 	}
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
+	}
+	if (p_what == NOTIFICATION_RESIZED) {
+		_update_auto_chat_display_scale();
 	}
 	if (p_what == NOTIFICATION_THEME_CHANGED) {
 		Color base = get_theme_color(SNAME("base_color"), SNAME("Editor"));
 		Color dark = get_theme_color(SNAME("dark_color_1"), SNAME("Editor"));
 		Color accent = get_theme_color(SNAME("accent_color"), SNAME("Editor"));
 		Color font = get_theme_color(SNAME("font_color"), SNAME("Editor"));
+		Color muted_font = font * Color(1, 1, 1, 0.62f);
+		Color sidebar_bg = dark.darkened(0.14f);
+		Color surface_bg = base.darkened(0.055f);
+		Color composer_bg = base.lightened(0.025f);
+		Color subtle_border = base.lightened(0.10f);
 
 		if (sidebar_panel) {
-			sidebar_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(dark.darkened(0.08f), base.lightened(0.08f), 8.0f, 10.0f));
+			sidebar_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(sidebar_bg, subtle_border, 0.0f, 12.0f));
 		}
 		if (chat_surface_panel) {
-			chat_surface_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(base.darkened(0.03f), base.lightened(0.06f), 8.0f, 0.0f));
+			chat_surface_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(surface_bg, surface_bg, 0.0f, 0.0f));
 		}
 		if (composer_panel) {
-			composer_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(base.lightened(0.04f), accent * Color(1, 1, 1, 0.35f), 8.0f, 10.0f));
+			composer_panel->add_theme_style_override(SNAME("panel"), _ai_chat_make_panel_style(composer_bg, subtle_border, 14.0f, 12.0f));
 		}
 		if (input) {
-			Ref<StyleBoxFlat> input_style = _ai_chat_make_panel_style(base.darkened(0.02f), base.lightened(0.12f), 8.0f, 8.0f);
+			Ref<StyleBoxFlat> input_style = _ai_chat_make_panel_style(composer_bg, composer_bg, 10.0f, 8.0f);
 			input->add_theme_style_override(CoreStringName(normal), input_style);
 			input->add_theme_color_override(SNAME("font_color"), font);
 		}
+		if (conversation_list) {
+			conversation_list->add_theme_color_override(SNAME("font_color"), muted_font);
+			conversation_list->add_theme_color_override(SNAME("font_selected_color"), font);
+			conversation_list->add_theme_color_override(SNAME("guide_color"), Color(0, 0, 0, 0));
+		}
+		if (new_conversation_button) {
+			Ref<StyleBoxFlat> normal = _ai_chat_make_button_style(Color(0, 0, 0, 0), subtle_border, 8.0f);
+			Ref<StyleBoxFlat> hover = _ai_chat_make_button_style(base.lightened(0.035f), subtle_border, 8.0f);
+			new_conversation_button->add_theme_style_override(SNAME("normal"), normal);
+			new_conversation_button->add_theme_style_override(SNAME("hover"), hover);
+			new_conversation_button->add_theme_color_override(SNAME("font_color"), font);
+		}
+		if (delete_conversation_button) {
+			delete_conversation_button->add_theme_color_override(SNAME("font_color"), muted_font);
+		}
+		if (send_button) {
+			Ref<StyleBoxFlat> send_normal = _ai_chat_make_button_style(accent, accent, 10.0f);
+			Ref<StyleBoxFlat> send_hover = _ai_chat_make_button_style(accent.lightened(0.08f), accent.lightened(0.08f), 10.0f);
+			send_button->add_theme_style_override(SNAME("normal"), send_normal);
+			send_button->add_theme_style_override(SNAME("hover"), send_hover);
+			send_button->add_theme_color_override(SNAME("font_color"), Color(1, 1, 1));
+		}
+		if (add_file_menu) {
+			add_file_menu->add_theme_color_override(SNAME("font_color"), muted_font);
+		}
+		if (clear_button) {
+			clear_button->add_theme_color_override(SNAME("font_color"), muted_font);
+		}
+		if (cancel_button) {
+			cancel_button->add_theme_color_override(SNAME("font_color"), muted_font);
+		}
+		if (status_label) {
+			status_label->add_theme_color_override(SNAME("font_color"), muted_font);
+		}
+		_update_auto_chat_display_scale();
 	}
 	if (p_what == NOTIFICATION_PREDELETE) {
+		Window *root_window = get_tree() ? get_tree()->get_root() : nullptr;
+		if (root_window && root_window->is_connected(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped))) {
+			root_window->disconnect(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped));
+		}
 		if (tool_execution_thread.is_started()) {
 			tool_execution_thread.wait_to_finish();
 		}
@@ -614,7 +682,7 @@ void AIChatPanel::_switch_to_engine() {
 	s.context_mode = AIContextMode::ENGINE;
 	AISettings::save(s);
 	_update_mode_indicator();
-	status_label->set_text(TTR("Switched to ENGINE mode �?engine source mode."));
+	status_label->set_text(TTR("Switched to ENGINE mode: engine source context."));
 }
 
 void AIChatPanel::_switch_to_project() {
@@ -622,7 +690,7 @@ void AIChatPanel::_switch_to_project() {
 	s.context_mode = AIContextMode::PROJECT;
 	AISettings::save(s);
 	_update_mode_indicator();
-	status_label->set_text(TTR("Switched to PROJECT mode �?game project mode."));
+	status_label->set_text(TTR("Switched to PROJECT mode: game project context."));
 }
 
 void AIChatPanel::_update_mode_indicator() {
@@ -645,7 +713,7 @@ void AIChatPanel::_update_mode_indicator() {
 
 void AIChatPanel::_update_translations() {
 	set_name(TTRC("Chat"));
-	input->set_placeholder(TTR("Input message / drop files here"));
+	input->set_placeholder(TTR("Message Jundot AI..."));
 	add_file_menu->set_text(TTR("+"));
 	add_file_menu->set_tooltip_text(TTR("Attach or reference a text file"));
 	PopupMenu *file_popup = add_file_menu->get_popup();
@@ -653,6 +721,7 @@ void AIChatPanel::_update_translations() {
 	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_UPLOAD_TEXT), TTR("Upload Text File"));
 	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_IMPORT), TTR("Import Skill / MCP / Memory..."));
 	clear_button->set_text(TTR("Clear"));
+	clear_button->set_tooltip_text(TTR("Clear input and attachments"));
 	cancel_button->set_text(TTR("Cancel"));
 	send_button->set_text(TTR("Send"));
 	if (tool_limit_toggle_button) {
@@ -684,7 +753,7 @@ void AIChatPanel::_update_translations() {
 	add_all_button->set_text(TTR("Add All"));
 	dismiss_all_button->set_text(TTR("Dismiss All"));
 	if (new_conversation_button) {
-		new_conversation_button->set_text(TTR("New Chat"));
+		new_conversation_button->set_text(TTR("+ New Chat"));
 	}
 	if (delete_conversation_button) {
 		delete_conversation_button->set_text(TTR("Delete"));
@@ -964,6 +1033,7 @@ void AIChatPanel::_dismiss_tool_limit_options() {
 void AIChatPanel::_add_user_message(const String &p_text) {
 	AIChatMessage *message = memnew(AIChatMessage);
 	message->setup_user(p_text);
+	message->set_display_scale(chat_display_scale);
 	message_list->add_child(message);
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
@@ -972,6 +1042,7 @@ void AIChatPanel::_add_ai_message(const String &p_content, const String &p_think
 	AIChatMessage *message = memnew(AIChatMessage);
 	message->setup_ai(p_content, p_think_content, p_think_time, p_prompt_tokens, p_completion_tokens);
 	message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
+	message->set_display_scale(chat_display_scale);
 	message_list->add_child(message);
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
@@ -1031,6 +1102,55 @@ void AIChatPanel::_project_file_selected(const String &p_path) {
 
 void AIChatPanel::_external_file_selected(const String &p_path) {
 	_add_attachment(p_path, true);
+}
+
+void AIChatPanel::_add_dropped_files(const Vector<String> &p_files) {
+	int added = 0;
+	for (const String &path : p_files) {
+		const bool external = !path.begins_with("res://");
+		const int before = attachments.size();
+		_add_attachment(path, external);
+		if (attachments.size() > before) {
+			added++;
+		}
+	}
+	if (added > 1) {
+		status_label->set_text(vformat(TTR("Attached %d files."), added));
+	}
+}
+
+void AIChatPanel::_window_files_dropped(const Vector<String> &p_files) {
+	if (!is_visible_in_tree() || !composer_panel || !input) {
+		return;
+	}
+	const Vector2 mouse_pos = get_global_mouse_position();
+	if (!composer_panel->get_global_rect().has_point(mouse_pos) && !input->get_global_rect().has_point(mouse_pos)) {
+		return;
+	}
+	_add_dropped_files(p_files);
+	input->grab_focus();
+}
+
+bool AIChatPanel::_can_drop_files_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const {
+	if (p_data.get_type() != Variant::DICTIONARY) {
+		return false;
+	}
+	const Dictionary d = p_data;
+	if (!d.has("type") || String(d["type"]) != "files" || !d.has("files")) {
+		return false;
+	}
+	Vector<String> files = d["files"];
+	return !files.is_empty();
+}
+
+void AIChatPanel::_drop_files_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) {
+	if (!_can_drop_files_fw(p_point, p_data, p_from)) {
+		return;
+	}
+	const Dictionary d = p_data;
+	Vector<String> files = d["files"];
+	_add_dropped_files(files);
+	input->grab_focus();
 }
 
 void AIChatPanel::_add_attachment(const String &p_path, bool p_external) {
@@ -1107,6 +1227,37 @@ String AIChatPanel::_build_attachment_context() const {
 		context += "\n```";
 	}
 	return context;
+}
+
+void AIChatPanel::_set_chat_display_scale(float p_scale) {
+	chat_display_scale = CLAMP(p_scale, 0.78f, 1.05f);
+	if (input) {
+		input->add_theme_font_size_override(SceneStringName(font_size), Math::round(14 * chat_display_scale * EDSCALE));
+	}
+	if (!message_list) {
+		return;
+	}
+	for (int i = 0; i < message_list->get_child_count(); i++) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (msg) {
+			msg->set_display_scale(chat_display_scale);
+		}
+	}
+}
+
+void AIChatPanel::_update_auto_chat_display_scale() {
+	float width = chat_surface_panel ? chat_surface_panel->get_size().x : get_size().x;
+	float scale = 0.92f;
+	if (width > 1100 * EDSCALE) {
+		scale = 1.0f;
+	} else if (width > 850 * EDSCALE) {
+		scale = 0.96f;
+	} else if (width < 560 * EDSCALE) {
+		scale = 0.82f;
+	} else if (width < 700 * EDSCALE) {
+		scale = 0.88f;
+	}
+	_set_chat_display_scale(scale);
 }
 
 void AIChatPanel::_send_message() {
@@ -1380,6 +1531,7 @@ void AIChatPanel::_summary_completed(const String &p_summary_text) {
 void AIChatPanel::_add_summary_message(const String &p_content) {
 	AIChatMessage *message = memnew(AIChatMessage);
 	message->setup_summary(p_content);
+	message->set_display_scale(chat_display_scale);
 	// Insert at the beginning of the message list, after any existing summaries.
 	int insert_pos = 0;
 	for (int i = 0; i < message_list->get_child_count(); i++) {
@@ -1508,6 +1660,14 @@ void AIChatPanel::_cancel_request() {
 	_set_requesting(false);
 }
 
+void AIChatPanel::_clear_input() {
+	input->clear();
+	attachments.clear();
+	_refresh_attachment_chips();
+	input->grab_focus();
+	status_label->set_text(TTR("Input cleared."));
+}
+
 void AIChatPanel::_clear_messages() {
 	_stop_build_status_poll();
 
@@ -1557,6 +1717,7 @@ void AIChatPanel::_chat_stream_data(const String &p_delta, const String &p_full_
 		streaming_message = memnew(AIChatMessage);
 		streaming_message->setup_ai(p_full_content, String(), 0.0, 0, p_completion_tokens);
 		streaming_message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
+		streaming_message->set_display_scale(chat_display_scale);
 		message_list->add_child(streaming_message);
 	} else {
 		streaming_message->set_markdown_content(p_full_content);
@@ -1944,6 +2105,9 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		AIChatParser::parse_task_plans(p_content, task_plans);
 		Vector<String> generated_next_questions;
 		AIChatParser::parse_next_questions(p_content, generated_next_questions);
+		if (generated_next_questions.is_empty() && _looks_like_tool_preamble(p_content)) {
+			generated_next_questions.push_back(TTR("Please continue from where you stopped, using function calling tools to perform the next concrete step."));
+		}
 
 		String final_content = _strip_text_tool_call_blocks(AIChatParser::strip_next_question_blocks(AIChatParser::strip_task_plan_blocks(p_content)));
 		if (final_content.is_empty() && p_content.find("<tool_call") != -1) {
@@ -2031,7 +2195,18 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 	if (error_text.is_empty()) {
 		error_text = vformat(TTR("AI request failed. HTTP %d."), p_response_code);
 	}
+	if (!p_raw_body.strip_edges().is_empty() && !error_text.contains(p_raw_body.strip_edges())) {
+		String raw_preview = p_raw_body.strip_edges();
+		if (raw_preview.length() > 1000) {
+			raw_preview = raw_preview.substr(0, 1000) + "...";
+		}
+		error_text += "\n\n" + raw_preview;
+	}
 	_add_ai_message(error_text, String(), 0.0, 0, 0);
+	Vector<String> retry_options;
+	retry_options.push_back(TTR("Please continue from where you stopped, using function calling tools to perform the next concrete step."));
+	_set_next_question_options(retry_options, false);
+	_show_tool_limit_options(false);
 	_serialize_current_messages();
 	_refresh_conversation_list_ui();
 	_save_all_conversations();
@@ -2786,38 +2961,39 @@ void AIChatPanel::_clear_repair_cards() {
 
 AIChatPanel::AIChatPanel() {
 	set_name(TTRC("Chat"));
-	add_theme_constant_override("margin_left", 6 * EDSCALE);
-	add_theme_constant_override("margin_top", 6 * EDSCALE);
-	add_theme_constant_override("margin_right", 6 * EDSCALE);
-	add_theme_constant_override("margin_bottom", 6 * EDSCALE);
+	add_theme_constant_override("margin_left", 0);
+	add_theme_constant_override("margin_top", 0);
+	add_theme_constant_override("margin_right", 0);
+	add_theme_constant_override("margin_bottom", 0);
 
 	VBoxContainer *root = memnew(VBoxContainer);
 	root->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	root->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	root->add_theme_constant_override("separation", 8 * EDSCALE);
+	root->add_theme_constant_override("separation", 0);
 	add_child(root);
 
-	// Top-level horizontal layout: conversation sidebar + chat area.
-	HBoxContainer *hbox = memnew(HBoxContainer);
-	hbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	hbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	hbox->add_theme_constant_override("separation", 6 * EDSCALE);
-	root->add_child(hbox);
+	// Top-level split layout: conversation sidebar + chat area.
+	HSplitContainer *split = memnew(HSplitContainer);
+	split->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	split->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	split->set_split_offset(218 * EDSCALE);
+	split->set_touch_dragger_enabled(true);
+	root->add_child(split);
 
 	// Sidebar with conversation list.
 	sidebar_panel = memnew(PanelContainer);
-	sidebar_panel->set_custom_minimum_size(Size2(208 * EDSCALE, 0));
-	hbox->add_child(sidebar_panel);
+	sidebar_panel->set_custom_minimum_size(Size2(190 * EDSCALE, 0));
+	split->add_child(sidebar_panel);
 
 	sidebar = memnew(VBoxContainer);
 	sidebar->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	sidebar->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	sidebar->add_theme_constant_override("separation", 6 * EDSCALE);
+	sidebar->add_theme_constant_override("separation", 10 * EDSCALE);
 	sidebar_panel->add_child(sidebar);
 
 	Label *sidebar_title = memnew(Label);
-	sidebar_title->set_text(TTR("Conversations"));
-	sidebar_title->add_theme_font_size_override("font_size", 14 * EDSCALE);
+	sidebar_title->set_text(TTR("Jundot AI"));
+	sidebar_title->add_theme_font_size_override("font_size", 16 * EDSCALE);
 	sidebar_title->add_theme_color_override("font_color", Color(0.75f, 0.75f, 0.75f));
 	sidebar->add_child(sidebar_title);
 
@@ -2840,26 +3016,62 @@ AIChatPanel::AIChatPanel() {
 	conversation_list->set_auto_height(false);
 	conversation_list->set_fixed_icon_size(Size2(0, 0));
 	conversation_list->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	conversation_list->set_allow_reselect(true);
 	conversation_list->connect("item_selected", callable_mp(this, &AIChatPanel::_conversation_selected));
 	sidebar->add_child(conversation_list);
 
 	chat_surface_panel = memnew(PanelContainer);
 	chat_surface_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	chat_surface_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	hbox->add_child(chat_surface_panel);
+	chat_surface_panel->set_custom_minimum_size(Size2(420 * EDSCALE, 0));
+	split->add_child(chat_surface_panel);
 
 	// Chat area (the right side) reuses most of the original root layout.
 	VBoxContainer *chat_vbox = memnew(VBoxContainer);
 	chat_vbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	chat_vbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	chat_vbox->add_theme_constant_override("separation", 6 * EDSCALE);
+	chat_vbox->add_theme_constant_override("separation", 0);
 	chat_surface_panel->add_child(chat_vbox);
+
+	MarginContainer *top_bar_margin = memnew(MarginContainer);
+	top_bar_margin->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	top_bar_margin->add_theme_constant_override("margin_left", 16 * EDSCALE);
+	top_bar_margin->add_theme_constant_override("margin_right", 16 * EDSCALE);
+	top_bar_margin->add_theme_constant_override("margin_top", 6 * EDSCALE);
+	top_bar_margin->add_theme_constant_override("margin_bottom", 4 * EDSCALE);
+	chat_vbox->add_child(top_bar_margin);
+
+	HBoxContainer *top_bar = memnew(HBoxContainer);
+	top_bar->set_custom_minimum_size(Size2(0, 46) * EDSCALE);
+	top_bar->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	top_bar->add_theme_constant_override("separation", 8 * EDSCALE);
+	top_bar_margin->add_child(top_bar);
+
+	VBoxContainer *title_box = memnew(VBoxContainer);
+	title_box->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
+	title_box->add_theme_constant_override("separation", 0);
+	top_bar->add_child(title_box);
+
+	Label *title_label = memnew(Label);
+	title_label->set_text(TTR("AI Assistant"));
+	title_label->add_theme_font_size_override("font_size", 16 * EDSCALE);
+	title_box->add_child(title_label);
+
+	Label *subtitle_label = memnew(Label);
+	subtitle_label->set_text(TTR("Chat, inspect code, run tools"));
+	subtitle_label->add_theme_font_size_override("font_size", 11 * EDSCALE);
+	subtitle_label->set_modulate(Color(1, 1, 1, 0.62f));
+	title_box->add_child(subtitle_label);
+
+	Control *top_spacer = memnew(Control);
+	top_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	top_bar->add_child(top_spacer);
 
 	// Mode switching bar (ENGINE / PROJECT)
 	mode_bar = memnew(HBoxContainer);
-	mode_bar->set_custom_minimum_size(Size2(0, 34) * EDSCALE);
+	mode_bar->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
 	mode_bar->add_theme_constant_override("separation", 6 * EDSCALE);
-	chat_vbox->add_child(mode_bar);
+	top_bar->add_child(mode_bar);
 
 	engine_mode_btn = memnew(Button);
 	engine_mode_btn->set_flat(true);
@@ -2880,10 +3092,19 @@ AIChatPanel::AIChatPanel() {
 	message_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	chat_vbox->add_child(message_scroll);
 
+	MarginContainer *message_margin = memnew(MarginContainer);
+	message_margin->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	message_margin->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	message_margin->add_theme_constant_override("margin_left", 20 * EDSCALE);
+	message_margin->add_theme_constant_override("margin_right", 20 * EDSCALE);
+	message_margin->add_theme_constant_override("margin_top", 8 * EDSCALE);
+	message_margin->add_theme_constant_override("margin_bottom", 8 * EDSCALE);
+	message_scroll->add_child(message_margin);
+
 	message_list = memnew(VBoxContainer);
 	message_list->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	message_list->add_theme_constant_override("separation", 6 * EDSCALE);
-	message_scroll->add_child(message_list);
+	message_list->add_theme_constant_override("separation", 12 * EDSCALE);
+	message_margin->add_child(message_list);
 
 	// Bulk action bar
 	bulk_action_bar = memnew(HBoxContainer);
@@ -2964,10 +3185,18 @@ AIChatPanel::AIChatPanel() {
 	tool_limit_bottom_row->add_child(tool_limit_collapse_button);
 
 	// === Composer panel ===
+	MarginContainer *composer_outer = memnew(MarginContainer);
+	composer_outer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	composer_outer->add_theme_constant_override("margin_left", 20 * EDSCALE);
+	composer_outer->add_theme_constant_override("margin_right", 20 * EDSCALE);
+	composer_outer->add_theme_constant_override("margin_top", 6 * EDSCALE);
+	composer_outer->add_theme_constant_override("margin_bottom", 10 * EDSCALE);
+	chat_vbox->add_child(composer_outer);
+
 	composer_panel = memnew(PanelContainer);
 	composer_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	composer_panel->set_custom_minimum_size(Size2(0, 150) * EDSCALE);
-	chat_vbox->add_child(composer_panel);
+	composer_panel->set_custom_minimum_size(Size2(0, 118) * EDSCALE);
+	composer_outer->add_child(composer_panel);
 
 	VBoxContainer *composer_vb = memnew(VBoxContainer);
 	composer_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
@@ -2983,8 +3212,9 @@ AIChatPanel::AIChatPanel() {
 	attachment_row->add_child(attachment_chips);
 
 	input = memnew(TextEdit);
-	input->set_custom_minimum_size(Size2(0, 74) * EDSCALE);
+	input->set_custom_minimum_size(Size2(0, 52) * EDSCALE);
 	input->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	input->set_drag_forwarding(Callable(), callable_mp(this, &AIChatPanel::_can_drop_files_fw).bind(input), callable_mp(this, &AIChatPanel::_drop_files_fw).bind(input));
 	composer_vb->add_child(input);
 
 	HBoxContainer *actions = memnew(HBoxContainer);
@@ -3001,7 +3231,8 @@ AIChatPanel::AIChatPanel() {
 
 	clear_button = memnew(Button);
 	clear_button->set_flat(true);
-	clear_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_clear_messages));
+	clear_button->set_tooltip_text(TTR("Clear input and attachments"));
+	clear_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_clear_input));
 	actions->add_child(clear_button);
 
 	Control *spacer = memnew(Control);
@@ -3014,6 +3245,7 @@ AIChatPanel::AIChatPanel() {
 	actions->add_child(cancel_button);
 
 	send_button = memnew(Button);
+	send_button->set_flat(false);
 	send_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_send_message));
 	actions->add_child(send_button);
 
@@ -3078,5 +3310,6 @@ AIChatPanel::AIChatPanel() {
 		_refresh_conversation_list_ui();
 	}
 	_set_requesting(false);
+	_update_auto_chat_display_scale();
 	status_label->set_text(TTR("AI assistant ready."));
 }

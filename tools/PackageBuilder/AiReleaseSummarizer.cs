@@ -138,12 +138,16 @@ public class AiReleaseSummarizer
 
         sb.AppendLine("You are the release notes writer for the Jundot engine (a Godot Engine fork).");
         sb.AppendLine("Based on the data below, produce a concise, well-structured GitHub Release body in English Markdown.");
+        sb.AppendLine("Write what changed compared with the previous version. Prioritize commit subjects and source changes over package metadata.");
+        sb.AppendLine("Do not invent features. Do not describe executable, zip, manifest, timestamp, hash, or package-size changes as product features.");
+        sb.AppendLine("If the only detected changes are packaging metadata or build artifacts, say that no user-facing engine changes were detected.");
         sb.AppendLine("");
         sb.AppendLine("## Target output structure");
         sb.AppendLine("- A title line like `Release vX.Y.Z`.");
-        sb.AppendLine("- `## What's Changed` section listing the meaningful changes.");
-        sb.AppendLine("- `## Highlights` section for the 2-3 most important items.");
-        sb.AppendLine("- `## Full Changelog` section with per-file summary or a link / note.");
+        sb.AppendLine("- `## What's Changed` section listing meaningful engine/editor/tool changes since the previous version.");
+        sb.AppendLine("- `## Highlights` section for the 2-3 most important user-facing items, or `No user-facing highlights detected`.");
+        sb.AppendLine("- `## Full Changelog` section with commit/file summaries from the source change evaluation.");
+        sb.AppendLine("- `## Packaging` section for package artifacts, platform, manifest, and build timestamp details.");
         sb.AppendLine("- If there is a risk summary, include it under `## Risk Notes`.");
         sb.AppendLine("Do NOT wrap your reply in prose outside the Markdown body — output Markdown only.");
         sb.AppendLine("");

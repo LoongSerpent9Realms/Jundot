@@ -134,34 +134,55 @@ public class GitHubReleasePublisher
         try
         {
             // ── Step 0: Generate AI summary ONCE using combined context ──
+            var firstPkg = list[0];
+            if (!string.IsNullOrWhiteSpace(_config.ReleaseBody) &&
+                !ReleaseBodyMatchesVersion(_config.ReleaseBody, firstPkg.Version))
+            {
+                LogInfo($"Ignoring stale saved release body because it does not mention version {firstPkg.Version}.");
+                _config.ReleaseBody = "";
+            }
+
             string? aiBody = aiOverrideBody;
+            if (!string.IsNullOrWhiteSpace(aiBody) && !ReleaseBodyMatchesVersion(aiBody, firstPkg.Version))
+            {
+                LogInfo($"Ignoring override release body because it does not mention version {firstPkg.Version}.");
+                aiBody = null;
+            }
+
             if (string.IsNullOrEmpty(aiBody) && _config.UseAiSummary)
             {
                 LogInfo($"Generating AI release summary for {list.Count} package(s)...");
 
-                var first = list[0];
                 var combinedPackageNames = string.Join(", ", list.Select(p => p.PackageName));
+                var changeEvaluationPath = EnsureChangeEvaluationReport(firstPkg, forceRegenerate: true);
 
-                // Prefer the first package's change evaluation / manifest as input to the AI
+                // Prefer the first package's change evaluation / manifest as input to the AI.
                 var summarizer = new AiReleaseSummarizer(_config);
                 summarizer.LogMessage += (s, e) => LogInfo(e);
 
                 aiBody = await summarizer.SummarizeAsync(
-                    first.Version,
+                    firstPkg.Version,
                     combinedPackageNames,
-                    first.ChangeEvaluationPath ?? "",
-                    first.ManifestPath,
+                    changeEvaluationPath,
+                    firstPkg.ManifestPath,
                     _config.Changelog ?? "",
                     ct);
 
-                if (!string.IsNullOrEmpty(aiBody))
+                if (!string.IsNullOrEmpty(aiBody) && ReleaseBodyMatchesVersion(aiBody, firstPkg.Version))
                 {
                     _config.ReleaseBody = aiBody;
                     LogInfo("Release body updated with AI summary.");
                 }
+                else if (!string.IsNullOrEmpty(aiBody))
+                {
+                    LogInfo($"AI summary did not mention version {firstPkg.Version}; discarding it to avoid publishing stale notes.");
+                    aiBody = null;
+                    _config.ReleaseBody = "";
+                }
                 else
                 {
-                    LogInfo("AI summary unavailable; using existing release body.");
+                    LogInfo("AI summary unavailable; using generated fallback release body.");
+                    _config.ReleaseBody = BuildFallbackReleaseBody(firstPkg.Version, list);
                 }
             }
             else if (!string.IsNullOrEmpty(aiBody))
@@ -170,7 +191,6 @@ public class GitHubReleasePublisher
             }
 
             // ── Step 1: Find or create the shared release ──
-            var firstPkg = list[0];
             var releaseTag = string.IsNullOrEmpty(_config.ReleaseTag)
                 ? $"v{firstPkg.Version}"
                 : _config.ReleaseTag;
@@ -180,6 +200,7 @@ public class GitHubReleasePublisher
                 : _config.ReleaseName;
 
             LogInfo($"Publishing {list.Count} package(s) to GitHub Releases (tag: {releaseTag})...");
+            LogInfo($"Release flags: draft={_config.Draft}, prerelease={_config.Prerelease}, make_latest=github-default");
 
             var release = await FindOrCreateReleaseAsync(releaseTag, releaseName, ct);
             if (release == null)
@@ -464,7 +485,10 @@ public class GitHubReleasePublisher
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<GitHubRelease>(json);
+                var existing = JsonSerializer.Deserialize<GitHubRelease>(json);
+                if (existing != null)
+                    await UpdateReleaseAsync(existing.Id, name, ct);
+                return existing;
             }
         }
         catch
@@ -504,6 +528,37 @@ public class GitHubReleasePublisher
 
         var createJson = await createResponse.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<GitHubRelease>(createJson);
+    }
+
+    private async Task UpdateReleaseAsync(long releaseId, string name, CancellationToken ct)
+    {
+        var body = _config.ReleaseBody;
+        if (string.IsNullOrEmpty(body))
+            body = $"Automated build of Jundot {name}.";
+
+        var payload = new
+        {
+            name,
+            body,
+            draft = _config.Draft,
+            prerelease = _config.Prerelease
+        };
+
+        var content = new StringContent(
+            JsonSerializer.Serialize(payload),
+            Encoding.UTF8,
+            "application/json");
+
+        var url = $"https://api.github.com/repos/{_config.Owner}/{_config.Repo}/releases/{releaseId}";
+        var response = await _http.PatchAsync(url, content, ct);
+        if (response.IsSuccessStatusCode)
+        {
+            LogInfo($"Release metadata synchronized. Draft: {_config.Draft}, prerelease: {_config.Prerelease}, make_latest=github-default");
+            return;
+        }
+
+        var errorBody = await response.Content.ReadAsStringAsync(ct);
+        LogInfo($"Could not update existing release metadata (HTTP {(int)response.StatusCode}). If it is already published, GitHub may not allow converting it back to draft. {errorBody}");
     }
 
     private async Task<string?> UploadAssetAsync(
@@ -698,6 +753,51 @@ public class GitHubReleasePublisher
         >= 1024      => $"{bytes / 1024.0:F1} KB",
         _            => $"{bytes} B"
     };
+
+    private string EnsureChangeEvaluationReport(
+        (string PackageName, string Version, string ZipPath, string ManifestPath, string Platform, string Arch, string ChangeEvaluationPath) package,
+        bool forceRegenerate = false)
+    {
+        if (!forceRegenerate && !string.IsNullOrWhiteSpace(package.ChangeEvaluationPath) && File.Exists(package.ChangeEvaluationPath))
+            return package.ChangeEvaluationPath;
+
+        LogInfo(forceRegenerate
+            ? "Regenerating change evaluation report for current build..."
+            : "Change evaluation report missing; generating source comparison for AI release notes...");
+        var generated = ChangeEvaluator.Evaluate(
+            _repoRoot,
+            package.PackageName,
+            package.Version,
+            package.ManifestPath,
+            _config.Changelog);
+
+        return generated ?? package.ChangeEvaluationPath ?? "";
+    }
+
+    private static bool ReleaseBodyMatchesVersion(string body, string version)
+    {
+        if (string.IsNullOrWhiteSpace(body) || string.IsNullOrWhiteSpace(version))
+            return false;
+        return body.Contains(version, StringComparison.OrdinalIgnoreCase) ||
+               body.Contains($"v{version}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildFallbackReleaseBody(
+        string version,
+        IEnumerable<(string PackageName, string Version, string ZipPath, string ManifestPath, string Platform, string Arch, string ChangeEvaluationPath)> packages)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"# Release v{version}");
+        sb.AppendLine();
+        sb.AppendLine("## What's Changed");
+        sb.AppendLine("- AI release-note generation was unavailable, so no automatic source summary was produced.");
+        sb.AppendLine("- Review the attached build artifacts and generated change evaluation report before publishing.");
+        sb.AppendLine();
+        sb.AppendLine("## Packaging");
+        foreach (var p in packages)
+            sb.AppendLine($"- `{p.PackageName}` ({p.Platform}/{p.Arch})");
+        return sb.ToString().Trim();
+    }
 
     // ── GitHub API response models ──────────────────────────────
 

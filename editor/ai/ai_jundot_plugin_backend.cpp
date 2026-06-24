@@ -117,6 +117,28 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 	}
 
 	Dictionary root = parsed;
+	if (p_response_code >= HTTPClient::RESPONSE_BAD_REQUEST) {
+		String error_text;
+		Variant error_value = root.get("error", Variant());
+		if (error_value.get_type() == Variant::DICTIONARY) {
+			Dictionary error_dict = error_value;
+			error_text = error_dict.get("message", JSON::stringify(error_dict));
+		} else if (error_value.get_type() != Variant::NIL) {
+			error_text = String(error_value);
+		}
+		if (error_text.is_empty()) {
+			error_text = root.get("message", String());
+		}
+		if (error_text.is_empty()) {
+			error_text = body_text.strip_edges();
+		}
+		if (error_text.is_empty()) {
+			error_text = vformat("MiMoCode jundot plugin request failed. HTTP %d.", p_response_code);
+		}
+		_emit_completed(HTTPRequest::RESULT_SUCCESS, p_response_code, error_text, root, body_text, elapsed);
+		return;
+	}
+
 	String content = root.get("content", String());
 	Dictionary openai_compatible = root.get("openai_compatible", Dictionary());
 
@@ -246,8 +268,8 @@ void AIJundotPluginBackend::_send_pending_request() {
 		return;
 	}
 
-	Array messages = pending_messages;
-	Array tools = pending_tools;
+	Array messages = pending_messages.duplicate(true);
+	Array tools = pending_tools.duplicate(true);
 	pending_messages.clear();
 	pending_tools.clear();
 	pending_request = false;

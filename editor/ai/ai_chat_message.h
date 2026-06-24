@@ -91,6 +91,7 @@ public:
 	void set_content(const String &p_content);
 
 	void set_markdown_content(const String &p_content);
+	void set_display_scale(float p_scale);
 
 	AIChatMessage();
 };
