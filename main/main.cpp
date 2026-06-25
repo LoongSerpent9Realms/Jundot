@@ -2,8 +2,8 @@
 /*  main.cpp                                                              */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -5365,10 +5365,16 @@ void Main::cleanup(bool p_force) {
 	}
 
 	if (OS::get_singleton()->is_restart_on_exit_set()) {
-		//attempt to restart with arguments
+		// Attempt to restart with arguments. A custom executable path is used
+		// when switching from the running editor to a newly compiled build.
 		List<String> args = OS::get_singleton()->get_restart_on_exit_arguments();
-		OS::get_singleton()->create_instance(args);
-		OS::get_singleton()->set_restart_on_exit(false, List<String>()); //clear list (uses memory)
+		const String restart_executable = OS::get_singleton()->get_restart_executable_path();
+		if (!restart_executable.is_empty()) {
+			OS::get_singleton()->create_process(restart_executable, args);
+		} else {
+			OS::get_singleton()->create_instance(args);
+		}
+		OS::get_singleton()->set_restart_on_exit(false, List<String>()); // Clear list and custom executable path.
 	}
 
 	// Now should be safe to delete MessageQueue (famous last words).

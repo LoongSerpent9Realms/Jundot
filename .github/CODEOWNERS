@@ -286,6 +286,12 @@
 /thirdparty/                                  @jundotengine/buildsystem
 /thirdparty/jolt_physics/                     @jundotengine/buildsystem @jundotengine/jolt-physics
 
+# Downstream build and packaging tools
+
+/tools/PackageBuilder/                         @jundotengine/buildsystem
+/tools/Launcher/                               @jundotengine/buildsystem
+/scripts/package-jundot.ps1                    @jundotengine/buildsystem
+
 # Buildsystem (After everything to catch all)
 
 /*.*                                          @jundotengine/buildsystem

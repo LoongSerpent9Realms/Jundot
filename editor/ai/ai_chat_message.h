@@ -1,4 +1,4 @@
-/*  ai_chat_message.h                                                    */
+/*  ai_chat_message.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -88,9 +88,13 @@ public:
 	bool is_user_message() const { return is_user; }
 	bool is_summary_message() const { return is_summary; }
 	String get_content() const;
+	String get_think_content() const { return think_content; }
+	double get_think_time_seconds() const { return think_time_seconds; }
 	void set_content(const String &p_content);
+	void set_think_time_seconds(double p_seconds);
 
 	void set_markdown_content(const String &p_content);
+	void set_display_scale(float p_scale);
 
 	AIChatMessage();
 };

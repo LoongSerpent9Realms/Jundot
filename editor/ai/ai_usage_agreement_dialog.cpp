@@ -6,9 +6,8 @@
 
 #include "ai_usage_agreement_dialog.h"
 
-#include "ai_settings.h"
-
 #include "core/object/callable_mp.h"
+#include "editor/ai/ai_settings.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/check_box.h"
@@ -26,6 +25,8 @@ void AIUsageAgreementDialog::_bind_methods() {
 void AIUsageAgreementDialog::_notification(int p_what) {
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
+	} else if (p_what == NOTIFICATION_VISIBILITY_CHANGED && is_visible()) {
+		_reset_confirmation_state();
 	}
 }
 
@@ -52,6 +53,15 @@ void AIUsageAgreementDialog::_canceled() {
 
 void AIUsageAgreementDialog::_confirm_toggled(bool p_pressed) {
 	get_ok_button()->set_disabled(!p_pressed);
+}
+
+void AIUsageAgreementDialog::_reset_confirmation_state() {
+	if (confirm_check) {
+		confirm_check->set_pressed(false);
+	}
+	if (get_ok_button()) {
+		get_ok_button()->set_disabled(true);
+	}
 }
 
 void AIUsageAgreementDialog::_update_translations() {
@@ -90,5 +100,5 @@ AIUsageAgreementDialog::AIUsageAgreementDialog() {
 	connect(SNAME("canceled"), callable_mp(this, &AIUsageAgreementDialog::_canceled));
 
 	_update_translations();
-	get_ok_button()->set_disabled(true);
+	_reset_confirmation_state();
 }

@@ -6479,6 +6479,18 @@ msgstr "无法实例化选中的类。"
 msgid "Favorites:"
 msgstr "收藏："
 
+msgid "Quick Access:"
+msgstr "快捷访问："
+
+msgid "Desktop"
+msgstr "桌面"
+
+msgid "Downloads"
+msgstr "下载"
+
+msgid "Documents"
+msgstr "文档"
+
 msgid "Recent:"
 msgstr "最近使用："
 
@@ -21379,3 +21391,111 @@ msgstr "正在加密引擎源码缓存... %d / %d"
 
 msgid "Could not encrypt path: %s (Windows error %d)"
 msgstr "无法加密路径：%s（Windows 错误 %d）"
+
+msgid "AI Usage Agreement"
+msgstr "AI 使用协议"
+
+msgid "Using AI features sends your prompts, selected context, attachments, logs, test output, and generated analysis to the configured AI API provider. These requests consume API tokens. Adding project memories, tool context, files, logs, or automatic repair analysis can increase token usage, and multi-step defect analysis may trigger more than one request. You can cancel this agreement, disable automatic suggestions, or reset this consent from the AI Config panel. Actual billing is controlled by your API provider."
+msgstr "使用 AI 功能会将你的提示词、所选上下文、附件、日志、测试输出和生成的分析发送到已配置的 AI API 提供方。这些请求会消耗 API 令牌。加入项目记忆、工具上下文、文件、日志或自动修复分析会增加令牌消耗，多步骤缺陷分析也可能触发多次请求。你可以取消本协议、关闭自动建议，或在 AI 配置面板中重置此同意状态。实际计费由你的 API 提供方控制。"
+
+msgid "I understand that AI requests can consume additional API tokens."
+msgstr "我理解 AI 请求可能会消耗额外的 API 令牌。"
+
+msgid "I Agree"
+msgstr "我同意"
+
+msgid "Please review and accept the AI usage agreement before sending messages."
+msgstr "发送消息前，请先查看并同意 AI 使用协议。"
+
+msgid "Please check and accept the AI usage agreement before sending messages."
+msgstr "发送消息前，请勾选并同意 AI 使用协议。"
+
+msgid "AI usage agreement accepted. Send your message again to continue."
+msgstr "已同意 AI 使用协议。请再次发送消息以继续。"
+
+msgid "AI message was not sent because the usage agreement was not accepted."
+msgstr "尚未同意使用协议，AI 消息未发送。"
+
+msgid "View AI Usage Agreement"
+msgstr "查看 AI 使用协议"
+
+msgid "Reset Agreement Consent"
+msgstr "重置协议同意状态"
+
+msgid "AI usage agreement consent reset."
+msgstr "AI 使用协议同意状态已重置。"
+
+msgid "AI usage agreement consent could not be reset."
+msgstr "无法重置 AI 使用协议同意状态。"
+
+msgid "AI Backend"
+msgstr "AI 后端"
+
+msgid "jundot AI Plugin ID"
+msgstr "jundot AI 插件 ID"
+
+msgid "jundot AI Plugin URL"
+msgstr "jundot AI 插件 URL"
+
+msgid "jundot Plugin (MiMoCode)"
+msgstr "jundot 插件（MiMoCode）"
+
+msgid "Legacy OpenAI-Compatible"
+msgstr "旧版 OpenAI 兼容接口"
+
+msgid "Download MiMoCode"
+msgstr "下载 MiMoCode"
+
+msgid "Open the packaged MiMoCode jundot plugin download page."
+msgstr "打开打包版 MiMoCode jundot 插件下载页面。"
+
+msgid "System Language (Auto)"
+msgstr "系统语言（自动）"
+
+msgid "The AI response has finished. What would you like to do next?"
+msgstr "AI 回复已结束。接下来要怎么做？"
+
+msgid "Send Another Message"
+msgstr "发送另一条消息"
+
+msgid "Stop Here"
+msgstr "到此停止"
+
+msgid "Collapse"
+msgstr "折叠"
+
+msgid "Please continue from where you stopped."
+msgstr "请从刚才停止的地方继续。"
+
+msgid "AI returned a text tool call. Converting it to an executable tool call..."
+msgstr "AI 返回了文本形式的工具调用，正在转换为可执行工具调用..."
+
+msgid "AI returned a text tool call, but Function Calling tools are disabled. Enable tools in AI settings and try again."
+msgstr "AI 返回了文本形式的工具调用，但函数调用工具未启用。请在 AI 设置中启用工具后重试。"
+
+msgid "AI returned a text tool call, but no tools are available for the current mode."
+msgstr "AI 返回了文本形式的工具调用，但当前模式没有可用工具。"
+
+msgid "AI returned a text tool call, but it could not be parsed or the requested tool is not available. Please try again with a valid tool call."
+msgstr "AI 返回了文本形式的工具调用，但无法解析，或请求的工具不可用。请使用有效的工具调用重试。"
+
+msgid "\n\n[Tool calling did not run: the model returned normal text instead of a structured tool_calls response. Use a model or API endpoint that supports OpenAI-compatible function calling, and make sure Function Calling tools are enabled.]"
+msgstr "\n\n[工具调用未运行：模型返回的是普通文本，而不是结构化的 tool_calls 响应。请使用支持 OpenAI 兼容函数调用的模型或 API 端点，并确认已启用函数调用工具。]"
+
+msgid "Engine Mode"
+msgstr "引擎模式"
+
+msgid "Project Mode"
+msgstr "项目模式"
+
+msgid "You"
+msgstr "你"
+
+msgid "Processed"
+msgstr "已处理"
+
+msgid "Processed %dm %ds"
+msgstr "已处理 %d分 %d秒"
+
+msgid "Processed %.1fs"
+msgstr "已处理 %.1f秒"

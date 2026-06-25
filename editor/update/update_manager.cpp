@@ -1,11 +1,33 @@
 /**************************************************************************/
-/*  update_dialog.cpp                                                     */
+/*  update_manager.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             JunDot ENGINE                               */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
-/* Copyright (c) 2026-present JunDot Engine contributors . */
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
+
 #include "update_manager.h"
 
 #include "core/error/error_macros.h"
@@ -17,6 +39,7 @@
 #include "editor/editor_string_names.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
+#include "scene/main/timer.h"
 
 namespace {
 
@@ -44,10 +67,18 @@ String _get_user_channel() {
 	switch (mode) {
 		case 0: // DISABLED
 			return "disabled";
-		case 1: // AUTO — determine from current version status
-			return (String(JUNDOT_VERSION_STATUS) == "stable") ? "stable" : "beta";
+		case 1: { // AUTO - determine from current version status
+			const String status = String(JUNDOT_VERSION_STATUS).to_lower();
+			if (status == "stable") {
+				return "stable";
+			}
+			if (status == "beta" || status == "rc") {
+				return "beta";
+			}
+			return "dev";
+		}
 		case 2: // NEWEST_UNSTABLE
-			return "beta";
+			return "dev";
 		case 3: // NEWEST_STABLE
 			return "stable";
 		case 4: // NEWEST_PATCH
@@ -83,10 +114,17 @@ UpdateManager::UpdateManager() {
 	http->set_timeout(15.0);
 	add_child(http);
 	http->connect("request_completed", callable_mp(this, &UpdateManager::_http_request_completed));
+
+	launcher_poll_timer = memnew(Timer);
+	launcher_poll_timer->set_wait_time(0.25);
+	add_child(launcher_poll_timer);
+	launcher_poll_timer->connect("timeout", callable_mp(this, &UpdateManager::_poll_launcher_process));
 }
 
 void UpdateManager::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("update_check_completed", PropertyInfo(Variant::INT, "status")));
+	ADD_SIGNAL(MethodInfo("update_launcher_started"));
+	ADD_SIGNAL(MethodInfo("update_launcher_finished", PropertyInfo(Variant::INT, "exit_code")));
 }
 
 void UpdateManager::check_for_updates() {
@@ -141,6 +179,69 @@ void UpdateManager::_http_request_completed(int p_result, int p_response_code, c
 	if (!manifest.parse(json_str)) {
 		_set_check_status(CHECK_ERROR);
 		return;
+	}
+
+	// v1.1: if platform_downloads[] is present, replace the top-level
+	// download_url / package_size / sha256 / platform / arch with the
+	// entry that best matches the runtime OS + CPU architecture. This
+	// ensures users on Windows/Linux/macOS (and x86_64 vs arm64) always
+	// get the correct binary from a multi-architecture Release.
+	if (manifest.platform_downloads.size() > 0) {
+		String runtime_platform;
+		String runtime_arch;
+
+#if defined(WINDOWS_ENABLED) || defined(_WIN32) || defined(_WIN64)
+		runtime_platform = "windows";
+#elif defined(MACOS_ENABLED) || defined(__APPLE__)
+		runtime_platform = "macos";
+#elif defined(LINUX_ENABLED) || defined(__linux__)
+		runtime_platform = "linux";
+#elif defined(__FreeBSD__)
+		runtime_platform = "freebsd";
+#elif defined(__OpenBSD__)
+		runtime_platform = "openbsd";
+#else
+		runtime_platform = OS::get_singleton()->get_name().to_lower();
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm64__)
+		runtime_arch = "arm64";
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__x86_64)
+		runtime_arch = "x86_64";
+#elif defined(__i386__) || defined(_M_IX86)
+		runtime_arch = "x86";
+#else
+		// Fallback: inspect the OS executable path / info.
+		runtime_arch = "x86_64";
+#endif
+
+		PlatformDownload resolved;
+		if (manifest.resolve_platform_download(runtime_platform, runtime_arch, resolved)) {
+			// Only override if the resolved entry has non-empty values.
+			if (!resolved.download_url.is_empty()) {
+				manifest.download_url = resolved.download_url;
+			}
+			if (resolved.package_size > 0) {
+				manifest.package_size = resolved.package_size;
+			}
+			if (!resolved.sha256.is_empty()) {
+				manifest.sha256 = resolved.sha256;
+			}
+			if (!resolved.platform.is_empty()) {
+				manifest.platform = resolved.platform;
+			}
+			if (!resolved.arch.is_empty()) {
+				manifest.arch = resolved.arch;
+			}
+		} else {
+			// The manifest lists other platforms but not ours. Treat as
+			// "no update available for this platform" so the user doesn't
+			// get a (wrong) update notification.
+			WARN_PRINT(vformat("Update manifest has platform_downloads[] but no entry for %s-%s; suppressing update notification.",
+					runtime_platform, runtime_arch));
+			_set_check_status(CHECK_UP_TO_DATE);
+			return;
+		}
 	}
 
 	// Evaluate: should we notify?
@@ -216,6 +317,10 @@ String UpdateManager::find_launcher_path() {
 }
 
 int UpdateManager::trigger_launcher_update() {
+	if (launcher_pid != 0 && OS::get_singleton()->is_process_running(launcher_pid)) {
+		return int(launcher_pid);
+	}
+
 	String launcher = find_launcher_path();
 	if (launcher.is_empty()) {
 		WARN_PRINT("JundotLauncher.exe not found. Please build tools/Launcher/ first.");
@@ -227,26 +332,38 @@ int UpdateManager::trigger_launcher_update() {
 	List<String> args;
 	args.push_back("update");
 	args.push_back(vformat("--engine-path=%s", engine_dir));
+	args.push_back("--yes");
 
 	String channel = _get_user_channel();
 	if (channel != "stable" && channel != "disabled") {
 		args.push_back(vformat("--channel=%s", channel));
 	}
 
-	// execute() is synchronous — blocks until the launcher completes.
-	// The launcher handles download/install, then returns exit code.
-	int exitcode = -1;
-	Error err = OS::get_singleton()->execute(launcher, args, nullptr, &exitcode);
+	Error err = OS::get_singleton()->create_process(launcher, args, &launcher_pid, true);
 	if (err != OK) {
 		WARN_PRINT(vformat("Failed to launch JundotLauncher for update. Error: %d", err));
+		launcher_pid = 0;
 		return -1;
 	}
 
-	if (exitcode != 0) {
-		WARN_PRINT(vformat("JundotLauncher exited with code %d.", exitcode));
+	launcher_poll_timer->start();
+	emit_signal("update_launcher_started");
+	return int(launcher_pid);
+}
+
+void UpdateManager::_poll_launcher_process() {
+	if (launcher_pid == 0) {
+		launcher_poll_timer->stop();
+		return;
+	}
+	if (OS::get_singleton()->is_process_running(launcher_pid)) {
+		return;
 	}
 
-	return exitcode;
+	const int exit_code = OS::get_singleton()->get_process_exit_code(launcher_pid);
+	launcher_poll_timer->stop();
+	launcher_pid = 0;
+	emit_signal("update_launcher_finished", exit_code);
 }
 
 int UpdateManager::trigger_launcher_rollback(const String &p_target_version) {

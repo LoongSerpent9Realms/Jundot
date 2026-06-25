@@ -472,6 +472,13 @@ def configure_msvc(env: "SConsEnvironment"):
     if env.debug_features:
         LIBS += ["psapi", "dbghelp"]
 
+    # dbghelp is needed by crash_handler_windows_seh.cpp regardless of
+    # debug_features (the crash handler uses StackWalk64 / SymInitialize
+    # etc. for minidump generation on template_release too).  psapi is
+    # always needed by the crash handler as well.
+    if not env.debug_features:
+        LIBS += ["dbghelp"]
+
     if env["accesskit"]:
         if os.path.exists(env["accesskit_sdk_path"]):
             env.Prepend(CPPPATH=[env["accesskit_sdk_path"] + "/include"])

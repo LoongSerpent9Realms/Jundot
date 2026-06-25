@@ -1,4 +1,4 @@
-/*  ai_importer.cpp                                                        */
+/*  ai_importer.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,12 +27,11 @@
 
 #include "ai_importer.h"
 
-#include "ai_memory_store.h"
-#include "ai_tool_registry.h"
-
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_tool_registry.h"
 
 AIImporter::FileFormat AIImporter::_detect_format(const String &p_path) {
 	const String filename = p_path.get_file().to_lower();
@@ -185,7 +184,7 @@ Error AIImporter::_parse_mcp_json(const String &p_content, Vector<AIMCPServerEnt
 
 			const Variant env_var = server_dict.get("env", Variant());
 			if (env_var.get_type() == Variant::DICTIONARY) {
-				entry.capabilities_json = JSON::stringify(env_var, "\t");
+				entry.environment = env_var;
 			}
 
 			r_servers.push_back(entry);
@@ -207,6 +206,7 @@ Error AIImporter::_parse_mcp_json(const String &p_content, Vector<AIMCPServerEnt
 				entry.command = server_dict.get("command", String());
 				entry.arguments = server_dict.get("arguments", String());
 				entry.url = server_dict.get("url", String());
+				entry.environment = server_dict.get("environment", server_dict.get("env", Dictionary()));
 				entry.capabilities_json = server_dict.get("capabilities_json", String());
 				if (!entry.name.is_empty()) {
 					r_servers.push_back(entry);

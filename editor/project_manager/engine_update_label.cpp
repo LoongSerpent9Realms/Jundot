@@ -2,8 +2,8 @@
 /*  engine_update_label.cpp                                               */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -31,35 +31,91 @@
 #include "engine_update_label.h"
 
 #include "core/io/file_access.h"
-#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "core/version.h"
 #include "editor/editor_string_names.h"
 #include "editor/settings/editor_settings.h"
+#include "editor/update/update_manifest.h"
 #include "scene/main/http_request.h"
 
 namespace {
 
-const char *JUNDOT_AUTO_RELEASES_API = "https://api.github.com/repos/LoongSerpent9Realms/Jundot-Auto/releases";
-const char *JUNDOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Jundot-Auto/releases";
+const char *JUNDOT_AUTO_MANIFEST_URL = "https://github.com/LoongSerpent9Realms/Jundot/releases/latest/download/update-manifest.json";
+const char *JUNDOT_AUTO_RELEASES_PAGE = "https://github.com/LoongSerpent9Realms/Jundot/releases";
 
-bool _split_github_release_tag(const String &p_tag, String &r_base_version, String &r_release_status) {
-	String tag = p_tag.strip_edges();
-	tag = tag.trim_prefix("refs/tags/");
-	tag = tag.trim_prefix("jundot-");
-	tag = tag.trim_prefix("v");
-
-	int separator = tag.find_char('-');
-	if (separator == -1) {
-		r_base_version = tag;
-		r_release_status = "stable";
-	} else {
-		r_base_version = tag.substr(0, separator);
-		r_release_status = tag.substr(separator + 1);
+String _get_current_version_string() {
+#ifdef JUNDOT_VERSION_PATCH
+	String ver = vformat("%d.%d.%d", JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR, JUNDOT_VERSION_PATCH);
+#else
+	String ver = vformat("%d.%d", JUNDOT_VERSION_MAJOR, JUNDOT_VERSION_MINOR);
+#endif
+	String status(JUNDOT_VERSION_STATUS);
+	if (!status.is_empty() && status != "stable") {
+		ver += "-" + status;
 	}
+	return ver;
+}
 
-	return r_base_version.split(".").size() >= 2;
+String _get_user_channel() {
+	EngineUpdateLabel::UpdateMode mode = EngineUpdateLabel::UpdateMode(int(EDITOR_GET("network/connection/check_for_updates")));
+	switch (mode) {
+		case EngineUpdateLabel::UpdateMode::DISABLED:
+			return "disabled";
+		case EngineUpdateLabel::UpdateMode::AUTO: {
+			const String status = String(JUNDOT_VERSION_STATUS).to_lower();
+			if (status == "stable") {
+				return "stable";
+			}
+			if (status == "beta" || status == "rc") {
+				return "beta";
+			}
+			return "dev";
+		}
+		case EngineUpdateLabel::UpdateMode::NEWEST_UNSTABLE:
+			return "dev";
+		case EngineUpdateLabel::UpdateMode::NEWEST_STABLE:
+		case EngineUpdateLabel::UpdateMode::NEWEST_PATCH:
+			return "stable";
+	}
+	return "stable";
+}
+
+bool _is_newest_patch_mode() {
+	return EngineUpdateLabel::UpdateMode(int(EDITOR_GET("network/connection/check_for_updates"))) == EngineUpdateLabel::UpdateMode::NEWEST_PATCH;
+}
+
+String _get_http_request_result_message(int p_result) {
+	switch (p_result) {
+		case HTTPRequest::RESULT_CHUNKED_BODY_SIZE_MISMATCH:
+			return TTR("Received an incomplete response from the update server.");
+		case HTTPRequest::RESULT_CANT_CONNECT:
+			return TTR("Could not connect to the update server.");
+		case HTTPRequest::RESULT_CANT_RESOLVE:
+			return TTR("Could not resolve the update server address.");
+		case HTTPRequest::RESULT_CONNECTION_ERROR:
+			return TTR("The connection to the update server failed.");
+		case HTTPRequest::RESULT_TLS_HANDSHAKE_ERROR:
+			return TTR("Could not establish a secure connection to the update server.");
+		case HTTPRequest::RESULT_NO_RESPONSE:
+			return TTR("The update server did not respond.");
+		case HTTPRequest::RESULT_BODY_SIZE_LIMIT_EXCEEDED:
+			return TTR("The update response was too large.");
+		case HTTPRequest::RESULT_BODY_DECOMPRESS_FAILED:
+			return TTR("Could not decompress the update response.");
+		case HTTPRequest::RESULT_REQUEST_FAILED:
+			return TTR("The update request failed.");
+		case HTTPRequest::RESULT_DOWNLOAD_FILE_CANT_OPEN:
+			return TTR("Could not open the update download file.");
+		case HTTPRequest::RESULT_DOWNLOAD_FILE_WRITE_ERROR:
+			return TTR("Could not write the update download file.");
+		case HTTPRequest::RESULT_REDIRECT_LIMIT_REACHED:
+			return TTR("The update request was redirected too many times.");
+		case HTTPRequest::RESULT_TIMEOUT:
+			return TTR("The update request timed out.");
+		default:
+			return TTR("The update request failed.");
+	}
 }
 
 } // namespace
@@ -73,16 +129,25 @@ void EngineUpdateLabel::_check_update() {
 	checked_update = true;
 	_set_status(UpdateStatus::BUSY);
 
+	String manifest_url = EDITOR_GET("network/connection/update_manifest_url");
+	if (manifest_url.is_empty()) {
+		manifest_url = JUNDOT_AUTO_MANIFEST_URL;
+	}
+
 	PackedStringArray headers;
-	headers.push_back("Accept: application/vnd.github+json");
-	headers.push_back("User-Agent: Jundot-Auto");
-	http->request(JUNDOT_AUTO_RELEASES_API, headers);
+	headers.push_back("Accept: application/json");
+	headers.push_back(vformat("User-Agent: Jundot-Editor/%s", _get_current_version_string()));
+	Error err = http->request(manifest_url, headers);
+	if (err != OK) {
+		_set_status(UpdateStatus::ERROR);
+		_set_message(vformat(TTR("Failed to check for updates. Error: %d."), err), theme_cache.error_color);
+	}
 }
 
 void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
 	if (p_result != OK) {
 		_set_status(UpdateStatus::ERROR);
-		_set_message(vformat(TTR("Failed to check for updates. Error: %d."), p_result), theme_cache.error_color);
+		_set_message(vformat(TTR("Failed to check for updates. %s (Error: %d)."), _get_http_request_result_message(p_result), p_result), theme_cache.error_color);
 		return;
 	}
 
@@ -92,116 +157,31 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 		return;
 	}
 
-	Array version_array;
-	{
-		const uint8_t *r = p_body.ptr();
-		String s = String::utf8((const char *)r, p_body.size());
+	const uint8_t *r = p_body.ptr();
+	String s = String::utf8((const char *)r, p_body.size());
 
-		Variant result = JSON::parse_string(s);
-		if (result == Variant()) {
-			_set_status(UpdateStatus::ERROR);
-			_set_message(TTR("Failed to parse version JSON."), theme_cache.error_color);
-			return;
-		}
-		if (result.get_type() != Variant::ARRAY) {
-			_set_status(UpdateStatus::ERROR);
-			_set_message(TTR("Received JSON data is not a valid version array."), theme_cache.error_color);
-			return;
-		}
-		version_array = result;
+	UpdateManifest manifest;
+	if (!manifest.parse(s)) {
+		_set_status(UpdateStatus::ERROR);
+		_set_message(TTR("Failed to parse version JSON."), theme_cache.error_color);
+		return;
 	}
 
-	UpdateMode update_mode = UpdateMode(int(EDITOR_GET("network/connection/check_for_updates")));
-	if (update_mode == UpdateMode::AUTO) {
-		if (_get_version_type(JUNDOT_VERSION_STATUS) == VersionType::STABLE) {
-			update_mode = UpdateMode::NEWEST_STABLE;
-		} else {
-			update_mode = UpdateMode::NEWEST_UNSTABLE;
-		}
-	}
-	bool stable_only = update_mode == UpdateMode::NEWEST_STABLE || update_mode == UpdateMode::NEWEST_PATCH;
-
+	String current_version = _get_current_version_string();
+	String target_version = manifest.get_version_string();
 	available_newer_version = String();
 	available_newer_url = String();
-	for (const Variant &data_bit : version_array) {
-		const Dictionary version_info = data_bit;
+	available_manifest.clear();
 
-		String base_version_string;
-		Array releases;
-		String release_url;
-		if (version_info.has("tag_name")) {
-			String release_string;
-			if (!_split_github_release_tag(version_info.get("tag_name", ""), base_version_string, release_string)) {
-				continue;
-			}
-
-			Dictionary release_info;
-			release_info["name"] = release_string;
-			releases.push_back(release_info);
-			release_url = version_info.get("html_url", JUNDOT_AUTO_RELEASES_PAGE);
-		} else {
-			base_version_string = version_info.get("name", "");
-			releases = version_info.get("releases", Array());
-		}
-
-		const PackedStringArray version_bits = base_version_string.split(".");
-
-		if (version_bits.size() < 2) {
-			continue;
-		}
-
-		int minor = version_bits[1].to_int();
-		if (version_bits[0].to_int() != JUNDOT_VERSION_MAJOR || minor < JUNDOT_VERSION_MINOR) {
-			continue;
-		}
-
-		int patch = 0;
-		if (version_bits.size() >= 3) {
-			patch = version_bits[2].to_int();
-		}
-
-		if (minor == JUNDOT_VERSION_MINOR && patch < JUNDOT_VERSION_PATCH) {
-			continue;
-		}
-
-		if (update_mode == UpdateMode::NEWEST_PATCH && minor > JUNDOT_VERSION_MINOR) {
-			continue;
-		}
-
-		if (releases.is_empty()) {
-			continue;
-		}
-
-		const Dictionary newest_release = releases[0];
-		const String release_string = newest_release.get("name", "unknown");
-
-		int release_index;
-		VersionType release_type = _get_version_type(release_string, &release_index);
-
-		if (minor > JUNDOT_VERSION_MINOR || patch > JUNDOT_VERSION_PATCH) {
-			if (stable_only && release_type != VersionType::STABLE) {
-				continue;
-			}
-
-			available_newer_version = vformat("%s-%s", base_version_string, release_string);
-			available_newer_url = release_url;
-			break;
-		}
-
-		int current_version_index;
-		VersionType current_version_type = _get_version_type(JUNDOT_VERSION_STATUS, &current_version_index);
-
-		if (int(release_type) > int(current_version_type)) {
-			break;
-		}
-
-		if (int(release_type) == int(current_version_type) && release_index <= current_version_index) {
-			break;
-		}
-
-		available_newer_version = vformat("%s-%s", base_version_string, release_string);
-		available_newer_url = release_url;
-		break;
+	String grayscale_reason;
+	if (compare_versions(target_version, current_version) > 0 &&
+			(!_is_newest_patch_mode() || manifest.version.minor == JUNDOT_VERSION_MINOR) &&
+			channel_matches(manifest.channel, _get_user_channel()) &&
+			meets_min_version(current_version, manifest.min_version) &&
+			GrayscaleEvaluator::is_eligible(GrayscaleEvaluator::generate_machine_id(), manifest.grayscale, &grayscale_reason)) {
+		available_newer_version = target_version;
+		available_newer_url = JUNDOT_AUTO_RELEASES_PAGE;
+		available_manifest = manifest;
 	}
 
 	if (!available_newer_version.is_empty()) {
@@ -223,13 +203,7 @@ void EngineUpdateLabel::_set_message(const String &p_message, const Color &p_col
 
 void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 	status = p_status;
-	if (status == UpdateStatus::BUSY || status == UpdateStatus::UP_TO_DATE) {
-		// Hide the label to prevent unnecessary distraction.
-		hide();
-		return;
-	} else {
-		show();
-	}
+	show();
 
 	switch (status) {
 		case UpdateStatus::OFFLINE: {
@@ -244,6 +218,13 @@ void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 			break;
 		}
 
+		case UpdateStatus::BUSY: {
+			set_disabled(true);
+			_set_message(TTR("Checking for updates..."), theme_cache.disabled_color);
+			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
+			set_tooltip_text("");
+		} break;
+
 		case UpdateStatus::ERROR: {
 			set_disabled(false);
 			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
@@ -256,45 +237,16 @@ void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 			set_tooltip_text(TTR("Click to open download page."));
 		} break;
 
+		case UpdateStatus::UP_TO_DATE: {
+			set_disabled(true);
+			_set_message(TTR("Jundot is up to date."), theme_cache.default_color);
+			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
+			set_tooltip_text("");
+		} break;
+
 		default: {
 		}
 	}
-}
-
-EngineUpdateLabel::VersionType EngineUpdateLabel::_get_version_type(const String &p_string, int *r_index) const {
-	VersionType type = VersionType::UNKNOWN;
-	String index_string;
-
-	static HashMap<String, VersionType> type_map;
-	if (type_map.is_empty()) {
-		type_map["stable"] = VersionType::STABLE;
-		type_map["rc"] = VersionType::RC;
-		type_map["beta"] = VersionType::BETA;
-		type_map["alpha"] = VersionType::ALPHA;
-		type_map["dev"] = VersionType::DEV;
-	}
-
-	for (const KeyValue<String, VersionType> &kv : type_map) {
-		if (p_string.begins_with(kv.key)) {
-			index_string = p_string.trim_prefix(kv.key);
-			type = kv.value;
-			break;
-		}
-	}
-
-	if (r_index) {
-		if (index_string.is_empty()) {
-			*r_index = DEV_VERSION;
-		} else {
-			*r_index = index_string.to_int();
-		}
-	}
-	return type;
-}
-
-String EngineUpdateLabel::_extract_sub_string(const String &p_line) const {
-	int j = p_line.find_char('"') + 1;
-	return p_line.substr(j, p_line.find_char('"', j) - j);
 }
 
 void EngineUpdateLabel::_notification(int p_what) {
@@ -389,13 +341,14 @@ void EngineUpdateLabel::_trigger_launcher_update() {
 
 EngineUpdateLabel::EngineUpdateLabel() {
 	set_underline_mode(UNDERLINE_MODE_ON_HOVER);
+	EDITOR_DEF("network/connection/update_manifest_url", String(JUNDOT_AUTO_MANIFEST_URL));
 
 	http = memnew(HTTPRequest);
 	// Delay EDITOR_GET until EditorSettings is ready
 	if (EditorSettings::get_singleton()) {
 		http->set_https_proxy(EDITOR_GET("network/http_proxy/host"), EDITOR_GET("network/http_proxy/port"));
 	}
-	http->set_timeout(10.0);
+	http->set_timeout(30.0);
 	add_child(http);
 	http->connect("request_completed", callable_mp(this, &EngineUpdateLabel::_http_request_completed));
 }

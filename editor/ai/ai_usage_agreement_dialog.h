@@ -20,6 +20,7 @@ class AIUsageAgreementDialog : public ConfirmationDialog {
 	void _confirmed();
 	void _canceled();
 	void _confirm_toggled(bool p_pressed);
+	void _reset_confirmation_state();
 	void _update_translations();
 
 protected:

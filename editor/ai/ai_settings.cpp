@@ -1,4 +1,4 @@
-/*  ai_settings.cpp                                                        */
+/*  ai_settings.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -44,6 +44,10 @@ static constexpr const char *LEGACY_TEMPERATURE_KEY = "ai_assistant/temperature"
 static constexpr const char *LEGACY_MAX_TOKENS_KEY = "ai_assistant/max_tokens";
 
 static constexpr const char *EDITOR_AI_BASE_URL_KEY = "ai_settings/provider/base_url";
+static constexpr const char *EDITOR_AI_BACKEND_TYPE_KEY = "ai_settings/provider/backend_type";
+static constexpr const char *EDITOR_AI_JUNDOT_PLUGIN_ID_KEY = "ai_settings/provider/jundot_plugin_id";
+static constexpr const char *EDITOR_AI_JUNDOT_PLUGIN_URL_KEY = "ai_settings/provider/jundot_plugin_url";
+static constexpr const char *EDITOR_AI_ALLOW_LEGACY_OPENAI_BACKEND_KEY = "ai_settings/provider/allow_legacy_openai_backend";
 static constexpr const char *EDITOR_AI_MODEL_KEY = "ai_settings/provider/model";
 static constexpr const char *EDITOR_AI_API_KEY_KEY = "ai_settings/provider/api_key";
 static constexpr const char *EDITOR_AI_TEMPERATURE_KEY = "ai_settings/provider/temperature";
@@ -147,6 +151,19 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	if (_should_read_editor_setting(EDITOR_AI_BASE_URL_KEY, p_only_changed)) {
 		r_settings.base_url = editor_settings->get_setting(EDITOR_AI_BASE_URL_KEY);
 	}
+	if (_should_read_editor_setting(EDITOR_AI_BACKEND_TYPE_KEY, p_only_changed)) {
+		const String backend_type = String(editor_settings->get_setting(EDITOR_AI_BACKEND_TYPE_KEY));
+		r_settings.backend_type = (backend_type == "legacy_openai") ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+	}
+	if (_should_read_editor_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY, p_only_changed)) {
+		r_settings.jundot_ai_plugin_id = editor_settings->get_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY);
+	}
+	if (_should_read_editor_setting(EDITOR_AI_JUNDOT_PLUGIN_URL_KEY, p_only_changed)) {
+		r_settings.jundot_ai_plugin_url = editor_settings->get_setting(EDITOR_AI_JUNDOT_PLUGIN_URL_KEY);
+	}
+	if (_should_read_editor_setting(EDITOR_AI_ALLOW_LEGACY_OPENAI_BACKEND_KEY, p_only_changed)) {
+		r_settings.allow_legacy_openai_backend = editor_settings->get_setting(EDITOR_AI_ALLOW_LEGACY_OPENAI_BACKEND_KEY);
+	}
 	if (_should_read_editor_setting(EDITOR_AI_MODEL_KEY, p_only_changed)) {
 		r_settings.model = editor_settings->get_setting(EDITOR_AI_MODEL_KEY);
 	}
@@ -201,6 +218,10 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	}
 
 	editor_settings->set_setting(EDITOR_AI_BASE_URL_KEY, p_settings.base_url);
+	editor_settings->set_setting(EDITOR_AI_BACKEND_TYPE_KEY, p_settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin");
+	editor_settings->set_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY, p_settings.jundot_ai_plugin_id);
+	editor_settings->set_setting(EDITOR_AI_JUNDOT_PLUGIN_URL_KEY, p_settings.jundot_ai_plugin_url);
+	editor_settings->set_setting(EDITOR_AI_ALLOW_LEGACY_OPENAI_BACKEND_KEY, p_settings.allow_legacy_openai_backend);
 	editor_settings->set_setting(EDITOR_AI_MODEL_KEY, p_settings.model);
 	editor_settings->set_setting(EDITOR_AI_API_KEY_KEY, p_settings.api_key);
 	editor_settings->set_setting(EDITOR_AI_TEMPERATURE_KEY, p_settings.temperature);
@@ -227,20 +248,27 @@ String AISettings::get_default_model() {
 }
 
 String AISettings::get_default_system_prompt() {
-	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (read_files, write_file, search_files, grep_code, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, building the engine, and executing commands.\n\n"
-		"When you use a tool, you will receive the result and can continue reasoning. After executing tools, analyze the results and either call more tools if needed or provide a comprehensive summary to the user with the next steps. Do NOT end the conversation with a single sentence — always follow up with a thorough analysis, reasoning, or actionable proposal.\n\n"
-		"If MCP tools are configured, they are available as tools with names prefixed by the server name (e.g. 'servername.toolname').\n\n"
-		"=== Tool Call Protocol ===\n"
-		"- You MUST use the available tools to implement requests, not just describe solutions.\n"
-		"- BEFORE writing or suggesting code changes, ALWAYS read the relevant source files first.\n"
-		"- run_build runs in the background. After calling it, call check_build_status to get the result. If still running, call it again in subsequent rounds.\n"
-		"- When you encounter a build error, read the build log, analyze the error, apply fixes, then rebuild to verify.\n\n"
-		"=== Agent Loop (CRITICAL) ===\n"
-		"- After you finish calling tools and receive the final text response from the model, do NOT stop.\n"
-		"- Analyze what you learned from the tool results.\n"
-		"- Provide a thorough summary of what was done, what was found, or what the user should know.\n"
-		"- Suggest concrete next steps or ask clarifying questions if needed.\n"
-		"- Keep the conversation going — a single terse response is never sufficient.");
+	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (batch_tools, list_files, read_files, write_file, edit_file, search_files, grep_code, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, building the engine, and executing commands.\n\n"
+			   "When you use a tool, you will receive the result and can continue reasoning. After executing tools, analyze the results and either call more tools if needed or provide a comprehensive summary to the user with the next steps. Do NOT end the conversation with a single sentence — always follow up with a thorough analysis, reasoning, or actionable proposal.\n\n"
+			   "If MCP tools are configured, they are available as tools with names prefixed by the server name (e.g. 'servername.toolname').\n\n"
+			   "=== Task Breakdown Protocol ===\n"
+			   "- For any non-trivial request, first produce a short ordered task list before executing tools or proposing code changes.\n"
+			   "- Keep each task concrete and tied to an observable action, such as inspect files, identify cause, modify files, run validation, or summarize result.\n"
+			   "- Put the task list in this machine-readable block; the editor will show it to the user:\n"
+			   "<!-- TASK_PLAN -->\nTITLE: <short goal>\nSTEP: <task title> | <short detail> | pending\nSTEP: <task title> | <short detail> | pending\n<!-- END_TASK_PLAN -->\n"
+			   "- Do not put code fences inside TASK_PLAN. Keep it compact.\n\n"
+			   "=== Tool Call Protocol ===\n"
+			   "- You MUST use the available tools to implement requests, not just describe solutions.\n"
+			   "- Prefer batch_tools when you can combine independent local actions into one tool call, such as list_files + grep_code + read_files, reading several files, or writing several related files.\n"
+			   "- BEFORE writing or suggesting code changes, ALWAYS read the relevant source files first.\n"
+			   "- run_build runs in the background. After calling it, call check_build_status to get the result. If still running, call it again in subsequent rounds.\n"
+			   "- When you encounter a build error, read the build log, analyze the error, apply fixes, then rebuild to verify.\n\n"
+			   "=== Agent Loop (CRITICAL) ===\n"
+			   "- After you finish calling tools and receive the final text response from the model, do NOT stop.\n"
+			   "- Analyze what you learned from the tool results.\n"
+			   "- Provide a thorough summary of what was done, what was found, or what the user should know.\n"
+			   "- Suggest concrete next steps or ask clarifying questions if needed.\n"
+			   "- Keep the conversation going — a single terse response is never sufficient.");
 }
 
 int AISettings::get_default_context_char_budget() {
@@ -321,6 +349,11 @@ AISettingsData AISettings::load() {
 	}
 
 	const Dictionary root = data;
+	const String backend_type = root.get("backend_type", String("jundot_plugin"));
+	settings.backend_type = (backend_type == "legacy_openai") ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+	settings.jundot_ai_plugin_id = root.get("jundot_ai_plugin_id", String(JUNDOT_MIMOCODE_PLUGIN_ID));
+	settings.jundot_ai_plugin_url = root.get("jundot_ai_plugin_url", String("http://127.0.0.1:4096"));
+	settings.allow_legacy_openai_backend = root.get("allow_legacy_openai_backend", false);
 	settings.base_url = root.get("base_url", get_default_base_url());
 	settings.model = root.get("model", get_default_model());
 	settings.api_key = root.get("api_key", String());
@@ -363,6 +396,10 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	}
 
 	Dictionary root;
+	root["backend_type"] = p_settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin";
+	root["jundot_ai_plugin_id"] = p_settings.jundot_ai_plugin_id;
+	root["jundot_ai_plugin_url"] = p_settings.jundot_ai_plugin_url;
+	root["allow_legacy_openai_backend"] = p_settings.allow_legacy_openai_backend;
 	root["base_url"] = p_settings.base_url;
 	root["model"] = p_settings.model;
 	root["api_key"] = p_settings.api_key;

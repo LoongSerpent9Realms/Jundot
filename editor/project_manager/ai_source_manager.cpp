@@ -1,4 +1,4 @@
-/*  ai_source_manager.cpp                                                  */
+/*  ai_source_manager.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -36,13 +36,14 @@
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/project_manager/multipart_downloader.h"
 #include "editor/themes/editor_scale.h"
-#include "modules/zip/zip_reader.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
-#include "scene/gui/scroll_container.h"
 #include "scene/gui/scroll_bar.h"
+#include "scene/gui/scroll_container.h"
+
+#include "modules/zip/zip_reader.h"
 
 #ifdef WINDOWS_ENABLED
 #include <windows.h>
@@ -268,6 +269,96 @@ bool AISourceManager::_is_git_available() const {
 	int exit_code = 0;
 	const Error err = OS::get_singleton()->execute("git", args, &output, &exit_code, true);
 	return err == OK && exit_code == 0;
+}
+
+bool AISourceManager::_run_git_status_command(const String &p_working_dir, const List<String> &p_args, String &r_output) const {
+	r_output.clear();
+	if (p_working_dir.is_empty()) {
+		return false;
+	}
+
+	List<String> args;
+	args.push_back("-C");
+	args.push_back(p_working_dir);
+	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
+		args.push_back(E->get());
+	}
+
+	int exit_code = 0;
+	const Error err = OS::get_singleton()->execute("git", args, &r_output, &exit_code, true);
+	if (err != OK || exit_code != 0) {
+		r_output.clear();
+		return false;
+	}
+
+	r_output = r_output.strip_edges();
+	return !r_output.is_empty();
+}
+
+String AISourceManager::_get_git_update_status_text(const String &p_source_root, const String &p_repository_url, bool &r_update_available) {
+	r_update_available = false;
+
+	if (p_source_root.is_empty() || !FileAccess::exists(p_source_root.path_join(".git"))) {
+		return TTR("Update Check: ZIP cache or non-Git source. Use Re-download to refresh.");
+	}
+	if (!_is_git_available()) {
+		return TTR("Update Check: Git is not available. Install Git to check and update the source cache.");
+	}
+
+	String repo_url = p_repository_url.strip_edges();
+	if (repo_url.is_empty()) {
+		repo_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
+	}
+
+	const uint64_t now = OS::get_singleton()->get_ticks_msec();
+	if (cached_update_check_source_root == p_source_root && cached_update_check_repository_url == repo_url && !cached_update_check_status_text.is_empty() && now - cached_update_check_msec < 300000) {
+		r_update_available = cached_update_check_available;
+		return cached_update_check_status_text;
+	}
+
+	String local_head;
+	List<String> local_args;
+	local_args.push_back("rev-parse");
+	local_args.push_back("HEAD");
+	if (!_run_git_status_command(p_source_root, local_args, local_head)) {
+		return TTR("Update Check: Could not read local Git revision.");
+	}
+
+	String remote_head;
+	List<String> remote_args;
+	remote_args.push_back("ls-remote");
+	remote_args.push_back(repo_url);
+	remote_args.push_back("refs/heads/master");
+	if (!_run_git_status_command(p_source_root, remote_args, remote_head)) {
+		return TTR("Update Check: Could not contact the source repository. Click Update to retry.");
+	}
+	remote_head = remote_head.get_slice("\t", 0).strip_edges();
+	if (remote_head.is_empty()) {
+		return TTR("Update Check: Could not read the remote source revision. Click Update to retry.");
+	}
+
+	String status_text;
+	if (local_head != remote_head) {
+		r_update_available = true;
+		status_text = TTR("Update Check: Source update available. Click Update to refresh the engine source cache.");
+	} else {
+		status_text = TTR("Update Check: Engine source cache is up to date.");
+	}
+
+	cached_update_check_source_root = p_source_root;
+	cached_update_check_repository_url = repo_url;
+	cached_update_check_status_text = status_text;
+	cached_update_check_available = r_update_available;
+	cached_update_check_msec = now;
+	return status_text;
+}
+
+void AISourceManager::_clear_update_check_cache() {
+	cached_update_check_source_root.clear();
+	cached_update_check_repository_url.clear();
+	cached_update_check_status_text.clear();
+	cached_update_check_available = false;
+	cached_update_check_msec = 0;
 }
 
 Error AISourceManager::_run_git_process(const List<String> &p_args, const String &p_command, String &r_output, int *r_exit_code) {
@@ -628,7 +719,10 @@ void AISourceManager::_update_ui() {
 			break;
 
 		case SourceStatus::DOWNLOADED: {
-			status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s"), _get_source_root()));
+			const String source_root = _get_source_root();
+			bool update_available = false;
+			const String update_status = _get_git_update_status_text(source_root, repo_url, update_available);
+			status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\n%s"), source_root, update_status));
 			String saved_url = settings.engine_source_repository_url.strip_edges();
 			if (saved_url.is_empty()) {
 				saved_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
@@ -638,6 +732,8 @@ void AISourceManager::_update_ui() {
 			// that in the button label.
 			if (saved_url != repo_url) {
 				download_button->set_text(TTR("Re-clone with New URL"));
+			} else if (update_available) {
+				download_button->set_text(TTR("Update Source"));
 			} else {
 				download_button->set_text(TTR("Update"));
 			}
@@ -737,6 +833,7 @@ void AISourceManager::_on_browse_button_pressed() {
 
 void AISourceManager::_on_cache_dir_selected(const String &p_path) {
 	current_error.clear();
+	_clear_update_check_cache();
 	cache_path_edit->set_text(p_path);
 	AISettingsData settings = AISettings::load();
 	settings.engine_source_cache_root = p_path;
@@ -752,6 +849,7 @@ void AISourceManager::_on_reset_url_button_pressed() {
 
 void AISourceManager::_on_download_button_pressed() {
 	current_error.clear();
+	_clear_update_check_cache();
 
 	if (is_downloading) {
 		if (downloader) {
@@ -1062,6 +1160,7 @@ Error AISourceManager::_encrypt_cache(const String &p_cache_path, String &r_erro
 			return ERR_SKIP;
 		}
 
+		FileAccess::set_read_only_attribute(p_path, false);
 		const Char16String path_utf16 = p_path.utf16();
 		if (!EncryptFileW((LPCWSTR)path_utf16.get_data())) {
 			const DWORD windows_error = GetLastError();
@@ -1296,6 +1395,7 @@ void AISourceManager::_on_processing_completed() {
 		return;
 	}
 	is_processing = false;
+	_clear_update_check_cache();
 
 	if (worker_thread) {
 		worker_thread->wait_to_finish();
@@ -1333,8 +1433,8 @@ void AISourceManager::_on_processing_completed() {
 void AISourceManager::popup_centered_on_parent(const Window *p_parent) {
 	(void)p_parent;
 	_update_ui();
-	const Size2i base_size = Size2(640, 360) * EDSCALE;
-	const Size2i content_size = main_vbox ? main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE : Size2i();
+	const Size2 base_size = Size2(640, 360) * EDSCALE;
+	const Size2 content_size = main_vbox ? main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE : Size2();
 	popup_centered_clamped(base_size.max(content_size), 0.9);
 }
 
@@ -1459,4 +1559,3 @@ AISourceManager::AISourceManager() {
 	cache_dir_dialog->connect("dir_selected", callable_mp(this, &AISourceManager::_on_cache_dir_selected));
 	add_child(cache_dir_dialog);
 }
-

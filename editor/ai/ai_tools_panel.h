@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "ai_chat_parser.h"
-#include "ai_tool_registry.h"
-
+#include "core/os/thread.h"
+#include "editor/ai/ai_chat_parser.h"
+#include "editor/ai/ai_tool_registry.h"
 #include "scene/gui/margin_container.h"
 
 class Button;
@@ -52,8 +52,10 @@ class AIToolsPanel : public MarginContainer {
 	LineEdit *mcp_command = nullptr;
 	LineEdit *mcp_arguments = nullptr;
 	LineEdit *mcp_url = nullptr;
+	TextEdit *mcp_environment = nullptr;
 	TextEdit *mcp_capabilities = nullptr;
 	Button *mcp_new_button = nullptr;
+	Button *mcp_add_godot_ai_button = nullptr;
 	Button *mcp_delete_button = nullptr;
 	Button *mcp_save_button = nullptr;
 	Button *mcp_import_button = nullptr;
@@ -63,6 +65,12 @@ class AIToolsPanel : public MarginContainer {
 	Button *mcp_stop_button = nullptr;
 	OptionButton *mcp_lifecycle = nullptr;
 	SpinBox *mcp_timeout = nullptr;
+	Thread mcp_test_thread;
+	AIMCPServerEntry mcp_test_server;
+	bool mcp_test_running = false;
+	Error mcp_test_result = OK;
+	int mcp_test_tool_count = 0;
+	String mcp_test_error;
 
 	Button *reload_button = nullptr;
 	Label *status_label = nullptr;
@@ -82,6 +90,7 @@ class AIToolsPanel : public MarginContainer {
 	void _delete_skill();
 	void _save_skill();
 	void _new_mcp_server();
+	void _add_godot_ai_server();
 	void _delete_mcp_server();
 	void _save_mcp_server();
 	void _reload_registry();
@@ -101,6 +110,8 @@ class AIToolsPanel : public MarginContainer {
 	void _mcp_import_file_selected(const String &p_path);
 	void _mcp_import_dir_selected(const String &p_dir);
 	void _mcp_test_connection();
+	static void _mcp_test_thread_func(void *p_userdata);
+	void _finish_mcp_test();
 	void _mcp_refresh_tools();
 	void _mcp_stop_server();
 	void _update_mcp_status();
@@ -112,4 +123,5 @@ protected:
 
 public:
 	AIToolsPanel();
+	~AIToolsPanel();
 };

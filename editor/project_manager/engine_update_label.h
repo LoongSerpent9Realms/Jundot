@@ -2,8 +2,8 @@
 /*  engine_update_label.h                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "editor/update/update_manifest.h"
 #include "scene/gui/link_button.h"
 
 class HTTPRequest;
@@ -47,17 +48,6 @@ public:
 	};
 
 private:
-	static constexpr int DEV_VERSION = 9999; // Version index for unnumbered builds (assumed to always be newest).
-
-	enum class VersionType {
-		STABLE,
-		RC,
-		BETA,
-		ALPHA,
-		DEV,
-		UNKNOWN,
-	};
-
 	enum class UpdateStatus {
 		NONE,
 		OFFLINE,
@@ -80,6 +70,7 @@ private:
 	bool checked_update = false;
 	String available_newer_version;
 	String available_newer_url;
+	UpdateManifest available_manifest;
 
 	void _trigger_launcher_update();
 	bool _can_check_updates() const;
@@ -89,9 +80,6 @@ private:
 	void _set_message(const String &p_message, const Color &p_color);
 	void _set_status(UpdateStatus p_status);
 
-	VersionType _get_version_type(const String &p_string, int *r_index = nullptr) const;
-	String _extract_sub_string(const String &p_line) const;
-
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -100,4 +88,5 @@ protected:
 
 public:
 	EngineUpdateLabel();
+	const UpdateManifest &get_available_manifest() const { return available_manifest; }
 };

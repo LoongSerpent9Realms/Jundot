@@ -1,4 +1,4 @@
-/*  ai_chat_parser.h                                                       */
+/*  ai_chat_parser.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,12 +27,11 @@
 
 #pragma once
 
-#include "editor/ai/ai_memory_store.h"
-#include "editor/ai/ai_tool_registry.h"
-#include "editor/ai/ai_feature_gate.h"
-
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
+#include "editor/ai/ai_feature_gate.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_tool_registry.h"
 
 struct AISuggestion {
 	enum Type {
@@ -61,6 +60,17 @@ struct AIRepairSuggestion {
 	String risk;
 };
 
+struct AITaskPlan {
+	struct Step {
+		String title;
+		String detail;
+		String status;
+	};
+
+	String title;
+	Vector<Step> steps;
+};
+
 class AIChatParser {
 	static constexpr int MAX_SUGGESTIONS_PER_RESPONSE = 10;
 
@@ -72,12 +82,14 @@ class AIChatParser {
 	static AIMemoryEntry _parse_memory_from_comment(const String &p_block);
 	static AIRepairSuggestion _parse_repair_from_comment(const String &p_block);
 	static AIFeatureGateResult _parse_feature_gate_from_comment(const String &p_block);
+	static AITaskPlan _parse_task_plan_from_comment(const String &p_block);
 
 	static AISkillEntry _parse_skill_from_json(const Dictionary &p_dict);
 	static AIMCPServerEntry _parse_mcp_from_json(const Dictionary &p_dict);
 	static AIMemoryEntry _parse_memory_from_json(const Dictionary &p_dict);
 	static AIRepairSuggestion _parse_repair_from_json(const Dictionary &p_dict);
 	static AIFeatureGateResult _parse_feature_gate_from_json(const Dictionary &p_dict);
+	static AITaskPlan _parse_task_plan_from_json(const Dictionary &p_dict);
 
 	static String _extract_field(const String &p_text, const String &p_key);
 	static Vector<String> _split_lines(const String &p_text);
@@ -85,6 +97,10 @@ class AIChatParser {
 
 public:
 	static void parse(const String &p_response, Vector<AISuggestion> &r_suggestions);
+	static void parse_next_questions(const String &p_response, Vector<String> &r_questions);
 	static void parse_repair_tasks(const String &p_response, Vector<AIRepairSuggestion> &r_repairs);
 	static void parse_feature_gates(const String &p_response, Vector<AIFeatureGateResult> &r_features);
+	static void parse_task_plans(const String &p_response, Vector<AITaskPlan> &r_task_plans);
+	static String strip_task_plan_blocks(const String &p_response);
+	static String strip_next_question_blocks(const String &p_response);
 };

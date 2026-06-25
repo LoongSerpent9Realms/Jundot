@@ -2,8 +2,8 @@
 /*  file_dialog.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -278,6 +278,7 @@ void FileDialog::_notification(int p_what) {
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
 			update_filters();
+			_update_system_shortcuts();
 			[[fallthrough]];
 		}
 
@@ -292,6 +293,7 @@ void FileDialog::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_THEME_CHANGED: {
+			system_shortcuts_list->set_custom_minimum_size(Vector2(128, 92) * get_theme_default_base_scale());
 			favorite_list->set_custom_minimum_size(Vector2(128 * get_theme_default_base_scale(), 0));
 			recent_list->set_custom_minimum_size(Vector2(128 * get_theme_default_base_scale(), 0));
 
@@ -313,6 +315,7 @@ void FileDialog::_notification(int p_what) {
 			_setup_button(file_sort_button, theme_cache.sort);
 			_setup_button(fav_up_button, theme_cache.favorite_up);
 			_setup_button(fav_down_button, theme_cache.favorite_down);
+			_update_system_shortcuts();
 			invalidate();
 		} break;
 
@@ -361,6 +364,7 @@ Vector<String> FileDialog::get_selected_files() const {
 
 void FileDialog::update_dir() {
 	full_dir = dir_access->get_current_dir();
+	_update_system_shortcuts();
 	if (root_prefix.is_empty()) {
 		directory_edit->set_text(dir_access->get_current_dir(false));
 	} else {
@@ -1234,6 +1238,7 @@ void FileDialog::update_customization() {
 	favorite_button->set_visible(customization_flags[CUSTOMIZATION_FAVORITES]);
 	favorite_vbox->set_visible(customization_flags[CUSTOMIZATION_FAVORITES]);
 	recent_vbox->set_visible(customization_flags[CUSTOMIZATION_RECENT]);
+	system_shortcuts_vbox->set_visible(access == ACCESS_FILESYSTEM && system_shortcuts_list->get_item_count() > 0);
 }
 
 void FileDialog::clear_filename_filter() {
@@ -1716,9 +1721,57 @@ void FileDialog::_sort_option_selected(int p_option) {
 	invalidate();
 }
 
+void FileDialog::_system_shortcut_selected(int p_item) {
+	ERR_FAIL_INDEX(p_item, system_shortcuts_list->get_item_count());
+	_change_dir(system_shortcuts_list->get_item_metadata(p_item));
+	favorite_list->deselect_all();
+	recent_list->deselect_all();
+	_push_history();
+}
+
+void FileDialog::_update_system_shortcuts() {
+	system_shortcuts_list->clear();
+
+	if (access != ACCESS_FILESYSTEM) {
+		system_shortcuts_vbox->hide();
+		return;
+	}
+
+	struct SystemShortcut {
+		OS::SystemDir directory;
+		String label;
+	};
+
+	const SystemShortcut shortcuts[] = {
+		{ OS::SYSTEM_DIR_DESKTOP, ETR("Desktop") },
+		{ OS::SYSTEM_DIR_DOWNLOADS, ETR("Downloads") },
+		{ OS::SYSTEM_DIR_DOCUMENTS, ETR("Documents") },
+	};
+
+	const String current_dir = get_current_dir().trim_suffix("/");
+	for (const SystemShortcut &shortcut : shortcuts) {
+		const String path = OS::get_singleton()->get_system_dir(shortcut.directory).trim_suffix("/");
+		if (path.is_empty() || !path.begins_with(root_prefix) || !dir_access->dir_exists(path)) {
+			continue;
+		}
+
+		system_shortcuts_list->add_item(shortcut.label, theme_cache.folder);
+		system_shortcuts_list->set_item_tooltip(-1, path);
+		system_shortcuts_list->set_item_metadata(-1, path);
+		system_shortcuts_list->set_item_icon_modulate(-1, _get_folder_color(path));
+		if (path == current_dir) {
+			system_shortcuts_list->select(system_shortcuts_list->get_item_count() - 1);
+		}
+	}
+
+	system_shortcuts_vbox->set_visible(system_shortcuts_list->get_item_count() > 0);
+}
+
 void FileDialog::_favorite_selected(int p_item) {
 	ERR_FAIL_UNSIGNED_INDEX((uint32_t)p_item, global_favorites.size());
 	_change_dir(favorite_list->get_item_metadata(p_item));
+	system_shortcuts_list->deselect_all();
+	recent_list->deselect_all();
 	_push_history();
 }
 
@@ -1855,6 +1908,8 @@ void FileDialog::_update_fav_buttons() {
 void FileDialog::_recent_selected(int p_item) {
 	ERR_FAIL_UNSIGNED_INDEX((uint32_t)p_item, global_recents.size());
 	_change_dir(recent_list->get_item_metadata(p_item));
+	system_shortcuts_list->deselect_all();
+	favorite_list->deselect_all();
 	_push_history();
 }
 
@@ -2438,8 +2493,28 @@ FileDialog::FileDialog() {
 	main_vbox->add_child(main_split);
 
 	{
+		VBoxContainer *left_sidebar = memnew(VBoxContainer);
+		main_split->add_child(left_sidebar);
+
+		system_shortcuts_vbox = memnew(VBoxContainer);
+		left_sidebar->add_child(system_shortcuts_vbox);
+
+		{
+			Label *label = memnew(Label(ETR("Quick Access:")));
+			label->set_theme_type_variation("HeaderSmall");
+			system_shortcuts_vbox->add_child(label);
+		}
+
+		system_shortcuts_list = memnew(ItemList);
+		system_shortcuts_list->set_custom_minimum_size(Vector2(128, 92) * get_theme_default_base_scale());
+		system_shortcuts_list->set_theme_type_variation("ItemListSecondary");
+		system_shortcuts_list->set_accessibility_name(ETR("Quick Access:"));
+		system_shortcuts_vbox->add_child(system_shortcuts_list);
+		system_shortcuts_list->connect(SceneStringName(item_selected), callable_mp(this, &FileDialog::_system_shortcut_selected));
+
 		VSplitContainer *fav_split = memnew(VSplitContainer);
-		main_split->add_child(fav_split);
+		fav_split->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+		left_sidebar->add_child(fav_split);
 
 		favorite_vbox = memnew(VBoxContainer);
 		favorite_vbox->set_v_size_flags(Control::SIZE_EXPAND_FILL);

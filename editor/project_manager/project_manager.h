@@ -2,8 +2,8 @@
 /*  project_manager.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -38,6 +38,7 @@ class EditorAbout;
 class EditorAssetLibrary;
 class EditorFileDialog;
 class EditorTitleBar;
+class EngineUpdateLabel;
 class HFlowContainer;
 class LineEdit;
 class MarginContainer;
@@ -141,10 +142,13 @@ class ProjectManager : public Control {
 
 	UpdateDialog *update_dialog = nullptr;
 	UpdateManager *update_manager = nullptr;
+	EngineUpdateLabel *engine_update_label = nullptr;
 
 	void _on_update_download_requested(const String &p_version, const String &p_url);
 	void _on_update_now_requested();
 	void _on_skip_version_requested();
+	void _on_update_launcher_started();
+	void _on_update_launcher_finished(int p_exit_code);
 
 	// AI engine source cache bootstrap.
 

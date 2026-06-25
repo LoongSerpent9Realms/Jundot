@@ -2,8 +2,8 @@
 /*  file_dialog.h                                                         */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -233,6 +233,8 @@ private:
 	Button *show_filename_filter_button = nullptr;
 	MenuButton *file_sort_button = nullptr;
 
+	VBoxContainer *system_shortcuts_vbox = nullptr;
+	ItemList *system_shortcuts_list = nullptr;
 	VBoxContainer *favorite_vbox = nullptr;
 	Button *fav_up_button = nullptr;
 	Button *fav_down_button = nullptr;
@@ -339,6 +341,9 @@ private:
 	void _change_dir(const String &p_new_dir);
 	void _update_drives(bool p_select = true);
 	void _sort_option_selected(int p_option);
+
+	void _system_shortcut_selected(int p_item);
+	void _update_system_shortcuts();
 
 	void _favorite_selected(int p_item);
 	void _favorite_pressed();

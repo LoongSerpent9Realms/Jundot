@@ -2,6 +2,30 @@
 
 import sys
 
+
+def is_supported_jundot_header(lines, start):
+    if start >= len(lines):
+        return False
+
+    first = lines[start].strip()
+    if not (
+        first.startswith("/**********")
+        or (
+            first.startswith("/*  ")
+            and first.endswith("*/")
+            and "This file is part of:" not in first
+            and start + 1 < len(lines)
+            and lines[start + 1].strip().startswith("/**********")
+        )
+    ):
+        return False
+
+    header_preview = "".join(lines[start : start + 40])
+    return "This file is part of:" in header_preview and (
+        "GODOT ENGINE" in header_preview or "JUNDOT ENGINE" in header_preview or "JunDot" in header_preview
+    )
+
+
 if len(sys.argv) < 2:
     print("Invalid usage of header_guards.py, it should be called with a path to one or multiple files.")
     sys.exit(1)
@@ -10,30 +34,23 @@ changed = []
 invalid = []
 
 for file in sys.argv[1:]:
-    header_start = -1
-    header_end = -1
-
     with open(file.strip(), "rt", encoding="utf-8", newline="\n") as f:
         lines = f.readlines()
 
-    for idx, line in enumerate(lines):
-        sline = line.strip()
+    header_start = 0
+    while header_start < len(lines) and lines[header_start].strip() == "":
+        header_start += 1
 
-        if header_start < 0:
-            if sline == "":  # Skip empty lines at the top.
-                continue
+    if is_supported_jundot_header(lines, header_start):
+        guard_offset = header_start
+        while guard_offset < len(lines) and lines[guard_offset].strip().startswith(("/*", "*")):
+            guard_offset += 1
+        while guard_offset < len(lines) and lines[guard_offset].strip() == "":
+            guard_offset += 1
+    else:
+        guard_offset = header_start
 
-            if sline.startswith("/**********"):  # Jundot header starts this way.
-                header_start = idx
-            else:
-                header_end = 0  # There is no Jundot header.
-                break
-        else:
-            if not sline.startswith(("*", "/*")):  # Not in the Jundot header anymore.
-                header_end = idx + 1  # The guard should be two lines below the Jundot header.
-                break
-
-    if (HEADER_CHECK_OFFSET := header_end) < 0 or HEADER_CHECK_OFFSET >= len(lines):
+    if (HEADER_CHECK_OFFSET := guard_offset) < 0 or HEADER_CHECK_OFFSET >= len(lines):
         invalid.append(file)
         continue
 

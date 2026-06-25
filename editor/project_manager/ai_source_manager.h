@@ -1,4 +1,4 @@
-/*  ai_source_manager.h                                                    */
+/*  ai_source_manager.h                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,9 +27,9 @@
 
 #pragma once
 
+#include "core/os/thread.h"
 #include "core/templates/safe_refcount.h"
 #include "scene/gui/dialogs.h"
-#include "core/os/thread.h"
 #include "scene/gui/progress_bar.h"
 
 class Button;
@@ -77,6 +77,11 @@ private:
 	bool is_downloading = false;
 	bool is_processing = false;
 	String current_error;
+	String cached_update_check_source_root;
+	String cached_update_check_repository_url;
+	String cached_update_check_status_text;
+	bool cached_update_check_available = false;
+	uint64_t cached_update_check_msec = 0;
 
 	Thread *worker_thread = nullptr;
 	String worker_cache_path;
@@ -119,6 +124,9 @@ private:
 	Error _extract_zip(const String &p_zip_path, const String &p_cache_path, String &r_source_root);
 	Error _encrypt_cache(const String &p_cache_path, String &r_error);
 	bool _is_git_available() const;
+	bool _run_git_status_command(const String &p_working_dir, const List<String> &p_args, String &r_output) const;
+	String _get_git_update_status_text(const String &p_source_root, const String &p_repository_url, bool &r_update_available);
+	void _clear_update_check_cache();
 	Error _run_git_process(const List<String> &p_args, const String &p_command, String &r_output, int *r_exit_code = nullptr);
 	Error _run_git_command(const String &p_working_dir, const List<String> &p_args, String &r_output, int *r_exit_code = nullptr);
 	Error _update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_error);

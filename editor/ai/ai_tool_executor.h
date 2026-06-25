@@ -1,4 +1,4 @@
-/*  ai_tool_executor.h                                                     */
+/*  ai_tool_executor.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -29,8 +29,8 @@
 
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
-#include "core/variant/dictionary.h"
 #include "core/variant/array.h"
+#include "core/variant/dictionary.h"
 
 // Executes tool calls returned by the LLM in a Function Calling response.
 // Each tool_call is a Dictionary with "id", "type", "function" keys.
@@ -46,7 +46,9 @@ public:
 private:
 	static Dictionary _read_files(const Dictionary &p_args);
 	static Dictionary _write_file(const Dictionary &p_args);
+	static Dictionary _edit_file(const Dictionary &p_args);
 	static Dictionary _search_files(const Dictionary &p_args);
+	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
 	static Dictionary _check_build_status(const Dictionary &p_args);
@@ -55,6 +57,7 @@ private:
 	static Dictionary _shell_command(const Dictionary &p_args);
 	static Dictionary _restart_engine(const Dictionary &p_args);
 	static Dictionary _upload_code(const Dictionary &p_args);
+	static Dictionary _batch_tools(const Dictionary &p_args);
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 
 	static Dictionary _make_result(const String &p_content, bool p_is_error = false);

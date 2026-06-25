@@ -1,4 +1,4 @@
-/*  ai_chat_message.cpp                                                  */
+/*  ai_chat_message.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -351,7 +351,9 @@ static String _markdown_to_bbcode(const String &p_md) {
 	{
 		Vector<String> lines = s.split("\n", false);
 		s.clear();
-		enum ListState { LIST_NONE, LIST_UL, LIST_OL };
+		enum ListState { LIST_NONE,
+			LIST_UL,
+			LIST_OL };
 		ListState current_list = LIST_NONE;
 		bool in_table = false;
 		int table_cols = 0;
@@ -525,7 +527,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 					item_text = trimmed.substr(1).strip_edges();
 					is_ul = true;
 				}
-			if (is_ul) {
+				if (is_ul) {
 					if (current_list != LIST_UL) {
 						if (current_list != LIST_NONE) {
 							s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";
@@ -658,36 +660,40 @@ void AIChatMessage::_notification(int p_what) {
 		_update_translations();
 	}
 	if (p_what == NOTIFICATION_THEME_CHANGED) {
-		// Apply bubble colors based on editor theme.
+		// Apply message surface colors based on editor theme.
 		Ref<StyleBoxFlat> bubble_style;
 		bubble_style.instantiate();
-		bubble_style->set_corner_radius_all(8 * EDSCALE);
-		bubble_style->set_content_margin_all(10 * EDSCALE);
+		bubble_style->set_corner_radius_all(14 * EDSCALE);
+		bubble_style->set_content_margin_all(14 * EDSCALE);
 
 		Color base = get_theme_color(SNAME("base_color"), SNAME("Editor"));
+		Color font = get_theme_color(SNAME("font_color"), SNAME("Editor"));
+		Color accent = get_theme_color(SNAME("accent_color"), SNAME("Editor"));
 
 		if (is_user) {
-			// User bubble: slightly lighter/different from base.
-			Color user_bg = base.lightened(0.08f);
-			user_bg.a = 0.85f;
+			Color user_bg = accent.darkened(0.48f);
+			user_bg.a = 0.42f;
 			bubble_style->set_bg_color(user_bg);
 			bubble_style->set_border_width_all(1);
-			bubble_style->set_border_color(base.lightened(0.15f));
+			bubble_style->set_border_color(accent * Color(1, 1, 1, 0.40f));
+			author_label->add_theme_color_override(SNAME("font_color"), accent.lightened(0.35f));
 		} else if (is_summary) {
-			// Summary bubble: warm amber/yellow tone.
 			Color summary_bg(0.5f, 0.45f, 0.25f, 0.25f);
 			bubble_style->set_bg_color(summary_bg);
 			bubble_style->set_border_width_all(1);
 			bubble_style->set_border_color(Color(0.6f, 0.55f, 0.3f, 0.5f));
+			author_label->add_theme_color_override(SNAME("font_color"), Color(0.95f, 0.82f, 0.42f));
 		} else {
-			// AI bubble: use base color with subtle border.
 			Color ai_bg = base.lightened(0.02f);
-			ai_bg.a = 0.85f;
+			ai_bg.a = 0.18f;
 			bubble_style->set_bg_color(ai_bg);
-			bubble_style->set_border_width_all(1);
-			bubble_style->set_border_color(base.lightened(0.1f));
+			bubble_style->set_border_width_all(0);
+			bubble_style->set_border_color(Color(0, 0, 0, 0));
+			author_label->add_theme_color_override(SNAME("font_color"), font * Color(1, 1, 1, 0.72f));
 		}
 		bubble->add_theme_style_override(SNAME("panel"), bubble_style);
+		content_label->add_theme_color_override(SNAME("default_color"), font);
+		token_label->add_theme_color_override(SNAME("font_color"), font * Color(1, 1, 1, 0.48f));
 
 		// Thinking toggle button style.
 		if (think_toggle) {
@@ -698,7 +704,6 @@ void AIChatMessage::_notification(int p_what) {
 			think_toggle->add_theme_style_override(SNAME("normal"), think_style);
 			think_toggle->add_theme_style_override(SNAME("hover"), think_style);
 			think_toggle->add_theme_style_override(SNAME("pressed"), think_style);
-			Color accent = get_theme_color(SNAME("accent_color"), SNAME("Editor"));
 			think_toggle->add_theme_color_override(SNAME("font_color"), accent);
 		}
 	}
@@ -723,17 +728,23 @@ void AIChatMessage::_edit_pressed() {
 }
 
 void AIChatMessage::_update_think_visibility() {
-	if (think_content.is_empty()) {
+	if (think_content.is_empty() && think_time_seconds <= 0.0) {
 		think_container->set_visible(false);
 		return;
 	}
 	think_container->set_visible(true);
 	String arrow = think_expanded ? String::utf8("\xe2\x96\xbc") : String::utf8("\xe2\x96\xb6");
-	String time_text;
-	if (think_time_seconds > 0.0) {
-		time_text = vformat(TTR(" (%.1f s)"), think_time_seconds);
+	String processed_text = TTR("Processed");
+	if (think_time_seconds >= 60.0) {
+		const int total_seconds = (int)Math::round(think_time_seconds);
+		const int minutes = total_seconds / 60;
+		const int seconds = total_seconds % 60;
+		processed_text = vformat(TTR("Processed %dm %ds"), minutes, seconds);
+	} else if (think_time_seconds > 0.0) {
+		processed_text = vformat(TTR("Processed %.1fs"), think_time_seconds);
 	}
-	think_toggle->set_text(arrow + " " + TTR("Thought") + time_text);
+	think_toggle->set_text(processed_text + " " + arrow);
+	think_label->set_visible(think_expanded && !think_content.is_empty());
 }
 
 void AIChatMessage::_update_footer() {
@@ -747,6 +758,8 @@ void AIChatMessage::_update_footer() {
 
 void AIChatMessage::_update_translations() {
 	author_label->set_text(is_summary ? TTR("Summary") : (is_user ? TTR("You") : TTR("AI")));
+	copy_button->set_text(TTR("Copy"));
+	edit_button->set_text(TTR("Edit"));
 	copy_button->set_tooltip_text(TTR("Copy message"));
 	edit_button->set_tooltip_text(TTR("Edit message"));
 	_update_think_visibility();
@@ -761,13 +774,12 @@ void AIChatMessage::_build_ui() {
 	alignment_box->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	add_child(alignment_box);
 
-	// Spacers push the bubble to the correct side.
 	Control *left_spacer = memnew(Control);
-	left_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	left_spacer->set_custom_minimum_size(Size2(10, 0) * EDSCALE);
 	alignment_box->add_child(left_spacer);
 
 	bubble = memnew(PanelContainer);
-	bubble->set_h_size_flags(Control::SIZE_SHRINK_BEGIN);
+	bubble->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	bubble->set_v_size_flags(Control::SIZE_SHRINK_BEGIN);
 	alignment_box->add_child(bubble);
 
@@ -786,7 +798,8 @@ void AIChatMessage::_build_ui() {
 	content_label->set_fit_content(true);
 	content_label->set_selection_enabled(true);
 	content_label->set_deselect_on_focus_loss_enabled(true);
-	content_label->set_custom_minimum_size(Size2(260 * EDSCALE, 0));
+	content_label->set_custom_minimum_size(Size2(420 * EDSCALE, 0));
+	content_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	content_label->set_use_bbcode(true);
 	bubble_content->add_child(content_label);
 
@@ -835,7 +848,7 @@ void AIChatMessage::_build_ui() {
 	footer->add_child(edit_button);
 
 	Control *right_spacer = memnew(Control);
-	right_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	right_spacer->set_custom_minimum_size(Size2(10, 0) * EDSCALE);
 	alignment_box->add_child(right_spacer);
 }
 
@@ -847,9 +860,13 @@ void AIChatMessage::setup_user(const String &p_content) {
 	footer->set_visible(true);
 	token_label->set_visible(false);
 
-	// Align to right: show left spacer to push bubble right, hide right spacer.
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(true); // left_spacer
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(false); // right_spacer
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_SHRINK_END);
 
 	// Ensure edit button is in footer for user messages.
 	if (edit_button && edit_button->get_parent() != footer) {
@@ -875,9 +892,13 @@ void AIChatMessage::setup_ai(const String &p_content, const String &p_think_cont
 		footer->remove_child(edit_button);
 	}
 
-	// Align to left: hide left spacer, show right spacer to keep bubble left.
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(false); // left_spacer
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true); // right_spacer
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
 	_update_think_visibility();
 	_update_footer();
@@ -904,9 +925,13 @@ void AIChatMessage::setup_summary(const String &p_content) {
 		footer->remove_child(edit_button);
 	}
 
-	// Align to left (like AI messages).
-	Object::cast_to<Control>(alignment_box->get_child(0))->set_visible(false); // left_spacer
-	Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1))->set_visible(true); // right_spacer
+	Control *left_spacer = Object::cast_to<Control>(alignment_box->get_child(0));
+	Control *right_spacer = Object::cast_to<Control>(alignment_box->get_child(alignment_box->get_child_count() - 1));
+	left_spacer->set_visible(true);
+	left_spacer->set_h_size_flags(Control::SIZE_FILL);
+	right_spacer->set_visible(true);
+	right_spacer->set_h_size_flags(Control::SIZE_FILL);
+	bubble->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 
 	_update_footer();
 	_update_translations();
@@ -925,9 +950,32 @@ void AIChatMessage::set_content(const String &p_content) {
 	}
 }
 
+void AIChatMessage::set_think_time_seconds(double p_seconds) {
+	think_time_seconds = MAX(0.0, p_seconds);
+	_update_think_visibility();
+}
+
 void AIChatMessage::set_markdown_content(const String &p_content) {
 	message_content = p_content;
 	content_label->set_text(_markdown_to_bbcode(p_content));
+}
+
+void AIChatMessage::set_display_scale(float p_scale) {
+	const float clamped = CLAMP(p_scale, 0.75f, 1.35f);
+	const int body_size = Math::round(14 * clamped * EDSCALE);
+	const int small_size = Math::round(11 * clamped * EDSCALE);
+	const int mono_size = Math::round(13 * clamped * EDSCALE);
+
+	author_label->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	content_label->add_theme_font_size_override(SNAME("normal_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("bold_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("italics_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("bold_italics_font_size"), body_size);
+	content_label->add_theme_font_size_override(SNAME("mono_font_size"), mono_size);
+	think_label->add_theme_font_size_override(SceneStringName(font_size), Math::round(12 * clamped * EDSCALE));
+	token_label->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	copy_button->add_theme_font_size_override(SceneStringName(font_size), small_size);
+	edit_button->add_theme_font_size_override(SceneStringName(font_size), small_size);
 }
 
 AIChatMessage::AIChatMessage() {

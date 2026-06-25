@@ -1,4 +1,4 @@
-/*  ai_chat_service.h                                                      */
+/*  ai_chat_service.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -30,16 +30,17 @@
 #include "core/io/http_client.h"
 #include "core/typedefs.h"
 #include "core/variant/dictionary.h"
+#include "editor/ai/ai_settings.h"
 #include "scene/main/node.h"
 
-#include "ai_settings.h"
-
+class AIJundotPluginBackend;
 class HTTPRequest;
 
 class AIChatService : public Node {
 	GDCLASS(AIChatService, Node)
 
 	HTTPRequest *http_request = nullptr;
+	AIJundotPluginBackend *jundot_plugin_backend = nullptr;
 	AISettingsData settings;
 	double timeout = 300.0;
 	bool use_threads = true;
@@ -53,7 +54,11 @@ class AIChatService : public Node {
 
 	String _build_chat_url() const;
 	void _ensure_http_request();
+	void _ensure_jundot_plugin_backend();
+	bool _should_use_jundot_plugin_backend() const;
 	void _request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	void _jundot_plugin_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
+	void _jundot_plugin_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
 	String _extract_text_from_response(const Variant &p_data) const;
 	void _extract_usage_from_response(const Variant &p_data, int &r_prompt_tokens, int &r_completion_tokens) const;
 	void _extract_think_from_content(String &r_content, String &r_think) const;

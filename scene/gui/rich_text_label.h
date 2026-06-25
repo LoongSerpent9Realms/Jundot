@@ -2,8 +2,8 @@
 /*  rich_text_label.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -616,11 +616,11 @@ private:
 		mutable bool to_line_found = false;
 
 		enum SelectionMode {
-			SINGLE_CLICK,
-			DOUBLE_CLICK,
-			TRIPLE_CLICK,
+			SELECTION_SINGLE_CLICK,
+			SELECTION_DOUBLE_CLICK,
+			SELECTION_TRIPLE_CLICK,
 		};
-		SelectionMode selection_mode = SINGLE_CLICK;
+		SelectionMode selection_mode = SELECTION_SINGLE_CLICK;
 		bool active = false; // anything selected? i.e. from, to, etc. valid?
 		bool enabled = false; // allow selections?
 		bool drag_attempt = false;

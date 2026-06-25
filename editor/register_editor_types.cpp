@@ -2,8 +2,8 @@
 /*  register_editor_types.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -36,10 +36,11 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
-#include "editor/ai/ai_chat_service.h"
 #include "editor/ai/ai_chat_panel.h"
+#include "editor/ai/ai_chat_service.h"
 #include "editor/ai/ai_config_panel.h"
 #include "editor/ai/ai_editor_plugin.h"
+#include "editor/ai/ai_jundot_plugin_backend.h"
 #include "editor/ai/ai_memory_panel.h"
 #include "editor/ai/ai_repair_card.h"
 #include "editor/ai/ai_tools_panel.h"
@@ -213,6 +214,7 @@ void register_editor_types() {
 	GDREGISTER_VIRTUAL_CLASS(EditorCommandPalette);
 	GDREGISTER_CLASS(EditorDebuggerPlugin);
 	GDREGISTER_ABSTRACT_CLASS(EditorDebuggerSession);
+	GDREGISTER_ABSTRACT_CLASS(AIJundotPluginBackend);
 	GDREGISTER_ABSTRACT_CLASS(AIChatService);
 	GDREGISTER_ABSTRACT_CLASS(AIChatPanel);
 	GDREGISTER_ABSTRACT_CLASS(AIConfigPanel);
