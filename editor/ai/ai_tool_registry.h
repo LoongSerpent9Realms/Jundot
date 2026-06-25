@@ -26,9 +26,9 @@ struct AISkillEntry {
 };
 
 enum class MCPServerLifecycle {
-	DEFAULT,    // 按需启动，对话结束后关闭
-	KEEPALIVE,  // 永久驻留，编辑器退出时关闭
-	ONE_SHOT    // 单次使用
+	DEFAULT, // 按需启动，对话结束后关闭
+	KEEPALIVE, // 永久驻留，编辑器退出时关闭
+	ONE_SHOT // 单次使用
 };
 
 struct AIMCPServerEntry {

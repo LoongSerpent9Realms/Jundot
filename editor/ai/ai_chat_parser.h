@@ -1,4 +1,4 @@
-/*  ai_chat_parser.h                                                       */
+/*  ai_chat_parser.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,12 +27,11 @@
 
 #pragma once
 
-#include "editor/ai/ai_memory_store.h"
-#include "editor/ai/ai_tool_registry.h"
-#include "editor/ai/ai_feature_gate.h"
-
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
+#include "editor/ai/ai_feature_gate.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_tool_registry.h"
 
 struct AISuggestion {
 	enum Type {

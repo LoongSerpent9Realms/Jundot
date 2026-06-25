@@ -9,9 +9,8 @@
 #include "core/typedefs.h"
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
+#include "editor/ai/ai_settings.h"
 #include "scene/main/node.h"
-
-#include "ai_settings.h"
 
 class HTTPRequest;
 class Timer;

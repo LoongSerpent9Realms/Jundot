@@ -1,4 +1,4 @@
-/*  ai_chat_message.h                                                    */
+/*  ai_chat_message.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */

@@ -1,4 +1,4 @@
-/*  ai_source_manager.cpp                                                  */
+/*  ai_source_manager.cpp                                                 */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -36,13 +36,14 @@
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/project_manager/multipart_downloader.h"
 #include "editor/themes/editor_scale.h"
-#include "modules/zip/zip_reader.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
-#include "scene/gui/scroll_container.h"
 #include "scene/gui/scroll_bar.h"
+#include "scene/gui/scroll_container.h"
+
+#include "modules/zip/zip_reader.h"
 
 #ifdef WINDOWS_ENABLED
 #include <windows.h>

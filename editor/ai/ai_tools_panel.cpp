@@ -6,15 +6,14 @@
 
 #include "ai_tools_panel.h"
 
-#include "ai_importer.h"
-#include "ai_memory_store.h"
-#include "ai_skill_installer.h"
-#include "ai_mcp_runtime.h"
-
 #include "core/error/error_macros.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/time.h"
+#include "editor/ai/ai_importer.h"
+#include "editor/ai/ai_mcp_runtime.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_skill_installer.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"

@@ -1,4 +1,4 @@
-/*  ai_chat_panel.h                                                        */
+/*  ai_chat_panel.h                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,11 +27,10 @@
 
 #pragma once
 
-#include "ai_settings.h"
-#include "editor/ai/ai_chat_parser.h"
-
-#include "core/templates/vector.h"
 #include "core/os/thread.h"
+#include "core/templates/vector.h"
+#include "editor/ai/ai_chat_parser.h"
+#include "editor/ai/ai_settings.h"
 #include "scene/gui/margin_container.h"
 
 class AIChatMessage;

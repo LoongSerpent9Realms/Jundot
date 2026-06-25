@@ -2,8 +2,8 @@
 /*  register_editor_types.cpp                                             */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                             GODOT ENGINE                               */
-/*                        https://godotengine.org                         */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
 /**************************************************************************/
 /* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
 /* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
@@ -36,8 +36,8 @@
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
 #include "core/os/os.h"
-#include "editor/ai/ai_chat_service.h"
 #include "editor/ai/ai_chat_panel.h"
+#include "editor/ai/ai_chat_service.h"
 #include "editor/ai/ai_config_panel.h"
 #include "editor/ai/ai_editor_plugin.h"
 #include "editor/ai/ai_jundot_plugin_backend.h"

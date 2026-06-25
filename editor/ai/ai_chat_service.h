@@ -1,4 +1,4 @@
-/*  ai_chat_service.h                                                      */
+/*  ai_chat_service.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -30,9 +30,8 @@
 #include "core/io/http_client.h"
 #include "core/typedefs.h"
 #include "core/variant/dictionary.h"
+#include "editor/ai/ai_settings.h"
 #include "scene/main/node.h"
-
-#include "ai_settings.h"
 
 class AIJundotPluginBackend;
 class HTTPRequest;

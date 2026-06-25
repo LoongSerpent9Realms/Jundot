@@ -1,4 +1,4 @@
-/*  ai_tool_executor.h                                                     */
+/*  ai_tool_executor.h                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -29,8 +29,8 @@
 
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
-#include "core/variant/dictionary.h"
 #include "core/variant/array.h"
+#include "core/variant/dictionary.h"
 
 // Executes tool calls returned by the LLM in a Function Calling response.
 // Each tool_call is a Dictionary with "id", "type", "function" keys.

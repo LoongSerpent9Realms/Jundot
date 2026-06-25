@@ -2,17 +2,40 @@
 /*  ai_mcp_http_server.cpp                                                */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                                JunDot                                  */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
 #include "ai_mcp_http_server.h"
 
-#include "ai_settings.h"
-#include "ai_tool_executor.h"
-#include "ai_tool_defs.h"
-#include "ai_tool_registry.h"
 #include "core/io/json.h"
 #include "core/os/os.h"
+#include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_tool_defs.h"
+#include "editor/ai/ai_tool_executor.h"
+#include "editor/ai/ai_tool_registry.h"
 
 static Dictionary _external_mcp_str_property(const String &p_description) {
 	Dictionary prop;
@@ -156,11 +179,20 @@ void AIMCPHTTPServer::_handle_client(Ref<StreamPeerTCP> p_client) {
 void AIMCPHTTPServer::_send_response(Ref<StreamPeerTCP> p_client, int p_status_code, const String &p_content_type, const String &p_content) {
 	String status_text;
 	switch (p_status_code) {
-		case 200: status_text = "OK"; break;
-		case 400: status_text = "Bad Request"; break;
-		case 404: status_text = "Not Found"; break;
-		case 500: status_text = "Internal Server Error"; break;
-		default: status_text = "Unknown";
+		case 200:
+			status_text = "OK";
+			break;
+		case 400:
+			status_text = "Bad Request";
+			break;
+		case 404:
+			status_text = "Not Found";
+			break;
+		case 500:
+			status_text = "Internal Server Error";
+			break;
+		default:
+			status_text = "Unknown";
 	}
 
 	String response = vformat("HTTP/1.1 %d %s\r\n", p_status_code, status_text);

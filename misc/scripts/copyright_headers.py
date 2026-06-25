@@ -3,6 +3,34 @@
 import os
 import sys
 
+
+def has_supported_jundot_header(lines):
+    first_line = 0
+    while first_line < len(lines) and lines[first_line].strip() == "":
+        first_line += 1
+
+    if first_line >= len(lines):
+        return False
+
+    first = lines[first_line].strip()
+    if not (
+        first.startswith("/**********")
+        or (
+            first.startswith("/*  ")
+            and first.endswith("*/")
+            and "This file is part of:" not in first
+            and first_line + 1 < len(lines)
+            and lines[first_line + 1].strip().startswith("/**********")
+        )
+    ):
+        return False
+
+    header_preview = "".join(lines[first_line : first_line + 40])
+    return "This file is part of:" in header_preview and (
+        "GODOT ENGINE" in header_preview or "JUNDOT ENGINE" in header_preview or "JunDot" in header_preview
+    )
+
+
 header = """\
 /**************************************************************************/
 /*  $filename                                                             */
@@ -41,6 +69,15 @@ if len(sys.argv) < 2:
 
 for f in sys.argv[1:]:
     fname = f
+
+    with open(fname.strip(), "r", encoding="utf-8") as fileread:
+        original_lines = fileread.readlines()
+
+    # JunDot-specific files may use the shorter contributor header, while
+    # inherited engine files may retain the upstream GODOT ENGINE header. All
+    # contain the project marker and the MIT license and are valid.
+    if has_supported_jundot_header(original_lines):
+        continue
 
     # Handle replacing $filename with actual filename and keep alignment
     fsingle = os.path.basename(fname.strip())

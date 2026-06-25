@@ -6,10 +6,9 @@
 
 #include "ai_context_builder.h"
 
-#include "ai_memory_store.h"
-#include "ai_tool_registry.h"
-
 #include "core/math/math_defs.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_tool_registry.h"
 
 struct AIMemorySort {
 	bool operator()(const AIMemoryEntry &p_left, const AIMemoryEntry &p_right) const {

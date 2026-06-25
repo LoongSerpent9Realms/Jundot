@@ -6,9 +6,8 @@
 
 #include "ai_usage_agreement_dialog.h"
 
-#include "ai_settings.h"
-
 #include "core/object/callable_mp.h"
+#include "editor/ai/ai_settings.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/check_box.h"

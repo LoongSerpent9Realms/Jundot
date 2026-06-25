@@ -1,4 +1,4 @@
-/*  ai_chat_message.cpp                                                  */
+/*  ai_chat_message.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -351,7 +351,9 @@ static String _markdown_to_bbcode(const String &p_md) {
 	{
 		Vector<String> lines = s.split("\n", false);
 		s.clear();
-		enum ListState { LIST_NONE, LIST_UL, LIST_OL };
+		enum ListState { LIST_NONE,
+			LIST_UL,
+			LIST_OL };
 		ListState current_list = LIST_NONE;
 		bool in_table = false;
 		int table_cols = 0;
@@ -525,7 +527,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 					item_text = trimmed.substr(1).strip_edges();
 					is_ul = true;
 				}
-			if (is_ul) {
+				if (is_ul) {
 					if (current_list != LIST_UL) {
 						if (current_list != LIST_NONE) {
 							s += "[/" + String(current_list == LIST_UL ? "ul" : "ol") + "]\n";

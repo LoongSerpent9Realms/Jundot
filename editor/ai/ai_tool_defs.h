@@ -1,4 +1,4 @@
-/*  ai_tool_defs.h                                                          */
+/*  ai_tool_defs.h                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,9 +27,9 @@
 
 #pragma once
 
-#include "ai_settings.h"
 #include "core/templates/vector.h"
 #include "core/variant/array.h"
+#include "editor/ai/ai_settings.h"
 
 // Tool name constants.
 namespace AIToolNames {

@@ -1,4 +1,4 @@
-/*  ai_tool_defs.cpp                                                        */
+/*  ai_tool_defs.cpp                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -26,10 +26,10 @@
 /**************************************************************************/
 
 #include "ai_tool_defs.h"
-#include "ai_tool_registry.h"
-#include "ai_mcp_runtime.h"
 
 #include "core/io/json.h"
+#include "editor/ai/ai_mcp_runtime.h"
+#include "editor/ai/ai_tool_registry.h"
 
 static Dictionary _make_fn(const String &p_name, const String &p_description, const Dictionary &p_parameters, const Array &p_required) {
 	Dictionary fn;

@@ -6,14 +6,13 @@
 
 #include "ai_jundot_plugin_backend.h"
 
-#include "ai_http_response_text.h"
-
 #include "core/io/http_client.h"
 #include "core/io/json.h"
 #include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "editor/ai/ai_http_response_text.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
 #include "scene/main/timer.h"
@@ -147,12 +146,12 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 		if (preview.is_empty()) {
 			preview = "(empty body)";
 		}
-		
+
 		String hint = "";
 		if (preview.begins_with("<!doctype html>") || preview.begins_with("<html")) {
 			hint = "\n\nHint: The plugin returned an HTML page instead of JSON. This usually means the /ai/chat endpoint does not exist on the MiMoCode server. Please ensure you have the latest version of the MiMoCode Jundot plugin installed.";
 		}
-		
+
 		String error_text = vformat("MiMoCode jundot plugin returned a non-JSON response (HTTP %d): %s%s", p_response_code, preview, hint);
 		_emit_completed(HTTPRequest::RESULT_BODY_DECOMPRESS_FAILED, p_response_code, error_text, Dictionary(), body_text, elapsed);
 		return;

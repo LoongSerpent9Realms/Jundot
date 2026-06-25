@@ -1,4 +1,4 @@
-/*  ai_chat_service.cpp                                                    */
+/*  ai_chat_service.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,14 +27,13 @@
 
 #include "ai_chat_service.h"
 
-#include "ai_http_response_text.h"
-#include "ai_jundot_plugin_backend.h"
-#include "ai_settings.h"
-
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "editor/ai/ai_http_response_text.h"
+#include "editor/ai/ai_jundot_plugin_backend.h"
+#include "editor/ai/ai_settings.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
 
@@ -357,19 +356,32 @@ void AIChatService::_extract_think_from_content(String &r_content, String &r_thi
 
 static String _http_result_to_string(int p_result) {
 	switch (p_result) {
-		case 0: return "Success";
-		case 1: return "Chunked body size mismatch";
-		case 2: return "Cannot connect to server";
-		case 3: return "Cannot resolve hostname";
-		case 4: return "Connection error";
-		case 5: return "SSL handshake failed";
-		case 6: return "No response from server";
-		case 7: return "Body decompression failed";
-		case 8: return "Request failed (possibly timed out)";
-		case 9: return "Cannot open download file";
-		case 10: return "Download file write error";
-		case 11: return "Redirect limit reached";
-		default: return "Unknown error (code: " + itos(p_result) + ")";
+		case 0:
+			return "Success";
+		case 1:
+			return "Chunked body size mismatch";
+		case 2:
+			return "Cannot connect to server";
+		case 3:
+			return "Cannot resolve hostname";
+		case 4:
+			return "Connection error";
+		case 5:
+			return "SSL handshake failed";
+		case 6:
+			return "No response from server";
+		case 7:
+			return "Body decompression failed";
+		case 8:
+			return "Request failed (possibly timed out)";
+		case 9:
+			return "Cannot open download file";
+		case 10:
+			return "Download file write error";
+		case 11:
+			return "Redirect limit reached";
+		default:
+			return "Unknown error (code: " + itos(p_result) + ")";
 	}
 }
 

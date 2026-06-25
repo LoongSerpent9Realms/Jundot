@@ -1,4 +1,4 @@
-/*  ai_config_panel.h                                                      */
+/*  ai_config_panel.h                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */

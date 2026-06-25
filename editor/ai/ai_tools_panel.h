@@ -6,10 +6,9 @@
 
 #pragma once
 
-#include "ai_chat_parser.h"
-#include "ai_tool_registry.h"
-
 #include "core/os/thread.h"
+#include "editor/ai/ai_chat_parser.h"
+#include "editor/ai/ai_tool_registry.h"
 #include "scene/gui/margin_container.h"
 
 class Button;

@@ -1,4 +1,4 @@
-/*  ai_config_panel.cpp                                                    */
+/*  ai_config_panel.cpp                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,18 +27,17 @@
 
 #include "ai_config_panel.h"
 
-#include "ai_chat_service.h"
-#include "ai_settings.h"
-#include "ai_usage_agreement_dialog.h"
-#include "ai_mcp_manager.h"
-
-#include "core/io/file_access.h"
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
-#include "editor/themes/editor_scale.h"
+#include "editor/ai/ai_chat_service.h"
+#include "editor/ai/ai_mcp_manager.h"
+#include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/gui/editor_file_dialog.h"
+#include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"

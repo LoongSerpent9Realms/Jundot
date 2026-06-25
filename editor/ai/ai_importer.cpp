@@ -1,4 +1,4 @@
-/*  ai_importer.cpp                                                        */
+/*  ai_importer.cpp                                                       */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,12 +27,11 @@
 
 #include "ai_importer.h"
 
-#include "ai_memory_store.h"
-#include "ai_tool_registry.h"
-
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_tool_registry.h"
 
 AIImporter::FileFormat AIImporter::_detect_format(const String &p_path) {
 	const String filename = p_path.get_file().to_lower();

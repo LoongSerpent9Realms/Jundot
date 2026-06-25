@@ -1,4 +1,4 @@
-/*  ai_source_manager.h                                                    */
+/*  ai_source_manager.h                                                   */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,9 +27,9 @@
 
 #pragma once
 
+#include "core/os/thread.h"
 #include "core/templates/safe_refcount.h"
 #include "scene/gui/dialogs.h"
-#include "core/os/thread.h"
 #include "scene/gui/progress_bar.h"
 
 class Button;

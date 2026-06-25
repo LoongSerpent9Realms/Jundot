@@ -1,4 +1,4 @@
-﻿/*  ai_chat_panel.cpp                                                      */
+/*  ai_chat_panel.cpp                                                     */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
@@ -27,33 +27,32 @@
 
 #include "ai_chat_panel.h"
 
-#include "ai_build_bridge.h"
-#include "ai_chat_message.h"
-#include "ai_code_fetcher.h"
-#include "ai_new_build_notifier.h"
-#include "ai_patch_applier.h"
-#include "ai_restart_helper.h"
-#include "ai_chat_service.h"
-#include "ai_context_builder.h"
-#include "ai_importer.h"
-#include "ai_memory_store.h"
-#include "ai_settings.h"
-#include "ai_repair_card.h"
-#include "ai_repair_workflow.h"
-#include "ai_suggestion_card.h"
-#include "ai_tool_confirmation_dialog.h"
-#include "ai_tool_defs.h"
-#include "ai_tool_executor.h"
-#include "ai_tool_registry.h"
-#include "ai_usage_agreement_dialog.h"
-#include "ai_feature_gate.h"
-
-#include "core/io/file_access.h"
 #include "core/io/dir_access.h"
+#include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "editor/ai/ai_build_bridge.h"
+#include "editor/ai/ai_chat_message.h"
+#include "editor/ai/ai_chat_service.h"
+#include "editor/ai/ai_code_fetcher.h"
+#include "editor/ai/ai_context_builder.h"
+#include "editor/ai/ai_feature_gate.h"
+#include "editor/ai/ai_importer.h"
+#include "editor/ai/ai_memory_store.h"
+#include "editor/ai/ai_new_build_notifier.h"
+#include "editor/ai/ai_patch_applier.h"
+#include "editor/ai/ai_repair_card.h"
+#include "editor/ai/ai_repair_workflow.h"
+#include "editor/ai/ai_restart_helper.h"
+#include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_suggestion_card.h"
+#include "editor/ai/ai_tool_confirmation_dialog.h"
+#include "editor/ai/ai_tool_defs.h"
+#include "editor/ai/ai_tool_executor.h"
+#include "editor/ai/ai_tool_registry.h"
+#include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/docks/editor_dock.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -70,21 +69,21 @@
 #include "scene/gui/split_container.h"
 #include "scene/gui/tab_container.h"
 #include "scene/gui/text_edit.h"
-#include "scene/main/scene_tree.h"
-#include "scene/main/window.h"
 #include "scene/main/http_request.h"
+#include "scene/main/scene_tree.h"
 #include "scene/main/timer.h"
+#include "scene/main/window.h"
 #include "scene/resources/style_box_flat.h"
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
 
 static String _ai_chat_next_question_protocol() {
 	return String("=== Next Question Options Protocol ===\n"
-			"- REQUIRED: At the end of every final assistant response, suggest 2 to 4 likely next questions the user may want to ask. Never omit them.\n"
-			"- Put each question in a hidden machine-readable block so the editor can show it as a clickable option:\n"
-			"<!-- NEXT_QUESTION -->\nQUESTION: <one concise user question>\n<!-- END_NEXT_QUESTION -->\n"
-			"- Keep each question specific to the current conversation and useful as the user's next message.\n"
-			"- Do not mention these hidden blocks in the visible response.");
+				  "- REQUIRED: At the end of every final assistant response, suggest 2 to 4 likely next questions the user may want to ask. Never omit them.\n"
+				  "- Put each question in a hidden machine-readable block so the editor can show it as a clickable option:\n"
+				  "<!-- NEXT_QUESTION -->\nQUESTION: <one concise user question>\n<!-- END_NEXT_QUESTION -->\n"
+				  "- Keep each question specific to the current conversation and useful as the user's next message.\n"
+				  "- Do not mention these hidden blocks in the visible response.");
 }
 
 static Ref<StyleBoxFlat> _ai_chat_make_panel_style(const Color &p_bg, const Color &p_border, float p_radius = 8.0f, float p_margin = 8.0f) {
@@ -504,7 +503,7 @@ void AIChatPanel::_delete_current_conversation() {
 
 void AIChatPanel::_save_all_conversations() const {
 	// Make sure the currently active conversation is up-to-date before saving.
-	// (This is a const method that serialises by working on a cached copy;
+	// (This is a const method that serializes by working on a cached copy;
 	// we instead rely on callers invoking _serialize_current_messages first.)
 
 	String path = _get_conversations_file_path();
@@ -1457,7 +1456,7 @@ void AIChatPanel::_send_message() {
 	Array history = _build_message_history();
 
 	// Auto-title: on the first user message of a conversation with no
-	// manually-set title, ask the AI to summarise a conversation title
+	// manually-set title, ask the AI to summarize a conversation title
 	// once the normal response has been received.
 	bool needs_auto_title = !has_auto_titled &&
 			(!conversation_name_edit || conversation_name_edit->get_text().strip_edges().is_empty()) &&
@@ -2239,8 +2238,8 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 				String finish_reason = first.get("finish_reason", String());
 				Dictionary msg = first.get("message", Dictionary());
 				bool has_tool_calls = (finish_reason == "tool_calls") ||
-					(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
-						!((Array)msg["tool_calls"]).is_empty());
+						(msg.has("tool_calls") && msg["tool_calls"].get_type() == Variant::ARRAY &&
+								!((Array)msg["tool_calls"]).is_empty());
 				if (has_tool_calls) {
 					Vector<AITaskPlan> task_plans;
 					AIChatParser::parse_task_plans(p_content, task_plans);
@@ -2274,7 +2273,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 						if (err != OK) {
 							_set_requesting(false);
 							_add_ai_message(vformat(TTR("Maximum tool call iterations (%d) reached, and the final summary request could not start. Please ask the AI to summarize the results manually."),
-									active_settings.max_tool_iterations),
+													active_settings.max_tool_iterations),
 									String(), 0.0, p_prompt_tokens, p_completion_tokens);
 							tool_call_label->set_visible(false);
 							tool_call_label->set_text(String());
@@ -3035,12 +3034,12 @@ void AIChatPanel::_repair_run_tests(AIRepairCard *p_card) {
 	Error err = AIRepairWorkflow::run_repair_tests(test_cmd, output, exit_code);
 
 	AIRepairTask::State new_state = (err == OK && exit_code == 0)
-		? AIRepairTask::STATE_TESTS_PASSED
-		: AIRepairTask::STATE_TESTS_FAILED;
+			? AIRepairTask::STATE_TESTS_PASSED
+			: AIRepairTask::STATE_TESTS_FAILED;
 
 	String error_detail = (new_state == AIRepairTask::STATE_TESTS_FAILED)
-		? vformat("Test exited with code %d. %s", exit_code, output.substr(0, 256))
-		: String();
+			? vformat("Test exited with code %d. %s", exit_code, output.substr(0, 256))
+			: String();
 
 	AIRepairWorkflow::update_task(task.id, new_state, error_detail);
 	task.state = new_state;

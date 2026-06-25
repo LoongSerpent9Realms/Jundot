@@ -2,7 +2,30 @@
 /*  ai_mcp_runtime.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
-/*                                JunDot                                  */
+/*                             JUNDOT ENGINE                               */
+/*                        https://jundotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
 #include "ai_mcp_runtime.h"
@@ -74,9 +97,7 @@ MCPServerRuntime::~MCPServerRuntime() {
 Error MCPServerRuntime::start(const AIMCPServerEntry &p_entry) {
 	if (p_entry.command.is_empty()) {
 		MutexLock lock(state_mutex);
-		last_error = p_entry.url.is_empty() ?
-				"MCP server command is empty" :
-				"URL-only MCP servers require a stdio bridge command";
+		last_error = p_entry.url.is_empty() ? "MCP server command is empty" : "URL-only MCP servers require a stdio bridge command";
 		state = ServerState::ERROR;
 		return ERR_UNAVAILABLE;
 	}
@@ -155,9 +176,7 @@ Error MCPServerRuntime::start(const AIMCPServerEntry &p_entry) {
 
 	if (result.is_empty()) {
 		MutexLock lock(state_mutex);
-		last_error = command.get_file().get_basename().to_lower() == "uvx" ?
-				"Could not start uvx. Install uv and ensure uvx is available in PATH." :
-				"execute_with_pipe failed to start: " + command;
+		last_error = command.get_file().get_basename().to_lower() == "uvx" ? "Could not start uvx. Install uv and ensure uvx is available in PATH." : "execute_with_pipe failed to start: " + command;
 		state = ServerState::ERROR;
 		return FAILED;
 	}

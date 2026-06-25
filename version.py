@@ -1,4 +1,4 @@
-﻿short_name = "jundot"
+short_name = "jundot"
 
 name = "Jundot Engine"
 
@@ -15,4 +15,3 @@ module_config = ""
 website = "https://jundotengine.org"
 
 docs = "latest"
-

@@ -1,4 +1,4 @@
-/*  ai_chat_parser.cpp                                                     */
+/*  ai_chat_parser.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                                JunDot                                  */
