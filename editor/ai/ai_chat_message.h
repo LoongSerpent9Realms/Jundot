@@ -91,6 +91,7 @@ public:
 	String get_think_content() const { return think_content; }
 	double get_think_time_seconds() const { return think_time_seconds; }
 	void set_content(const String &p_content);
+	void set_think_time_seconds(double p_seconds);
 
 	void set_markdown_content(const String &p_content);
 	void set_display_scale(float p_scale);

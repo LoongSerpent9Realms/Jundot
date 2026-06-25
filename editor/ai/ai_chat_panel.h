@@ -156,6 +156,7 @@ class AIChatPanel : public MarginContainer {
 	uint64_t response_started_usec = 0;
 	String accumulated_think_content;
 	Timer *build_status_poll_timer = nullptr;
+	Timer *response_elapsed_timer = nullptr;
 	int build_status_poll_count = 0;
 
 	// Tool call confirmation dialog.
@@ -250,6 +251,7 @@ class AIChatPanel : public MarginContainer {
 	bool _extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const;
 	String _strip_text_tool_call_blocks(const String &p_content) const;
 	void _start_response_tracking();
+	void _on_response_elapsed_tick();
 	void _append_response_thought(const String &p_content);
 	String _get_response_thought(const String &p_current_thought) const;
 	double _get_response_elapsed(double p_fallback_elapsed) const;

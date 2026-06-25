@@ -1875,7 +1875,7 @@ void AIChatPanel::_chat_stream_data(const String &p_delta, const String &p_full_
 
 	if (!streaming_message) {
 		streaming_message = memnew(AIChatMessage);
-		streaming_message->setup_ai(p_full_content, String(), 0.0, 0, p_completion_tokens);
+		streaming_message->setup_ai(p_full_content, String(), _get_response_elapsed(0.0), 0, p_completion_tokens);
 		streaming_message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
 		streaming_message->set_display_scale(chat_display_scale);
 		message_list->add_child(streaming_message);
@@ -2093,6 +2093,37 @@ String AIChatPanel::_strip_text_tool_call_blocks(const String &p_content) const 
 void AIChatPanel::_start_response_tracking() {
 	response_started_usec = OS::get_singleton()->get_ticks_usec();
 	accumulated_think_content.clear();
+
+	if (!response_elapsed_timer) {
+		response_elapsed_timer = memnew(Timer);
+		response_elapsed_timer->set_wait_time(0.1);
+		response_elapsed_timer->set_one_shot(false);
+		response_elapsed_timer->connect("timeout", callable_mp(this, &AIChatPanel::_on_response_elapsed_tick));
+		add_child(response_elapsed_timer, false, INTERNAL_MODE_BACK);
+	}
+	response_elapsed_timer->start();
+	_on_response_elapsed_tick();
+}
+
+void AIChatPanel::_on_response_elapsed_tick() {
+	if (response_started_usec == 0 || !is_inside_tree()) {
+		return;
+	}
+	if (!request_conversation_id.is_empty() && request_conversation_id != active_conversation_id) {
+		return;
+	}
+
+	const double elapsed = _get_response_elapsed(0.0);
+	if (!streaming_message) {
+		streaming_message = memnew(AIChatMessage);
+		streaming_message->setup_ai(String(), String(), elapsed, 0, 0);
+		streaming_message->connect(SNAME("edit_requested"), callable_mp(this, &AIChatPanel::_on_edit_requested));
+		streaming_message->set_display_scale(chat_display_scale);
+		message_list->add_child(streaming_message);
+	} else {
+		streaming_message->set_think_time_seconds(elapsed);
+	}
+	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
 void AIChatPanel::_append_response_thought(const String &p_content) {
@@ -2126,8 +2157,15 @@ double AIChatPanel::_get_response_elapsed(double p_fallback_elapsed) const {
 }
 
 void AIChatPanel::_clear_response_tracking() {
+	if (response_elapsed_timer) {
+		response_elapsed_timer->stop();
+	}
 	response_started_usec = 0;
 	accumulated_think_content.clear();
+	if (streaming_message && streaming_message->get_content().strip_edges().is_empty()) {
+		streaming_message->queue_free();
+		streaming_message = nullptr;
+	}
 }
 
 bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {

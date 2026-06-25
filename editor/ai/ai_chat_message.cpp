@@ -948,6 +948,11 @@ void AIChatMessage::set_content(const String &p_content) {
 	}
 }
 
+void AIChatMessage::set_think_time_seconds(double p_seconds) {
+	think_time_seconds = MAX(0.0, p_seconds);
+	_update_think_visibility();
+}
+
 void AIChatMessage::set_markdown_content(const String &p_content) {
 	message_content = p_content;
 	content_label->set_text(_markdown_to_bbcode(p_content));
