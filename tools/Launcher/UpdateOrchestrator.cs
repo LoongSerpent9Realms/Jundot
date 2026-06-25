@@ -135,7 +135,7 @@ public class UpdateOrchestrator
         // Skip if mandatory? No, if we reach here it's available.
         var actionText = manifest.Mandatory ? "（强制更新）" : "";
 
-        if (!ConsoleUI.AskYesNo($"是否更新到 {targetVer} {actionText}?", defaultYes: true))
+        if (!Program.AssumeYes && !ConsoleUI.AskYesNo($"是否更新到 {targetVer} {actionText}?", defaultYes: true))
         {
             ConsoleUI.Info("更新已取消。");
             if (!manifest.Mandatory)

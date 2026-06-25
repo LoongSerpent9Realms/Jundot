@@ -1235,7 +1235,12 @@ void EditorAssetLibrary::_image_update(void *p_image_queue) {
 		} else if ((memcmp(&r[0], &bmp_signature[0], 2) == 0) && Image::_bmp_mem_loader_func) {
 			parsed_image = Image::_bmp_mem_loader_func(r, len);
 		} else if (Image::_svg_scalable_mem_loader_func) {
-			parsed_image = Image::_svg_scalable_mem_loader_func(r, len, 1.0);
+			// Asset image URLs occasionally return HTML or another non-image payload.
+			// Only pass text that actually looks like SVG to the SVG loader.
+			const String text_header = String::utf8(reinterpret_cast<const char *>(r), MIN(len, 1024));
+			if (text_header.findn("<svg") >= 0) {
+				parsed_image = Image::_svg_scalable_mem_loader_func(r, len, 1.0);
+			}
 		}
 
 		if (parsed_image.is_null()) {
@@ -1919,12 +1924,15 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 				ERR_FAIL_COND(!d.has("download_url"));
 				ERR_FAIL_COND(!d.has("version"));
 				ERR_FAIL_COND(!d.has("stable"));
-				ERR_FAIL_COND(!d.has("min_jundot_version"));
-				ERR_FAIL_COND(!d.has("max_jundot_version"));
+				ERR_FAIL_COND(!d.has("min_jundot_version") && !d.has("min_godot_version"));
+				ERR_FAIL_COND(!d.has("max_jundot_version") && !d.has("max_godot_version"));
 				ERR_FAIL_COND(!d.has("changes_bbcode"));
 
-				if (d["min_jundot_version"].get_type() != Variant::NIL) {
-					Vector<String> compat_version = String(d["min_jundot_version"]).split(".", false);
+				const Variant min_engine_version = d.has("min_jundot_version") ? d["min_jundot_version"] : d["min_godot_version"];
+				const Variant max_engine_version = d.has("max_jundot_version") ? d["max_jundot_version"] : d["max_godot_version"];
+
+				if (min_engine_version.get_type() != Variant::NIL) {
+					Vector<String> compat_version = String(min_engine_version).split(".", false);
 					compat_version.resize_initialized(3);
 
 					bool is_compat = true;
@@ -1942,8 +1950,8 @@ void EditorAssetLibrary::_http_request_completed(int p_status, int p_code, const
 					}
 				}
 
-				if (d["max_jundot_version"].get_type() != Variant::NIL) {
-					Vector<String> compat_version = String(d["max_jundot_version"]).split(".", false);
+				if (max_engine_version.get_type() != Variant::NIL) {
+					Vector<String> compat_version = String(max_engine_version).split(".", false);
 					compat_version.resize_initialized(3);
 
 					bool is_compat = true;

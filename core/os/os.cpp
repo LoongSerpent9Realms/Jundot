@@ -652,6 +652,9 @@ bool OS::is_sandboxed() const {
 void OS::set_restart_on_exit(bool p_restart, const List<String> &p_restart_arguments) {
 	restart_on_exit = p_restart;
 	restart_commandline = p_restart_arguments;
+	if (!p_restart) {
+		restart_executable_path.clear();
+	}
 }
 
 bool OS::is_restart_on_exit_set() const {
@@ -660,6 +663,14 @@ bool OS::is_restart_on_exit_set() const {
 
 List<String> OS::get_restart_on_exit_arguments() const {
 	return List<String>(restart_commandline);
+}
+
+void OS::set_restart_executable_path(const String &p_executable_path) {
+	restart_executable_path = p_executable_path;
+}
+
+String OS::get_restart_executable_path() const {
+	return restart_executable_path;
 }
 
 PackedStringArray OS::get_connected_midi_inputs() {

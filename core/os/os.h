@@ -101,6 +101,7 @@ private:
 
 	bool restart_on_exit = false;
 	List<String> restart_commandline;
+	String restart_executable_path;
 
 	String _current_rendering_driver_name;
 	RenderingSource _current_rendering_driver_name_source = RENDERING_SOURCE_DEFAULT;
@@ -368,6 +369,8 @@ public:
 	void set_restart_on_exit(bool p_restart, const List<String> &p_restart_arguments);
 	bool is_restart_on_exit_set() const;
 	List<String> get_restart_on_exit_arguments() const;
+	void set_restart_executable_path(const String &p_executable_path);
+	String get_restart_executable_path() const;
 
 	virtual bool request_permission(const String &p_name) { return true; }
 	virtual bool request_permissions() { return true; }

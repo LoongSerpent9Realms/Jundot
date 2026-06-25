@@ -38,6 +38,7 @@ class EditorAbout;
 class EditorAssetLibrary;
 class EditorFileDialog;
 class EditorTitleBar;
+class EngineUpdateLabel;
 class HFlowContainer;
 class LineEdit;
 class MarginContainer;
@@ -141,10 +142,13 @@ class ProjectManager : public Control {
 
 	UpdateDialog *update_dialog = nullptr;
 	UpdateManager *update_manager = nullptr;
+	EngineUpdateLabel *engine_update_label = nullptr;
 
 	void _on_update_download_requested(const String &p_version, const String &p_url);
 	void _on_update_now_requested();
 	void _on_skip_version_requested();
+	void _on_update_launcher_started();
+	void _on_update_launcher_finished(int p_exit_code);
 
 	// AI engine source cache bootstrap.
 

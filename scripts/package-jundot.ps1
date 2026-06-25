@@ -523,9 +523,10 @@ if (-not $SkipBuild) {
         $buildArgs = Add-SConsArgIfMissing -Arguments $buildArgs -Name "cxxflags" -Value "/Zm200"
     }
 
-    if ($Mono) {
-        $buildArgs = Add-SConsArgIfMissing -Arguments $buildArgs -Name "module_mono_enabled" -Value "yes"
-    }
+    # SCons persists option values between invocations. Force the requested
+    # state so a non-Mono build after a Mono build does not remain Mono.
+    $buildArgs = @($buildArgs | Where-Object { $_ -notmatch '^module_mono_enabled=' })
+    $buildArgs += "module_mono_enabled=$(if ($Mono) { 'yes' } else { 'no' })"
 
     Write-Step "Building Jundot ($($buildArgs -join ' '))"
     $sconsCommand = $sconsRunner.Command

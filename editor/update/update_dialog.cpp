@@ -15,6 +15,7 @@
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/label.h"
+#include "scene/gui/progress_bar.h"
 #include "scene/gui/rich_text_label.h"
 #include "scene/gui/separator.h"
 
@@ -45,6 +46,17 @@ UpdateDialog::UpdateDialog() {
 
 	header_hbox->add_child(info_vbox);
 	main_vbox->add_child(header_hbox);
+
+	_status_label = memnew(Label);
+	_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	_status_label->hide();
+	main_vbox->add_child(_status_label);
+
+	_progress_bar = memnew(ProgressBar);
+	_progress_bar->set_indeterminate(true);
+	_progress_bar->set_show_percentage(false);
+	_progress_bar->hide();
+	main_vbox->add_child(_progress_bar);
 
 	// ── Separator ────────────────────────────────────────────
 	HSeparator *sep = memnew(HSeparator);
@@ -78,6 +90,16 @@ UpdateDialog::UpdateDialog() {
 }
 
 void UpdateDialog::set_update_info(const UpdateManifest &p_manifest) {
+	_status_label->hide();
+	_progress_bar->hide();
+	_update_button->set_disabled(false);
+	_skip_button->set_disabled(false);
+	_skip_button->show();
+	get_ok_button()->set_disabled(false);
+	get_ok_button()->set_text(TTRC("Remind Later"));
+	_update_button->set_text(TTRC("Update Now"));
+	set_title(TTRC("Engine Update Available"));
+
 	// Version display: "Jundot v1.7.3-rc is available"
 	String version_text = vformat(TTR("%s is available!"), p_manifest.get_version_string());
 	if (!version_text.is_empty()) {
@@ -111,6 +133,28 @@ void UpdateDialog::set_update_info(const UpdateManifest &p_manifest) {
 	}
 }
 
+void UpdateDialog::set_update_started() {
+	_status_label->set_text(TTR("Updater started. Live download, verification, and installation progress is shown in the updater window."));
+	_status_label->show();
+	_progress_bar->set_indeterminate(true);
+	_progress_bar->show();
+	_update_button->set_disabled(true);
+	_skip_button->set_disabled(true);
+	get_ok_button()->set_disabled(true);
+	popup_centered();
+}
+
+void UpdateDialog::set_update_finished(bool p_success, const String &p_message) {
+	_status_label->set_text(p_message);
+	_status_label->show();
+	_progress_bar->hide();
+	_update_button->set_disabled(p_success);
+	_skip_button->set_disabled(p_success);
+	get_ok_button()->set_disabled(false);
+	get_ok_button()->set_text(p_success ? TTR("Close") : TTR("Remind Later"));
+	popup_centered();
+}
+
 // ═══════════════════════════════════════════════════════════════
 
 void UpdateDialog::_bind_methods() {
@@ -120,7 +164,6 @@ void UpdateDialog::_bind_methods() {
 
 void UpdateDialog::_on_update_pressed() {
 	emit_signal("update_now_requested");
-	hide();
 }
 
 void UpdateDialog::_on_skip_pressed() {

@@ -57,6 +57,9 @@ bool UpdateManifest::parse(const String &p_json) {
 	release_date = root.get("release_date", String());
 	channel = root.get("channel", "stable");
 	changelog = root.get("changelog", String());
+	if (changelog.strip_edges().is_empty()) {
+		changelog = root.get("release_body", String());
+	}
 
 	// ── Optional fields ─────────────────────────────────────
 	mandatory = bool(root.get("mandatory", false));

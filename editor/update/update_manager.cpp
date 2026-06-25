@@ -17,6 +17,7 @@
 #include "editor/editor_string_names.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
+#include "scene/main/timer.h"
 
 namespace {
 
@@ -44,10 +45,18 @@ String _get_user_channel() {
 	switch (mode) {
 		case 0: // DISABLED
 			return "disabled";
-		case 1: // AUTO — determine from current version status
-			return (String(JUNDOT_VERSION_STATUS) == "stable") ? "stable" : "beta";
+		case 1: { // AUTO - determine from current version status
+			const String status = String(JUNDOT_VERSION_STATUS).to_lower();
+			if (status == "stable") {
+				return "stable";
+			}
+			if (status == "beta" || status == "rc") {
+				return "beta";
+			}
+			return "dev";
+		}
 		case 2: // NEWEST_UNSTABLE
-			return "beta";
+			return "dev";
 		case 3: // NEWEST_STABLE
 			return "stable";
 		case 4: // NEWEST_PATCH
@@ -83,10 +92,17 @@ UpdateManager::UpdateManager() {
 	http->set_timeout(15.0);
 	add_child(http);
 	http->connect("request_completed", callable_mp(this, &UpdateManager::_http_request_completed));
+
+	launcher_poll_timer = memnew(Timer);
+	launcher_poll_timer->set_wait_time(0.25);
+	add_child(launcher_poll_timer);
+	launcher_poll_timer->connect("timeout", callable_mp(this, &UpdateManager::_poll_launcher_process));
 }
 
 void UpdateManager::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("update_check_completed", PropertyInfo(Variant::INT, "status")));
+	ADD_SIGNAL(MethodInfo("update_launcher_started"));
+	ADD_SIGNAL(MethodInfo("update_launcher_finished", PropertyInfo(Variant::INT, "exit_code")));
 }
 
 void UpdateManager::check_for_updates() {
@@ -279,6 +295,10 @@ String UpdateManager::find_launcher_path() {
 }
 
 int UpdateManager::trigger_launcher_update() {
+	if (launcher_pid != 0 && OS::get_singleton()->is_process_running(launcher_pid)) {
+		return int(launcher_pid);
+	}
+
 	String launcher = find_launcher_path();
 	if (launcher.is_empty()) {
 		WARN_PRINT("JundotLauncher.exe not found. Please build tools/Launcher/ first.");
@@ -290,26 +310,38 @@ int UpdateManager::trigger_launcher_update() {
 	List<String> args;
 	args.push_back("update");
 	args.push_back(vformat("--engine-path=%s", engine_dir));
+	args.push_back("--yes");
 
 	String channel = _get_user_channel();
 	if (channel != "stable" && channel != "disabled") {
 		args.push_back(vformat("--channel=%s", channel));
 	}
 
-	// execute() is synchronous — blocks until the launcher completes.
-	// The launcher handles download/install, then returns exit code.
-	int exitcode = -1;
-	Error err = OS::get_singleton()->execute(launcher, args, nullptr, &exitcode);
+	Error err = OS::get_singleton()->create_process(launcher, args, &launcher_pid, true);
 	if (err != OK) {
 		WARN_PRINT(vformat("Failed to launch JundotLauncher for update. Error: %d", err));
+		launcher_pid = 0;
 		return -1;
 	}
 
-	if (exitcode != 0) {
-		WARN_PRINT(vformat("JundotLauncher exited with code %d.", exitcode));
+	launcher_poll_timer->start();
+	emit_signal("update_launcher_started");
+	return int(launcher_pid);
+}
+
+void UpdateManager::_poll_launcher_process() {
+	if (launcher_pid == 0) {
+		launcher_poll_timer->stop();
+		return;
+	}
+	if (OS::get_singleton()->is_process_running(launcher_pid)) {
+		return;
 	}
 
-	return exitcode;
+	const int exit_code = OS::get_singleton()->get_process_exit_code(launcher_pid);
+	launcher_poll_timer->stop();
+	launcher_pid = 0;
+	emit_signal("update_launcher_finished", exit_code);
 }
 
 int UpdateManager::trigger_launcher_rollback(const String &p_target_version) {

@@ -62,10 +62,18 @@ String _get_user_channel() {
 	switch (mode) {
 		case EngineUpdateLabel::UpdateMode::DISABLED:
 			return "disabled";
-		case EngineUpdateLabel::UpdateMode::AUTO:
-			return (String(JUNDOT_VERSION_STATUS) == "stable") ? "stable" : "beta";
+		case EngineUpdateLabel::UpdateMode::AUTO: {
+			const String status = String(JUNDOT_VERSION_STATUS).to_lower();
+			if (status == "stable") {
+				return "stable";
+			}
+			if (status == "beta" || status == "rc") {
+				return "beta";
+			}
+			return "dev";
+		}
 		case EngineUpdateLabel::UpdateMode::NEWEST_UNSTABLE:
-			return "beta";
+			return "dev";
 		case EngineUpdateLabel::UpdateMode::NEWEST_STABLE:
 		case EngineUpdateLabel::UpdateMode::NEWEST_PATCH:
 			return "stable";
@@ -163,6 +171,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 	String target_version = manifest.get_version_string();
 	available_newer_version = String();
 	available_newer_url = String();
+	available_manifest.clear();
 
 	String grayscale_reason;
 	if (compare_versions(target_version, current_version) > 0 &&
@@ -172,6 +181,7 @@ void EngineUpdateLabel::_http_request_completed(int p_result, int p_response_cod
 			GrayscaleEvaluator::is_eligible(GrayscaleEvaluator::generate_machine_id(), manifest.grayscale, &grayscale_reason)) {
 		available_newer_version = target_version;
 		available_newer_url = JUNDOT_AUTO_RELEASES_PAGE;
+		available_manifest = manifest;
 	}
 
 	if (!available_newer_version.is_empty()) {
@@ -193,13 +203,7 @@ void EngineUpdateLabel::_set_message(const String &p_message, const Color &p_col
 
 void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 	status = p_status;
-	if (status == UpdateStatus::BUSY || status == UpdateStatus::UP_TO_DATE) {
-		// Hide the label to prevent unnecessary distraction.
-		hide();
-		return;
-	} else {
-		show();
-	}
+	show();
 
 	switch (status) {
 		case UpdateStatus::OFFLINE: {
@@ -214,6 +218,13 @@ void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 			break;
 		}
 
+		case UpdateStatus::BUSY: {
+			set_disabled(true);
+			_set_message(TTR("Checking for updates..."), theme_cache.disabled_color);
+			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
+			set_tooltip_text("");
+		} break;
+
 		case UpdateStatus::ERROR: {
 			set_disabled(false);
 			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
@@ -224,6 +235,13 @@ void EngineUpdateLabel::_set_status(UpdateStatus p_status) {
 			set_disabled(false);
 			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
 			set_tooltip_text(TTR("Click to open download page."));
+		} break;
+
+		case UpdateStatus::UP_TO_DATE: {
+			set_disabled(true);
+			_set_message(TTR("Jundot is up to date."), theme_cache.default_color);
+			set_accessibility_live(AccessibilityServerEnums::AccessibilityLiveMode::LIVE_POLITE);
+			set_tooltip_text("");
 		} break;
 
 		default: {

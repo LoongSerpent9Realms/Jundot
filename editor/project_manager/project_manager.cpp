@@ -534,13 +534,14 @@ void ProjectManager::_on_update_download_requested(const String &p_version, cons
 		return;
 	}
 
-	// Populate the update dialog with version info from EngineUpdateLabel.
-	// For full manifest info (size, changelog, etc.), we'd need to fetch it.
-	// For now, we show what we have and let the launcher handle the rest.
 	UpdateManifest info;
-	info.version.full = p_version;
-	info.download_url = p_url;
-	info.package_size = 0; // Unknown until launcher fetches manifest
+	if (engine_update_label && engine_update_label->get_available_manifest().get_version_string() == p_version) {
+		info = engine_update_label->get_available_manifest();
+	} else {
+		// Graceful fallback for callers that only know the version and URL.
+		info.version.full = p_version;
+		info.download_url = p_url;
+	}
 
 	update_dialog->set_update_info(info);
 	update_dialog->popup_centered();
@@ -551,10 +552,27 @@ void ProjectManager::_on_update_now_requested() {
 		return;
 	}
 
-	// Trigger the launcher. This is synchronous (blocks until launcher finishes).
-	// The launcher will handle download, verification, and installation.
-	// After it completes, it typically restarts the engine.
-	update_manager->trigger_launcher_update();
+	const int pid = update_manager->trigger_launcher_update();
+	if (pid < 0) {
+		update_dialog->set_update_finished(false, TTR("Could not start the Jundot updater. Make sure JundotLauncher.exe is installed next to the engine."));
+	}
+}
+
+void ProjectManager::_on_update_launcher_started() {
+	if (update_dialog) {
+		update_dialog->set_update_started();
+	}
+}
+
+void ProjectManager::_on_update_launcher_finished(int p_exit_code) {
+	if (!update_dialog) {
+		return;
+	}
+	if (p_exit_code == 0) {
+		update_dialog->set_update_finished(true, TTR("Update completed. Restart Jundot to use the new version."));
+	} else {
+		update_dialog->set_update_finished(false, vformat(TTR("The updater stopped with exit code %d. Check the updater window for details."), p_exit_code));
+	}
 }
 
 void ProjectManager::_on_skip_version_requested() {
@@ -1868,10 +1886,10 @@ ProjectManager::ProjectManager() {
 		main_vbox->add_child(footer_bar);
 
 #ifdef ENGINE_UPDATE_CHECK_ENABLED
-		EngineUpdateLabel *update_label = memnew(EngineUpdateLabel);
-		footer_bar->add_child(update_label);
-		update_label->connect("offline_clicked", callable_mp(this, &ProjectManager::_show_quick_settings));
-		update_label->connect("update_download_requested", callable_mp(this, &ProjectManager::_on_update_download_requested));
+		engine_update_label = memnew(EngineUpdateLabel);
+		footer_bar->add_child(engine_update_label);
+		engine_update_label->connect("offline_clicked", callable_mp(this, &ProjectManager::_show_quick_settings));
+		engine_update_label->connect("update_download_requested", callable_mp(this, &ProjectManager::_on_update_download_requested));
 #endif
 
 		EditorVersionButton *version_btn = memnew(EditorVersionButton(EditorVersionButton::FORMAT_WITH_BUILD));
@@ -1895,6 +1913,8 @@ ProjectManager::ProjectManager() {
 
 		update_manager = memnew(UpdateManager);
 		add_child(update_manager);
+		update_manager->connect("update_launcher_started", callable_mp(this, &ProjectManager::_on_update_launcher_started));
+		update_manager->connect("update_launcher_finished", callable_mp(this, &ProjectManager::_on_update_launcher_finished));
 
 		scan_dir = memnew(EditorFileDialog);
 		scan_dir->set_access(EditorFileDialog::ACCESS_FILESYSTEM);

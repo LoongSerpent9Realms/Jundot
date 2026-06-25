@@ -13,6 +13,7 @@
 #include "scene/gui/dialogs.h"
 
 class Label;
+class ProgressBar;
 class RichTextLabel;
 
 /// Dialog shown when a Jundot engine update is available.
@@ -26,6 +27,8 @@ public:
 
 	/// Populate the dialog with manifest data.
 	void set_update_info(const UpdateManifest &p_manifest);
+	void set_update_started();
+	void set_update_finished(bool p_success, const String &p_message);
 
 	/// Signal emitted when the user clicks "Update Now".
 	/// @signal update_now_requested
@@ -39,6 +42,8 @@ protected:
 private:
 	Label *_version_label = nullptr;
 	Label *_size_label = nullptr;
+	Label *_status_label = nullptr;
+	ProgressBar *_progress_bar = nullptr;
 	RichTextLabel *_changelog = nullptr;
 	Button *_update_button = nullptr;
 	Button *_skip_button = nullptr;

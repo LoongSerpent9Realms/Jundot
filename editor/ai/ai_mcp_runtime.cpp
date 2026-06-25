@@ -9,6 +9,55 @@
 
 #include "core/io/json.h"
 #include "core/os/os.h"
+#include "core/templates/hash_set.h"
+
+static String _resolve_mcp_command(const String &p_command) {
+	if (p_command.is_empty() || p_command.is_absolute_path() || p_command.contains("/") || p_command.contains("\\")) {
+		return p_command;
+	}
+
+	Vector<String> executable_names;
+	executable_names.push_back(p_command);
+#ifdef WINDOWS_ENABLED
+	if (p_command.get_extension().is_empty()) {
+		executable_names.push_back(p_command + ".exe");
+		executable_names.push_back(p_command + ".cmd");
+		executable_names.push_back(p_command + ".bat");
+	}
+#endif
+
+	Vector<String> search_directories;
+	const String path_environment = OS::get_singleton()->get_environment("PATH");
+#ifdef WINDOWS_ENABLED
+	search_directories.append_array(path_environment.split(";", false));
+#else
+	search_directories.append_array(path_environment.split(":", false));
+#endif
+
+	// uv installs uv/uvx here by default on Windows, but GUI applications may
+	// have been started before the installer added the directory to PATH.
+	if (OS::get_singleton()->has_environment("USERPROFILE")) {
+		search_directories.push_back(OS::get_singleton()->get_environment("USERPROFILE").path_join(".local/bin"));
+	}
+	if (OS::get_singleton()->has_environment("HOME")) {
+		search_directories.push_back(OS::get_singleton()->get_environment("HOME").path_join(".local/bin"));
+	}
+
+	for (const String &directory : search_directories) {
+		const String clean_directory = directory.strip_edges().trim_prefix("\"").trim_suffix("\"");
+		if (clean_directory.is_empty()) {
+			continue;
+		}
+		for (const String &executable_name : executable_names) {
+			const String candidate = clean_directory.path_join(executable_name);
+			if (FileAccess::exists(candidate)) {
+				return candidate;
+			}
+		}
+	}
+
+	return p_command;
+}
 
 MCPServerRuntime *MCPServerRuntime::get_singleton() {
 	static Ref<MCPServerRuntime> singleton;
@@ -23,55 +72,114 @@ MCPServerRuntime::~MCPServerRuntime() {
 }
 
 Error MCPServerRuntime::start(const AIMCPServerEntry &p_entry) {
-	MutexLock lock(state_mutex);
-
-	if (state == ServerState::RUNNING || state == ServerState::STARTING) {
-		if (server_name == p_entry.name) {
-			return OK; // Already running with same server
-		}
-		stop();
+	if (p_entry.command.is_empty()) {
+		MutexLock lock(state_mutex);
+		last_error = p_entry.url.is_empty() ?
+				"MCP server command is empty" :
+				"URL-only MCP servers require a stdio bridge command";
+		state = ServerState::ERROR;
+		return ERR_UNAVAILABLE;
 	}
 
-	server_name = p_entry.name;
-	command = p_entry.command;
-	timeout_ms = p_entry.timeout_seconds * 1000;
-
-	// Parse arguments into List<String>
-	arguments.clear();
-	if (!p_entry.arguments.is_empty()) {
-		Vector<String> arg_parts = p_entry.arguments.split(" ", false);
-		for (const String &arg : arg_parts) {
-			arguments.push_back(arg);
+	{
+		MutexLock lock(state_mutex);
+		if ((state == ServerState::RUNNING || state == ServerState::STARTING || state == ServerState::INITIALIZING) && server_name == p_entry.name) {
+			return OK;
 		}
 	}
 
-	lifecycle = p_entry.lifecycle;
-	last_error.clear();
-	state = ServerState::STARTING;
+	stop();
+
+	{
+		MutexLock lock(state_mutex);
+		server_name = p_entry.name;
+		command = _resolve_mcp_command(p_entry.command);
+		if (p_entry.command.get_file().get_basename().to_lower() == "uvx" && command == p_entry.command && !command.is_absolute_path()) {
+			last_error = "Could not find uvx. Install uv or add %USERPROFILE%\\.local\\bin to PATH.";
+			state = ServerState::ERROR;
+			return ERR_FILE_NOT_FOUND;
+		}
+		environment = p_entry.environment;
+		if (p_entry.url.begins_with("http://127.0.0.1") || p_entry.url.begins_with("https://127.0.0.1") ||
+				p_entry.url.begins_with("http://localhost") || p_entry.url.begins_with("https://localhost")) {
+			String no_proxy = environment.get("NO_PROXY", OS::get_singleton()->get_environment("NO_PROXY"));
+			Vector<String> bypass_hosts = no_proxy.split(",", false);
+			if (!bypass_hosts.has("127.0.0.1")) {
+				bypass_hosts.push_back("127.0.0.1");
+			}
+			if (!bypass_hosts.has("localhost")) {
+				bypass_hosts.push_back("localhost");
+			}
+			environment["NO_PROXY"] = String(",").join(bypass_hosts);
+		}
+		timeout_ms = p_entry.timeout_seconds * 1000;
+
+		// Parse arguments into List<String>.
+		arguments.clear();
+		if (!p_entry.arguments.is_empty()) {
+			Vector<String> arg_parts = p_entry.arguments.split(" ", false);
+			for (const String &arg : arg_parts) {
+				arguments.push_back(arg);
+			}
+		}
+
+		lifecycle = p_entry.lifecycle;
+		last_error.clear();
+		state = ServerState::STARTING;
+	}
+
+	HashMap<String, String> previous_environment;
+	HashSet<String> missing_environment;
+	for (const Variant *key = environment.next(nullptr); key; key = environment.next(key)) {
+		const String env_name = *key;
+		if (OS::get_singleton()->has_environment(env_name)) {
+			previous_environment[env_name] = OS::get_singleton()->get_environment(env_name);
+		} else {
+			missing_environment.insert(env_name);
+		}
+		OS::get_singleton()->set_environment(env_name, String(environment[*key]));
+	}
 
 	// Launch subprocess with pipe
-	Dictionary result = OS::get_singleton()->execute_with_pipe(command, arguments, true);
+	// MCP servers such as `uvx mcp-proxy` may spawn child processes that inherit
+	// the stdio handles. A blocking pipe can then keep the reader thread stuck
+	// forever after the launcher process is stopped. Polling a non-blocking pipe
+	// lets shutdown_requested reliably terminate the reader loop.
+	Dictionary result = OS::get_singleton()->execute_with_pipe(command, arguments, false);
+	for (const KeyValue<String, String> &entry : previous_environment) {
+		OS::get_singleton()->set_environment(entry.key, entry.value);
+	}
+	for (const String &env_name : missing_environment) {
+		OS::get_singleton()->unset_environment(env_name);
+	}
+
 	if (result.is_empty()) {
-		last_error = "execute_with_pipe failed to start";
+		MutexLock lock(state_mutex);
+		last_error = command.get_file().get_basename().to_lower() == "uvx" ?
+				"Could not start uvx. Install uv and ensure uvx is available in PATH." :
+				"execute_with_pipe failed to start: " + command;
 		state = ServerState::ERROR;
 		return FAILED;
 	}
 
-	stdio_pipe = result.get("stdio", Ref<FileAccess>());
-	err_pipe = result.get("stderr", Ref<FileAccess>());
-	pid = result.get("pid", 0);
+	{
+		MutexLock lock(state_mutex);
+		stdio_pipe = result.get("stdio", Ref<FileAccess>());
+		err_pipe = result.get("stderr", Ref<FileAccess>());
+		pid = result.get("pid", 0);
 
-	if (stdio_pipe.is_null() || pid == 0) {
-		last_error = "execute_with_pipe returned invalid handles";
-		state = ServerState::ERROR;
-		return FAILED;
+		if (stdio_pipe.is_null() || pid == 0) {
+			last_error = "execute_with_pipe returned invalid handles";
+			state = ServerState::ERROR;
+			return FAILED;
+		}
+
+		shutdown_requested.clear();
+		state = ServerState::INITIALIZING;
 	}
 
 	// Start reader thread
-	shutdown_requested.clear();
 	reader_thread.start(_reader_thread_func, this);
-
-	state = ServerState::INITIALIZING;
 
 	// Protocol handshake
 	Error err = _protocol_initialize();
@@ -87,27 +195,35 @@ Error MCPServerRuntime::start(const AIMCPServerEntry &p_entry) {
 		ERR_PRINT("MCPServerRuntime: tools/list failed for " + server_name);
 	}
 
-	state = ServerState::RUNNING;
+	{
+		MutexLock lock(state_mutex);
+		state = ServerState::RUNNING;
+	}
 	return OK;
 }
 
 void MCPServerRuntime::stop() {
-	MutexLock lock(state_mutex);
-
-	if (state == ServerState::STOPPED) {
-		return;
+	ProcessID process_to_kill = 0;
+	{
+		MutexLock lock(state_mutex);
+		if (state == ServerState::STOPPED) {
+			return;
+		}
+		shutdown_requested.set();
+		process_to_kill = pid;
 	}
 
-	shutdown_requested.set();
+	// Closing the child first unblocks a reader waiting for more stdio data.
+	if (process_to_kill != 0) {
+		OS::get_singleton()->kill(process_to_kill);
+	}
 
 	if (reader_thread.is_started()) {
 		reader_thread.wait_to_finish();
 	}
 
-	if (pid != 0) {
-		OS::get_singleton()->kill(pid);
-		pid = 0;
-	}
+	MutexLock lock(state_mutex);
+	pid = 0;
 
 	if (stdio_pipe.is_valid()) {
 		stdio_pipe.unref();
@@ -126,6 +242,11 @@ void MCPServerRuntime::stop() {
 bool MCPServerRuntime::is_alive() const {
 	MutexLock lock(state_mutex);
 	return state == ServerState::RUNNING && pid != 0 && OS::get_singleton()->is_process_running(pid);
+}
+
+bool MCPServerRuntime::is_running_server(const String &p_server_name) const {
+	MutexLock lock(state_mutex);
+	return state == ServerState::RUNNING && server_name == p_server_name && pid != 0 && OS::get_singleton()->is_process_running(pid);
 }
 
 MCPServerRuntime::ServerState MCPServerRuntime::get_state() const {
@@ -310,7 +431,6 @@ int MCPServerRuntime::_send_request(const String &p_method, const Dictionary &p_
 		return -1;
 	}
 
-	pending_responses[id] = Dictionary(); // Mark as pending
 	return id;
 }
 

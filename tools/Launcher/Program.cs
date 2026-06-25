@@ -27,6 +27,7 @@ public class Program
     private static string _enginePath = "";
     private static string _channel = "stable";
     private static string _manifestUrl = "";
+    internal static bool AssumeYes { get; private set; }
 
     // Unused-param hint for future stages
     // ReSharper disable UnusedAutoPropertyAccessor.Local
@@ -554,6 +555,11 @@ JundotLauncher — Jundot Engine 线上热更新启动器
             if (arg == "--engine-path" && i + 1 < args.Length)
             {
                 _enginePath = args[++i];
+                continue;
+            }
+            else if (arg == "--yes" || arg == "-y")
+            {
+                AssumeYes = true;
                 continue;
             }
 

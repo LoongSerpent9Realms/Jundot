@@ -112,7 +112,7 @@ Array AIToolDefs::get_builtin_tools() {
 	{
 		Dictionary props;
 		props["path"] = _str_property("File path relative to the project root.");
-		props["content"] = _str_property("Full file content to write. Creates the file if it doesn't exist; overwrites if it does.");
+		props["content"] = _str_property("Complete non-empty file content to write. Creates the file if it does not exist; overwrites if it does. Empty content is rejected to prevent accidental truncation.");
 		Array required;
 		required.push_back("path");
 		required.push_back("content");
@@ -123,7 +123,24 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::WRITE_FILE, "", fn));
 	}
 
-	// 3. search_files
+	// 3. edit_file
+	{
+		Dictionary props;
+		props["path"] = _str_property("File path relative to the project root.");
+		props["old_string"] = _str_property("Exact existing text to replace. It must occur exactly once in the file.");
+		props["new_string"] = _str_property("Replacement text.");
+		Array required;
+		required.push_back("path");
+		required.push_back("old_string");
+		required.push_back("new_string");
+		Dictionary fn = _make_fn(
+				AIToolNames::EDIT_FILE,
+				"Edit one file by replacing an exact, unique old_string with new_string. Use this for localized changes instead of overwriting the complete file.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::EDIT_FILE, "", fn));
+	}
+
+	// 4. search_files
 	{
 		Dictionary props;
 		props["pattern"] = _str_property("Glob pattern to search for, e.g. '**/*.cpp', 'src/**/*.h'.");
@@ -170,7 +187,7 @@ Array AIToolDefs::get_builtin_tools() {
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
 		Dictionary fn = _make_fn(
 				AIToolNames::RUN_BUILD,
-				"Incrementally build the engine using scons in the configured JunDot source checkout or the default engine_source cache checkout. A packaged editor executable does not contain source code; if no source checkout with SConstruct is available, clone/download the source into the cache directory or set engine_source_root before retrying. By default builds platform=windows target=editor.",
+				"Check the configured Git source checkout for upstream updates, preserve local changes, automatically merge updates with local-first conflict handling, then incrementally build the engine using scons. A packaged editor executable does not contain source code; if no source checkout with SConstruct is available, clone/download the source into the cache directory or set engine_source_root before retrying. By default builds platform=windows target=editor with module_mono_enabled=no so the generated editor can restart without separately built .NET assemblies.",
 				props, Array());
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
@@ -290,8 +307,14 @@ Array AIToolDefs::get_mcp_tools() {
 
 		bool has_runtime_tools = false;
 
+		// Discover tools on demand. URL-only servers still require a configured
+		// stdio bridge command until the runtime supports Streamable HTTP natively.
+		if (!runtime->is_running_server(server.name) && !server.command.is_empty()) {
+			runtime->start(server);
+		}
+
 		// Try to get tools from runtime (dynamic discovery via tools/list)
-		if (runtime->is_alive() && runtime->get_state() == MCPServerRuntime::ServerState::RUNNING) {
+		if (runtime->is_running_server(server.name)) {
 			Array runtime_tools = runtime->get_tools();
 			if (!runtime_tools.is_empty()) {
 				for (int i = 0; i < runtime_tools.size(); i++) {

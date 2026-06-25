@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "editor/update/update_manifest.h"
 #include "scene/gui/link_button.h"
 
 class HTTPRequest;
@@ -69,6 +70,7 @@ private:
 	bool checked_update = false;
 	String available_newer_version;
 	String available_newer_url;
+	UpdateManifest available_manifest;
 
 	void _trigger_launcher_update();
 	bool _can_check_updates() const;
@@ -86,4 +88,5 @@ protected:
 
 public:
 	EngineUpdateLabel();
+	const UpdateManifest &get_available_manifest() const { return available_manifest; }
 };

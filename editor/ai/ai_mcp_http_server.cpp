@@ -176,6 +176,37 @@ void AIMCPHTTPServer::_send_response(Ref<StreamPeerTCP> p_client, int p_status_c
 	p_client->put_data((const uint8_t *)cs.get_data(), cs.size());
 }
 
+Array AIMCPHTTPServer::_get_jundot_plugin_tools() const {
+	Array mode_tools = AIToolDefs::get_tools_for_mode(AISettings::load().context_mode);
+	Array exposed_tools;
+	HashSet<StringName> exposed_names;
+	exposed_names.insert(StringName(AIToolNames::BATCH_TOOLS));
+	exposed_names.insert(StringName(AIToolNames::LIST_FILES));
+	exposed_names.insert(StringName(AIToolNames::READ_FILES));
+	exposed_names.insert(StringName(AIToolNames::SEARCH_FILES));
+	exposed_names.insert(StringName(AIToolNames::GREP_CODE));
+	exposed_names.insert(StringName(AIToolNames::EDIT_FILE));
+	exposed_names.insert(StringName(AIToolNames::WRITE_FILE));
+	exposed_names.insert(StringName(AIToolNames::SHELL_COMMAND));
+	exposed_names.insert(StringName(AIToolNames::RUN_BUILD));
+	exposed_names.insert(StringName(AIToolNames::CHECK_BUILD_STATUS));
+	exposed_names.insert(StringName(AIToolNames::READ_BUILD_LOG));
+
+	for (int i = 0; i < mode_tools.size(); i++) {
+		Dictionary tool = mode_tools[i];
+		Dictionary fn_def = tool.get("function", Dictionary());
+		const String tool_name = fn_def.get("name", String());
+		if (!exposed_names.has(StringName(tool_name))) {
+			continue;
+		}
+		tool["x_mcp_server_name"] = "jundot";
+		tool["x_builtin"] = true;
+		tool["x_jundot_plugin"] = true;
+		exposed_tools.push_back(tool);
+	}
+	return exposed_tools;
+}
+
 Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 	Array tools;
 
@@ -256,6 +287,33 @@ String AIMCPHTTPServer::_execute_tool(const String &p_server_name, const String 
 	fn["name"] = p_server_name + "." + p_tool_name;
 	fn["arguments"] = p_args_json;
 	tool_call["id"] = "ext-" + String::num_int64(OS::get_singleton()->get_ticks_usec());
+	tool_call["type"] = "function";
+	tool_call["function"] = fn;
+
+	Dictionary result = AIToolExecutor::execute(tool_call);
+	return result.get("content", "Unknown error").operator String();
+}
+
+String AIMCPHTTPServer::_execute_builtin_tool(const String &p_tool_name, const String &p_args_json) {
+	Array available_tools = _get_jundot_plugin_tools();
+	bool available = false;
+	for (int i = 0; i < available_tools.size(); i++) {
+		Dictionary tool = available_tools[i];
+		Dictionary fn_def = tool.get("function", Dictionary());
+		if (String(fn_def.get("name", String())) == p_tool_name) {
+			available = true;
+			break;
+		}
+	}
+	if (!available) {
+		return "Built-in tool is not available in the current editor mode: " + p_tool_name;
+	}
+
+	Dictionary tool_call;
+	Dictionary fn;
+	fn["name"] = p_tool_name;
+	fn["arguments"] = p_args_json;
+	tool_call["id"] = "ext-builtin-" + String::num_int64(OS::get_singleton()->get_ticks_usec());
 	tool_call["type"] = "function";
 	tool_call["function"] = fn;
 
@@ -378,7 +436,8 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 	}
 
 	if (p_method == "GET" && p_path == "/api/mcp/tools") {
-		Array tools = AIToolDefs::get_mcp_tools();
+		Array tools = _get_jundot_plugin_tools();
+		tools.append_array(AIToolDefs::get_mcp_tools());
 		tools.append_array(_get_ai_settings_tools());
 		String json = JSON::stringify(tools);
 		_send_response(p_client, 200, "application/json", json);
@@ -389,6 +448,12 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 		Vector<AISkillEntry> skills;
 		Vector<AIMCPServerEntry> mcp_servers_list;
 		Array server_list;
+		Dictionary jundot_server;
+		jundot_server["name"] = "jundot";
+		jundot_server["enabled"] = true;
+		jundot_server["builtin"] = true;
+		jundot_server["description"] = "Selected built-in Jundot editor tools exposed to the MiMoCode plugin for files, edits, builds, logs, and commands.";
+		server_list.push_back(jundot_server);
 		server_list.push_back(_get_ai_settings_server_info());
 		if (AIToolRegistry::load(skills, mcp_servers_list) == OK) {
 			for (const AIMCPServerEntry &mcp_entry : mcp_servers_list) {
@@ -441,7 +506,14 @@ void AIMCPHTTPServer::_handle_request(Ref<StreamPeerTCP> p_client, const String 
 			return;
 		}
 
-		String result = server_name == "ai_settings" ? _execute_ai_settings_tool(tool_name, args_json) : _execute_tool(server_name, tool_name, args_json);
+		String result;
+		if (server_name == "jundot") {
+			result = _execute_builtin_tool(tool_name, args_json);
+		} else if (server_name == "ai_settings") {
+			result = _execute_ai_settings_tool(tool_name, args_json);
+		} else {
+			result = _execute_tool(server_name, tool_name, args_json);
+		}
 		Dictionary response;
 		response["result"] = result;
 		_send_response(p_client, 200, "application/json", JSON::stringify(response));

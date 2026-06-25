@@ -35,6 +35,7 @@
 namespace AIToolNames {
 constexpr const char *READ_FILES = "read_files";
 constexpr const char *WRITE_FILE = "write_file";
+constexpr const char *EDIT_FILE = "edit_file";
 constexpr const char *SEARCH_FILES = "search_files";
 constexpr const char *LIST_FILES = "list_files";
 constexpr const char *GREP_CODE = "grep_code";

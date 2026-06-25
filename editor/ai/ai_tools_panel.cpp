@@ -12,6 +12,7 @@
 #include "ai_mcp_runtime.h"
 
 #include "core/error/error_macros.h"
+#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/time.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -64,7 +65,10 @@ void AIToolsPanel::_set_mcp_editor_enabled(bool p_enabled) {
 	mcp_command->set_editable(p_enabled);
 	mcp_arguments->set_editable(p_enabled);
 	mcp_url->set_editable(p_enabled);
+	mcp_environment->set_editable(p_enabled);
 	mcp_capabilities->set_editable(p_enabled);
+	mcp_lifecycle->set_disabled(!p_enabled);
+	mcp_timeout->set_editable(p_enabled);
 	mcp_delete_button->set_disabled(!p_enabled);
 	mcp_save_button->set_disabled(!p_enabled);
 }
@@ -109,7 +113,10 @@ void AIToolsPanel::_update_mcp_editor() {
 		mcp_command->clear();
 		mcp_arguments->clear();
 		mcp_url->clear();
+		mcp_environment->clear();
 		mcp_capabilities->clear();
+		mcp_lifecycle->select(0);
+		mcp_timeout->set_value(30);
 		return;
 	}
 
@@ -122,7 +129,10 @@ void AIToolsPanel::_update_mcp_editor() {
 	mcp_command->set_text(entry.command);
 	mcp_arguments->set_text(entry.arguments);
 	mcp_url->set_text(entry.url);
+	mcp_environment->set_text(JSON::stringify(entry.environment, "\t"));
 	mcp_capabilities->set_text(entry.capabilities_json);
+	mcp_lifecycle->select((int)entry.lifecycle);
+	mcp_timeout->set_value(entry.timeout_seconds);
 }
 
 void AIToolsPanel::_update_selected_skill_from_editor() {
@@ -150,7 +160,11 @@ void AIToolsPanel::_update_selected_mcp_from_editor() {
 	entry.command = mcp_command->get_text().strip_edges();
 	entry.arguments = mcp_arguments->get_text().strip_edges();
 	entry.url = mcp_url->get_text().strip_edges();
+	const Variant parsed_environment = JSON::parse_string(mcp_environment->get_text());
+	entry.environment = parsed_environment.get_type() == Variant::DICTIONARY ? Dictionary(parsed_environment) : Dictionary();
 	entry.capabilities_json = mcp_capabilities->get_text();
+	entry.lifecycle = (MCPServerLifecycle)mcp_lifecycle->get_selected_id();
+	entry.timeout_seconds = (int)mcp_timeout->get_value();
 	entry.updated_at = _ai_tools_now_string();
 }
 
@@ -284,6 +298,42 @@ void AIToolsPanel::_new_mcp_server() {
 	selected_mcp_server = mcp_servers.size() - 1;
 	_refresh_mcp_list();
 	status_label->set_text(TTR("New MCP server created."));
+}
+
+void AIToolsPanel::_add_godot_ai_server() {
+	if (selected_mcp_server >= 0 && selected_mcp_server < mcp_servers.size()) {
+		_update_selected_mcp_from_editor();
+	}
+
+	for (int i = 0; i < mcp_servers.size(); i++) {
+		if (mcp_servers[i].name.to_lower() == "godot-ai") {
+			mcp_servers.write[i].environment["UV_LINK_MODE"] = "copy";
+			mcp_servers.write[i].environment["NO_PROXY"] = "127.0.0.1,localhost";
+			selected_mcp_server = i;
+			_refresh_mcp_list();
+			_save_registry();
+			status_label->set_text(TTR("Godot AI MCP server configuration updated."));
+			return;
+		}
+	}
+
+	AIMCPServerEntry entry = AIToolRegistry::make_mcp_server("godot-ai");
+	entry.command = "uvx";
+	entry.arguments = "mcp-proxy==0.11.0 --transport streamablehttp http://127.0.0.1:8000/mcp";
+	entry.url = "http://127.0.0.1:8000/mcp";
+	entry.environment["UV_LINK_MODE"] = "copy";
+	entry.environment["NO_PROXY"] = "127.0.0.1,localhost";
+	entry.enabled = true;
+	entry.writes = true;
+	entry.requires_confirmation = true;
+	entry.read_only_allowed = false;
+	entry.lifecycle = MCPServerLifecycle::KEEPALIVE;
+	entry.timeout_seconds = 30;
+	mcp_servers.push_back(entry);
+	selected_mcp_server = mcp_servers.size() - 1;
+	_refresh_mcp_list();
+	_save_registry();
+	status_label->set_text(TTR("Godot AI MCP server added. Enable the project plugin and MCP tools in AI Settings, then press Test."));
 }
 
 void AIToolsPanel::_delete_mcp_server() {
@@ -440,6 +490,7 @@ void AIToolsPanel::_update_translations() {
 	skill_save_button->set_text(TTR("Save"));
 	skill_import_button->set_text(TTR("Import..."));
 	mcp_new_button->set_text(TTR("New"));
+	mcp_add_godot_ai_button->set_text(TTR("Add Godot AI"));
 	mcp_delete_button->set_text(TTR("Delete"));
 	mcp_save_button->set_text(TTR("Save"));
 	mcp_import_button->set_text(TTR("Import..."));
@@ -462,6 +513,7 @@ void AIToolsPanel::_update_translations() {
 	mcp_command->set_placeholder(TTR("Command"));
 	mcp_arguments->set_placeholder(TTR("Arguments"));
 	mcp_url->set_placeholder(TTR("URL"));
+	mcp_environment->set_placeholder(TTR("Environment variables JSON"));
 	mcp_capabilities->set_placeholder(TTR("Capability list JSON. The editor does not execute MCP tools in this phase."));
 }
 
@@ -585,7 +637,7 @@ AIToolsPanel::AIToolsPanel() {
 	tabs->add_child(mcp_tab);
 
 	VBoxContainer *mcp_left = memnew(VBoxContainer);
-	mcp_left->set_custom_minimum_size(Size2(150, 0) * EDSCALE);
+	mcp_left->set_custom_minimum_size(Size2(230, 0) * EDSCALE);
 	mcp_left->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	mcp_tab->add_child(mcp_left);
 
@@ -601,6 +653,10 @@ AIToolsPanel::AIToolsPanel() {
 	mcp_new_button = memnew(Button);
 	mcp_new_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_new_mcp_server));
 	mcp_list_actions->add_child(mcp_new_button);
+
+	mcp_add_godot_ai_button = memnew(Button);
+	mcp_add_godot_ai_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_add_godot_ai_server));
+	mcp_list_actions->add_child(mcp_add_godot_ai_button);
 
 	mcp_import_button = memnew(Button);
 	mcp_import_button->connect(SceneStringName(pressed), callable_mp(this, &AIToolsPanel::_mcp_import_pressed));
@@ -659,10 +715,21 @@ AIToolsPanel::AIToolsPanel() {
 	mcp_url->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	mcp_grid->add_child(mcp_url);
 
+	Label *mcp_environment_label = memnew(Label);
+	mcp_environment_label->set_text(TTR("Environment"));
+	mcp_editor->add_child(mcp_environment_label);
+	mcp_environment = memnew(TextEdit);
+	mcp_environment->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	mcp_environment->set_custom_minimum_size(Size2(0, 70) * EDSCALE);
+	mcp_editor->add_child(mcp_environment);
+
+	Label *mcp_capabilities_label = memnew(Label);
+	mcp_capabilities_label->set_text(TTR("Capabilities"));
+	mcp_editor->add_child(mcp_capabilities_label);
 	mcp_capabilities = memnew(TextEdit);
 	mcp_capabilities->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	mcp_capabilities->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	mcp_capabilities->set_custom_minimum_size(Size2(0, 160) * EDSCALE);
+	mcp_capabilities->set_custom_minimum_size(Size2(0, 90) * EDSCALE);
 	mcp_editor->add_child(mcp_capabilities);
 
 	HBoxContainer *mcp_actions = memnew(HBoxContainer);
@@ -678,13 +745,17 @@ AIToolsPanel::AIToolsPanel() {
 	mcp_actions->add_child(mcp_delete_button);
 
 	// MCP runtime controls
+	mcp_status_label = memnew(Label);
+	mcp_status_label->set_text(TTR("Status: Stopped"));
+	mcp_status_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	mcp_status_label->set_custom_minimum_size(Size2(0, 0));
+	mcp_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	mcp_status_label->set_text_overrun_behavior(TextServer::OVERRUN_TRIM_ELLIPSIS);
+	mcp_editor->add_child(mcp_status_label);
+
 	HBoxContainer *mcp_controls = memnew(HBoxContainer);
 	mcp_controls->add_theme_constant_override("separation", 4 * EDSCALE);
 	mcp_editor->add_child(mcp_controls);
-
-	mcp_status_label = memnew(Label);
-	mcp_status_label->set_text(TTR("Status: Stopped"));
-	mcp_controls->add_child(mcp_status_label);
 
 	mcp_test_button = memnew(Button);
 	mcp_test_button->set_text(TTR("Test"));
@@ -774,26 +845,73 @@ AIToolsPanel::AIToolsPanel() {
 }
 
 void AIToolsPanel::_mcp_test_connection() {
+	if (mcp_test_running) {
+		return;
+	}
+
 	if (selected_mcp_server < 0 || selected_mcp_server >= mcp_servers.size()) {
 		mcp_status_label->set_text(TTR("No server selected"));
 		return;
 	}
 
-	const AIMCPServerEntry &server = mcp_servers[selected_mcp_server];
+	_update_selected_mcp_from_editor();
+	mcp_status_label->set_text(TTR("Testing connection..."));
+	mcp_status_label->set_tooltip_text("");
+	mcp_test_button->set_disabled(true);
+	mcp_refresh_button->set_disabled(true);
+
+	mcp_test_result = OK;
+	mcp_test_tool_count = 0;
+	mcp_test_error.clear();
+	mcp_test_server = mcp_servers[selected_mcp_server];
+	mcp_test_running = true;
+
+	const Thread::ID thread_id = mcp_test_thread.start(_mcp_test_thread_func, this);
+	if (thread_id == Thread::UNASSIGNED_ID) {
+		mcp_test_running = false;
+		mcp_test_button->set_disabled(false);
+		mcp_refresh_button->set_disabled(false);
+		mcp_stop_button->set_disabled(false);
+		const String error = TTR("Connection failed: Could not start connection test thread.");
+		mcp_status_label->set_text(error);
+		mcp_status_label->set_tooltip_text(error);
+	}
+}
+
+void AIToolsPanel::_mcp_test_thread_func(void *p_userdata) {
+	AIToolsPanel *panel = static_cast<AIToolsPanel *>(p_userdata);
 	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
 
-	mcp_status_label->set_text(TTR("Testing connection..."));
+	panel->mcp_test_result = runtime->start(panel->mcp_test_server);
+	if (panel->mcp_test_result != OK) {
+		panel->mcp_test_error = runtime->get_last_error();
+	} else {
+		panel->mcp_test_tool_count = runtime->get_tools().size();
+	}
 
-	Error err = runtime->start(server);
-	if (err != OK) {
-		mcp_status_label->set_text(TTR("Connection failed: ") + runtime->get_last_error());
+	callable_mp(panel, &AIToolsPanel::_finish_mcp_test).call_deferred();
+}
+
+void AIToolsPanel::_finish_mcp_test() {
+	if (mcp_test_thread.is_started()) {
+		mcp_test_thread.wait_to_finish();
+	}
+
+	mcp_test_running = false;
+	mcp_test_button->set_disabled(false);
+	mcp_refresh_button->set_disabled(false);
+	mcp_stop_button->set_disabled(false);
+
+	if (mcp_test_result != OK) {
+		const String error = TTR("Connection failed: ") + mcp_test_error;
+		mcp_status_label->set_text(error);
+		mcp_status_label->set_tooltip_text(error);
 		return;
 	}
 
-	Array tools = runtime->get_tools();
-	mcp_status_label->set_text(vformat("Connected! %d tools available.", tools.size()));
+	mcp_status_label->set_text(vformat(TTR("Connected! %d tools available."), mcp_test_tool_count));
+	mcp_status_label->set_tooltip_text("");
 }
-
 void AIToolsPanel::_mcp_refresh_tools() {
 	if (selected_mcp_server < 0 || selected_mcp_server >= mcp_servers.size()) {
 		mcp_status_label->set_text(TTR("No server selected"));
@@ -814,6 +932,7 @@ void AIToolsPanel::_mcp_stop_server() {
 	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
 	runtime->stop();
 	mcp_status_label->set_text(TTR("Status: Stopped"));
+	mcp_status_label->set_tooltip_text("");
 }
 
 void AIToolsPanel::_update_mcp_status() {
@@ -844,4 +963,13 @@ void AIToolsPanel::_update_mcp_status() {
 
 void AIToolsPanel::_update_mcp_status_from_runtime() {
 	_update_mcp_status();
+}
+
+AIToolsPanel::~AIToolsPanel() {
+	if (mcp_test_running) {
+		MCPServerRuntime::get_singleton()->stop();
+	}
+	if (mcp_test_thread.is_started()) {
+		mcp_test_thread.wait_to_finish();
+	}
 }

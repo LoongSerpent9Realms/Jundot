@@ -153,6 +153,8 @@ class AIChatPanel : public MarginContainer {
 	PendingToolRound pending_tool_round;
 	bool in_tool_loop = false;
 	String request_conversation_id;
+	uint64_t response_started_usec = 0;
+	String accumulated_think_content;
 	Timer *build_status_poll_timer = nullptr;
 	int build_status_poll_count = 0;
 
@@ -193,7 +195,9 @@ class AIChatPanel : public MarginContainer {
 	struct Conversation {
 		String id;
 		String title;
+		AIContextMode context_mode = AIContextMode::PROJECT;
 		Vector<ConversationMessage> messages;
+		Array structured_messages;
 		uint64_t created_at = 0;
 		uint64_t updated_at = 0;
 		bool tool_limit_options_available = false;
@@ -229,6 +233,9 @@ class AIChatPanel : public MarginContainer {
 	void _refresh_conversation_list_ui();
 	void _serialize_current_messages();
 	void _load_conversation_to_ui(const Conversation &p_conv);
+	Array _get_structured_history() const;
+	void _store_structured_history(const Array &p_messages, const String &p_assistant_content = String());
+	void _clear_structured_history();
 
 	// ============ End multi-conversation support ============
 
@@ -242,6 +249,11 @@ class AIChatPanel : public MarginContainer {
 	bool _looks_like_tool_preamble(const String &p_content) const;
 	bool _extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const;
 	String _strip_text_tool_call_blocks(const String &p_content) const;
+	void _start_response_tracking();
+	void _append_response_thought(const String &p_content);
+	String _get_response_thought(const String &p_current_thought) const;
+	double _get_response_elapsed(double p_fallback_elapsed) const;
+	void _clear_response_tracking();
 	bool _retry_after_missing_tool_call(const String &p_content);
 	void _execute_tool_calls(const Dictionary &p_json);
 	void _add_user_message(const String &p_text);

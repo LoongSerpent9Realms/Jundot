@@ -46,6 +46,7 @@ public:
 private:
 	static Dictionary _read_files(const Dictionary &p_args);
 	static Dictionary _write_file(const Dictionary &p_args);
+	static Dictionary _edit_file(const Dictionary &p_args);
 	static Dictionary _search_files(const Dictionary &p_args);
 	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);

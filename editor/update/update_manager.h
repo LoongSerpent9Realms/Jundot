@@ -10,10 +10,12 @@
 
 #pragma once
 
+#include "core/os/os.h"
 #include "editor/update/update_manifest.h"
 #include "scene/main/node.h"
 
 class HTTPRequest;
+class Timer;
 class UpdateDialog;
 
 /// Engine-side update manager integrated into the project manager.
@@ -61,11 +63,13 @@ protected:
 
 private:
 	HTTPRequest *http = nullptr;
+	Timer *launcher_poll_timer = nullptr;
 	UpdateManifest manifest;
 	CheckStatus check_status = CHECK_IDLE;
 	String machine_id;
 	String manifest_url;
 	String launcher_path_cache;
+	ProcessID launcher_pid = 0;
 
 	/// Parse a JSON manifest from the HTTP response body.
 	void _parse_manifest_from_json(const String &p_json);
@@ -75,5 +79,6 @@ private:
 
 	void _http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	void _set_check_status(CheckStatus p_status);
+	void _poll_launcher_process();
 };
 

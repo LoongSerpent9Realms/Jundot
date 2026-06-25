@@ -726,17 +726,23 @@ void AIChatMessage::_edit_pressed() {
 }
 
 void AIChatMessage::_update_think_visibility() {
-	if (think_content.is_empty()) {
+	if (think_content.is_empty() && think_time_seconds <= 0.0) {
 		think_container->set_visible(false);
 		return;
 	}
 	think_container->set_visible(true);
 	String arrow = think_expanded ? String::utf8("\xe2\x96\xbc") : String::utf8("\xe2\x96\xb6");
-	String time_text;
-	if (think_time_seconds > 0.0) {
-		time_text = vformat(TTR(" (%.1f s)"), think_time_seconds);
+	String processed_text = TTR("Processed");
+	if (think_time_seconds >= 60.0) {
+		const int total_seconds = (int)Math::round(think_time_seconds);
+		const int minutes = total_seconds / 60;
+		const int seconds = total_seconds % 60;
+		processed_text = vformat(TTR("Processed %dm %ds"), minutes, seconds);
+	} else if (think_time_seconds > 0.0) {
+		processed_text = vformat(TTR("Processed %.1fs"), think_time_seconds);
 	}
-	think_toggle->set_text(arrow + " " + TTR("Thought") + time_text);
+	think_toggle->set_text(processed_text + " " + arrow);
+	think_label->set_visible(think_expanded && !think_content.is_empty());
 }
 
 void AIChatMessage::_update_footer() {

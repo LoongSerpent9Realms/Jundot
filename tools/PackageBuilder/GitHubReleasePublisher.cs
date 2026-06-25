@@ -190,6 +190,10 @@ public class GitHubReleasePublisher
                 _config.ReleaseBody = aiBody;
             }
 
+            var manifestChangelog = !string.IsNullOrWhiteSpace(_config.Changelog)
+                ? _config.Changelog
+                : _config.ReleaseBody;
+
             // ── Step 1: Find or create the shared release ──
             var releaseTag = string.IsNullOrEmpty(_config.ReleaseTag)
                 ? $"v{firstPkg.Version}"
@@ -281,7 +285,7 @@ public class GitHubReleasePublisher
                     {
                         manifestNode["download_url"] = zipDownloadUrl;
                         manifestNode["release_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
-                        manifestNode["changelog"] = _config.Changelog ?? "";
+                        manifestNode["changelog"] = manifestChangelog ?? "";
                         manifestNode["mandatory"] = _config.Mandatory;
                         if (manifestNode["grayscale"] is JsonObject gs)
                         {
@@ -340,7 +344,7 @@ public class GitHubReleasePublisher
                 // Override with shared fields
                 root["manifest_version"] = "1.1";
                 root["release_date"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
-                root["changelog"] = _config.Changelog ?? "";
+                root["changelog"] = manifestChangelog ?? "";
                 root["mandatory"] = _config.Mandatory;
                 if (root["grayscale"] is System.Text.Json.Nodes.JsonObject gs2)
                 {

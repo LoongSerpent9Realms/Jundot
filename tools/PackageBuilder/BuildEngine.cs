@@ -1026,11 +1026,11 @@ Install one of these toolchains, then run this tool again:
             AddIfMissing(buildArgs, "cxxflags", "/Zm500");
         }
 
-        // Mono
-        if (_cfg.Mono)
-        {
-            AddIfMissing(buildArgs, "module_mono_enabled", "yes");
-        }
+        // SCons persists option values between invocations. Always set the
+        // Mono module state explicitly so switching from Mono to a standard
+        // build cannot keep producing stale `.mono` product names.
+        buildArgs.RemoveAll(a => a.StartsWith("module_mono_enabled=", StringComparison.OrdinalIgnoreCase));
+        buildArgs.Add($"module_mono_enabled={(_cfg.Mono ? "yes" : "no")}");
 
         var argsStr = string.Join(" ", buildArgs);
         Report($"SCons args: {argsStr}", "info");

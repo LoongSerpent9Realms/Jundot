@@ -10,6 +10,7 @@
 
 #include "core/io/http_client.h"
 #include "core/io/json.h"
+#include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
@@ -17,8 +18,9 @@
 #include "scene/main/http_request.h"
 #include "scene/main/timer.h"
 
-static constexpr uint64_t JUNDOT_PLUGIN_MIN_REQUEST_INTERVAL_USEC = 2500000;
-static constexpr uint64_t JUNDOT_PLUGIN_RATE_LIMIT_BACKOFF_USEC = 30000000;
+static constexpr uint64_t JUNDOT_PLUGIN_MIN_REQUEST_INTERVAL_USEC = 8000000;
+static constexpr uint64_t JUNDOT_PLUGIN_RATE_LIMIT_BACKOFF_USEC = 45000000;
+static constexpr int JUNDOT_PLUGIN_MAX_RATE_LIMIT_RETRIES = 2;
 
 void AIJundotPluginBackend::_ensure_http_request() {
 	if (http_request) {
@@ -64,6 +66,43 @@ String AIJundotPluginBackend::_build_plugin_url() const {
 	return url;
 }
 
+double AIJundotPluginBackend::_get_rate_limit_wait_seconds(const PackedStringArray &p_headers) const {
+	for (int i = 0; i < p_headers.size(); i++) {
+		const String header = p_headers[i].strip_edges();
+		const int separator = header.find(":");
+		if (separator < 0 || header.substr(0, separator).strip_edges().to_lower() != "retry-after") {
+			continue;
+		}
+		const String value = header.substr(separator + 1).strip_edges();
+		if (value.is_valid_float()) {
+			return MAX(1.0, value.to_float());
+		}
+	}
+
+	// The free MiMo channel often omits Retry-After. Use exponential
+	// backoff so rapid tool rounds do not immediately hit the same limit.
+	return 45.0 * Math::pow(2.0, rate_limit_retry_count);
+}
+
+bool AIJundotPluginBackend::_schedule_rate_limit_retry(const PackedStringArray &p_headers) {
+	if (rate_limit_retry_count >= JUNDOT_PLUGIN_MAX_RATE_LIMIT_RETRIES || active_messages.is_empty()) {
+		return false;
+	}
+
+	const double wait_seconds = MIN(180.0, _get_rate_limit_wait_seconds(p_headers));
+	rate_limit_retry_count++;
+	last_request_end_usec = OS::get_singleton()->get_ticks_usec();
+	rate_limit_backoff_until_usec = last_request_end_usec + (uint64_t)(wait_seconds * 1000000.0);
+
+	_ensure_cooldown_timer();
+	pending_messages = active_messages.duplicate(true);
+	pending_tools = active_tools.duplicate(true);
+	pending_request = true;
+	requesting = true;
+	cooldown_timer->start(wait_seconds);
+	return true;
+}
+
 void AIJundotPluginBackend::_emit_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds) {
 	requesting = false;
 	last_request_end_usec = OS::get_singleton()->get_ticks_usec();
@@ -98,6 +137,9 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 
 	Variant parsed = JSON::parse_string(body_text);
 	if (parsed.get_type() != Variant::DICTIONARY) {
+		if (body_text.to_lower().contains("too many requests") && _schedule_rate_limit_retry(p_headers)) {
+			return;
+		}
 		String preview = body_text.strip_edges();
 		if (preview.length() > 200) {
 			preview = preview.substr(0, 200) + "...";
@@ -135,6 +177,9 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 		if (error_text.is_empty()) {
 			error_text = vformat("MiMoCode jundot plugin request failed. HTTP %d.", p_response_code);
 		}
+		if (p_response_code == HTTPClient::RESPONSE_TOO_MANY_REQUESTS && _schedule_rate_limit_retry(p_headers)) {
+			return;
+		}
 		_emit_completed(HTTPRequest::RESULT_SUCCESS, p_response_code, error_text, root, body_text, elapsed);
 		return;
 	}
@@ -168,6 +213,16 @@ void AIJundotPluginBackend::_request_completed(int p_result, int p_response_code
 		}
 	}
 
+	if (content.to_lower().contains("too many requests")) {
+		if (_schedule_rate_limit_retry(p_headers)) {
+			return;
+		}
+		_emit_completed(HTTPRequest::RESULT_SUCCESS, HTTPClient::RESPONSE_TOO_MANY_REQUESTS, content, openai_compatible, body_text, elapsed);
+		return;
+	}
+
+	rate_limit_retry_count = 0;
+	rate_limit_backoff_until_usec = 0;
 	_emit_completed(HTTPRequest::RESULT_SUCCESS, p_response_code, content, openai_compatible, body_text, elapsed);
 }
 
@@ -209,6 +264,7 @@ Error AIJundotPluginBackend::send_messages(const Array &p_messages, const Array 
 
 	_ensure_http_request();
 	ERR_FAIL_COND_V_MSG(is_requesting(), ERR_BUSY, "AI jundot plugin backend is already handling a request.");
+	rate_limit_retry_count = 0;
 
 	const uint64_t now_usec = OS::get_singleton()->get_ticks_usec();
 	if (rate_limit_backoff_until_usec > now_usec) {
@@ -253,6 +309,8 @@ Error AIJundotPluginBackend::_send_messages_now(const Array &p_messages, const A
 	headers.push_back("Accept: application/json");
 	headers.push_back("Accept-Charset: utf-8");
 
+	active_messages = p_messages.duplicate(true);
+	active_tools = p_tools.duplicate(true);
 	requesting = true;
 	request_start_usec = OS::get_singleton()->get_ticks_usec();
 	const Error err = http_request->request(_build_plugin_url(), headers, HTTPClient::METHOD_POST, JSON::stringify(payload));
@@ -284,6 +342,10 @@ void AIJundotPluginBackend::cancel_request() {
 	pending_request = false;
 	pending_messages.clear();
 	pending_tools.clear();
+	active_messages.clear();
+	active_tools.clear();
+	rate_limit_retry_count = 0;
+	rate_limit_backoff_until_usec = 0;
 	if (cooldown_timer) {
 		cooldown_timer->stop();
 	}

@@ -51,9 +51,11 @@ private:
 	void _send_response(Ref<StreamPeerTCP> p_client, int p_status_code, const String &p_content_type, const String &p_content);
 	void _handle_request(Ref<StreamPeerTCP> p_client, const String &p_method, const String &p_path, const String &p_body);
 	Array _get_ai_settings_tools() const;
+	Array _get_jundot_plugin_tools() const;
 	Dictionary _get_ai_settings_server_info() const;
 	Dictionary _get_ai_settings_snapshot() const;
 	String _execute_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
+	String _execute_builtin_tool(const String &p_tool_name, const String &p_args_json);
 	String _execute_ai_settings_tool(const String &p_tool_name, const String &p_args_json);
 
 	static void _server_thread_poll(void *data);

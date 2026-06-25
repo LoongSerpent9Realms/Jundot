@@ -42,6 +42,7 @@
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/os/os.h"
+#include "core/object/callable_mp.h"
 #include "core/os/thread.h"
 #include "core/os/thread_safe.h"
 #include "core/string/string_builder.h"
@@ -55,6 +56,7 @@ struct BuildState {
 	String std_out;
 	int exit_code = -1;
 	String extra_args; // snapshot of args for the running build
+	String executable_path; // editor binary produced by the successful build
 	bool has_result = false;
 
 	Mutex mutex;
@@ -70,12 +72,14 @@ struct BuildState {
 		std_out.clear();
 		exit_code = -1;
 		extra_args = p_extra_args;
+		executable_path.clear();
 	}
 
-	void complete(const String &p_std_out, int p_exit_code) {
+	void complete(const String &p_std_out, int p_exit_code, const String &p_executable_path = String()) {
 		MutexLock lock(mutex);
 		std_out = p_std_out;
 		exit_code = p_exit_code;
+		executable_path = p_executable_path;
 		status = (p_exit_code == 0) ? DONE : FAILED;
 		has_result = true;
 	}
@@ -87,6 +91,7 @@ struct BuildState {
 		r["exit_code"] = exit_code;
 		r["stdout"] = std_out;
 		r["has_result"] = has_result;
+		r["executable_path"] = executable_path;
 		return r;
 	}
 
@@ -183,6 +188,301 @@ static String _source_root_missing_message() {
 	return message;
 }
 
+static String _find_latest_built_editor_executable(const String &p_project_root, uint64_t p_build_started_at, bool p_mono_enabled) {
+	const String bin_dir = p_project_root.path_join("bin");
+	Ref<DirAccess> dir = DirAccess::open(bin_dir);
+	if (dir.is_null()) {
+		return String();
+	}
+
+	String latest_path;
+	uint64_t latest_mtime = 0;
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		const String lower_name = name.to_lower();
+		const bool is_mono = lower_name.contains(".mono.");
+		if (!dir->current_is_dir() && lower_name.contains(".windows.editor") &&
+				lower_name.ends_with(".exe") && !lower_name.ends_with(".console.exe") &&
+				is_mono == p_mono_enabled) {
+			const String candidate = bin_dir.path_join(name);
+			const uint64_t mtime = FileAccess::get_modified_time(candidate);
+			// Ignore stale editor binaries left by earlier build configurations.
+			// Allow a small tolerance for filesystems with coarse timestamp precision.
+			if (mtime + 2 >= p_build_started_at && mtime >= latest_mtime) {
+				latest_mtime = mtime;
+				latest_path = candidate;
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+
+	if (p_mono_enabled && !latest_path.is_empty()) {
+		const String assemblies_dir = bin_dir.path_join("JundotSharp").path_join("Api").path_join("Debug");
+		if (!DirAccess::dir_exists_absolute(assemblies_dir)) {
+			return String();
+		}
+	}
+	return latest_path;
+}
+
+static Error _run_prebuild_git_command(const List<String> &p_args, String &r_output, int &r_exit_code) {
+	r_output.clear();
+	r_exit_code = -1;
+	const Error err = OS::get_singleton()->execute("git", p_args, &r_output, &r_exit_code, true);
+	if (err != OK) {
+		return err;
+	}
+	return r_exit_code == 0 ? OK : FAILED;
+}
+
+static void _restore_prebuild_stash_after_failed_update(const String &p_stash_ref, String &r_log) {
+	if (p_stash_ref.is_empty()) {
+		return;
+	}
+
+	String output;
+	int exit_code = -1;
+	List<String> abort_args;
+	abort_args.push_back("merge");
+	abort_args.push_back("--abort");
+	_run_prebuild_git_command(abort_args, output, exit_code);
+
+	List<String> apply_args;
+	apply_args.push_back("stash");
+	apply_args.push_back("apply");
+	apply_args.push_back("--index");
+	apply_args.push_back(p_stash_ref);
+	Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
+	if (apply_err != OK) {
+		List<String> conflicts_args;
+		conflicts_args.push_back("diff");
+		conflicts_args.push_back("--name-only");
+		conflicts_args.push_back("--diff-filter=U");
+		String conflicts;
+		int conflict_exit = -1;
+		_run_prebuild_git_command(conflicts_args, conflicts, conflict_exit);
+		if (!conflicts.strip_edges().is_empty()) {
+			List<String> theirs_args;
+			theirs_args.push_back("checkout");
+			theirs_args.push_back("--theirs");
+			theirs_args.push_back("--");
+			theirs_args.push_back(".");
+			if (_run_prebuild_git_command(theirs_args, output, exit_code) == OK) {
+				List<String> add_args;
+				add_args.push_back("add");
+				add_args.push_back("-A");
+				apply_err = _run_prebuild_git_command(add_args, output, exit_code);
+			}
+		}
+	}
+
+	if (apply_err == OK) {
+		List<String> drop_args;
+		drop_args.push_back("stash");
+		drop_args.push_back("drop");
+		drop_args.push_back(p_stash_ref);
+		_run_prebuild_git_command(drop_args, output, exit_code);
+		r_log += "[Source Update] Restored local changes after the failed update attempt.\n";
+	} else {
+		r_log += "[Source Update] Automatic update failed; local changes remain recoverable in " + p_stash_ref + ".\n";
+	}
+}
+
+static Error _auto_update_source_before_build(String &r_log) {
+	String output;
+	int exit_code = -1;
+
+	List<String> inside_args;
+	inside_args.push_back("rev-parse");
+	inside_args.push_back("--is-inside-work-tree");
+	if (_run_prebuild_git_command(inside_args, output, exit_code) != OK || output.strip_edges() != "true") {
+		r_log += "[Source Update] Current engine source is not a Git worktree; skipping update check.\n";
+		return OK;
+	}
+
+	List<String> upstream_args;
+	upstream_args.push_back("rev-parse");
+	upstream_args.push_back("--abbrev-ref");
+	upstream_args.push_back("--symbolic-full-name");
+	upstream_args.push_back("@{upstream}");
+	if (_run_prebuild_git_command(upstream_args, output, exit_code) != OK || output.strip_edges().is_empty()) {
+		r_log += "[Source Update] Current branch has no upstream; skipping automatic pull.\n";
+		return OK;
+	}
+	const String upstream = output.strip_edges();
+
+	List<String> fetch_args;
+	fetch_args.push_back("fetch");
+	fetch_args.push_back("--prune");
+	if (_run_prebuild_git_command(fetch_args, output, exit_code) != OK) {
+		r_log += "[Source Update] git fetch failed:\n" + output + "\n";
+		return FAILED;
+	}
+
+	List<String> behind_args;
+	behind_args.push_back("rev-list");
+	behind_args.push_back("--count");
+	behind_args.push_back("HEAD.." + upstream);
+	if (_run_prebuild_git_command(behind_args, output, exit_code) != OK) {
+		r_log += "[Source Update] Could not compare local and upstream revisions:\n" + output + "\n";
+		return FAILED;
+	}
+	const int behind_count = output.strip_edges().to_int();
+	if (behind_count <= 0) {
+		r_log += "[Source Update] Source is up to date.\n";
+		return OK;
+	}
+	r_log += vformat("[Source Update] Upstream has %d new commit(s); updating before build.\n", behind_count);
+
+	List<String> status_args;
+	status_args.push_back("status");
+	status_args.push_back("--porcelain");
+	if (_run_prebuild_git_command(status_args, output, exit_code) != OK) {
+		r_log += "[Source Update] Could not inspect local changes:\n" + output + "\n";
+		return FAILED;
+	}
+	const bool had_local_changes = !output.strip_edges().is_empty();
+	String stash_ref;
+	if (had_local_changes) {
+		const String stash_message = "jundot-ai-prebuild-" + String::num_int64(OS::get_singleton()->get_ticks_usec());
+		List<String> stash_args;
+		stash_args.push_back("stash");
+		stash_args.push_back("push");
+		stash_args.push_back("--include-untracked");
+		stash_args.push_back("--message");
+		stash_args.push_back(stash_message);
+		if (_run_prebuild_git_command(stash_args, output, exit_code) != OK) {
+			r_log += "[Source Update] Failed to preserve local changes before update:\n" + output + "\n";
+			return FAILED;
+		}
+		stash_ref = "stash@{0}";
+		r_log += "[Source Update] Preserved local tracked and untracked changes in " + stash_ref + ".\n";
+	}
+
+	List<String> merge_args;
+	merge_args.push_back("merge");
+	merge_args.push_back("--no-edit");
+	merge_args.push_back("-X");
+	merge_args.push_back("ours");
+	merge_args.push_back(upstream);
+	Error merge_err = _run_prebuild_git_command(merge_args, output, exit_code);
+	if (merge_err != OK) {
+		List<String> conflicts_args;
+		conflicts_args.push_back("diff");
+		conflicts_args.push_back("--name-only");
+		conflicts_args.push_back("--diff-filter=U");
+		String conflict_output;
+		int conflict_exit = -1;
+		_run_prebuild_git_command(conflicts_args, conflict_output, conflict_exit);
+		if (conflict_output.strip_edges().is_empty()) {
+			List<String> abort_args;
+			abort_args.push_back("merge");
+			abort_args.push_back("--abort");
+			String ignored;
+			int ignored_exit = -1;
+			_run_prebuild_git_command(abort_args, ignored, ignored_exit);
+			r_log += "[Source Update] Upstream merge failed without resolvable file conflicts:\n" + output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+
+		List<String> ours_args;
+		ours_args.push_back("checkout");
+		ours_args.push_back("--ours");
+		ours_args.push_back("--");
+		ours_args.push_back(".");
+		String resolve_output;
+		int resolve_exit = -1;
+		if (_run_prebuild_git_command(ours_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to resolve upstream conflicts with local branch versions:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		List<String> add_args;
+		add_args.push_back("add");
+		add_args.push_back("-A");
+		if (_run_prebuild_git_command(add_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to stage automatically resolved upstream conflicts:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		List<String> commit_args;
+		commit_args.push_back("-c");
+		commit_args.push_back("user.name=Jundot AI");
+		commit_args.push_back("-c");
+		commit_args.push_back("user.email=jundot-ai@local");
+		commit_args.push_back("commit");
+		commit_args.push_back("--no-edit");
+		if (_run_prebuild_git_command(commit_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to finalize automatically resolved upstream merge:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		r_log += "[Source Update] Resolved upstream conflicts by preserving current local branch versions.\n";
+	}
+
+	if (!stash_ref.is_empty()) {
+		List<String> apply_args;
+		apply_args.push_back("stash");
+		apply_args.push_back("apply");
+		apply_args.push_back("--index");
+		apply_args.push_back(stash_ref);
+		Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
+		if (apply_err != OK) {
+			List<String> conflicts_args;
+			conflicts_args.push_back("diff");
+			conflicts_args.push_back("--name-only");
+			conflicts_args.push_back("--diff-filter=U");
+			String conflict_output;
+			int conflict_exit = -1;
+			_run_prebuild_git_command(conflicts_args, conflict_output, conflict_exit);
+			if (conflict_output.strip_edges().is_empty()) {
+				r_log += "[Source Update] Updated source, but failed to restore local changes:\n" + output + "\n";
+				return FAILED;
+			}
+			List<String> theirs_args;
+			theirs_args.push_back("checkout");
+			theirs_args.push_back("--theirs");
+			theirs_args.push_back("--");
+			theirs_args.push_back(".");
+			if (_run_prebuild_git_command(theirs_args, output, exit_code) != OK) {
+				r_log += "[Source Update] Failed to restore local working changes during conflict resolution:\n" + output + "\n";
+				return FAILED;
+			}
+			List<String> add_args;
+			add_args.push_back("add");
+			add_args.push_back("-A");
+			if (_run_prebuild_git_command(add_args, output, exit_code) != OK) {
+				r_log += "[Source Update] Failed to stage restored local working changes:\n" + output + "\n";
+				return FAILED;
+			}
+			r_log += "[Source Update] Resolved restore conflicts by preserving the pre-build local working versions.\n";
+		}
+
+		List<String> drop_args;
+		drop_args.push_back("stash");
+		drop_args.push_back("drop");
+		drop_args.push_back(stash_ref);
+		if (_run_prebuild_git_command(drop_args, output, exit_code) != OK) {
+			r_log += "[Source Update] Warning: restored local changes, but could not remove " + stash_ref + ".\n";
+		}
+	}
+
+	List<String> unresolved_args;
+	unresolved_args.push_back("diff");
+	unresolved_args.push_back("--name-only");
+	unresolved_args.push_back("--diff-filter=U");
+	if (_run_prebuild_git_command(unresolved_args, output, exit_code) != OK || !output.strip_edges().is_empty()) {
+		r_log += "[Source Update] Unresolved conflicts remain; build cancelled.\n" + output + "\n";
+		return FAILED;
+	}
+
+	r_log += "[Source Update] Source update completed successfully.\n";
+	return OK;
+}
+
 static void _build_thread_callback(void *p_userdata) {
 	String extra_args = String();
 	if (p_userdata) {
@@ -203,12 +503,22 @@ static void _build_thread_callback(void *p_userdata) {
 		return;
 	}
 
+	String source_update_log;
+	if (_auto_update_source_before_build(source_update_log) != OK) {
+		OS::get_singleton()->set_cwd(previous_cwd);
+		build_state.complete(source_update_log + "\nBuild cancelled because the engine source update did not complete safely.", -1);
+		return;
+	}
+
 	// Build scons arguments.
 	List<String> scons_args;
 	scons_args.push_back("platform=windows");
 	scons_args.push_back("target=editor");
 	scons_args.push_back("arch=x86_64");
 	scons_args.push_back("debug_symbols=no");
+	// AI builds default to the native editor. A Mono editor also requires a
+	// separate managed assemblies build, so never select it accidentally.
+	scons_args.push_back("module_mono_enabled=no");
 	scons_args.push_back("-j4");
 	scons_args.push_back("d3d12=no");
 	scons_args.push_back("accesskit=no");
@@ -217,10 +527,15 @@ static void _build_thread_callback(void *p_userdata) {
 	if (!extra_args.is_empty()) {
 		Vector<String> extras = extra_args.split(" ", false);
 		for (int i = 0; i < extras.size(); i++) {
+			if (extras[i].begins_with("module_mono_enabled=")) {
+				continue;
+			}
 			scons_args.push_back(extras[i]);
 		}
 	}
 
+	const bool mono_enabled = false;
+	const uint64_t build_started_at = OS::get_singleton()->get_unix_time();
 
 	// Try python -m SCons first, then scons, then python3 -m SCons.
 	String std_out;
@@ -249,7 +564,14 @@ static void _build_thread_callback(void *p_userdata) {
 	}
 
 	OS::get_singleton()->set_cwd(previous_cwd);
-	build_state.complete(std_out, exit_code);
+	std_out = source_update_log + "\n" + std_out;
+	const String built_executable = exit_code == 0 ? _find_latest_built_editor_executable(project_root, build_started_at, mono_enabled) : String();
+	if (exit_code == 0 && built_executable.is_empty()) {
+		std_out += mono_enabled ?
+				"\n\nBuild succeeded, but the Mono editor or its JundotSharp/Api/Debug assemblies were not generated by this build." :
+				"\n\nBuild succeeded, but no native non-console Windows editor executable generated by this build was found in: " + project_root.path_join("bin");
+	}
+	build_state.complete(std_out, exit_code, built_executable);
 }
 
 Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
@@ -269,6 +591,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _read_files(args);
 	} else if (name == AIToolNames::WRITE_FILE) {
 		result = _write_file(args);
+	} else if (name == AIToolNames::EDIT_FILE) {
+		result = _edit_file(args);
 	} else if (name == AIToolNames::SEARCH_FILES) {
 		result = _search_files(args);
 	} else if (name == AIToolNames::LIST_FILES) {
@@ -402,9 +726,17 @@ Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
 Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 	String path = p_args.get("path", String());
 	String content = p_args.get("content", String());
+	if (content.is_empty() && p_args.has("new_string")) {
+		// Compatibility with models that emit write_file(path, new_string)
+		// using edit-style argument naming in text-form tool calls.
+		content = p_args.get("new_string", String());
+	}
 
 	if (path.is_empty()) {
 		return _make_result("No file path provided.", true);
+	}
+	if (content.is_empty()) {
+		return _make_result(vformat("File write rejected: content is empty, so the existing file was not modified.\nPath: %s", path), true);
 	}
 
 	// Validate content: reject Markdown code fences, which usually mean the
@@ -445,8 +777,16 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		return _make_result(vformat("Failed to open temporary file for writing: %s", path), true);
 	}
 
+	const int64_t expected_size = content.utf8().length();
 	file->store_string(content);
+	file->flush();
 	file.unref();
+
+	const int64_t temporary_size = FileAccess::get_size(tmp_path);
+	if (temporary_size != expected_size) {
+		da->remove(tmp_path);
+		return _make_result(vformat("File write rejected: temporary file size mismatch (expected %d bytes, wrote %d bytes). The existing file was not modified.\nPath: %s", expected_size, temporary_size, path), true);
+	}
 
 	String bak_path = full_path + ".bak";
 	if (FileAccess::exists(bak_path)) {
@@ -473,7 +813,61 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		return _make_result(vformat("Failed to replace file after writing temporary content: %s", path), true);
 	}
 
-	return _make_result(vformat("Successfully wrote %s (%d bytes).", path, content.utf8().length()));
+	const int64_t final_size = FileAccess::get_size(full_path);
+	if (final_size != expected_size) {
+		da->remove(full_path);
+		if (FileAccess::exists(bak_path)) {
+			da->rename(bak_path, full_path);
+		}
+		return _make_result(vformat("File write failed verification: final file size mismatch (expected %d bytes, got %d bytes). The previous file was restored when available.\nPath: %s", expected_size, final_size, path), true);
+	}
+
+	return _make_result(vformat("Successfully wrote %s (%d bytes).", path, expected_size));
+}
+
+Dictionary AIToolExecutor::_edit_file(const Dictionary &p_args) {
+	const String path = p_args.get("path", String());
+	const String old_string = p_args.get("old_string", String());
+	const String new_string = p_args.get("new_string", String());
+
+	if (path.is_empty()) {
+		return _make_result("No file path provided.", true);
+	}
+	if (old_string.is_empty()) {
+		return _make_result(vformat("File edit rejected: old_string is empty.\nPath: %s", path), true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	const String full_path = project_root.path_join(path);
+	if (!FileAccess::exists(full_path)) {
+		return _make_result(vformat("File edit rejected: file not found.\nPath: %s", path), true);
+	}
+
+	Error read_err = OK;
+	const String content = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		return _make_result(vformat("File edit rejected: failed to read file (err=%d).\nPath: %s", (int)read_err, path), true);
+	}
+
+	const int occurrence_count = content.count(old_string);
+	if (occurrence_count == 0) {
+		return _make_result(vformat("File edit rejected: old_string was not found.\nPath: %s", path), true);
+	}
+	if (occurrence_count > 1) {
+		return _make_result(vformat("File edit rejected: old_string occurs %d times; provide more surrounding context so it matches exactly once.\nPath: %s", occurrence_count, path), true);
+	}
+
+	Dictionary write_args;
+	write_args["path"] = path;
+	write_args["content"] = content.replace(old_string, new_string);
+	Dictionary result = _write_file(write_args);
+	if (!bool(result.get("is_error", false))) {
+		result["content"] = vformat("Successfully edited %s by replacing one exact match.", path);
+	}
+	return result;
 }
 
 Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
@@ -939,6 +1333,18 @@ Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
 }
 
 Dictionary AIToolExecutor::_read_build_log(const Dictionary &p_args) {
+	Dictionary build_result = build_state.get_result();
+	const String build_status = build_result.get("status", "idle");
+	const String build_output = build_result.get("stdout", String());
+	if (build_status == "running") {
+		return _make_result("Build is still running. Use check_build_status to wait for completion.");
+	}
+	if (bool(build_result.get("has_result", false)) && !build_output.is_empty()) {
+		const int MAX_LOG_CHARS = 30000;
+		const String visible_output = build_output.length() > MAX_LOG_CHARS ? build_output.substr(build_output.length() - MAX_LOG_CHARS) : build_output;
+		return _make_result(vformat("Latest in-memory build output (status: %s, exit code: %d):\n\n%s", build_status, int(build_result.get("exit_code", -1)), visible_output));
+	}
+
 	String project_root = _get_project_root();
 	if (project_root.is_empty()) {
 		return _make_result(_source_root_missing_message(), true);
@@ -1025,6 +1431,7 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 		return _make_result("No command provided.", true);
 	}
 
+
 	String project_root = _get_project_root();
 	if (project_root.is_empty()) {
 		project_root = _get_configured_engine_source_cache_root(AISettings::load());
@@ -1091,17 +1498,37 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 	return _make_result(result.as_string());
 }
 
-Dictionary AIToolExecutor::_restart_engine(const Dictionary &p_args) {
-	// Save editor state before restart.
-	Error err = AIRestartHelper::save_state();
-	if (err != OK) {
-		return _make_result("Failed to save editor state: " + itos((int)err), true);
+static void _restart_editor_on_main_thread(const String &p_executable_path) {
+	EditorNode *editor = EditorNode::get_singleton();
+	if (!editor) {
+		ERR_PRINT("AI engine restart failed: EditorNode is unavailable.");
+		return;
 	}
 
-	// Trigger editor restart.
-	EditorNode::get_singleton()->restart_editor(false);
+	const Error state_err = AIRestartHelper::save_state();
+	if (state_err != OK) {
+		ERR_PRINT(vformat("AI engine restart could not save editor state (err=%d). Restarting with the standard editor session restore path.", (int)state_err));
+	}
 
-	return _make_result("Engine restart initiated. The editor will save open files and relaunch with the new build.");
+	// restart_editor() touches editor UI and configures OS restart-on-exit, so
+	// it must run on the main thread rather than the AI tool worker thread.
+	OS::get_singleton()->set_restart_executable_path(p_executable_path);
+	editor->restart_editor(false);
+}
+
+Dictionary AIToolExecutor::_restart_engine(const Dictionary &p_args) {
+	const Dictionary build_result = build_state.get_result();
+	if (String(build_result.get("status", "idle")) != "done" || int(build_result.get("exit_code", -1)) != 0) {
+		return _make_result("Engine switch rejected: no successful AI build is available. Run run_build and wait for check_build_status to report success first.", true);
+	}
+
+	const String executable_path = build_result.get("executable_path", String());
+	if (executable_path.is_empty() || !FileAccess::exists(executable_path)) {
+		return _make_result("Engine switch rejected: the executable produced by the successful AI build could not be found.", true);
+	}
+
+	callable_mp_static(&_restart_editor_on_main_thread).bind(executable_path).call_deferred();
+	return _make_result("Engine switch scheduled. The current editor will close, then launch the AI-compiled editor: " + executable_path);
 }
 
 Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
@@ -1207,7 +1634,7 @@ Dictionary AIToolExecutor::_execute_mcp_tool(const String &p_server_name, const 
 	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
 
 	// Lazy start: if runtime not running for this server, start it
-	if (!runtime->is_alive()) {
+	if (!runtime->is_running_server(p_server_name)) {
 		Error err = runtime->start(target_server);
 		if (err != OK) {
 			return _make_result(vformat("Failed to start MCP server '%s': %s", p_server_name, runtime->get_last_error()), true);

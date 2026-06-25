@@ -6479,6 +6479,18 @@ msgstr "无法实例化选中的类。"
 msgid "Favorites:"
 msgstr "收藏："
 
+msgid "Quick Access:"
+msgstr "快捷访问："
+
+msgid "Desktop"
+msgstr "桌面"
+
+msgid "Downloads"
+msgstr "下载"
+
+msgid "Documents"
+msgstr "文档"
+
 msgid "Recent:"
 msgstr "最近使用："
 
@@ -21478,3 +21490,12 @@ msgstr "项目模式"
 
 msgid "You"
 msgstr "你"
+
+msgid "Processed"
+msgstr "已处理"
+
+msgid "Processed %dm %ds"
+msgstr "已处理 %d分 %d秒"
+
+msgid "Processed %.1fs"
+msgstr "已处理 %.1f秒"

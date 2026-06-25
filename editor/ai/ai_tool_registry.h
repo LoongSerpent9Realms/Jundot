@@ -37,6 +37,7 @@ struct AIMCPServerEntry {
 	String command;
 	String arguments;
 	String url;
+	Dictionary environment;
 	String capabilities_json;
 	bool enabled = true;
 	bool requires_confirmation = true;

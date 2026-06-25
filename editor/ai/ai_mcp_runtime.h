@@ -32,6 +32,7 @@ private:
 	String server_name;
 	String command;
 	List<String> arguments;
+	Dictionary environment;
 	MCPServerLifecycle lifecycle = MCPServerLifecycle::DEFAULT;
 	int timeout_ms = 30000;
 
@@ -77,6 +78,7 @@ public:
 	Error start(const AIMCPServerEntry &p_entry);
 	void stop();
 	bool is_alive() const;
+	bool is_running_server(const String &p_server_name) const;
 	ServerState get_state() const;
 	String get_last_error() const;
 	String get_protocol_version() const;
