@@ -70,6 +70,8 @@ class AIChatPanel : public MarginContainer {
 	VBoxContainer *message_list = nullptr;
 	ScrollContainer *message_scroll = nullptr;
 	HBoxContainer *attachment_chips = nullptr;
+	VBoxContainer *queued_messages_box = nullptr;
+	Label *queued_messages_title = nullptr;
 	TextEdit *input = nullptr;
 	Button *send_button = nullptr;
 	Button *cancel_button = nullptr;
@@ -94,6 +96,10 @@ class AIChatPanel : public MarginContainer {
 
 	// Mode switching (PROJECT / ENGINE).
 	HBoxContainer *mode_bar = nullptr;
+	Label *source_update_status_label = nullptr;
+	Label *develop_mode_status_label = nullptr;
+	Button *develop_user_pass_button = nullptr;
+	Button *develop_user_fail_button = nullptr;
 	Button *engine_mode_btn = nullptr;
 	Button *project_mode_btn = nullptr;
 	Label *mode_indicator = nullptr;
@@ -192,6 +198,11 @@ class AIChatPanel : public MarginContainer {
 		int completion_tokens = 0;
 	};
 
+	struct QueuedChatMessage {
+		String text;
+		bool guided = false;
+		uint64_t created_at = 0;
+	};
 	struct Conversation {
 		String id;
 		String title;
@@ -204,15 +215,18 @@ class AIChatPanel : public MarginContainer {
 		bool tool_limit_options_collapsed = false;
 		bool tool_limit_options_due_to_limit = false;
 		Vector<String> next_question_options;
+		Vector<QueuedChatMessage> queued_messages;
 
 		static Dictionary to_dict(const Conversation &p_conv);
 		static Conversation from_dict(const Dictionary &p_dict);
 	};
 
 	Vector<Conversation> conversations;
+	Vector<QueuedChatMessage> queued_messages;
 	String active_conversation_id;
 
 	// Sidebar UI.
+	HSplitContainer *chat_split = nullptr;
 	PanelContainer *sidebar_panel = nullptr;
 	PanelContainer *chat_surface_panel = nullptr;
 	PanelContainer *composer_panel = nullptr;
@@ -220,6 +234,12 @@ class AIChatPanel : public MarginContainer {
 	Button *new_conversation_button = nullptr;
 	Button *delete_conversation_button = nullptr;
 	ItemList *conversation_list = nullptr;
+	Button *collapse_sidebar_button = nullptr;
+	Button *expand_sidebar_button = nullptr;
+	bool sidebar_collapsed = false;
+	bool sidebar_user_collapsed = false;
+	bool sidebar_auto_collapsed = false;
+	int sidebar_expanded_width = 218;
 
 	void _new_conversation();
 	void _delete_current_conversation();
@@ -231,11 +251,20 @@ class AIChatPanel : public MarginContainer {
 	void _load_all_conversations();
 	String _get_conversations_file_path() const;
 	void _refresh_conversation_list_ui();
+	void _set_sidebar_collapsed(bool p_collapsed);
+	void _apply_sidebar_visibility();
+	void _update_responsive_sidebar();
+	void _toggle_sidebar();
 	void _serialize_current_messages();
 	void _load_conversation_to_ui(const Conversation &p_conv);
 	Array _get_structured_history() const;
 	void _store_structured_history(const Array &p_messages, const String &p_assistant_content = String());
 	void _clear_structured_history();
+	void _enqueue_current_message();
+	void _refresh_queued_messages_ui();
+	void _guide_queued_message(int p_index);
+	void _delete_queued_message(int p_index);
+	void _dispatch_next_queued_message();
 
 	// ============ End multi-conversation support ============
 
@@ -255,6 +284,7 @@ class AIChatPanel : public MarginContainer {
 	String _get_response_thought(const String &p_current_thought) const;
 	double _get_response_elapsed(double p_fallback_elapsed) const;
 	void _clear_response_tracking();
+	void _save_project_memory_update(const AIProjectMemoryUpdate &p_update);
 	bool _retry_after_missing_tool_call(const String &p_content);
 	void _execute_tool_calls(const Dictionary &p_json);
 	void _add_user_message(const String &p_text);
@@ -305,6 +335,8 @@ class AIChatPanel : public MarginContainer {
 	void _switch_to_engine();
 	void _switch_to_project();
 	void _update_mode_indicator();
+	void _update_develop_mode_ui();
+	void _develop_user_verification(bool p_passed);
 
 	// Suggestion card callbacks.
 	void _suggestion_accepted(AISuggestionCard *p_card);

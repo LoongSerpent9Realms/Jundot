@@ -74,6 +74,7 @@ static Error _curl_fetch(const String &p_url, const String &p_dest_path, String 
 	List<String> args;
 	args.push_back("-sS");          // silent but show errors
 	args.push_back("-L");           // follow redirects
+	args.push_back("-A"); args.push_back("Mozilla/5.0 (JunDot AI game-reference research)");
 	args.push_back("--connect-timeout"); args.push_back("15");
 	args.push_back("--max-time"); args.push_back("60");
 	args.push_back("-o"); args.push_back(p_dest_path);

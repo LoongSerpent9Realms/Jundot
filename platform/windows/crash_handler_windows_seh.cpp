@@ -39,8 +39,9 @@
 
 #ifdef CRASH_HANDLER_EXCEPTION
 
-// Forward declaration for crash dialog launcher
-static void launch_crash_dialog_if_present();
+// Forward declarations for crash diagnostics.
+static void write_native_crash_report(EXCEPTION_POINTERS *ep);
+static bool launch_crash_dialog_if_present();
 
 // Backtrace code based on: https://stackoverflow.com/questions/6205981/windows-c-stack-trace-from-a-running-app
 
@@ -133,6 +134,8 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 	if (OS::get_singleton()->is_crash_handler_silent()) {
 		std::_Exit(0);
 	}
+
+	write_native_crash_report(ep);
 
 	// 避免使用 GLOBAL_GET，因为它可能触发 EditorSettings 访问
 	String msg;
@@ -268,7 +271,7 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
 		}
 	}
 
-	// Launch the crash dialog before terminating
+	// Launch the crash dialog before terminating.
 	launch_crash_dialog_if_present();
 
 	// Pass the exception to the OS
@@ -283,16 +286,71 @@ DWORD CrashHandlerException(EXCEPTION_POINTERS *ep) {
  * Note: This function must be robust and avoid operations that could cause
  * a secondary crash (e.g., memory allocation, complex string operations).
  */
-static void launch_crash_dialog_if_present() {
-	WCHAR engine_path[MAX_PATH] = {0};
+static void write_native_crash_report(EXCEPTION_POINTERS *ep) {
+	WCHAR engine_path[MAX_PATH] = { 0 };
 	if (!GetModuleFileNameW(nullptr, engine_path, MAX_PATH)) {
 		return;
+	}
+
+	WCHAR engine_dir[MAX_PATH] = { 0 };
+	WCHAR *last_sep = wcsrchr(engine_path, L'\\');
+	if (!last_sep) {
+		return;
+	}
+	size_t dir_len = last_sep - engine_path;
+	wcsncpy_s(engine_dir, MAX_PATH, engine_path, dir_len);
+	engine_dir[dir_len] = L'\0';
+
+	WCHAR log_dir[MAX_PATH * 2] = { 0 };
+	swprintf_s(log_dir, L"%s\\logs", engine_dir);
+	CreateDirectoryW(log_dir, nullptr);
+
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+
+	WCHAR report_path[MAX_PATH * 2] = { 0 };
+	swprintf_s(report_path, L"%s\\jundot-native-crash-%04d%02d%02d-%02d%02d%02d-%lu.txt",
+			log_dir,
+			st.wYear,
+			st.wMonth,
+			st.wDay,
+			st.wHour,
+			st.wMinute,
+			st.wSecond,
+			GetCurrentProcessId());
+
+	FILE *report_file = nullptr;
+	if (_wfopen_s(&report_file, report_path, L"w, ccs=UTF-8") != 0 || !report_file) {
+		return;
+	}
+
+	fwprintf_s(report_file, L"========== Jundot Native Crash ==========\n");
+	fwprintf_s(report_file, L"Time: %04d-%02d-%02d %02d:%02d:%02d\n", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	fwprintf_s(report_file, L"Engine: %s\n", engine_path);
+	fwprintf_s(report_file, L"EngineDir: %s\n", engine_dir);
+	fwprintf_s(report_file, L"Version: %hs\n", JUNDOT_VERSION_FULL_NAME);
+	const char *hash = JUNDOT_VERSION_HASH;
+	if (hash && hash[0] != '\0') {
+		fwprintf_s(report_file, L"Hash: %hs\n", hash);
+	}
+	if (ep && ep->ExceptionRecord) {
+		fwprintf_s(report_file, L"ExceptionCode: 0x%08lX\n", ep->ExceptionRecord->ExceptionCode);
+		fwprintf_s(report_file, L"ExceptionAddress: 0x%p\n", ep->ExceptionRecord->ExceptionAddress);
+	}
+	fwprintf_s(report_file, L"\nThe full C++ backtrace is still printed through the engine logger. This emergency file is written before the crash dialog starts so there is always an on-disk breadcrumb.\n");
+	fclose(report_file);
+}
+
+static bool launch_crash_dialog_if_present() {
+	WCHAR engine_path[MAX_PATH] = {0};
+	if (!GetModuleFileNameW(nullptr, engine_path, MAX_PATH)) {
+		return false;
 	}
 
 	WCHAR engine_dir[MAX_PATH] = {0};
 	WCHAR* last_sep = wcsrchr(engine_path, L'\\');
 	if (!last_sep) {
-		return;
+		return false;
 	}
 	size_t dir_len = last_sep - engine_path;
 	wcsncpy_s(engine_dir, MAX_PATH, engine_path, dir_len);
@@ -333,13 +391,13 @@ static void launch_crash_dialog_if_present() {
 	}
 
 	if (!found) {
-		return;
+		return false;
 	}
 
 	WCHAR crash_info_path[MAX_PATH];
 	WCHAR temp_path[MAX_PATH];
 	if (GetTempPathW(MAX_PATH, temp_path) == 0) {
-		return;
+		return false;
 	}
 	swprintf_s(crash_info_path, L"%s\\jundot_crash_info_%llu.txt",
 			temp_path,
@@ -347,7 +405,7 @@ static void launch_crash_dialog_if_present() {
 
 	FILE* crash_info_file = nullptr;
 	if (_wfopen_s(&crash_info_file, crash_info_path, L"w") != 0 || !crash_info_file) {
-		return;
+		return false;
 	}
 
 	fwprintf_s(crash_info_file, L"Engine: %s\n", engine_path);
@@ -385,8 +443,10 @@ static void launch_crash_dialog_if_present() {
 	if (created) {
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
+		return true;
 	} else {
 		DeleteFileW(crash_info_path);
+		return false;
 	}
 }
 #endif

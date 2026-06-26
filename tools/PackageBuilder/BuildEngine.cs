@@ -1217,7 +1217,8 @@ Install one of these toolchains, then run this tool again:
 		}
 
 		await CopyPackageBuilderAsync();
-		// await CopyLauncherAsync(); // 已禁�?        await CopyCrashDialogAsync();
+		// Launcher is intentionally not embedded for now.
+		await CopyCrashDialogAsync();
 
 		// Write manifest
 		var manifestPath = Path.Combine(_stagingDir, "package-manifest.txt");
@@ -1246,7 +1247,7 @@ Install one of these toolchains, then run this tool again:
 		if (_actualTarget == "editor")
 		{
 			lines.Add("  Tools/PackageBuilder/");
-			lines.Add("  Tools/Launcher/");
+			lines.Add("  Tools/CrashDialog/");
 		}
 
 		File.WriteAllLines(manifestPath, lines, System.Text.Encoding.UTF8);

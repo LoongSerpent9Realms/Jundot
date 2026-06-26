@@ -1,4 +1,4 @@
-short_name = "jundot"
+﻿short_name = "jundot"
 
 name = "Jundot Engine"
 
@@ -6,7 +6,7 @@ major = 0
 
 minor = 2
 
-patch = 73
+patch = 80
 
 status = "alpha"
 

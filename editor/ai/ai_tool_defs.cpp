@@ -181,7 +181,18 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::GREP_CODE, "", fn));
 	}
 
-	// 6. run_build
+	// 6. check_project_scripts
+	{
+		Dictionary props;
+		props["paths"] = _array_str_property("Optional script path(s) relative to the project root to validate, e.g. 'scripts/player.gd' or 'res://scripts/player.gd'. If omitted, all project GDScript files are syntax-checked and C# projects are built when present.");
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_PROJECT_SCRIPTS,
+				"Validate project scripts after creating or editing them. In PROJECT mode, syntax-checks GDScript files with the current editor executable in headless check-only mode and, when a C# project is present, runs dotnet build in the open project directory. Returns compiler/parser output so the AI can fix errors and validate again.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CHECK_PROJECT_SCRIPTS, "", fn));
+	}
+
+	// 7. run_build
 	{
 		Dictionary props;
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
@@ -192,7 +203,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
 
-	// 7. read_build_log
+	// 8. read_build_log
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -202,7 +213,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::READ_BUILD_LOG, "", fn));
 	}
 
-	// 8. fetch_url
+	// 9. fetch_url
 	{
 		Dictionary props;
 		props["url"] = _str_property("The full URL to download from.");
@@ -212,12 +223,12 @@ Array AIToolDefs::get_builtin_tools() {
 		required.push_back("dest_path");
 		Dictionary fn = _make_fn(
 				AIToolNames::FETCH_URL,
-				"Download a file from a URL and save it to the local project tree. Creates parent directories as needed.",
+				"Download a URL and save it in the current tool root. In PROJECT mode this is restricted to official Steam or Epic Games Store research pages and destinations under .JundotAI/research/. Use it to verify reference games before proposing differentiators. In ENGINE mode it may also fetch development dependencies.",
 				props, required);
 		tools.push_back(_tool(AIToolNames::FETCH_URL, "", fn));
 	}
 
-	// 9. shell_command
+	// 10. shell_command
 	{
 		Dictionary props;
 		props["command"] = _str_property("Shell command to execute in the project root directory.");
@@ -230,7 +241,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SHELL_COMMAND, "", fn));
 	}
 
-	// 10. restart_engine
+	// 11. restart_engine
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -240,7 +251,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RESTART_ENGINE, "", fn));
 	}
 
-	// 11. check_build_status
+	// 12. check_build_status
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -250,7 +261,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_BUILD_STATUS, "", fn));
 	}
 
-	// 12. upload_code
+	// 13. upload_code
 	{
 		Dictionary props;
 		props["file_path"] = _str_property("File path relative to the project root to upload to the git remote repository.");
@@ -260,15 +271,78 @@ Array AIToolDefs::get_builtin_tools() {
 		required.push_back("commit_message");
 		Dictionary fn = _make_fn(
 				AIToolNames::UPLOAD_CODE,
-				"Upload a modified file to the git remote repository. Runs security and universality checks before committing and pushing. Only works in ENGINE mode with a valid git repository.",
+				"Upload a modified file to the git remote repository. Before committing and pushing, validates repository formatting, code quality, security, and configured universality threshold. Any failed gate blocks the upload. Only works in ENGINE mode with a valid git repository.",
 				props, required);
 		tools.push_back(_tool(AIToolNames::UPLOAD_CODE, "", fn));
 	}
 
-	// 13. batch_tools
+	// 14. develop_ai_verify
+	{
+		Dictionary props;
+		Dictionary passed;
+		passed["type"] = "boolean";
+		passed["description"] = "Whether AI validation passed after reviewing the user feedback and available evidence.";
+		props["passed"] = passed;
+		props["summary"] = _str_property("AI validation findings and evidence.");
+		Array required;
+		required.push_back("passed");
+		required.push_back("summary");
+		Dictionary fn = _make_fn(
+				AIToolNames::DEVELOP_AI_VERIFY,
+				"Record the AI verification stage of a Develop Mode demonstration after the user has tested the restarted editor. This never uploads code.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::DEVELOP_AI_VERIFY, "", fn));
+	}
+
+	// 15. setup_engine_workspace
+	{
+		Dictionary props;
+		props["workspace_name"] = _str_property("Short project-specific engine workspace name. If omitted, the open project directory name is used.");
+		props["provider"] = _str_property("Remote provider to record: local, github, or gitee. This does not store credentials.");
+		props["remote_url"] = _str_property("Optional GitHub/Gitee/git remote URL to attach as the project-engine remote. Authentication uses the user's existing git credentials.");
+		props["branch"] = _str_property("Optional engine branch name. Defaults to project/<workspace_name>.");
+		props["base_ref"] = _str_property("Optional base branch/ref for a new workspace branch. Defaults to HEAD of the configured engine source.");
+		Array required;
+		Dictionary fn = _make_fn(
+				AIToolNames::SETUP_ENGINE_WORKSPACE,
+				"PROJECT mode only. Create or bind a project-specific JunDot engine worktree and branch, optionally attach a GitHub/Gitee remote URL using the user's existing git credentials, save the mapping in .JundotAI/engine_workspace.json, and point engine mode at that workspace.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::SETUP_ENGINE_WORKSPACE, "", fn));
+	}
+
+	// 16. request_engine_change
+	{
+		Dictionary props;
+		props["reason"] = _str_property("The exact project requirement or engine limitation that makes an engine change necessary.");
+		props["required_change"] = _str_property("The engine behavior, API, editor feature, or runtime capability that should be modified.");
+		props["project_work_done"] = _str_property("Optional summary of safe project-side work already completed before switching.");
+		Array required;
+		required.push_back("reason");
+		required.push_back("required_change");
+		Dictionary fn = _make_fn(
+				AIToolNames::REQUEST_ENGINE_CHANGE,
+				"PROJECT mode only. Request a controlled switch to ENGINE mode when the project task genuinely requires engine source changes. The editor will preserve the conversation, switch modes, continue with engine tools, and expect return_to_project_mode after the engine work is verified.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::REQUEST_ENGINE_CHANGE, "", fn));
+	}
+
+	// 17. return_to_project_mode
+	{
+		Dictionary props;
+		props["summary"] = _str_property("Summary of the engine change, validation result, and what the project-side continuation should do next.");
+		Array required;
+		required.push_back("summary");
+		Dictionary fn = _make_fn(
+				AIToolNames::RETURN_TO_PROJECT_MODE,
+				"ENGINE mode only. Return to PROJECT mode after the requested engine change has been completed and validated, so the AI can continue or finish the original game-project task in the project context.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::RETURN_TO_PROJECT_MODE, "", fn));
+	}
+
+	// 18. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -390,11 +464,21 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	engine_only.insert(StringName(AIToolNames::RESTART_ENGINE));
 	engine_only.insert(StringName(AIToolNames::FETCH_URL));
 	engine_only.insert(StringName(AIToolNames::UPLOAD_CODE));
+	engine_only.insert(StringName(AIToolNames::DEVELOP_AI_VERIFY));
+	engine_only.insert(StringName(AIToolNames::RETURN_TO_PROJECT_MODE));
+
+	HashSet<StringName> project_only;
+	project_only.insert(StringName(AIToolNames::CHECK_PROJECT_SCRIPTS));
+	project_only.insert(StringName(AIToolNames::SETUP_ENGINE_WORKSPACE));
+	project_only.insert(StringName(AIToolNames::REQUEST_ENGINE_CHANGE));
 
 	for (int i = 0; i < all_tools.size(); i++) {
 		Dictionary tool = all_tools[i];
 		Dictionary fn = tool["function"];
 		String name = fn["name"];
+		if (project_only.has(StringName(name)) && p_mode != AIContextMode::PROJECT) {
+			continue;
+		}
 		if (engine_only.has(StringName(name)) && p_mode != AIContextMode::ENGINE) {
 			continue;
 		}

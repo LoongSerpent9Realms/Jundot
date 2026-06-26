@@ -50,6 +50,7 @@ private:
 	static Dictionary _search_files(const Dictionary &p_args);
 	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
+	static Dictionary _check_project_scripts(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
 	static Dictionary _check_build_status(const Dictionary &p_args);
 	static Dictionary _read_build_log(const Dictionary &p_args);
@@ -57,6 +58,10 @@ private:
 	static Dictionary _shell_command(const Dictionary &p_args);
 	static Dictionary _restart_engine(const Dictionary &p_args);
 	static Dictionary _upload_code(const Dictionary &p_args);
+	static Dictionary _develop_ai_verify(const Dictionary &p_args);
+	static Dictionary _setup_engine_workspace(const Dictionary &p_args);
+	static Dictionary _request_engine_change(const Dictionary &p_args);
+	static Dictionary _return_to_project_mode(const Dictionary &p_args);
 	static Dictionary _batch_tools(const Dictionary &p_args);
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 

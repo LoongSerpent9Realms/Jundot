@@ -60,6 +60,17 @@ struct AIRepairSuggestion {
 	String risk;
 };
 
+
+struct AIProjectMemoryUpdate {
+	String user_preferences;
+	String project_requirements;
+	String key_decisions;
+	String completed_work;
+
+	bool is_empty() const {
+		return user_preferences.strip_edges().is_empty() && project_requirements.strip_edges().is_empty() && key_decisions.strip_edges().is_empty() && completed_work.strip_edges().is_empty();
+	}
+};
 struct AITaskPlan {
 	struct Step {
 		String title;
@@ -101,6 +112,8 @@ public:
 	static void parse_repair_tasks(const String &p_response, Vector<AIRepairSuggestion> &r_repairs);
 	static void parse_feature_gates(const String &p_response, Vector<AIFeatureGateResult> &r_features);
 	static void parse_task_plans(const String &p_response, Vector<AITaskPlan> &r_task_plans);
+	static bool parse_project_memory_update(const String &p_response, AIProjectMemoryUpdate &r_update);
+	static String strip_project_memory_blocks(const String &p_response);
 	static String strip_task_plan_blocks(const String &p_response);
 	static String strip_next_question_blocks(const String &p_response);
 };

@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "core/variant/variant.h"
 #include "scene/gui/box_container.h"
 
 class Button;
@@ -71,6 +72,7 @@ class AIChatMessage : public VBoxContainer {
 	void _toggle_think();
 	void _copy_pressed();
 	void _edit_pressed();
+	void _meta_clicked(const Variant &p_meta);
 	void _build_ui();
 	void _update_translations();
 	void _update_think_visibility();
