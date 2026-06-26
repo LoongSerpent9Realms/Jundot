@@ -14,6 +14,28 @@ namespace JundotTools.BuildLogger
         private StreamWriter _issuesStreamWriter = StreamWriter.Null;
         private int _indent;
 
+        private static StreamWriter CreateSharedWriter(string filePath, string fallbackPrefix)
+        {
+            try
+            {
+                var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete);
+                return new StreamWriter(stream);
+            }
+            catch (IOException)
+            {
+                string directory = Path.GetDirectoryName(filePath)!;
+                string extension = Path.GetExtension(filePath);
+                string fallbackFile = Path.Combine(directory,
+                    $"{fallbackPrefix}_{Environment.ProcessId}_{DateTime.UtcNow.Ticks}{extension}");
+                var stream = new FileStream(fallbackFile, FileMode.CreateNew, FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete);
+                var writer = new StreamWriter(stream);
+                writer.WriteLine($"Primary log file was locked; writing this build log to '{fallbackFile}'.");
+                return writer;
+            }
+        }
+
         public void Initialize(IEventSource eventSource)
         {
             if (null == Parameters)
@@ -37,8 +59,8 @@ namespace JundotTools.BuildLogger
                 if (!Directory.Exists(logDir))
                     Directory.CreateDirectory(logDir);
 
-                _logStreamWriter = new StreamWriter(logFile);
-                _issuesStreamWriter = new StreamWriter(issuesFile);
+                _logStreamWriter = CreateSharedWriter(logFile, "msbuild_log");
+                _issuesStreamWriter = CreateSharedWriter(issuesFile, "msbuild_issues");
             }
             catch (Exception ex)
             {

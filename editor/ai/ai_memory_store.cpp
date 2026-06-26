@@ -12,9 +12,23 @@
 #include "core/io/json.h"
 #include "core/os/time.h"
 #include "editor/file_system/editor_paths.h"
+#include "core/config/project_settings.h"
 
 String AIMemoryStore::_get_default_path() {
+	if (ProjectSettings::get_singleton()) {
+		const String project_root = ProjectSettings::get_singleton()->get_resource_path();
+		if (!project_root.is_empty() && FileAccess::exists(project_root.path_join("project.godot"))) {
+			return project_root.path_join(".JundotAI").path_join("memory.json");
+		}
+	}
 	ERR_FAIL_NULL_V(EditorPaths::get_singleton(), String());
+	return EditorPaths::get_singleton()->get_project_settings_dir().path_join("ai_memory.json");
+}
+
+static String _legacy_project_memory_path() {
+	if (!EditorPaths::get_singleton()) {
+		return String();
+	}
 	return EditorPaths::get_singleton()->get_project_settings_dir().path_join("ai_memory.json");
 }
 
@@ -99,10 +113,16 @@ AIMemoryEntry AIMemoryStore::make_entry(const String &p_title, const String &p_c
 Error AIMemoryStore::load(Vector<AIMemoryEntry> &r_entries, const String &p_path) {
 	r_entries.clear();
 
-	const String path = p_path.is_empty() ? _get_default_path() : p_path;
+	String path = p_path.is_empty() ? _get_default_path() : p_path;
 	ERR_FAIL_COND_V_MSG(path.is_empty(), ERR_UNCONFIGURED, "AI memory store path is empty.");
 	if (!FileAccess::exists(path)) {
-		return OK;
+		// Read the previous .godot/ai_memory.json location when present. The next
+		// automatic or manual save writes the merged data to .JundotAI/memory.json.
+		const String legacy_path = p_path.is_empty() ? _legacy_project_memory_path() : String();
+		if (legacy_path.is_empty() || legacy_path == path || !FileAccess::exists(legacy_path)) {
+			return OK;
+		}
+		path = legacy_path;
 	}
 
 	Error err = OK;

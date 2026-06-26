@@ -27,12 +27,15 @@
 
 #include "ai_config_panel.h"
 
+#include "editor/ai/ai_source_update_service.h"
+
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "editor/ai/ai_chat_service.h"
+#include "editor/ai/ai_develop_flow.h"
 #include "editor/ai/ai_mcp_manager.h"
 #include "editor/ai/ai_settings.h"
 #include "editor/ai/ai_usage_agreement_dialog.h"
@@ -42,6 +45,7 @@
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
 #include "scene/gui/file_dialog.h"
+#include "scene/gui/flow_container.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
@@ -325,12 +329,34 @@ void AIConfigPanel::_bind_methods() {
 void AIConfigPanel::_notification(int p_what) {
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
+	} else if (p_what == NOTIFICATION_READY || p_what == NOTIFICATION_RESIZED) {
+		_update_adaptive_layout();
 	}
+}
+
+void AIConfigPanel::_update_adaptive_layout() {
+	if (!settings_grid || !engine_source_path_grid || !external_mcp_config_edit || !system_prompt_edit || !user_extra_instructions_edit) {
+		return;
+	}
+
+	const bool use_compact_layout = get_size().x < 560.0f * EDSCALE;
+	if (compact_layout != use_compact_layout) {
+		compact_layout = use_compact_layout;
+		settings_grid->set_columns(compact_layout ? 1 : 2);
+		engine_source_path_grid->set_columns(compact_layout ? 1 : 2);
+	}
+
+	const float available_height = MAX(get_size().y, 320.0f * EDSCALE);
+	external_mcp_config_edit->set_custom_minimum_size(Size2(0, CLAMP(available_height * 0.18f, 90.0f * EDSCALE, 150.0f * EDSCALE)));
+	system_prompt_edit->set_custom_minimum_size(Size2(0, CLAMP(available_height * 0.16f, 90.0f * EDSCALE, 130.0f * EDSCALE)));
+	user_extra_instructions_edit->set_custom_minimum_size(Size2(0, CLAMP(available_height * 0.14f, 80.0f * EDSCALE, 110.0f * EDSCALE)));
 }
 
 LineEdit *AIConfigPanel::_add_line_edit_row(GridContainer *p_grid, Label **r_label, const String &p_label, const String &p_placeholder, bool p_secret) {
 	Label *label = memnew(Label);
 	label->set_text(p_label);
+	label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	p_grid->add_child(label);
 	*r_label = label;
 
@@ -345,6 +371,8 @@ LineEdit *AIConfigPanel::_add_line_edit_row(GridContainer *p_grid, Label **r_lab
 SpinBox *AIConfigPanel::_add_spin_box_row(GridContainer *p_grid, Label **r_label, const String &p_label, double p_min, double p_max, double p_step) {
 	Label *label = memnew(Label);
 	label->set_text(p_label);
+	label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	p_grid->add_child(label);
 	*r_label = label;
 
@@ -360,6 +388,8 @@ SpinBox *AIConfigPanel::_add_spin_box_row(GridContainer *p_grid, Label **r_label
 OptionButton *AIConfigPanel::_add_backend_type_row(GridContainer *p_grid, Label **r_label, const String &p_label) {
 	Label *label = memnew(Label);
 	label->set_text(p_label);
+	label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	p_grid->add_child(label);
 	*r_label = label;
 
@@ -374,6 +404,8 @@ OptionButton *AIConfigPanel::_add_backend_type_row(GridContainer *p_grid, Label 
 OptionButton *AIConfigPanel::_add_output_language_row(GridContainer *p_grid, Label **r_label, const String &p_label) {
 	Label *label = memnew(Label);
 	label->set_text(p_label);
+	label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	p_grid->add_child(label);
 	*r_label = label;
 
@@ -413,6 +445,8 @@ void AIConfigPanel::_update_translations() {
 	include_project_memories_check->set_text(TTR("Include project memories"));
 	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
 	tools_enabled_check->set_text(TTR("Enable Function Calling tools (read/write files, build, etc.)"));
+	develop_mode_check->set_text(TTR("Develop Mode (run local workflow, never commit or push)"));
+	develop_mode_check->set_tooltip_text(TTR("Demonstrates modify, build, restart, user verification, AI verification, and upload validation. Git commit and push are always skipped."));
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
@@ -523,7 +557,10 @@ void AIConfigPanel::_update_engine_source_status() {
 		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
 	}
 
-	String source_root = _find_engine_source_root_in_cache(cache_path);
+	String source_root = AISourceUpdateService::resolve_source_root();
+	if (source_root.is_empty()) {
+		source_root = _find_engine_source_root_in_cache(cache_path);
+	}
 
 	if (!source_root.is_empty()) {
 		if (settings.engine_source_root != source_root || settings.engine_source_cache_root != cache_path || !settings.encrypt_engine_source_cache) {
@@ -536,19 +573,43 @@ void AIConfigPanel::_update_engine_source_status() {
 		String encryption_error;
 		const Error encryption_err = _encrypt_engine_source_cache(cache_path, encryption_error);
 		if (encryption_err == OK) {
-			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Enabled"), source_root));
+			const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
+			const String update_text = update_status.source_root == source_root && !update_status.message.is_empty() ? update_status.message : TTR("Update: Not checked");
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Enabled\n%s"), source_root, update_text));
 		} else {
-			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Failed (%s)"), source_root, encryption_error));
+			const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
+			const String update_text = update_status.source_root == source_root && !update_status.message.is_empty() ? update_status.message : TTR("Update: Not checked");
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Failed (%s)\n%s"), source_root, encryption_error, update_text));
 		}
 		engine_source_download_button->set_text(TTR("Re-download"));
 		engine_source_delete_button->set_disabled(false);
+		engine_source_update_button->set_disabled(false);
+		const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
+		engine_source_update_button->set_text(update_status.source_root == source_root && update_status.state == AISourceUpdateStatus::UPDATE_AVAILABLE ? TTR("Update Now") : TTR("Check Updates"));
 	} else {
 		engine_source_status_label->set_text(TTR("Status: Not Downloaded"));
 		engine_source_download_button->set_text(TTR("Download"));
 		engine_source_delete_button->set_disabled(true);
+		engine_source_update_button->set_disabled(true);
+		engine_source_update_button->set_text(TTR("Check Updates"));
 	}
 
 	engine_source_cache_path_edit->set_text(cache_path);
+}
+
+void AIConfigPanel::_on_engine_source_update_button_pressed() {
+	engine_source_update_button->set_disabled(true);
+	const String source_root = AISourceUpdateService::resolve_source_root();
+	const AISourceUpdateStatus cached_status = AISourceUpdateService::get_cached_status();
+	if (cached_status.source_root == source_root && cached_status.state == AISourceUpdateStatus::UPDATE_AVAILABLE) {
+		engine_source_status_label->set_text(TTR("Updating engine source and preserving local changes..."));
+		AISourceUpdateStatus update_status = cached_status;
+		AISourceUpdateService::update_source(update_status);
+	} else {
+		engine_source_status_label->set_text(TTR("Checking the engine source repository for updates..."));
+		AISourceUpdateService::check_for_updates(true);
+	}
+	_update_engine_source_status();
 }
 
 void AIConfigPanel::_on_engine_source_browse_button_pressed() {
@@ -649,6 +710,7 @@ void AIConfigPanel::_load_settings() {
 	include_project_memories_check->set_pressed(settings.include_project_memories);
 	include_tool_context_check->set_pressed(settings.include_tool_context);
 	tools_enabled_check->set_pressed(settings.tools_enabled);
+	develop_mode_check->set_pressed(settings.develop_mode);
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
@@ -664,6 +726,7 @@ void AIConfigPanel::_load_settings() {
 
 void AIConfigPanel::_save_settings() {
 	AISettingsData settings = AISettings::load();
+	const bool was_develop_mode = settings.develop_mode;
 	settings.backend_type = _backend_type_from_id(backend_type_option->get_selected_id());
 	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
 	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
@@ -681,6 +744,7 @@ void AIConfigPanel::_save_settings() {
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
@@ -692,6 +756,9 @@ void AIConfigPanel::_save_settings() {
 	if (err != OK) {
 		status_label->set_text(TTR("AI settings could not be saved."));
 		return;
+	}
+	if (!was_develop_mode && settings.develop_mode) {
+		AIDevelopFlow::reset();
 	}
 	AIMCPManager::get_singleton()->update_settings(settings);
 	_update_external_mcp_config();
@@ -727,6 +794,7 @@ void AIConfigPanel::_test_connection() {
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
@@ -804,6 +872,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
@@ -823,6 +892,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["include_project_memories"] = settings.include_project_memories;
 	root["include_tool_context"] = settings.include_tool_context;
 	root["tools_enabled"] = settings.tools_enabled;
+	root["develop_mode"] = settings.develop_mode;
 	root["mcp_tools_enabled"] = settings.mcp_tools_enabled;
 	root["context_char_budget"] = settings.context_char_budget;
 	root["history_char_budget"] = settings.history_char_budget;
@@ -990,6 +1060,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("tools_enabled")) {
 		tools_enabled_check->set_pressed(root["tools_enabled"]);
 	}
+	if (root.has("develop_mode")) {
+		develop_mode_check->set_pressed(root["develop_mode"]);
+	}
 	if (root.has("mcp_tools_enabled")) {
 		mcp_tools_enabled_check->set_pressed(root["mcp_tools_enabled"]);
 	}
@@ -1027,24 +1100,29 @@ AIConfigPanel::AIConfigPanel() {
 	add_theme_constant_override("margin_right", 8 * EDSCALE);
 	add_theme_constant_override("margin_bottom", 8 * EDSCALE);
 
-	ScrollContainer *scroll = memnew(ScrollContainer);
-	scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-	add_child(scroll);
+	settings_scroll = memnew(ScrollContainer);
+	settings_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	settings_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	settings_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED);
+	settings_scroll->set_vertical_scroll_mode(ScrollContainer::SCROLL_MODE_AUTO);
+	add_child(settings_scroll);
 
 	VBoxContainer *root = memnew(VBoxContainer);
 	root->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	root->add_theme_constant_override("separation", 8 * EDSCALE);
-	scroll->add_child(root);
+	settings_scroll->add_child(root);
 
 	title_label = memnew(Label);
 	title_label->set_theme_type_variation("HeaderSmall");
 	root->add_child(title_label);
 
-	GridContainer *grid = memnew(GridContainer);
-	grid->set_columns(2);
-	grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-	root->add_child(grid);
+	settings_grid = memnew(GridContainer);
+	settings_grid->set_columns(2);
+	settings_grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	settings_grid->add_theme_constant_override("h_separation", 12 * EDSCALE);
+	settings_grid->add_theme_constant_override("v_separation", 6 * EDSCALE);
+	root->add_child(settings_grid);
+	GridContainer *grid = settings_grid;
 
 	backend_type_option = _add_backend_type_row(grid, &backend_type_label, TTR("AI Backend"));
 	backend_type_option->connect(SceneStringName(item_selected), callable_mp(this, &AIConfigPanel::_on_backend_type_selected));
@@ -1079,6 +1157,10 @@ AIConfigPanel::AIConfigPanel() {
 
 	tools_enabled_check = memnew(CheckBox);
 	root->add_child(tools_enabled_check);
+
+	develop_mode_check = memnew(CheckBox);
+	develop_mode_check->set_tooltip_text(TTR("Demonstrates the complete engine AI workflow without committing or pushing to GitHub."));
+	root->add_child(develop_mode_check);
 
 	mcp_tools_enabled_check = memnew(CheckBox);
 	root->add_child(mcp_tools_enabled_check);
@@ -1122,31 +1204,41 @@ AIConfigPanel::AIConfigPanel() {
 		engine_source_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 		root->add_child(engine_source_status_label);
 
-		HBoxContainer *engine_source_path_hb = memnew(HBoxContainer);
-		engine_source_path_hb->add_theme_constant_override("separation", 6 * EDSCALE);
-		root->add_child(engine_source_path_hb);
+		engine_source_path_grid = memnew(GridContainer);
+		engine_source_path_grid->set_columns(2);
+		engine_source_path_grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		engine_source_path_grid->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		engine_source_path_grid->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(engine_source_path_grid);
 
 		engine_source_cache_path_edit = memnew(LineEdit);
 		engine_source_cache_path_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-		engine_source_path_hb->add_child(engine_source_cache_path_edit);
+		engine_source_path_grid->add_child(engine_source_cache_path_edit);
 
 		engine_source_browse_button = memnew(Button);
 		engine_source_browse_button->set_text(TTR("Browse"));
 		engine_source_browse_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_browse_button_pressed));
-		engine_source_path_hb->add_child(engine_source_browse_button);
+		engine_source_path_grid->add_child(engine_source_browse_button);
 
-		HBoxContainer *engine_source_btn_hb = memnew(HBoxContainer);
-		engine_source_btn_hb->add_theme_constant_override("separation", 6 * EDSCALE);
-		root->add_child(engine_source_btn_hb);
+		engine_source_actions = memnew(HFlowContainer);
+		engine_source_actions->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		engine_source_actions->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		engine_source_actions->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(engine_source_actions);
 
 		engine_source_download_button = memnew(Button);
 		engine_source_download_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_download_button_pressed));
-		engine_source_btn_hb->add_child(engine_source_download_button);
+		engine_source_actions->add_child(engine_source_download_button);
+
+		engine_source_update_button = memnew(Button);
+		engine_source_update_button->set_text(TTR("Check Updates"));
+		engine_source_update_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_update_button_pressed));
+		engine_source_actions->add_child(engine_source_update_button);
 
 		engine_source_delete_button = memnew(Button);
 		engine_source_delete_button->set_text(TTR("Delete Cache"));
 		engine_source_delete_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_delete_button_pressed));
-		engine_source_btn_hb->add_child(engine_source_delete_button);
+		engine_source_actions->add_child(engine_source_delete_button);
 
 		Label *engine_source_spacer = memnew(Label);
 		engine_source_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
@@ -1177,9 +1269,12 @@ AIConfigPanel::AIConfigPanel() {
 	user_extra_instructions_edit->set_placeholder(TTR("Optional: enter extra instructions here. These will be appended to the system prompt."));
 	root->add_child(user_extra_instructions_edit);
 
-	HBoxContainer *actions = memnew(HBoxContainer);
-	actions->add_theme_constant_override("separation", 6 * EDSCALE);
-	root->add_child(actions);
+	config_actions = memnew(HFlowContainer);
+	config_actions->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	config_actions->add_theme_constant_override("h_separation", 6 * EDSCALE);
+	config_actions->add_theme_constant_override("v_separation", 6 * EDSCALE);
+	root->add_child(config_actions);
+	HFlowContainer *actions = config_actions;
 
 	save_button = memnew(Button);
 	save_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_save_settings));

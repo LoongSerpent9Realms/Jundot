@@ -28,6 +28,8 @@
 
 #include "ai_code_uploader.h"
 
+#include "editor/ai/ai_settings.h"
+
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/os/os.h"
@@ -63,6 +65,11 @@ Error AICodeUploader::upload(const String &p_file_path,
 		const String &p_commit_message,
 		const String &p_project_root,
 		String *r_error_message) {
+
+	if (AISettings::load().develop_mode) {
+		if (r_error_message) *r_error_message = "Develop Mode blocks git add, commit, and push.";
+		return ERR_UNAUTHORIZED;
+	}
 
 	if (p_file_path.is_empty()) {
 		if (r_error_message) *r_error_message = "File path is empty.";
@@ -116,7 +123,7 @@ Error AICodeUploader::upload(const String &p_file_path,
 	// Step 3: git commit -m <message>
 	String commit_output;
 	int commit_exit = -1;
-	err = _run_git_cmd(p_project_root, { "commit", "-m", p_commit_message }, &commit_output, &commit_exit);
+	err = _run_git_cmd(p_project_root, { "commit", "-m", p_commit_message, "--", p_file_path }, &commit_output, &commit_exit);
 	if (err != OK || commit_exit != 0) {
 		if (r_error_message) *r_error_message = "git commit failed: " + commit_output;
 		return ERR_FILE_CANT_WRITE;

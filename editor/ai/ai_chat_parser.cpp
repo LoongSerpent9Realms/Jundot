@@ -561,6 +561,41 @@ void AIChatParser::parse_task_plans(const String &p_response, Vector<AITaskPlan>
 	}
 }
 
+bool AIChatParser::parse_project_memory_update(const String &p_response, AIProjectMemoryUpdate &r_update) {
+	r_update = AIProjectMemoryUpdate();
+	const Vector<String> blocks = _extract_comment_blocks(p_response, "PROJECT_MEMORY");
+	if (blocks.is_empty()) {
+		return false;
+	}
+
+	const String &block = blocks[blocks.size() - 1];
+	r_update.user_preferences = _extract_field(block, "USER_PREFERENCES").strip_edges();
+	r_update.project_requirements = _extract_field(block, "PROJECT_REQUIREMENTS").strip_edges();
+	r_update.key_decisions = _extract_field(block, "KEY_DECISIONS").strip_edges();
+	r_update.completed_work = _extract_field(block, "COMPLETED_WORK").strip_edges();
+	return !r_update.is_empty();
+}
+
+String AIChatParser::strip_project_memory_blocks(const String &p_response) {
+	String result = p_response;
+	const String open_tag = "<!-- PROJECT_MEMORY -->";
+	const String close_tag = "<!-- END_PROJECT_MEMORY -->";
+
+	int from = 0;
+	while (from < result.length()) {
+		const int start = result.find(open_tag, from);
+		if (start < 0) {
+			break;
+		}
+		const int end = result.find(close_tag, start + open_tag.length());
+		if (end < 0) {
+			break;
+		}
+		result = result.substr(0, start) + result.substr(end + close_tag.length());
+		from = start;
+	}
+	return result.strip_edges();
+}
 String AIChatParser::strip_task_plan_blocks(const String &p_response) {
 	String result = p_response;
 	const String open_tag = "<!-- TASK_PLAN -->";

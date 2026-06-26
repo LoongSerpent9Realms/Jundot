@@ -1,5 +1,5 @@
-{
-  "Target": "editor",
+﻿{
+  "Target": "editor.dev",
   "PlatformName": "windows",
   "Arch": "x86_64",
   "RepoRoot": "H:\\Godot-Auto",

@@ -39,6 +39,7 @@ constexpr const char *EDIT_FILE = "edit_file";
 constexpr const char *SEARCH_FILES = "search_files";
 constexpr const char *LIST_FILES = "list_files";
 constexpr const char *GREP_CODE = "grep_code";
+constexpr const char *CHECK_PROJECT_SCRIPTS = "check_project_scripts";
 constexpr const char *RUN_BUILD = "run_build";
 constexpr const char *READ_BUILD_LOG = "read_build_log";
 constexpr const char *FETCH_URL = "fetch_url";
@@ -46,6 +47,10 @@ constexpr const char *SHELL_COMMAND = "shell_command";
 constexpr const char *RESTART_ENGINE = "restart_engine";
 constexpr const char *CHECK_BUILD_STATUS = "check_build_status";
 constexpr const char *UPLOAD_CODE = "upload_code";
+constexpr const char *DEVELOP_AI_VERIFY = "develop_ai_verify";
+constexpr const char *SETUP_ENGINE_WORKSPACE = "setup_engine_workspace";
+constexpr const char *REQUEST_ENGINE_CHANGE = "request_engine_change";
+constexpr const char *RETURN_TO_PROJECT_MODE = "return_to_project_mode";
 constexpr const char *BATCH_TOOLS = "batch_tools";
 } // namespace AIToolNames
 
@@ -60,7 +65,7 @@ public:
 	static Array get_mcp_tools();
 
 	// Returns the tools available for a specific context mode.
-	// - PROJECT: project file tools + shell_command (no build tools).
-	// - ENGINE: all project tools + build tools (run_build, read_build_log, check_build_status, restart_engine, fetch_url).
+	// - PROJECT: project file tools + shell_command + setup_engine_workspace + request_engine_change (no build tools).
+	// - ENGINE: engine source tools + build tools + return_to_project_mode.
 	static Array get_tools_for_mode(AIContextMode p_mode);
 };

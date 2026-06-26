@@ -36,14 +36,17 @@
 #include "core/os/os.h"
 #include "core/os/thread.h"
 #include "core/os/thread_safe.h"
+#include "core/os/time.h"
 #include "core/string/string_builder.h"
 #include "editor/ai/ai_code_fetcher.h"
+#include "editor/ai/ai_develop_flow.h"
 #include "editor/ai/ai_code_security_checker.h"
 #include "editor/ai/ai_code_uploader.h"
 #include "editor/ai/ai_feature_gate.h"
 #include "editor/ai/ai_mcp_runtime.h"
 #include "editor/ai/ai_restart_helper.h"
 #include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_source_update_service.h"
 #include "editor/ai/ai_tool_defs.h"
 #include "editor/ai/ai_tool_registry.h"
 #include "editor/editor_node.h"
@@ -600,6 +603,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _list_files(args);
 	} else if (name == AIToolNames::GREP_CODE) {
 		result = _grep_code(args);
+	} else if (name == AIToolNames::CHECK_PROJECT_SCRIPTS) {
+		result = _check_project_scripts(args);
 	} else if (name == AIToolNames::RUN_BUILD) {
 		result = _run_build(args);
 	} else if (name == AIToolNames::CHECK_BUILD_STATUS) {
@@ -612,8 +617,16 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _shell_command(args);
 	} else if (name == AIToolNames::UPLOAD_CODE) {
 		result = _upload_code(args);
+	} else if (name == AIToolNames::DEVELOP_AI_VERIFY) {
+		result = _develop_ai_verify(args);
 	} else if (name == AIToolNames::RESTART_ENGINE) {
 		result = _restart_engine(args);
+	} else if (name == AIToolNames::SETUP_ENGINE_WORKSPACE) {
+		result = _setup_engine_workspace(args);
+	} else if (name == AIToolNames::REQUEST_ENGINE_CHANGE) {
+		result = _request_engine_change(args);
+	} else if (name == AIToolNames::RETURN_TO_PROJECT_MODE) {
+		result = _return_to_project_mode(args);
 	} else if (name == AIToolNames::BATCH_TOOLS) {
 		result = _batch_tools(args);
 	} else if (name.find_char('.') >= 0) {
@@ -660,13 +673,356 @@ String AIToolExecutor::_get_project_root() {
 		}
 	}
 
-	// Project mode fallback: try the executable directory, otherwise fall back to cwd.
+	// Project mode may only operate on a verified game-project root. Falling
+	// back to the process cwd can accidentally expose an engine checkout when
+	// the editor was launched from its source directory.
 	String exe_path = OS::get_singleton()->get_executable_path();
 	if (!exe_path.is_empty() && FileAccess::exists(exe_path.get_base_dir().path_join("project.godot"))) {
 		return exe_path.get_base_dir();
 	}
 
-	return OS::get_singleton()->get_cwd();
+	return String();
+}
+
+static Error _ensure_engine_source_updated_before_mutation(String &r_message) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::ENGINE) {
+		return OK;
+	}
+	return AISourceUpdateService::ensure_updated_before_edit(r_message);
+}
+
+static bool _resolve_tool_file_path(const String &p_root, const String &p_input, String &r_full_path, String &r_error) {
+	String input = p_input.strip_edges().replace("\\", "/");
+	if (input.is_empty()) {
+		r_error = "Path is empty.";
+		return false;
+	}
+
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode == AIContextMode::ENGINE) {
+		r_full_path = input.is_absolute_path() ? input.simplify_path() : p_root.path_join(input).simplify_path();
+		return true;
+	}
+
+	input = input.trim_prefix("res://").simplify_path();
+	if (input.is_absolute_path() || input == ".." || input.begins_with("../") || input.contains("/../")) {
+		r_error = "PROJECT mode path rejected: the path must stay inside the open project root.";
+		return false;
+	}
+
+	const String normalized_root = p_root.replace("\\", "/").simplify_path().trim_suffix("/");
+	const String candidate = normalized_root.path_join(input).simplify_path();
+	const String root_lower = normalized_root.to_lower();
+	const String candidate_lower = candidate.to_lower();
+	if (candidate_lower != root_lower && !candidate_lower.begins_with(root_lower + "/")) {
+		r_error = "PROJECT mode path rejected: the resolved path escapes the open project root.";
+		return false;
+	}
+	r_full_path = candidate;
+	return true;
+}
+
+static bool _project_shell_command_stays_in_root(const String &p_command) {
+	const String command = p_command.to_lower().replace("\\", "/");
+	if (command.contains("..") || command.contains("pushd ") || command.contains("popd") || command.contains("cd /") || command.contains("sconstruct") || command.contains("editor/ai/")) {
+		return false;
+	}
+	for (int i = 0; i + 2 < command.length(); i++) {
+		const char32_t c = command[i];
+		if (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) && command[i + 1] == ':' && command[i + 2] == '/') {
+			return false;
+		}
+	}
+	return true;
+}
+
+static Error _run_command_in_root(const String &p_root, const String &p_program, const List<String> &p_args, String &r_output, int &r_exit_code);
+
+static String _ai_safe_git_segment(const String &p_value, const String &p_fallback) {
+	String value = p_value.strip_edges().to_lower().replace("\\", "-").replace("/", "-");
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
+			out += String::chr(c);
+		} else if (c == ' ' || c == '\t') {
+			out += "-";
+		}
+	}
+	out = out.strip_edges().trim_prefix(".").trim_suffix(".");
+	while (out.contains("--")) {
+		out = out.replace("--", "-");
+	}
+	return out.is_empty() ? p_fallback : out;
+}
+
+static Error _run_git_in_root(const String &p_root, const Vector<String> &p_args, String &r_output, int &r_exit_code) {
+	List<String> args;
+	for (const String &arg : p_args) {
+		args.push_back(arg);
+	}
+	return _run_command_in_root(p_root, "git", args, r_output, r_exit_code);
+}
+
+static bool _git_branch_exists(const String &p_root, const String &p_branch) {
+	String output;
+	int exit_code = -1;
+	_run_git_in_root(p_root, { "rev-parse", "--verify", "--quiet", p_branch }, output, exit_code);
+	return exit_code == 0;
+}
+
+static String _get_project_workspace_metadata_path(const String &p_project_root) {
+	return p_project_root.path_join(".JundotAI").path_join("engine_workspace.json");
+}
+
+static Error _write_project_engine_workspace_metadata(const String &p_project_root, const Dictionary &p_metadata, String &r_error) {
+	const String dir = p_project_root.path_join(".JundotAI");
+	Error err = DirAccess::make_dir_recursive_absolute(dir);
+	if (err != OK) {
+		r_error = "Could not create .JundotAI metadata directory.";
+		return err;
+	}
+
+	const String metadata_path = _get_project_workspace_metadata_path(p_project_root);
+	Ref<FileAccess> file = FileAccess::open(metadata_path, FileAccess::WRITE, &err);
+	if (err != OK || file.is_null()) {
+		r_error = "Could not write engine workspace metadata: " + metadata_path;
+		return err == OK ? ERR_CANT_OPEN : err;
+	}
+	file->store_string(JSON::stringify(p_metadata, "\t"));
+	return OK;
+}
+
+Dictionary AIToolExecutor::_setup_engine_workspace(const Dictionary &p_args) {
+	const AISettingsData current_settings = AISettings::load();
+	if (current_settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("setup_engine_workspace is only available in PROJECT mode.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("Project root not detected. Open a project with project.godot before creating an engine workspace.", true);
+	}
+
+	const String base_engine_root = _get_engine_build_root();
+	if (base_engine_root.is_empty() || !FileAccess::exists(base_engine_root.path_join("SConstruct"))) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+
+	const String project_name = _ai_safe_git_segment(project_root.get_file(), "jundot-project");
+	const String workspace_name = _ai_safe_git_segment(String(p_args.get("workspace_name", String())), project_name);
+	const String provider_raw = String(p_args.get("provider", "local")).strip_edges().to_lower();
+	const String provider = (provider_raw == "github" || provider_raw == "gitee") ? provider_raw : "local";
+	const String remote_url = String(p_args.get("remote_url", String())).strip_edges();
+	const String branch_arg = String(p_args.get("branch", String())).strip_edges();
+	const String branch = branch_arg.is_empty() ? "project/" + workspace_name : branch_arg;
+	const String base_ref_arg = String(p_args.get("base_ref", "HEAD")).strip_edges();
+	const String base_ref = base_ref_arg.is_empty() ? "HEAD" : base_ref_arg;
+
+	const String user_data_dir = OS::get_singleton()->get_user_data_dir();
+	if (user_data_dir.is_empty()) {
+		return _make_result("Could not resolve the editor user data directory for engine workspaces.", true);
+	}
+	const String workspace_parent = user_data_dir.path_join("project_engine_workspaces");
+	const String workspace_path = workspace_parent.path_join(workspace_name).simplify_path();
+
+	Error err = DirAccess::make_dir_recursive_absolute(workspace_parent);
+	if (err != OK) {
+		return _make_result("Could not create engine workspace parent directory: " + workspace_parent, true);
+	}
+
+	String output;
+	int exit_code = -1;
+	bool created_workspace = false;
+	if (!FileAccess::exists(workspace_path.path_join("SConstruct"))) {
+		Vector<String> worktree_args;
+		worktree_args.push_back("worktree");
+		worktree_args.push_back("add");
+		if (_git_branch_exists(base_engine_root, branch)) {
+			worktree_args.push_back(workspace_path);
+			worktree_args.push_back(branch);
+		} else {
+			worktree_args.push_back("-b");
+			worktree_args.push_back(branch);
+			worktree_args.push_back(workspace_path);
+			worktree_args.push_back(base_ref);
+		}
+		err = _run_git_in_root(base_engine_root, worktree_args, output, exit_code);
+		if (err != OK || exit_code != 0) {
+			return _make_result("Failed to create project engine worktree.\nCommand: git worktree add\nOutput:\n" + output, true);
+		}
+		created_workspace = true;
+	}
+
+	String remote_message;
+	if (!remote_url.is_empty()) {
+		_run_git_in_root(workspace_path, { "remote", "get-url", "project-engine" }, output, exit_code);
+		if (exit_code == 0) {
+			err = _run_git_in_root(workspace_path, { "remote", "set-url", "project-engine", remote_url }, output, exit_code);
+		} else {
+			err = _run_git_in_root(workspace_path, { "remote", "add", "project-engine", remote_url }, output, exit_code);
+		}
+		if (err != OK || exit_code != 0) {
+			return _make_result("Engine workspace was prepared, but the project-engine remote could not be configured.\nOutput:\n" + output, true);
+		}
+		remote_message = "Remote project-engine configured: " + remote_url;
+	} else if (provider != "local") {
+		remote_message = "Provider recorded as " + provider + ", but no remote_url was provided. The user can create/login to the remote provider and rerun setup_engine_workspace with remote_url.";
+	}
+
+	AISettingsData updated_settings = current_settings;
+	updated_settings.engine_source_root = workspace_path;
+	AISettings::save(updated_settings);
+
+	Dictionary metadata;
+	metadata["provider"] = provider;
+	metadata["remote_url"] = remote_url;
+	metadata["remote_name"] = remote_url.is_empty() ? String() : String("project-engine");
+	metadata["branch"] = branch;
+	metadata["local_path"] = workspace_path;
+	metadata["base_engine_root"] = base_engine_root;
+	metadata["base_ref"] = base_ref;
+	metadata["workspace_name"] = workspace_name;
+	metadata["created_or_updated_at"] = Time::get_singleton()->get_datetime_string_from_system(true);
+	metadata["schema_version"] = 1;
+
+	String metadata_error;
+	if (_write_project_engine_workspace_metadata(project_root, metadata, metadata_error) != OK) {
+		return _make_result("Engine workspace was prepared, but project metadata could not be saved. " + metadata_error, true);
+	}
+
+	String result = "ENGINE_WORKSPACE_READY\n";
+	result += "Workspace: " + workspace_path + "\n";
+	result += "Branch: " + branch + "\n";
+	result += "Provider: " + provider + "\n";
+	result += "Project metadata: " + _get_project_workspace_metadata_path(project_root) + "\n";
+	result += created_workspace ? "Created a new git worktree for this project.\n" : "Reused the existing project engine worktree.\n";
+	if (!remote_message.is_empty()) {
+		result += remote_message + "\n";
+	}
+	result += "Engine mode is now configured to use this project-specific workspace. If the project requires engine changes, call request_engine_change next.";
+	return _make_result(result);
+}
+
+
+Dictionary AIToolExecutor::_request_engine_change(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("request_engine_change is only needed in PROJECT mode; the assistant is already in ENGINE mode.");
+	}
+
+	const String reason = String(p_args.get("reason", String())).strip_edges();
+	const String required_change = String(p_args.get("required_change", String())).strip_edges();
+	const String project_work_done = String(p_args.get("project_work_done", String())).strip_edges();
+	if (reason.is_empty() || required_change.is_empty()) {
+		return _make_result("request_engine_change rejected: reason and required_change are required.", true);
+	}
+
+	String result = "ENGINE_MODE_REQUEST_ACCEPTED\n";
+	result += "Reason: " + reason + "\n";
+	result += "Required engine change: " + required_change + "\n";
+	if (!project_work_done.is_empty()) {
+		result += "Project-side work already done: " + project_work_done + "\n";
+	}
+	result += "The editor should switch to ENGINE mode, continue the same task with engine tools, build and verify engine changes when needed, then call return_to_project_mode.";
+	return _make_result(result);
+}
+
+Dictionary AIToolExecutor::_return_to_project_mode(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::ENGINE) {
+		return _make_result("return_to_project_mode is only needed in ENGINE mode; the assistant is already in PROJECT mode.");
+	}
+
+	const String summary = String(p_args.get("summary", String())).strip_edges();
+	if (summary.is_empty()) {
+		return _make_result("return_to_project_mode rejected: summary is required.", true);
+	}
+
+	String result = "PROJECT_MODE_RETURN_ACCEPTED\n";
+	result += "Engine work summary: " + summary + "\n";
+	result += "The editor should switch back to PROJECT mode and continue the original project task with project-scoped tools.";
+	return _make_result(result);
+}
+static Error _run_command_in_root(const String &p_root, const String &p_program, const List<String> &p_args, String &r_output, int &r_exit_code) {
+	const String previous_cwd = OS::get_singleton()->get_cwd();
+	if (OS::get_singleton()->set_cwd(p_root) != OK) {
+		r_output = "Could not switch command working directory to: " + p_root;
+		r_exit_code = -1;
+		return ERR_CANT_OPEN;
+	}
+
+	r_output.clear();
+	r_exit_code = -1;
+	const Error err = OS::get_singleton()->execute(p_program, p_args, &r_output, &r_exit_code, true);
+	OS::get_singleton()->set_cwd(previous_cwd);
+	return err;
+}
+
+static bool _is_script_check_path_rejected(const String &p_path) {
+	const String normalized = p_path.replace("\\", "/").trim_prefix("res://").simplify_path();
+	return normalized.is_absolute_path() || normalized == ".." || normalized.begins_with("../") || normalized.contains("/../");
+}
+
+static void _collect_gdscript_files(const String &p_root, const String &p_rel_dir, Vector<String> &r_paths, int p_limit) {
+	if (r_paths.size() >= p_limit) {
+		return;
+	}
+
+	const String abs_dir = p_rel_dir.is_empty() ? p_root : p_root.path_join(p_rel_dir);
+	Ref<DirAccess> da = DirAccess::open(abs_dir);
+	if (da.is_null()) {
+		return;
+	}
+
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty() && r_paths.size() < p_limit) {
+		if (name == "." || name == "..") {
+			name = da->get_next();
+			continue;
+		}
+
+		const String rel = p_rel_dir.is_empty() ? name : p_rel_dir.path_join(name);
+		if (da->current_is_dir()) {
+			if (!name.begins_with(".") && name != "bin" && name != "obj" && name != ".godot" && name != ".import" && name != "__pycache__") {
+				_collect_gdscript_files(p_root, rel, r_paths, p_limit);
+			}
+		} else if (name.to_lower().ends_with(".gd")) {
+			r_paths.push_back(rel);
+		}
+
+		name = da->get_next();
+	}
+	da->list_dir_end();
+}
+
+static bool _project_has_dotnet_project(const String &p_root) {
+	Ref<DirAccess> da = DirAccess::open(p_root);
+	if (da.is_null()) {
+		return false;
+	}
+
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty()) {
+		const String lower = name.to_lower();
+		if (!da->current_is_dir() && (lower.ends_with(".sln") || lower.ends_with(".csproj"))) {
+			da->list_dir_end();
+			return true;
+		}
+		name = da->get_next();
+	}
+	da->list_dir_end();
+	return false;
+}
+
+static String _truncate_tool_output(const String &p_output, int p_max_chars) {
+	if (p_output.length() <= p_max_chars) {
+		return p_output;
+	}
+	return p_output.substr(p_output.length() - p_max_chars) + vformat("\n\n[... output truncated to last %d chars]\n", p_max_chars);
 }
 
 // ---- Tool implementations ----
@@ -692,12 +1048,10 @@ Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
 	for (int i = 0; i < paths.size(); i++) {
 		String rel_path = paths[i];
 		String full_path;
-		if (rel_path.begins_with("res://")) {
-			full_path = ProjectSettings::get_singleton() ? ProjectSettings::get_singleton()->globalize_path(rel_path) : rel_path;
-		} else if (rel_path.is_absolute_path()) {
-			full_path = rel_path;
-		} else {
-			full_path = project_root.path_join(rel_path);
+		String path_error;
+		if (!_resolve_tool_file_path(project_root, rel_path, full_path, path_error)) {
+			result += vformat("[%s] Error: %s\n", rel_path, path_error);
+			continue;
 		}
 
 		if (!FileAccess::exists(full_path)) {
@@ -740,6 +1094,11 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		return _make_result(vformat("File write rejected: content is empty, so the existing file was not modified.\nPath: %s", path), true);
 	}
 
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before modification: " + source_update_message, true);
+	}
+
 	// Validate content: reject Markdown code fences, which usually mean the
 	// model returned a formatted snippet instead of raw file contents.
 	if (content.contains("```")) {
@@ -756,7 +1115,11 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 	if (project_root.is_empty()) {
 		return _make_result(_source_root_missing_message(), true);
 	}
-	String full_path = project_root.path_join(path);
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + path, true);
+	}
 
 	// Create parent directories.
 	Ref<DirAccess> da = DirAccess::create_for_path(full_path);
@@ -823,7 +1186,10 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 		return _make_result(vformat("File write failed verification: final file size mismatch (expected %d bytes, got %d bytes). The previous file was restored when available.\nPath: %s", expected_size, final_size, path), true);
 	}
 
-	return _make_result(vformat("Successfully wrote %s (%d bytes).", path, expected_size));
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_modified(path);
+	}
+	return _make_result(vformat("Successfully wrote %s (%d bytes).%s", path, expected_size, AISettings::load().develop_mode ? " [Develop Mode: local change only]" : ""));
 }
 
 Dictionary AIToolExecutor::_edit_file(const Dictionary &p_args) {
@@ -842,7 +1208,11 @@ Dictionary AIToolExecutor::_edit_file(const Dictionary &p_args) {
 	if (project_root.is_empty()) {
 		return _make_result(_source_root_missing_message(), true);
 	}
-	const String full_path = project_root.path_join(path);
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + path, true);
+	}
 	if (!FileAccess::exists(full_path)) {
 		return _make_result(vformat("File edit rejected: file not found.\nPath: %s", path), true);
 	}
@@ -908,9 +1278,17 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 						name == AIToolNames::CHECK_BUILD_STATUS ||
 						name == AIToolNames::RESTART_ENGINE ||
 						name == AIToolNames::FETCH_URL ||
-						name == AIToolNames::UPLOAD_CODE)) {
+						name == AIToolNames::UPLOAD_CODE ||
+						name == AIToolNames::RETURN_TO_PROJECT_MODE)) {
 			has_error = true;
 			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in engine mode.\n", i + 1, name);
+			continue;
+		}
+		if (settings.context_mode != AIContextMode::PROJECT &&
+				(name == AIToolNames::SETUP_ENGINE_WORKSPACE ||
+						name == AIToolNames::REQUEST_ENGINE_CHANGE)) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in project mode.\n", i + 1, name);
 			continue;
 		}
 
@@ -961,6 +1339,11 @@ Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
 	String project_root = _get_project_root();
 	if (project_root.is_empty()) {
 		return _make_result(_source_root_missing_message(), true);
+	}
+	const String normalized_pattern = pattern.replace("\\", "/").simplify_path();
+	if (AISettings::load().context_mode == AIContextMode::PROJECT &&
+			(normalized_pattern.is_absolute_path() || normalized_pattern == ".." || normalized_pattern.begins_with("../") || normalized_pattern.contains("/../"))) {
+		return _make_result("PROJECT mode search rejected: pattern must stay inside the open project root.", true);
 	}
 
 	// Use a simple recursive directory walk. Godot's DirAccess doesn't support
@@ -1184,16 +1567,21 @@ Dictionary AIToolExecutor::_grep_code(const Dictionary &p_args) {
 		return _make_result(_source_root_missing_message(), true);
 	}
 
-	// Determine which directories to search.
+	// Search the whole game project in PROJECT mode. ENGINE mode keeps the
+	// focused source-directory list to avoid scanning generated artifacts.
 	Vector<String> search_dirs;
-	search_dirs.push_back(project_root.path_join("editor"));
-	search_dirs.push_back(project_root.path_join("modules"));
-	search_dirs.push_back(project_root.path_join("scene"));
-	search_dirs.push_back(project_root.path_join("servers"));
-	search_dirs.push_back(project_root.path_join("core"));
-	search_dirs.push_back(project_root.path_join("drivers"));
-	search_dirs.push_back(project_root.path_join("main"));
-	search_dirs.push_back(project_root.path_join("platform"));
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		search_dirs.push_back(project_root);
+	} else {
+		search_dirs.push_back(project_root.path_join("editor"));
+		search_dirs.push_back(project_root.path_join("modules"));
+		search_dirs.push_back(project_root.path_join("scene"));
+		search_dirs.push_back(project_root.path_join("servers"));
+		search_dirs.push_back(project_root.path_join("core"));
+		search_dirs.push_back(project_root.path_join("drivers"));
+		search_dirs.push_back(project_root.path_join("main"));
+		search_dirs.push_back(project_root.path_join("platform"));
+	}
 
 	// Use the glob to filter file extension.
 	String suffix_filter;
@@ -1282,6 +1670,134 @@ Dictionary AIToolExecutor::_grep_code(const Dictionary &p_args) {
 	return _make_result(header + result.as_string());
 }
 
+
+Dictionary AIToolExecutor::_check_project_scripts(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_project_scripts is only available in PROJECT mode. Use run_build/check_build_status for engine source changes.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open Godot project root was detected. Open a project with project.godot before validating project scripts.", true);
+	}
+
+	Vector<String> script_paths;
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(p_args.get("path", String()));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(p_args["paths"]);
+	}
+
+	bool has_bad_path = false;
+	StringBuilder bad_paths;
+	for (int i = 0; i < paths.size(); i++) {
+		String rel = String(paths[i]).replace("\\", "/").strip_edges();
+		if (rel.is_empty()) {
+			continue;
+		}
+		if (_is_script_check_path_rejected(rel)) {
+			has_bad_path = true;
+			bad_paths += "Rejected path outside project root: " + rel + "\n";
+			continue;
+		}
+		rel = rel.trim_prefix("res://").simplify_path();
+		if (rel.to_lower().ends_with(".gd")) {
+			script_paths.push_back(rel);
+		}
+	}
+	if (has_bad_path) {
+		return _make_result(bad_paths.as_string(), true);
+	}
+	if (script_paths.is_empty() && paths.is_empty()) {
+		const int MAX_GDSCRIPT_CHECKS = 100;
+		_collect_gdscript_files(project_root, String(), script_paths, MAX_GDSCRIPT_CHECKS);
+	}
+
+	StringBuilder result;
+	bool failed = false;
+
+	const String editor_exe = OS::get_singleton()->get_executable_path();
+	if (script_paths.is_empty()) {
+		result += "No GDScript files selected or found for syntax checking.\n";
+	} else if (editor_exe.is_empty() || !FileAccess::exists(editor_exe)) {
+		failed = true;
+		result += "Could not locate the current editor executable for GDScript check-only validation.\n";
+	} else {
+		result += vformat("GDScript syntax check: %d file(s)\n", script_paths.size());
+		for (int i = 0; i < script_paths.size(); i++) {
+			const String rel = script_paths[i];
+			String full_path;
+			String path_error;
+			if (!_resolve_tool_file_path(project_root, rel, full_path, path_error) || !FileAccess::exists(full_path)) {
+				failed = true;
+				result += vformat("\n[%s]\nError: %s%s\n", rel, path_error, FileAccess::exists(full_path) ? String() : " File not found.");
+				continue;
+			}
+
+			List<String> args;
+			args.push_back("--headless");
+			args.push_back("--path");
+			args.push_back(project_root);
+			args.push_back("--check-only");
+			args.push_back("--script");
+			args.push_back("res://" + rel);
+
+			String output;
+			int exit_code = -1;
+			const Error err = _run_command_in_root(project_root, editor_exe, args, output, exit_code);
+			result += vformat("\n[%s]\nExit code: %d\n", rel, exit_code);
+			if (err != OK) {
+				failed = true;
+				result += vformat("Failed to start GDScript validator (err=%d).\n", (int)err);
+			}
+			if (!output.strip_edges().is_empty()) {
+				result += _truncate_tool_output(output, 12000).strip_edges() + "\n";
+			}
+			if (err != OK || exit_code != 0) {
+				failed = true;
+			}
+		}
+	}
+
+	bool explicit_cs_path = false;
+	for (int i = 0; i < paths.size(); i++) {
+		if (String(paths[i]).to_lower().ends_with(".cs")) {
+			explicit_cs_path = true;
+			break;
+		}
+	}
+
+	if (_project_has_dotnet_project(project_root) || explicit_cs_path) {
+		List<String> dotnet_args;
+		dotnet_args.push_back("build");
+		dotnet_args.push_back("--nologo");
+		String output;
+		int exit_code = -1;
+		const Error err = _run_command_in_root(project_root, "dotnet", dotnet_args, output, exit_code);
+		result += vformat("\nC#/.NET project build\nExit code: %d\n", exit_code);
+		if (err != OK) {
+			failed = true;
+			result += vformat("Failed to start dotnet build (err=%d). Ensure the .NET SDK is installed and available on PATH.\n", (int)err);
+		}
+		if (!output.strip_edges().is_empty()) {
+			result += _truncate_tool_output(output, 20000).strip_edges() + "\n";
+		}
+		if (err != OK || exit_code != 0) {
+			failed = true;
+		}
+	}
+
+	if (!failed) {
+		result += "\nProject script validation passed.";
+	} else {
+		result += "\nProject script validation failed. Read the errors above, edit the affected scripts, then run check_project_scripts again.";
+	}
+	return _make_result(result.as_string(), failed);
+}
+
 Dictionary AIToolExecutor::_run_build(const Dictionary &p_args) {
 	String extra_args = p_args.get("extra_args", String());
 
@@ -1292,6 +1808,9 @@ Dictionary AIToolExecutor::_run_build(const Dictionary &p_args) {
 
 	// Start the build in a background thread.
 	build_state.start(extra_args);
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_build_started();
+	}
 	String *args_copy = new String(extra_args);
 	build_state.thread.start(_build_thread_callback, args_copy);
 
@@ -1313,6 +1832,10 @@ Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
 	// Build is done �?retrieve the result.
 	String std_out = r["stdout"];
 	int exit_code = r["exit_code"];
+
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_build_result(exit_code == 0, exit_code == 0 ? "Build completed successfully." : "Build failed; inspect the build output.");
+	}
 
 	// Clean up the thread resource before returning.
 	build_state.join_thread();
@@ -1411,11 +1934,33 @@ Dictionary AIToolExecutor::_fetch_url(const Dictionary &p_args) {
 		return _make_result("No destination path provided.", true);
 	}
 
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode == AIContextMode::PROJECT) {
+		const String lower_url = url.to_lower();
+		const String normalized_dest = dest_path.replace("\\", "/").simplify_path();
+		const bool official_store = lower_url.begins_with("https://store.steampowered.com/") || lower_url.begins_with("https://store.epicgames.com/");
+		if (!official_store) {
+			return _make_result("PROJECT mode research rejected: fetch_url is limited to official Steam and Epic Games Store pages.", true);
+		}
+		if (!normalized_dest.begins_with(".JundotAI/research/")) {
+			return _make_result("PROJECT mode research rejected: downloads must be saved under .JundotAI/research/.", true);
+		}
+	}
+
 	String project_root = _get_project_root();
 	if (project_root.is_empty()) {
 		return _make_result(_source_root_missing_message(), true);
 	}
-	String full_dest = project_root.path_join(dest_path);
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before download: " + source_update_message, true);
+	}
+
+	String full_dest;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, dest_path, full_dest, path_error)) {
+		return _make_result(path_error + "\nPath: " + dest_path, true);
+	}
 
 	String sha256;
 	Error err = AICodeFetcher::fetch_file(url, full_dest, sha256);
@@ -1442,6 +1987,18 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 		if (da.is_null() || da->make_dir_recursive(project_root) != OK) {
 			return _make_result("Project root not detected and failed to create engine source cache directory.", true);
 		}
+	}
+
+	if (AISettings::load().context_mode == AIContextMode::PROJECT && !_project_shell_command_stays_in_root(command)) {
+		return _make_result("PROJECT mode shell command rejected: commands must stay inside the open project and may not reference parent, absolute, or engine-source paths.", true);
+	}
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before shell command: " + source_update_message, true);
+	}
+
+	if (AISettings::load().develop_mode) {
+		return _make_result("[Develop Mode] shell_command dry-run only; command was not executed: " + command);
 	}
 
 	// Split command into program and arguments.
@@ -1527,8 +2084,156 @@ Dictionary AIToolExecutor::_restart_engine(const Dictionary &p_args) {
 		return _make_result("Engine switch rejected: the executable produced by the successful AI build could not be found.", true);
 	}
 
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_restart_requested();
+	}
 	callable_mp_static(&_restart_editor_on_main_thread).bind(executable_path).call_deferred();
 	return _make_result("Engine switch scheduled. The current editor will close, then launch the AI-compiled editor: " + executable_path);
+}
+
+static Error _run_upload_check(const String &p_root, const String &p_program, const Vector<String> &p_args, String &r_output) {
+	List<String> args;
+	for (const String &arg : p_args) {
+		args.push_back(arg);
+	}
+	const String previous_cwd = OS::get_singleton()->get_cwd();
+	if (OS::get_singleton()->set_cwd(p_root) != OK) {
+		r_output = "Could not switch to the engine source root.";
+		return ERR_CANT_OPEN;
+	}
+	int exit_code = -1;
+	r_output.clear();
+	const Error err = OS::get_singleton()->execute(p_program, args, &r_output, &exit_code, true);
+	OS::get_singleton()->set_cwd(previous_cwd);
+	if (err != OK) {
+		r_output = vformat("Could not start required quality tool '%s' (error %d).", p_program, (int)err);
+		return err;
+	}
+	return exit_code == 0 ? OK : FAILED;
+}
+
+static Error _run_mutating_format_check(const String &p_root, const String &p_file_path, const Vector<String> &p_script_args, String &r_error) {
+	const String full_path = p_root.path_join(p_file_path);
+	Error read_err = OK;
+	const String original = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		r_error = "Could not read the file before format validation.";
+		return read_err;
+	}
+
+	String output;
+	const Error command_err = _run_upload_check(p_root, "python", p_script_args, output);
+	Error after_err = OK;
+	const String after = FileAccess::get_file_as_string(full_path, &after_err);
+	if (after_err != OK) {
+		r_error = "Format validation could not read the resulting file.";
+		return after_err;
+	}
+	if (after != original) {
+		Ref<FileAccess> restore = FileAccess::open(full_path, FileAccess::WRITE);
+		if (restore.is_valid()) {
+			restore->store_string(original);
+		}
+		r_error = "File formatting check failed. Run the repository formatter before uploading. " + output.strip_edges();
+		return FAILED;
+	}
+	if (command_err != OK) {
+		r_error = "Formatting check could not complete: " + output.strip_edges();
+		return command_err;
+	}
+	return OK;
+}
+
+static Error _validate_upload_format_and_quality(const String &p_root, const String &p_file_path, const String &p_code, String &r_report) {
+	if (p_code.contains("<<<<<<<") || p_code.contains("=======") || p_code.contains(">>>>>>>")) {
+		r_report = "Code quality check failed: unresolved merge conflict markers were found.";
+		return FAILED;
+	}
+	if (p_code.contains("C:/Users/") || p_code.contains("C:\\Users\\") || p_code.contains("/home/")) {
+		r_report = "Code quality check failed: user-specific absolute paths were found.";
+		return FAILED;
+	}
+
+	String output;
+	if (_run_upload_check(p_root, "git", { "diff", "--check", "--", p_file_path }, output) != OK) {
+		r_report = "Code quality check failed (git diff --check): " + output.strip_edges();
+		return FAILED;
+	}
+
+	String format_error;
+	if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/file_format.py", p_file_path }, format_error) != OK) {
+		r_report = format_error;
+		return FAILED;
+	}
+
+	const String extension = p_file_path.get_extension().to_lower();
+	const bool is_cpp = extension == "c" || extension == "h" || extension == "cpp" || extension == "hpp" || extension == "cc" || extension == "hh" || extension == "cxx" || extension == "hxx" || extension == "m" || extension == "mm" || extension == "inc";
+	if (is_cpp) {
+		if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/validate_includes.py", p_file_path }, format_error) != OK ||
+				_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/copyright_headers.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+		if ((extension == "h" || extension == "hpp" || extension == "hh" || extension == "hxx") &&
+				_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/header_guards.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+		if (_run_upload_check(p_root, "clang-format", { "--dry-run", "--Werror", "--style=file", p_file_path }, output) != OK) {
+			r_report = "C/C++ style check failed. Run clang-format before uploading. " + output.strip_edges();
+			return FAILED;
+		}
+	} else if (extension == "py") {
+		if (_run_upload_check(p_root, "ruff", { "check", p_file_path }, output) != OK ||
+				_run_upload_check(p_root, "ruff", { "format", "--check", p_file_path }, output) != OK) {
+			r_report = "Python quality check failed. Run Ruff before uploading. " + output.strip_edges();
+			return FAILED;
+		}
+	} else if (extension == "cs") {
+		if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/dotnet_format.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+	}
+
+	r_report = "Format and repository quality checks passed.";
+	return OK;
+}
+
+static double _estimate_code_universality(const String &p_file_path, const String &p_code, String &r_reason) {
+	double score = 88.0;
+	Vector<String> reasons;
+	if (p_code.length() < 120) {
+		score -= 18.0;
+		reasons.push_back("very small change surface");
+	}
+	const String lower = p_code.to_lower();
+	if (lower.contains("todo") || lower.contains("fixme")) {
+		score -= 12.0;
+		reasons.push_back("unfinished TODO/FIXME markers");
+	}
+	if (lower.contains("hardcoded") || lower.contains("workaround")) {
+		score -= 10.0;
+		reasons.push_back("hardcoded or workaround-specific behavior");
+	}
+	if (p_file_path.contains("test") || p_file_path.contains("_tmp") || p_file_path.contains("local")) {
+		score -= 8.0;
+		reasons.push_back("narrow test/local path");
+	}
+	if (p_file_path.begins_with("editor/") || p_file_path.begins_with("core/") || p_file_path.begins_with("scene/")) {
+		score += 4.0;
+		reasons.push_back("shared engine subsystem");
+	}
+	score = CLAMP(score, 0.0, 100.0);
+	String reason_text;
+	for (int i = 0; i < reasons.size(); i++) {
+		if (!reason_text.is_empty()) {
+			reason_text += ", ";
+		}
+		reason_text += reasons[i];
+	}
+	r_reason = reason_text.is_empty() ? "general reusable engine implementation" : reason_text;
+	return score;
 }
 
 Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
@@ -1547,6 +2252,11 @@ Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
 		return _make_result("Project root not detected. Make sure you're in ENGINE mode with a valid godot.creator.json or SConstruct in the working directory.", true);
 	}
 
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before upload: " + source_update_message, true);
+	}
+
 	String full_path = project_root.path_join(file_path);
 
 	// Step 1: Verify file exists.
@@ -1561,26 +2271,28 @@ Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
 		return _make_result("Failed to read file: " + full_path, true);
 	}
 
-	// Step 3: Security check - detect suspicious patterns.
+	// Step 3: Repository format and code-quality checks.
+	String quality_report;
+	if (_validate_upload_format_and_quality(project_root, file_path, code, quality_report) != OK) {
+		return _make_result("Upload rejected: " + quality_report, true);
+	}
+
+	// Step 4: Security check - detect suspicious patterns.
 	CodeSecurityReport security = AICodeSecurityChecker::check(code);
 	if (!security.is_safe) {
 		String warning_text = "Upload rejected: security check failed.\n";
 		for (int i = 0; i < security.warnings.size(); i++) {
 			warning_text += "  - " + security.warnings[i] + "\n";
 		}
-		warning_text += "\nPlease review the flagged code or use shell_command to push manually after review.";
+		warning_text += "\nPlease resolve the flagged code before uploading.";
 		return _make_result(warning_text, true);
 	}
 
-	// Step 4: Universality estimate (simple heuristic based on code characteristics).
-	double universality_score = 75.0; // default: assume generally useful
-	if (code.length() < 50) {
-		universality_score = 60.0; // tiny snippets are less general
-	} else if (code.find("TODO") >= 0 || code.find("hardcoded") >= 0) {
-		universality_score = 55.0; // code with explicit TODOs/hardcoded markers are lower
-	}
+	// Step 5: Estimate whether the change belongs in a shared engine fork.
+	String universality_reason;
+	const double universality_score = _estimate_code_universality(file_path, code, universality_reason);
 
-	// Step 5: Check against AIFeatureGate threshold.
+	// Step 6: Check against the configured universality threshold.
 	AISettingsData settings = AISettings::load();
 	if (universality_score < settings.feature_universality_threshold) {
 		return _make_result(
@@ -1590,7 +2302,20 @@ Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
 				true);
 	}
 
-	// Step 6: Perform git add / commit / push.
+	// Step 7: Perform git add / commit / push.
+	if (settings.develop_mode) {
+		if (AIDevelopFlow::get_stage() != AIDevelopFlow::READY_TO_UPLOAD) {
+			return _make_result("[Develop Mode] Upload simulation is waiting for successful user verification and AI verification.", true);
+		}
+		AIDevelopFlow::record_simulated_upload(file_path);
+		return _make_result(
+				"[Develop Mode] Upload simulation successful: " + file_path +
+						"\n  Format and quality: PASSED"
+						"\n  Security: PASSED"
+						"\n  Universality: " + String::num(universality_score, 1) + "% (" + universality_reason + ")"
+						"\n  Git add/commit/push: SKIPPED (no GitHub files changed)");
+	}
+
 	String error_msg;
 	Error upload_err = AICodeUploader::upload(file_path, commit_message, project_root, &error_msg);
 	if (upload_err != OK) {
@@ -1599,13 +2324,30 @@ Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
 
 	return _make_result(
 			"Upload successful: " + file_path +
-			"\n  Commit message: " + commit_message +
-			"\n  Security: PASSED"
-			"\n  Universality: " +
-			String::num(universality_score, 1) + "%");
+					"\n  Commit message: " + commit_message +
+					"\n  Format and quality: PASSED"
+					"\n  Security: PASSED"
+					"\n  Universality: " + String::num(universality_score, 1) + "% (" + universality_reason + ")");
+}
+
+Dictionary AIToolExecutor::_develop_ai_verify(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (!settings.develop_mode) {
+		return _make_result("Develop Mode is not enabled.", true);
+	}
+	if (AIDevelopFlow::get_stage() != AIDevelopFlow::AI_VERIFICATION) {
+		return _make_result("AI verification is not ready. The user must verify the restarted feature first.", true);
+	}
+	const bool passed = p_args.get("passed", false);
+	const String summary = p_args.get("summary", String());
+	AIDevelopFlow::record_ai_verification(passed, summary);
+	return _make_result(vformat("[Develop Mode] AI verification %s: %s", passed ? "PASSED" : "FAILED", summary), !passed);
 }
 
 Dictionary AIToolExecutor::_execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json) {
+	if (AISettings::load().develop_mode) {
+		return _make_result("[Develop Mode] External MCP tool execution is disabled during the safe workflow demonstration.", true);
+	}
 	// Look up the MCP server configuration.
 	Vector<AISkillEntry> skills;
 	Vector<AIMCPServerEntry> mcp_servers;

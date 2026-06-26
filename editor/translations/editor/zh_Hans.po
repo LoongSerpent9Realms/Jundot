@@ -21499,3 +21499,42 @@ msgstr "已处理 %d分 %d秒"
 
 msgid "Processed %.1fs"
 msgstr "已处理 %.1f秒"
+
+msgid "Queue"
+msgstr "加入队列"
+
+msgid "Guide"
+msgstr "引导"
+
+msgid "[Guided] "
+msgstr "[引导] "
+
+msgid "Queued messages (%d)"
+msgstr "队列消息（%d）"
+
+msgid "Prioritize this queued message as guidance for the next AI turn"
+msgstr "将这条队列消息作为下一轮 AI 的优先引导"
+
+msgid "Remove this queued message"
+msgstr "删除这条队列消息"
+
+msgid "Type a message to queue while the AI is responding."
+msgstr "AI 正在回答时，可以输入一条消息加入队列。"
+
+msgid "Message queued. It will be sent after the current AI response finishes. (%d queued)"
+msgstr "消息已加入队列，会在当前 AI 回答完成后发送。（队列中 %d 条）"
+
+msgid "Queued message prioritized as guidance for the next turn."
+msgstr "已将队列消息设为下一轮优先引导。"
+
+msgid "Queued message removed."
+msgstr "已删除队列消息。"
+
+msgid "Sending prioritized queued guidance..."
+msgstr "正在发送优先引导消息……"
+
+msgid "Sending next queued message..."
+msgstr "正在发送下一条队列消息……"
+
+msgid "Queue this message while the AI is responding"
+msgstr "AI 正在回答时，将这条消息加入队列"

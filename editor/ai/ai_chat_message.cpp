@@ -27,7 +27,9 @@
 
 #include "ai_chat_message.h"
 
+#include "core/config/project_settings.h"
 #include "core/object/callable_mp.h"
+#include "core/os/os.h"
 #include "core/object/class_db.h"
 #include "core/variant/variant.h"
 #include "editor/gui/editor_toaster.h"
@@ -135,7 +137,7 @@ static String _markdown_to_bbcode(const String &p_md) {
 			String url = s.substr(url_open + 1, url_close - url_open - 1);
 
 			if (is_image) {
-				links.push_back("[i]" + text + "[/i]"); // fall back: show alt-text as italic
+				links.push_back("[url=" + url + "][i]" + text + "[/i][/url]"); // clickable SVG/image fallback
 				String placeholder = "@@IMG_" + vformat("%d", links.size() - 1) + "@@";
 				s = s.substr(0, chosen_start) + placeholder + s.substr(url_close + 1);
 				pos = chosen_start + placeholder.length();
@@ -766,6 +768,16 @@ void AIChatMessage::_update_translations() {
 	_update_footer();
 }
 
+void AIChatMessage::_meta_clicked(const Variant &p_meta) {
+	String target = String(p_meta).strip_edges();
+	if (target.is_empty()) {
+		return;
+	}
+	if (target.begins_with("res://") && ProjectSettings::get_singleton()) {
+		target = ProjectSettings::get_singleton()->globalize_path(target);
+	}
+	OS::get_singleton()->shell_open(target);
+}
 void AIChatMessage::_build_ui() {
 	set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	add_theme_constant_override("separation", 4 * EDSCALE);
@@ -801,6 +813,7 @@ void AIChatMessage::_build_ui() {
 	content_label->set_custom_minimum_size(Size2(420 * EDSCALE, 0));
 	content_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	content_label->set_use_bbcode(true);
+	content_label->connect("meta_clicked", callable_mp(this, &AIChatMessage::_meta_clicked));
 	bubble_content->add_child(content_label);
 
 	// Thinking section (AI only).

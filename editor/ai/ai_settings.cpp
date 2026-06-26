@@ -363,6 +363,7 @@ AISettingsData AISettings::load() {
 	settings.include_project_memories = root.get("include_project_memories", true);
 	settings.include_tool_context = root.get("include_tool_context", true);
 	settings.tools_enabled = root.get("tools_enabled", true);
+	settings.develop_mode = root.get("develop_mode", false);
 	settings.mcp_tools_enabled = root.get("mcp_tools_enabled", false);
 	settings.context_char_budget = root.get("context_char_budget", get_default_context_char_budget());
 	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
@@ -409,6 +410,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["include_project_memories"] = p_settings.include_project_memories;
 	root["include_tool_context"] = p_settings.include_tool_context;
 	root["tools_enabled"] = p_settings.tools_enabled;
+	root["develop_mode"] = p_settings.develop_mode;
 	root["mcp_tools_enabled"] = p_settings.mcp_tools_enabled;
 	root["context_char_budget"] = p_settings.context_char_budget;
 	root["history_char_budget"] = p_settings.history_char_budget;

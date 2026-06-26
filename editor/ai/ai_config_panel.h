@@ -33,6 +33,8 @@ class Button;
 class CheckBox;
 class FileDialog;
 class GridContainer;
+class HFlowContainer;
+class ScrollContainer;
 class AIChatService;
 class AIUsageAgreementDialog;
 class Label;
@@ -61,6 +63,7 @@ class AIConfigPanel : public MarginContainer {
 	CheckBox *include_project_memories_check = nullptr;
 	CheckBox *include_tool_context_check = nullptr;
 	CheckBox *tools_enabled_check = nullptr;
+	CheckBox *develop_mode_check = nullptr;
 	CheckBox *mcp_tools_enabled_check = nullptr;
 	CheckBox *auto_suggest_entries_check = nullptr;
 	CheckBox *feature_design_philosophy_check = nullptr;
@@ -107,10 +110,17 @@ class AIConfigPanel : public MarginContainer {
 	Button *engine_source_download_button = nullptr;
 	Button *engine_source_delete_button = nullptr;
 	Button *engine_source_browse_button = nullptr;
+	Button *engine_source_update_button = nullptr;
 	Label *engine_source_status_label = nullptr;
 	LineEdit *engine_source_cache_path_edit = nullptr;
 	FileDialog *export_dialog = nullptr;
 	FileDialog *import_dialog = nullptr;
+	ScrollContainer *settings_scroll = nullptr;
+	GridContainer *settings_grid = nullptr;
+	GridContainer *engine_source_path_grid = nullptr;
+	HFlowContainer *engine_source_actions = nullptr;
+	HFlowContainer *config_actions = nullptr;
+	bool compact_layout = false;
 
 	void _load_settings();
 	void _save_settings();
@@ -133,7 +143,9 @@ class AIConfigPanel : public MarginContainer {
 	void _on_engine_source_download_button_pressed();
 	void _on_engine_source_delete_button_pressed();
 	void _on_engine_source_browse_button_pressed();
+	void _on_engine_source_update_button_pressed();
 	void _on_engine_source_cache_path_selected(const String &p_path);
+	void _update_adaptive_layout();
 
 	LineEdit *_add_line_edit_row(GridContainer *p_grid, Label **r_label, const String &p_label, const String &p_placeholder = String(), bool p_secret = false);
 	SpinBox *_add_spin_box_row(GridContainer *p_grid, Label **r_label, const String &p_label, double p_min, double p_max, double p_step);
