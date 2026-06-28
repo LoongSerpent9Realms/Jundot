@@ -1,0 +1,49 @@
+/*  ai_skill_installer.h                                                   */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                                JunDot                                  */
+/**************************************************************************/
+/* Copyright (c) 2024-present JunDot contributors.                        */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/**************************************************************************/
+
+#pragma once
+
+#include "core/string/ustring.h"
+
+class AISkillInstaller {
+	static String _find_defaults_dir();
+	static String _find_fallback_defaults_dir();
+
+	/// Fallback: install default skills compiled into the binary.
+	/// Used when no disk-based defaults directory is available (packaged builds).
+	static bool _install_builtin_defaults();
+
+public:
+	/// Returns the path to bundled AI skill defaults, or empty string if not found.
+	static String get_defaults_dir();
+
+	/// Auto-installs default skills into the current project.
+	/// Merges with existing skills — only installs defaults that aren't already present.
+	/// Falls back to built-in data if disk defaults are unavailable.
+	/// Returns true if new defaults were installed, false if all already present or not found.
+	static bool ensure_defaults_installed();
+};

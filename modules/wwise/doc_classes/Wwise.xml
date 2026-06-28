@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Wwise" inherits="Object" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Wwise sound engine singleton.
+	</brief_description>
+	<description>
+		Optional Audiokinetic Wwise SDK bridge. Enable it with [code]module_wwise_enabled=yes wwise_sdk_path=&lt;Wwise SDK path&gt;[/code].
+	</description>
+	<methods>
+		<method name="initialize">
+			<return type="int" />
+			<description>
+				Initializes the Wwise memory manager, stream manager, sound engine, and music engine.
+			</description>
+		</method>
+		<method name="is_initialized" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns whether Wwise has been initialized.
+			</description>
+		</method>
+		<method name="load_bank">
+			<return type="int" />
+			<param index="0" name="bank_path" type="String" />
+			<description>
+				Loads a generated Wwise [code].bnk[/code] file into memory and returns its bank id.
+			</description>
+		</method>
+		<method name="post_event">
+			<return type="int" />
+			<param index="0" name="event_name" type="String" />
+			<param index="1" name="game_object_id" type="int" />
+			<description>
+				Posts a Wwise event on a registered game object and returns the playing id.
+			</description>
+		</method>
+		<method name="register_game_object">
+			<return type="int" />
+			<param index="0" name="game_object_id" type="int" />
+			<param index="1" name="name" type="String" default="&quot;&quot;" />
+			<description>
+				Registers a Wwise game object id.
+			</description>
+		</method>
+		<method name="render_audio">
+			<return type="void" />
+			<description>
+				Advances Wwise audio processing. Call once per frame after initialization.
+			</description>
+		</method>
+		<method name="set_default_listener">
+			<return type="void" />
+			<param index="0" name="game_object_id" type="int" />
+			<description>
+				Sets the default Wwise listener game object.
+			</description>
+		</method>
+		<method name="set_rtpc_value">
+			<return type="int" />
+			<param index="0" name="rtpc_name" type="String" />
+			<param index="1" name="value" type="float" />
+			<param index="2" name="game_object_id" type="int" default="0" />
+			<description>
+				Sets an RTPC value globally or on a game object.
+			</description>
+		</method>
+		<method name="shutdown">
+			<return type="void" />
+			<description>
+				Unloads banks and terminates Wwise.
+			</description>
+		</method>
+		<method name="stop_all">
+			<return type="void" />
+			<param index="0" name="game_object_id" type="int" default="0" />
+			<description>
+				Stops all Wwise events, either globally or on the provided game object.
+			</description>
+		</method>
+		<method name="unload_bank">
+			<return type="int" />
+			<param index="0" name="bank_id" type="int" />
+			<description>
+				Unloads a bank previously returned by [method load_bank].
+			</description>
+		</method>
+		<method name="unload_bank_path">
+			<return type="int" />
+			<param index="0" name="bank_path" type="String" />
+			<description>
+				Unloads a bank by the path passed to [method load_bank].
+			</description>
+		</method>
+		<method name="unregister_game_object">
+			<return type="void" />
+			<param index="0" name="game_object_id" type="int" />
+			<description>
+				Unregisters a Wwise game object id.
+			</description>
+		</method>
+	</methods>
+</class>

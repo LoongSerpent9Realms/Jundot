@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<style name="JundotEditorTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+	</style>
+
+	<style name="JundotGameTheme" parent="JundotEditorTheme">
+		<item name="android:windowIsTranslucent">true</item>
+	</style>
+
+	<style name="JundotEditorSplashScreenTheme" parent="Theme.SplashScreen.IconBackground">
+		<!-- Set the theme of the Activity that directly follows your splash
+		screen. This is required. -->
+		<item name="postSplashScreenTheme">@style/JundotEditorTheme</item>
+	</style>
+
+	<style name="JundotEmbeddedGameTheme" parent="@android:style/Theme.DeviceDefault.Panel">
+	</style>
+</resources>

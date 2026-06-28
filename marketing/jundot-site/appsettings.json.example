@@ -1,0 +1,35 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=jundot_site.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "AdminSettings": {
+    "Username": "admin",
+    "Password": "your_admin_password_here"
+  },
+  "GitHub": {
+    "Owner": "your_github_owner",
+    "Repo": "your_repo_name",
+    "Token": "your_github_token_here"
+  },
+  "DocumentationAI": {
+    "Endpoint": "",
+    "ApiKey": "your_ai_api_key_here",
+    "Model": "gpt-4.1-mini"
+  },
+  "EmailSettings": {
+    "SmtpHost": "smtp.example.com",
+    "SmtpPort": 465,
+    "UseSsl": true,
+    "Username": "your_email@example.com",
+    "Password": "your_email_password_here",
+    "FromEmail": "your_email@example.com",
+    "FromName": "Your App Name"
+  }
+}

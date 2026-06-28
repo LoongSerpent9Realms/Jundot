@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <JundotSdkPackageVersionsFilePath>$(MSBuildThisFileDirectory)\SdkPackageVersions.props</JundotSdkPackageVersionsFilePath>
+  </PropertyGroup>
+  <Import Project="$(JundotSdkPackageVersionsFilePath)" />
+</Project>

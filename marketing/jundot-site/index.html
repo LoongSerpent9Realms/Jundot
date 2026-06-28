@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jundot Engine - AI 辅助自动迭代的游戏引擎</title>
+  <meta name="description" content="Jundot Engine 是基于 Godot 的 AI 辅助自动迭代游戏引擎，把对话、日志分析、构建自检、补丁迭代和打包发布放进同一个开发闭环。">
+  <style>
+    :root {
+      --ink: #f6f8f6;
+      --muted: #c7d2ce;
+      --line: rgba(246, 248, 246, 0.16);
+      --panel: rgba(8, 13, 15, 0.78);
+      --panel-solid: #101719;
+      --green: #7be495;
+      --teal: #56d5c8;
+      --amber: #f2b84b;
+      --coral: #ff7f68;
+      --blue: #78a8ff;
+      --dark: #070b0d;
+      --soft: #edf4ef;
+      --soft-ink: #17211e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--dark);
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 16px clamp(18px, 5vw, 72px);
+      background: rgba(7, 11, 13, 0.78);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 18px;
+      white-space: nowrap;
+    }
+
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, var(--green), var(--teal) 55%, var(--amber));
+      box-shadow: 0 0 24px rgba(86, 213, 200, 0.34);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .nav-cta {
+      color: #07100d;
+      background: var(--green);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      align-items: end;
+      position: relative;
+      overflow: hidden;
+      background-image:
+        linear-gradient(90deg, rgba(7, 11, 13, 0.96) 0%, rgba(7, 11, 13, 0.76) 38%, rgba(7, 11, 13, 0.24) 100%),
+        linear-gradient(0deg, rgba(7, 11, 13, 0.86) 0%, rgba(7, 11, 13, 0) 34%),
+        url("assets/jundot-ai-editor-hero.png");
+      background-size: cover;
+      background-position: center;
+      padding: 118px clamp(18px, 5vw, 72px) 48px;
+    }
+
+    .hero-inner {
+      max-width: 1160px;
+      width: 100%;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 660px) minmax(260px, 1fr);
+      gap: 36px;
+      align-items: end;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-weight: 800;
+      font-size: 14px;
+      margin: 0 0 18px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(42px, 7vw, 82px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 24px 0 0;
+      max-width: 640px;
+      color: var(--muted);
+      font-size: clamp(17px, 2vw, 22px);
+      line-height: 1.62;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 34px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      font-weight: 800;
+    }
+
+    .button.primary {
+      color: #06110d;
+      background: var(--green);
+      border-color: transparent;
+    }
+
+    .button.secondary {
+      color: var(--ink);
+      background: rgba(246, 248, 246, 0.08);
+    }
+
+    .stats {
+      align-self: end;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      min-height: 104px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 24px;
+      color: var(--ink);
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    section {
+      padding: 86px clamp(18px, 5vw, 72px);
+    }
+
+    .section-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(260px, 0.65fr);
+      gap: 42px;
+      align-items: end;
+      margin-bottom: 34px;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--soft-ink);
+      font-size: clamp(30px, 4vw, 50px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: #53615c;
+      line-height: 1.72;
+      font-size: 16px;
+    }
+
+    .light {
+      color: var(--soft-ink);
+      background: var(--soft);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .feature {
+      min-height: 228px;
+      padding: 22px;
+      background: #ffffff;
+      border: 1px solid #d9e3dd;
+      border-radius: 8px;
+    }
+
+    .feature b {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      color: #07110d;
+      background: var(--green);
+      font-size: 18px;
+    }
+
+    .feature h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .feature p {
+      margin: 0;
+      color: #52605b;
+      line-height: 1.68;
+    }
+
+    .flow {
+      background: #101719;
+    }
+
+    .flow h2,
+    .flow .section-head p {
+      color: var(--ink);
+    }
+
+    .flow .section-head p {
+      color: var(--muted);
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .step {
+      position: relative;
+      min-height: 186px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(246, 248, 246, 0.06);
+    }
+
+    .step em {
+      display: block;
+      color: var(--amber);
+      font-style: normal;
+      font-weight: 800;
+      margin-bottom: 18px;
+    }
+
+    .step h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 36px;
+      align-items: start;
+    }
+
+    .copy-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .copy-item {
+      padding: 20px;
+      border: 1px solid #d9e3dd;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .copy-item h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .copy-item p {
+      margin: 0;
+      color: #52605b;
+      line-height: 1.68;
+    }
+
+    .release {
+      color: var(--ink);
+      background: #14120f;
+      border-top: 1px solid rgba(242, 184, 75, 0.22);
+      border-bottom: 1px solid rgba(242, 184, 75, 0.22);
+    }
+
+    .release h2 {
+      color: var(--ink);
+    }
+
+    .release-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 30px;
+    }
+
+    .release-card {
+      min-height: 158px;
+      padding: 22px;
+      border-radius: 8px;
+      border: 1px solid rgba(242, 184, 75, 0.2);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .release-card h3 {
+      margin: 0 0 10px;
+      color: var(--amber);
+    }
+
+    .release-card p {
+      margin: 0;
+      color: #d9d0bd;
+      line-height: 1.65;
+    }
+
+    .cta {
+      color: var(--soft-ink);
+      background: #f7faf7;
+    }
+
+    .cta-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: center;
+      padding: 32px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #d9e3dd;
+    }
+
+    .cta h2 {
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin: 0;
+      color: #53615c;
+      line-height: 1.72;
+    }
+
+    footer {
+      padding: 24px clamp(18px, 5vw, 72px);
+      color: #9eaaa5;
+      background: #070b0d;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .footer-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 900px) {
+      .topbar {
+        position: absolute;
+      }
+
+      nav {
+        display: none;
+      }
+
+      .hero {
+        min-height: 94vh;
+        background-position: 58% center;
+      }
+
+      .hero-inner,
+      .section-head,
+      .split,
+      .cta-box {
+        grid-template-columns: 1fr;
+      }
+
+      .stats,
+      .feature-grid,
+      .timeline,
+      .release-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-box {
+        padding: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Jundot Engine 首页">
+      <span class="mark" aria-hidden="true"></span>
+      Jundot Engine
+    </a>
+    <nav aria-label="主导航">
+      <a href="#features">能力</a>
+      <a href="#workflow">流程</a>
+      <a href="#release">版本</a>
+      <a class="nav-cta" href="#download">开始使用</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">基于 Godot 的 AI 辅助自动迭代引擎</p>
+          <h1>Jundot Engine</h1>
+          <p class="lead">把游戏开发中的对话、日志分析、脚本自检、构建反馈、补丁迭代和打包发布放到一个可审核的闭环里。你仍然掌控方向，AI 负责把重复排查和迭代步骤推进得更快。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#download">下载预览版</a>
+            <a class="button secondary" href="#workflow">查看工作流</a>
+          </div>
+        </div>
+        <div class="stats" aria-label="核心亮点">
+          <div class="stat">
+            <strong>AI Chat</strong>
+            <span>编辑器内直接分析问题、读取上下文、生成修复建议。</span>
+          </div>
+          <div class="stat">
+            <strong>Build Loop</strong>
+            <span>构建结果回到对话中，让 AI 根据真实报错继续修复。</span>
+          </div>
+          <div class="stat">
+            <strong>Package Builder</strong>
+            <span>图形化配置构建、版本、发布和更新清单。</span>
+          </div>
+          <div class="stat">
+            <strong>MIT</strong>
+            <span>继承 Godot 的开放基础，游戏成果归你所有。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="light">
+      <div class="section-inner">
+        <div class="section-head">
+          <h2>不是把 AI 放在旁边，而是放进开发现场。</h2>
+          <p>Jundot 保留 Godot 的编辑器、2D/3D、导出和开源生态，同时把 AI 辅助工作流接入引擎内部。它适合想快速试错、持续修复、减少重复排查成本的独立开发者和小团队。</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature">
+            <b>1</b>
+            <h3>读懂上下文</h3>
+            <p>结合日志、崩溃报告、项目文件和对话记录，帮助定位缺陷来源，而不是只给泛泛建议。</p>
+          </article>
+          <article class="feature">
+            <b>2</b>
+            <h3>自动迭代修复</h3>
+            <p>AI 可以提出补丁、触发检查、读取构建错误，再把下一轮修复带回来给你审核。</p>
+          </article>
+          <article class="feature">
+            <b>3</b>
+            <h3>人工掌控合入</h3>
+            <p>工具调用和修改过程可见，关键改动仍由开发者确认，避免把项目交给不可控的黑箱。</p>
+          </article>
+          <article class="feature">
+            <b>4</b>
+            <h3>发布更省心</h3>
+            <p>Jundot Package Builder 提供图形化构建、版本号管理、发布说明和更新清单生成。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="workflow" class="flow">
+      <div class="section-inner">
+        <div class="section-head">
+          <h2>从想法到可测试版本，流程更短。</h2>
+          <p>Jundot 的核心不是替代开发者，而是把原本分散在聊天、终端、日志、编辑器和打包工具之间的步骤串起来。</p>
+        </div>
+        <div class="timeline">
+          <article class="step">
+            <em>01</em>
+            <h3>描述问题</h3>
+            <p>在编辑器里告诉 AI：哪里不好用、哪里报错、你想做成什么效果。</p>
+          </article>
+          <article class="step">
+            <em>02</em>
+            <h3>分析现场</h3>
+            <p>AI 读取相关上下文，结合日志、代码和项目结构判断下一步。</p>
+          </article>
+          <article class="step">
+            <em>03</em>
+            <h3>生成改动</h3>
+            <p>对脚本、场景或引擎代码提出可检查的修改，并保留人工审核空间。</p>
+          </article>
+          <article class="step">
+            <em>04</em>
+            <h3>构建自检</h3>
+            <p>把编译或脚本检查结果反馈给 AI，让修复建立在真实错误上。</p>
+          </article>
+          <article class="step">
+            <em>05</em>
+            <h3>打包发布</h3>
+            <p>通过图形化工具输出构建产物、更新清单和发布说明。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="light">
+      <div class="section-inner split">
+        <div>
+          <h2>适合什么人？</h2>
+        </div>
+        <div class="copy-list">
+          <article class="copy-item">
+            <h3>独立游戏开发者</h3>
+            <p>需要快速验证玩法、修复脚本问题、整理构建错误，希望少在重复排查上消耗时间。</p>
+          </article>
+          <article class="copy-item">
+            <h3>小型团队</h3>
+            <p>想把需求、修复、构建和发布流程沉淀下来，让 AI 作为团队里的工程助手。</p>
+          </article>
+          <article class="copy-item">
+            <h3>引擎实验者</h3>
+            <p>想在 Godot 的开放基础上探索 AI 参与引擎开发、工具开发和自动化迭代的可能性。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="release" class="release">
+      <div class="section-inner">
+        <h2>Jundot Engine 1.7.4 beta</h2>
+        <div class="release-grid">
+          <article class="release-card">
+            <h3>基于 Godot 4.6.3</h3>
+            <p>沿用成熟的 Godot 架构、编辑器体验、2D/3D 能力和导出流程。</p>
+          </article>
+          <article class="release-card">
+            <h3>内置 AI Chat 模块</h3>
+            <p>包含编辑器对话入口、Skill 系统、记忆系统、安全确认和工具调用可视化。</p>
+          </article>
+          <article class="release-card">
+            <h3>图形化打包工具</h3>
+            <p>配置平台、架构、版本、日志、更新检测和多平台发布，不必每次手写命令。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="download" class="cta">
+      <div class="section-inner">
+        <div class="cta-box">
+          <div>
+            <h2>开始试用 Jundot。</h2>
+            <p>下载预览版，打开项目，在编辑器里让 AI 帮你分析、修改、检查和迭代。当前仍是 beta，建议先用于测试项目和原型项目。</p>
+          </div>
+          <a class="button primary" href="https://github.com/LoongSerpent9Realms/Jundot/releases">前往 Releases</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>Jundot Engine - AI 辅助自动迭代的游戏引擎</span>
+      <span>Jundot 基于 Godot Engine，遵循相关 MIT/Expat 许可与版权声明。</span>
+    </div>
+  </footer>
+</body>
+</html>

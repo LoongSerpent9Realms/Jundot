@@ -1,0 +1,54 @@
+<Project>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" Condition="'$(JundotSdkImportsMicrosoftNetSdk)' == 'true'" />
+
+  <PropertyGroup>
+    <!--
+    Define constant to determine whether the real_t type in Jundot is double precision or not.
+    By default this is false, like the official Jundot builds. If someone is using a custom
+    Jundot build where real_t is double, they can override the JundotFloat64 property.
+    -->
+    <DefineConstants Condition=" '$(JundotFloat64)' == 'true' ">JUNDOT_REAL_T_IS_DOUBLE;$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+  We are defining ExportDebug and Debug in Sdk.targets to ensure that the user cannot
+  override the DefineConstants property in their csproj file and break the editor functionality.
+  -->
+  <PropertyGroup>
+    <!-- ExportDebug also defines DEBUG like Debug does. -->
+    <DefineConstants Condition=" '$(Configuration)' == 'ExportDebug' ">$(DefineConstants);DEBUG</DefineConstants>
+    <!-- Debug defines TOOLS to differentiate between Debug and ExportDebug configurations. -->
+    <DefineConstants Condition=" '$(Configuration)' == 'Debug' ">$(DefineConstants);TOOLS</DefineConstants>
+
+    <DefineConstants>$(_JundotDefineConstants);$(DefineConstants)</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableJundotDotNetPreview)' == 'true'">
+    <DisableImplicitJundotGeneratorReferences>true</DisableImplicitJundotGeneratorReferences>
+    <DisableImplicitJundotSharpReferences>true</DisableImplicitJundotSharpReferences>
+  </PropertyGroup>
+
+  <!-- JundotSharp references -->
+  <ItemGroup Condition=" '$(DisableImplicitJundotGeneratorReferences)' != 'true' ">
+    <PackageReference Include="Jundot.SourceGenerators" IsImplicitlyDefined="true" Version="$(PackageVersion_Jundot_SourceGenerators)" ReferenceOutputAssembly="false" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(DisableImplicitJundotSharpReferences)' != 'true' ">
+    <PackageReference Include="JundotSharp" IsImplicitlyDefined="true" Version="$(PackageVersion_JundotSharp)" />
+    <PackageReference Include="JundotSharpEditor" IsImplicitlyDefined="true" Version="$(PackageVersion_JundotSharp)" Condition=" '$(Configuration)' == 'Debug' " />
+  </ItemGroup>
+  <Target Name="CheckJundotDotNetReferences" BeforeTargets="Build" Condition=" '$(EnableJundotDotNetPreview)' != 'true' ">
+    <Error Text="The project or one of its dependencies references Jundot .NET packages which are incompatible with the active Jundot C# bindings. The active C# bindings is JundotSharp." Condition="$([System.String]::Copy('%(Reference.Identity)').Contains('Jundot.Bindings.dll'))" />
+  </Target>
+
+  <!-- Jundot .NET references -->
+  <ItemGroup Condition=" '$(EnableJundotDotNetPreview)' == 'true' ">
+    <PackageReference Include="Jundot" IsImplicitlyDefined="true" Version="$(PackageVersion_JundotDotNet)" />
+  </ItemGroup>
+  <Target Name="CheckJundotSharpReferences" BeforeTargets="Build" Condition=" '$(EnableJundotDotNetPreview)' == 'true' ">
+    <Error Text="The project or one of its dependencies references JundotSharp packages which is incompatible with the active Jundot C# bindings. The active C# bindings is Jundot .NET." Condition="$([System.String]::Copy('%(Reference.Identity)').Contains('JundotSharp.dll'))" />
+  </Target>
+
+  <!-- iOS-specific build targets -->
+  <Import Project="$(MSBuildThisFileDirectory)\iOS.targets" Condition=" '$(JundotTargetPlatform)' == 'ios' " />
+
+</Project>

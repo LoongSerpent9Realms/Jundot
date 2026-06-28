@@ -1,0 +1,76 @@
+/*  ai_tool_defs.h                                                        */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                                JunDot                                  */
+/**************************************************************************/
+/* Copyright (c) 2024-present JunDot contributors.                        */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/**************************************************************************/
+
+#pragma once
+
+#include "core/templates/vector.h"
+#include "core/variant/array.h"
+#include "editor/ai/ai_settings.h"
+
+// Tool name constants.
+namespace AIToolNames {
+constexpr const char *READ_FILES = "read_files";
+constexpr const char *WRITE_FILE = "write_file";
+constexpr const char *EDIT_FILE = "edit_file";
+constexpr const char *SEARCH_FILES = "search_files";
+constexpr const char *LIST_FILES = "list_files";
+constexpr const char *GREP_CODE = "grep_code";
+constexpr const char *CHECK_PROJECT_SCRIPTS = "check_project_scripts";
+constexpr const char *CHECK_UI_LAYOUT = "check_ui_layout";
+constexpr const char *BUILD_PROJECT = "build_project";
+constexpr const char *PLAY_SCENE = "play_scene";
+constexpr const char *CLICK_UI_POSITION = "click_ui_position";
+constexpr const char *STOP_PLAY_SCENE = "stop_play_scene";
+constexpr const char *RUN_BUILD = "run_build";
+constexpr const char *READ_BUILD_LOG = "read_build_log";
+constexpr const char *FETCH_URL = "fetch_url";
+constexpr const char *SHELL_COMMAND = "shell_command";
+constexpr const char *RESTART_ENGINE = "restart_engine";
+constexpr const char *CHECK_BUILD_STATUS = "check_build_status";
+constexpr const char *UPLOAD_CODE = "upload_code";
+constexpr const char *DEVELOP_AI_VERIFY = "develop_ai_verify";
+constexpr const char *SETUP_ENGINE_WORKSPACE = "setup_engine_workspace";
+constexpr const char *REQUEST_ENGINE_CHANGE = "request_engine_change";
+constexpr const char *RETURN_TO_PROJECT_MODE = "return_to_project_mode";
+constexpr const char *BATCH_TOOLS = "batch_tools";
+} // namespace AIToolNames
+
+// Returns the built-in tool definitions as an Array of Dictionary,
+// formatted for OpenAI/OpenRouter-compatible "tools" parameter.
+class AIToolDefs {
+public:
+	// OpenAI-compatible tool definitions (the "tools" array in the API payload).
+	static Array get_builtin_tools();
+
+	// Tools derived from configured MCP server capabilities.
+	static Array get_mcp_tools();
+
+	// Returns the tools available for a specific context mode.
+	// - PROJECT: project file tools + shell_command + setup_engine_workspace + request_engine_change (no build tools).
+	// - ENGINE: engine source tools + build tools + return_to_project_mode.
+	static Array get_tools_for_mode(AIContextMode p_mode);
+};

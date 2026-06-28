@@ -1,0 +1,22 @@
+<h1 id="scripting-api">Scripting API and Godot documentation</h1>
+<p>Jundot keeps Godot's scripting model. Nodes, scenes, resources, signals, exported properties, and lifecycle callbacks follow the Godot foundation unless Jundot documentation states otherwise.</p>
+
+<h2 id="use-godot-docs">Use Godot docs for general APIs</h2>
+<p>For standard APIs such as Node, Control, CharacterBody2D, AnimationPlayer, Resource, and signal usage, use the official Godot documentation as the detailed reference. Jundot docs focus on AI-assisted workflows and Jundot-specific behavior.</p>
+
+<h2 id="ask-ai">Ask the AI in project context</h2>
+<p>The Jundot AI Assistant can inspect your actual project before suggesting code. This is usually better than asking for generic snippets, because the AI can see existing scenes, scripts, node names, and errors.</p>
+
+<h2 id="safe-script-changes">Safe script changes</h2>
+<ul>
+    <li>Prefer small changes that can be checked quickly.</li>
+    <li>Keep node paths and exported names consistent with the scene.</li>
+    <li>Run project checks after script edits.</li>
+    <li>Ask the AI to explain any engine-level limitation separately from project script work.</li>
+</ul>
+
+<h2 id="when-api-is-missing">When the API is not enough</h2>
+<p>If a project needs behavior that scripting cannot express cleanly, the AI can request an engine change. The request should describe the missing capability, the project that needs it, and whether the change could be reused by other projects.</p>
+
+<h2 id="document-new-capability">Document new capability</h2>
+<p>When a new engine feature becomes part of the main engine, add documentation for the user workflow, scripting surface, limitations, and verification steps.</p>

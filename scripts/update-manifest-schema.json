@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jundotengine.org/schemas/update-manifest-v1.json",
+  "title": "Jundot 线上热更新版本清单 (Update Manifest)",
+  "description": "定义 Jundot Engine 每次发布的版本清单格式。由 PackageBuilder 构建时生成，上传到 GitHub Releases 作为独立 Asset，启动器和引擎端统一解析此格式来决定是否需要更新、如何下载、灰度策略、以及回滚目标。",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "package_name",
+    "version",
+    "platform",
+    "target",
+    "arch",
+    "download_url",
+    "package_size",
+    "sha256",
+    "release_date",
+    "channel"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Manifest 格式版本号。客户端通过此字段判断是否兼容当前 Schema。不兼容时提示用户手动更新启动器。当前为 \"1.0\"。",
+      "examples": ["1.0"]
+    },
+    "package_name": {
+      "type": "string",
+      "pattern": "^jundot-[a-z0-9._\\-]+$",
+      "description": "包的唯一标识名，与 ZIP 文件名对应（不含 .zip 后缀）。格式: jundot-{version}-{platform}-{target}-{arch}[-mono]-{timestamp}。",
+      "examples": ["jundot-1.7.2-beta-windows-editor-x86_64-20260608-120000"]
+    },
+    "version": {
+      "type": "object",
+      "required": ["major", "minor", "patch", "status", "full"],
+      "properties": {
+        "major": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "主版本号，对应 version.py 中 major 字段。大版本升级表示不兼容的 API 变更。"
+        },
+        "minor": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "次版本号，对应 version.py 中 minor 字段。功能新增但向后兼容。"
+        },
+        "patch": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "修订版本号，对应 version.py 中 patch 字段。Bug 修复，完全向后兼容。AutoUpdateVersion 时自动递增此字段。"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["stable", "beta", "alpha", "rc", "dev"],
+          "description": "版本状态，对应 version.py 中 status 字段。决定 channel 过滤行为。"
+        },
+        "full": {
+          "type": "string",
+          "description": "完整版本字符串，如 \"1.7.2-beta\"。用于 UI 显示和人类可读的版本标识。"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "description": "构建对应的 Git commit 短哈希（7~40 位），用于追溯构建源。"
+        }
+      },
+      "additionalProperties": false,
+      "description": "版本信息对象，字段与 version.py 一一对应。"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows", "linuxbsd", "macos", "android", "ios", "web"],
+      "description": "目标平台。v1 优先支持 windows。",
+      "examples": ["windows"]
+    },
+    "target": {
+      "type": "string",
+      "enum": ["editor", "template_release", "template_debug"],
+      "description": "构建目标类型。v1 优先支持 editor。",
+      "examples": ["editor"]
+    },
+    "arch": {
+      "type": "string",
+      "enum": ["x86_64", "x86_32", "arm64"],
+      "description": "CPU 架构。",
+      "examples": ["x86_64"]
+    },
+    "mono": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否包含 Mono/C# 支持。由构建配置的 Mono 选项决定。"
+    },
+    "download_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "description": "完整 ZIP 包的下载地址。v1 指向 GitHub Release Assets 的直接下载链接。",
+      "examples": ["https://github.com/LoongSerpent9Realms/Jundot/releases/download/v1.7.2-beta/jundot-1.7.2-beta-windows-editor-x86_64-20260608-120000.zip"]
+    },
+    "package_size": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ZIP 包总大小，单位：字节（bytes）。客户端用于预检查磁盘空间和下载进度计算。"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "整个 ZIP 包的 SHA-256 哈希值，64 位十六进制小写。下载完成后校验，校验失败则拒绝安装。"
+    },
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{40}$",
+      "description": "整个 ZIP 包的 SHA-1 哈希值，40 位十六进制小写。作为辅助校验手段（部分 CDN 提供 SHA1 对照）。可选字段。"
+    },
+    "release_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "发布日期时间，ISO 8601 格式（UTC）。用于 UI 展示和判断版本新旧。",
+      "examples": ["2026-06-08T12:00:00Z"]
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "beta", "dev"],
+      "description": "发布通道。客户端根据用户偏好（UpdateMode 配置）过滤：DISABLED 不检查 / AUTO 只看 stable / NEWEST_STABLE 只看 stable / NEWEST_UNSTABLE 包含 beta / NEWEST_PATCH 只看同主次版本的 patch。",
+      "examples": ["beta"]
+    },
+    "changelog": {
+      "type": "string",
+      "description": "变更日志，Markdown 格式。显示在更新对话框中供用户查看。",
+      "examples": ["## 1.7.2-beta\n\n- 修复大场景导入崩溃\n- 新增动画编辑功能"]
+    },
+    "mandatory": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为强制更新。为 true 时用户无法跳过此版本（如安全修复）。"
+    },
+    "min_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-z]+)?$",
+      "description": "安装此更新的最低基础版本要求。例如从 1.7.0 升级到 1.8.0 需要先有 1.7.5，则 min_version=\"1.7.5\"。用于处理版本依赖链。"
+    },
+    "rollback_to": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-z]+)?$",
+      "description": "回滚目标版本。当此更新失败时，系统应回滚到的版本标识。通常为上一个稳定版本。"
+    },
+    "grayscale": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用灰度发布。关闭时所有用户可见（等同于 percentage=100 且无白名单限制）。"
+        },
+        "percentage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 100,
+          "description": "灰度百分比（0~100）。通过 hash(machine_id + seed) % 100 < percentage 判断是否可见。0=全不可见，100=全可见。"
+        },
+        "whitelist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "白名单机器标识列表。白名单内的用户优先于百分比规则（即白名单始终可见更新）。用于内测用户精确推送。",
+          "examples": [["machine-abc123", "machine-def456"]]
+        },
+        "machine_id_hash_seed": {
+          "type": "string",
+          "default": "jundot-grayscale-v1",
+          "description": "灰度哈希种子。用于 hash(machine_id + seed) 计算，变更种子可重新分配灰度分组而不改变机器标识。"
+        }
+      },
+      "additionalProperties": false,
+      "description": "灰度发布配置。支持百分比 + 白名单双模式，白名单优先。"
+    },
+    "files": {
+      "type": "array",
+      "description": "包内文件清单（可选但推荐）。列出 ZIP 内每个关键文件的路径、SHA256 和大小。用于安装后逐文件校验完整性。",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "size"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "相对于包根目录的文件路径。",
+            "examples": ["jundot.windows.editor.x86_64.exe", "JundotSharp/JundotSharp.dll"]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "description": "该文件的 SHA-256 哈希。"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "文件大小，单位：字节（bytes）。"
+          },
+          "required": {
+            "type": "boolean",
+            "default": true,
+            "description": "是否为必需文件。标记为 false 的文件缺失不触发安装失败。"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+
+  "examples": [
+    {
+      "manifest_version": "1.0",
+      "package_name": "jundot-1.7.2-beta-windows-editor-x86_64-20260608-120000",
+      "version": {
+        "major": 1,
+        "minor": 7,
+        "patch": 2,
+        "status": "beta",
+        "full": "1.7.2-beta",
+        "commit": "a1b2c3d"
+      },
+      "platform": "windows",
+      "target": "editor",
+      "arch": "x86_64",
+      "mono": false,
+      "download_url": "https://github.com/LoongSerpent9Realms/Jundot/releases/download/v1.7.2-beta/jundot-1.7.2-beta-windows-editor-x86_64-20260608-120000.zip",
+      "package_size": 524288000,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "release_date": "2026-06-08T12:00:00Z",
+      "channel": "beta",
+      "changelog": "## 1.7.2-beta\n\n### 修复\n- 修复大场景导入时的内存溢出崩溃\n- 修复 EngineUpdateLabel 在高 DPI 下的布局错误\n\n### 新增\n- 热更新系统 v1：启动前自动检查 + 下载 + 安装",
+      "mandatory": false,
+      "min_version": "1.7.0",
+      "rollback_to": "1.7.1-beta",
+      "grayscale": {
+        "enabled": false,
+        "percentage": 100,
+        "whitelist": [],
+        "machine_id_hash_seed": "jundot-grayscale-v1"
+      },
+      "files": [
+        {
+          "path": "jundot.windows.editor.x86_64.exe",
+          "sha256": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+          "size": 98765432,
+          "required": true
+        },
+        {
+          "path": "jundot.windows.editor.x86_64.console.exe",
+          "sha256": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+          "size": 98765432,
+          "required": true
+        },
+        {
+          "path": "package-manifest.txt",
+          "sha256": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4",
+          "size": 2048,
+          "required": false
+        },
+        {
+          "path": "update-manifest.json",
+          "sha256": "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5",
+          "size": 4096,
+          "required": false
+        }
+      ]
+    },
+    {
+      "manifest_version": "1.0",
+      "package_name": "jundot-1.7.3-rc-windows-editor-x86_64-20260609-080000",
+      "version": {
+        "major": 1,
+        "minor": 7,
+        "patch": 3,
+        "status": "rc",
+        "full": "1.7.3-rc",
+        "commit": "e5f6a7b"
+      },
+      "platform": "windows",
+      "target": "editor",
+      "arch": "x86_64",
+      "mono": false,
+      "download_url": "https://github.com/LoongSerpent9Realms/Jundot/releases/download/v1.7.3-rc/jundot-1.7.3-rc-windows-editor-x86_64-20260609-080000.zip",
+      "package_size": 525000000,
+      "sha256": "f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7",
+      "release_date": "2026-06-09T08:00:00Z",
+      "channel": "beta",
+      "changelog": "## 1.7.3-rc\n\n### 新增\n- 灰度发布白名单支持\n- 断点续传下载加速",
+      "mandatory": true,
+      "min_version": "1.7.2",
+      "rollback_to": "1.7.2-beta",
+      "grayscale": {
+        "enabled": true,
+        "percentage": 10,
+        "whitelist": ["machine-abc123", "machine-def456"],
+        "machine_id_hash_seed": "jundot-grayscale-v1"
+      },
+      "files": []
+    }
+  ]
+}

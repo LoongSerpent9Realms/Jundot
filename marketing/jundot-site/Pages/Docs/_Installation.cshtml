@@ -1,0 +1,86 @@
+<h1 id="installation">安装指南</h1>
+<p>本页说明如何获取、启动和验证 Jundot Engine。当前文档按预览版发布流程编写，实际文件名以 Releases 页面为准。</p>
+
+<h2 id="download">下载 Jundot</h2>
+<p>建议从官方 Releases 页面下载最新预览版：</p>
+<pre><code>https://github.com/LoongSerpent9Realms/Jundot/releases</code></pre>
+<p>下载时优先选择与你系统匹配的编辑器包。如果 Release 同时提供导出模板，也可以一起下载，后续导出游戏时会用到。</p>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">预览版提示</div>
+    <p>Jundot 仍在快速迭代。正式项目建议保留 Godot/Jundot 版本号、项目备份和 Git 提交记录，避免更新后难以回退。</p>
+</div>
+
+<h2 id="system-requirements">系统要求</h2>
+<table>
+    <thead>
+        <tr>
+            <th>组件</th>
+            <th>建议</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>操作系统</td>
+            <td>Windows 10/11。macOS、Linux 以 Release 是否提供对应包为准。</td>
+        </tr>
+        <tr>
+            <td>处理器</td>
+            <td>x86_64 多核处理器。</td>
+        </tr>
+        <tr>
+            <td>内存</td>
+            <td>8 GB 或以上更适合同时运行编辑器、AI 后端和构建工具。</td>
+        </tr>
+        <tr>
+            <td>显卡</td>
+            <td>支持 Godot 4.x 所需的图形后端。</td>
+        </tr>
+        <tr>
+            <td>磁盘空间</td>
+            <td>至少预留数 GB 空间；源码、构建缓存、导出模板会占用更多空间。</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="windows">Windows 启动</h2>
+<ol>
+    <li>下载 Windows 版本压缩包。</li>
+    <li>解压到一个不需要管理员权限的目录，例如 <code>D:\Jundot</code> 或用户目录。</li>
+    <li>运行包内的 Jundot 编辑器可执行文件。</li>
+    <li>如果包含 <code>JundotLauncher.exe</code>，推荐从 Launcher 启动，以便检查更新。</li>
+</ol>
+
+<h3 id="windows-security">Windows 安全提示</h3>
+<ul>
+    <li>首次运行可能被 Windows Defender 或 SmartScreen 提示，请确认来源是官方 Release。</li>
+    <li>不要把编辑器解压到受保护目录后再让 AI 写项目文件，项目目录建议放在用户有完整读写权限的位置。</li>
+    <li>如果 C# 项目需要构建，请安装对应版本的 .NET SDK。</li>
+</ul>
+
+<h2 id="macos-linux">macOS 与 Linux</h2>
+<p>如果 Release 提供 macOS 或 Linux 包，按对应包内说明启动。由于 Jundot 的 AI、打包和更新工具仍在快速迭代，跨平台体验可能晚于 Windows 版本。</p>
+
+<h2 id="ai-backend">配置 AI 后端</h2>
+<p>Jundot 的基础编辑器功能可以离线使用；AI Assistant 需要配置可用的 AI 服务。常见选择包括：</p>
+<ul>
+    <li>本机或局域网中的 MiMoCode / OpenAI 兼容服务。</li>
+    <li>OpenAI 兼容 API 地址。</li>
+    <li>本地模型服务，前提是你的硬件足够运行代码模型。</li>
+</ul>
+<p>API Key 或服务地址应只保存在本机设置里，不要提交到 Git 仓库，也不要贴进公开 Issue。</p>
+
+<h2 id="verify">验证安装</h2>
+<ol>
+    <li>打开项目管理器，确认能创建或导入项目。</li>
+    <li>进入编辑器，确认 2D/3D 视图、文件系统、检查器正常显示。</li>
+    <li>打开 AI Assistant，确认能进入聊天或项目模式。</li>
+    <li>如果要使用 C#，创建一个测试项目并运行一次构建。</li>
+</ol>
+
+<h2 id="next">下一步</h2>
+<ul>
+    <li><a href="/docs/quickstart">快速入门</a> — 创建一个测试项目。</li>
+    <li><a href="/docs/ai-assistant">AI 助手</a> — 配置并使用项目模式。</li>
+    <li><a href="/docs/troubleshooting">常见问题</a> — 处理启动、网络、AI 和更新问题。</li>
+</ul>

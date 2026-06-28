@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <meta-data
+            android:name="org.jundotengine.plugin.v2.JundotAppInstrumentedTestPlugin"
+            android:value="com.jundot.game.test.JundotAppInstrumentedTestPlugin"/>
+
+        <meta-data
+            android:name="org.jundotengine.plugin.v2.SignalTestPlugin"
+            android:value="com.jundot.game.test.SignalTestPlugin"/>
+    </application>
+
+</manifest>

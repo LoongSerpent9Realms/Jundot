@@ -1,0 +1,106 @@
+@page
+@model JundotSite.Pages.Admin.IndexModel
+@{
+    Layout = "_AdminLayout";
+}
+
+<div class="stat-cards">
+    <div class="stat-card green">
+        <div class="stat-number">@Model.TotalReleases</div>
+        <div class="stat-label">版本总数</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-number">@Model.TotalDownloads</div>
+        <div class="stat-label">下载次数</div>
+    </div>
+    <div class="stat-card amber">
+        <div class="stat-number">@Model.UnreadMessages</div>
+        <div class="stat-label">未读留言</div>
+    </div>
+    <div class="stat-card coral">
+        <div class="stat-number">@Model.TotalContents</div>
+        <div class="stat-label">内容条目</div>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0;">最近版本</h3>
+        <a href="/Admin/Releases" class="btn btn-secondary btn-sm">查看全部</a>
+    </div>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>版本号</th>
+                <th>标题</th>
+                <th>状态</th>
+                <th>发布日期</th>
+                <th>下载量</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var release in Model.RecentReleases)
+            {
+                <tr>
+                    <td><strong>@release.VersionNumber</strong></td>
+                    <td>@release.Title</td>
+                    <td>
+                        @if (release.IsPublished)
+                        {
+                            <span class="badge badge-published">已发布</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-draft">草稿</span>
+                        }
+                        @if (release.IsBeta)
+                        {
+                            <span class="badge badge-beta" style="margin-left: 6px;">Beta</span>
+                        }
+                    </td>
+                    <td>@release.ReleaseDate.ToString("yyyy-MM-dd")</td>
+                    <td>@release.DownloadCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="admin-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0;">最近留言</h3>
+        <a href="/Admin/Messages" class="btn btn-secondary btn-sm">查看全部</a>
+    </div>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>姓名</th>
+                <th>邮箱</th>
+                <th>主题</th>
+                <th>状态</th>
+                <th>时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var message in Model.RecentMessages)
+            {
+                <tr>
+                    <td>@message.Name</td>
+                    <td>@message.Email</td>
+                    <td>@(message.Subject ?? "-")</td>
+                    <td>
+                        @if (message.IsRead)
+                        {
+                            <span class="badge badge-published">已读</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-draft">未读</span>
+                        }
+                    </td>
+                    <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

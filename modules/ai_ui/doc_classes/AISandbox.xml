@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AISandbox" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/jundotengine/jundot/master/doc/class.xsd">
+	<brief_description>
+		Explicit sandbox for AI-driven capabilities and function overrides.
+	</brief_description>
+	<description>
+		[AISandbox] is a small permission boundary for AI integrations. Scripts register named capabilities and overrides as [Callable] values, then AI-facing code can execute only those registered names through this node.
+		Capabilities receive one [Variant] payload. Overrides receive the original value and a context [Dictionary], and return a replacement value through the result dictionary.
+		Every execution returns a dictionary with [code]ok[/code], [code]status[/code], [code]name[/code], [code]handled[/code], [code]value[/code], and [code]error[/code] fields.
+	</description>
+	<methods>
+		<method name="apply_override">
+			<return type="Dictionary" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="original_value" type="Variant" default="null" />
+			<param index="2" name="context" type="Dictionary" default="{}" />
+			<description>
+				Applies the registered override named [param name]. If no override is registered, returns [param original_value] with [code]handled[/code] set to [code]false[/code].
+			</description>
+		</method>
+		<method name="clear_capabilities">
+			<return type="void" />
+			<description>
+				Removes all registered capabilities.
+			</description>
+		</method>
+		<method name="clear_overrides">
+			<return type="void" />
+			<description>
+				Removes all registered overrides.
+			</description>
+		</method>
+		<method name="execute_capability">
+			<return type="Dictionary" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="payload" type="Variant" default="null" />
+			<description>
+				Executes the registered capability named [param name], passing [param payload] to its callback.
+			</description>
+		</method>
+		<method name="get_capabilities" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns registered capability names.
+			</description>
+		</method>
+		<method name="get_capability_options" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the options dictionary for a registered capability, or an empty dictionary.
+			</description>
+		</method>
+		<method name="get_override_options" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns the options dictionary for a registered override, or an empty dictionary.
+			</description>
+		</method>
+		<method name="get_overrides" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				Returns registered override names.
+			</description>
+		</method>
+		<method name="has_capability" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param name] is registered as a capability.
+			</description>
+		</method>
+		<method name="has_override" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Returns [code]true[/code] if [param name] is registered as an override.
+			</description>
+		</method>
+		<method name="register_capability">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="callback" type="Callable" />
+			<param index="2" name="options" type="Dictionary" default="{}" />
+			<description>
+				Registers a named capability. Set [code]options.writes[/code] to [code]true[/code] for callbacks that mutate project or scene state so [member read_only] can deny them.
+			</description>
+		</method>
+		<method name="register_override">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="callback" type="Callable" />
+			<param index="2" name="options" type="Dictionary" default="{}" />
+			<description>
+				Registers a named override. Override callbacks receive [code](original_value, context)[/code].
+			</description>
+		</method>
+		<method name="unregister_capability">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes a registered capability.
+			</description>
+		</method>
+		<method name="unregister_override">
+			<return type="void" />
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Removes a registered override.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="allow_overrides" type="bool" setter="set_allow_overrides" getter="are_overrides_allowed" default="true">
+			If [code]false[/code], [method apply_override] denies all registered overrides.
+		</member>
+		<member name="default_timeout" type="float" setter="set_default_timeout" getter="get_default_timeout" default="30.0">
+			Default timeout metadata copied into capability and override options when no [code]timeout[/code] option is provided.
+		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="true">
+			If [code]false[/code], all capability and override execution is denied.
+		</member>
+		<member name="read_only" type="bool" setter="set_read_only" getter="is_read_only" default="false">
+			If [code]true[/code], entries whose options contain [code]writes = true[/code] are denied.
+		</member>
+	</members>
+	<signals>
+		<signal name="capability_executed">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="ok" type="bool" />
+			<param index="2" name="result" type="Dictionary" />
+			<description>
+				Emitted after a capability execution attempt.
+			</description>
+		</signal>
+		<signal name="capability_registered">
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Emitted when a capability is registered or replaced.
+			</description>
+		</signal>
+		<signal name="override_applied">
+			<param index="0" name="name" type="StringName" />
+			<param index="1" name="ok" type="bool" />
+			<param index="2" name="result" type="Dictionary" />
+			<description>
+				Emitted after an override application attempt.
+			</description>
+		</signal>
+		<signal name="override_registered">
+			<param index="0" name="name" type="StringName" />
+			<description>
+				Emitted when an override is registered or replaced.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="STATUS_OK" value="0" enum="SandboxStatus">
+			The operation succeeded.
+		</constant>
+		<constant name="STATUS_DISABLED" value="1" enum="SandboxStatus">
+			The sandbox is disabled.
+		</constant>
+		<constant name="STATUS_NOT_FOUND" value="2" enum="SandboxStatus">
+			The requested capability or override was not found.
+		</constant>
+		<constant name="STATUS_DENIED" value="3" enum="SandboxStatus">
+			The sandbox policy denied the operation.
+		</constant>
+		<constant name="STATUS_CALL_ERROR" value="4" enum="SandboxStatus">
+			The callback failed to execute.
+		</constant>
+	</constants>
+</class>

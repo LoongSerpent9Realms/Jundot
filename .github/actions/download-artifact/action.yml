@@ -1,0 +1,20 @@
+name: Download Jundot artifact
+description: Download the Jundot artifact.
+
+inputs:
+  name:
+    description: The artifact name.
+    default: ${{ github.job }}
+  path:
+    description: The path to download and extract to.
+    required: true
+    default: ./
+
+runs:
+  using: composite
+  steps:
+    - name: Download Jundot Artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}

@@ -1,0 +1,947 @@
+<h1 id="scripting-api">脚本 API 参考</h1>
+<p>Jundot Engine 以 Godot 的脚本 API 为基础。大部分 Godot 4.x 的节点、场景、GDScript 和 C# 用法都适用；Jundot 特有差异会在文档中单独标注。</p>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">ℹ️ 关于本页面</div>
+    <p>Jundot 基于 Godot 构建，Godot 官方文档仍然是学习节点、场景、脚本和 API 的主要参考。本文档只做常用速查和 Jundot 差异说明。</p>
+    <p>完整 Godot API 请参考 <a href="https://docs.godotengine.org/">Godot 官方文档</a>。</p>
+</div>
+
+<h2 id="overview">概述</h2>
+<p>Jundot Engine 支持两种脚本语言：</p>
+<table>
+    <thead>
+        <tr>
+            <th>语言</th>
+            <th>特点</th>
+            <th>适用场景</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>GDScript</strong></td>
+            <td>简单易学、动态类型、与引擎深度集成</td>
+            <td>快速原型、游戏逻辑、UI</td>
+        </tr>
+        <tr>
+            <td><strong>C#</strong></td>
+            <td>静态类型、高性能、生态丰富</td>
+            <td>复杂系统、性能敏感、已有 C# 代码</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">基于 Godot API</div>
+    <p>常规脚本开发请优先参考 <a href="https://docs.godotengine.org/">Godot 官方文档</a>。如果 Jundot 添加了 AI、构建、发布或编辑器相关扩展，会在 Jundot 文档中补充。</p>
+</div>
+
+<h2 id="node-system">节点系统</h2>
+<p>节点（Node）是 Godot/Jundot 的核心概念。所有游戏对象都是节点，节点可以嵌套组成场景树。</p>
+
+<h3 id="node-hierarchy">节点层级</h3>
+<pre><code>Root (Node)
+├── Player (CharacterBody2D)
+│   ├── Sprite2D
+│   ├── CollisionShape2D
+│   └── AnimationPlayer
+├── Enemy (CharacterBody2D)
+├── Camera2D
+└── UI (CanvasLayer)
+    └── Control
+        ├── Label
+        └── Button</code></pre>
+
+<h3 id="common-nodes">常用节点分类</h3>
+
+<h4 id="base-nodes">基础节点</h4>
+<table>
+    <thead>
+        <tr>
+            <th>节点</th>
+            <th>说明</th>
+            <th>关键属性/方法</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>Node</code></td>
+            <td>所有节点的基类</td>
+            <td><code>_Ready()</code>, <code>_Process(delta)</code>, <code>_PhysicsProcess(delta)</code></td>
+        </tr>
+        <tr>
+            <td><code>Node2D</code></td>
+            <td>2D 空间节点</td>
+            <td><code>position</code>, <code>rotation</code>, <code>scale</code>, <code>Translate(v)</code></td>
+        </tr>
+        <tr>
+            <td><code>Node3D</code></td>
+            <td>3D 空间节点</td>
+            <td><code>position</code>, <code>rotation</code>, <code>scale</code>, <code>basis</code></td>
+        </tr>
+        <tr>
+            <td><code>Control</code></td>
+            <td>UI 控件基类</td>
+            <td><code>size</code>, <code>anchor</code>, <code>mouse_entered</code> 信号</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4 id="physics-nodes">物理节点</h4>
+<table>
+    <thead>
+        <tr>
+            <th>节点</th>
+            <th>说明</th>
+            <th>适用场景</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>CharacterBody2D / 3D</code></td>
+            <td>角色控制器</td>
+            <td>玩家、敌人、NPC</td>
+        </tr>
+        <tr>
+            <td><code>RigidBody2D / 3D</code></td>
+            <td>刚体</td>
+            <td>受物理影响的物体</td>
+        </tr>
+        <tr>
+            <td><code>StaticBody2D / 3D</code></td>
+            <td>静态碰撞体</td>
+            <td>地形、墙壁</td>
+        </tr>
+        <tr>
+            <td><code>Area2D / 3D</code></td>
+            <td>触发区域</td>
+            <td>检测进入/离开</td>
+        </tr>
+        <tr>
+            <td><code>AnimatableBody2D / 3D</code></td>
+            <td>可动画的刚体</td>
+            <td>移动平台、门</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4 id="visual-nodes">视觉节点</h4>
+<table>
+    <thead>
+        <tr>
+            <th>节点</th>
+            <th>说明</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>Sprite2D</code></td>
+            <td>2D 精灵，显示单张纹理</td>
+        </tr>
+        <tr>
+            <td><code>AnimatedSprite2D</code></td>
+            <td>2D 帧动画精灵</td>
+        </tr>
+        <tr>
+            <td><code>Sprite3D</code></td>
+            <td>3D 空间中的 2D 精灵</td>
+        </tr>
+        <tr>
+            <td><code>MeshInstance3D</code></td>
+            <td>3D 网格实例</td>
+        </tr>
+        <tr>
+            <td><code>Label</code></td>
+            <td>文本标签</td>
+        </tr>
+        <tr>
+            <td><code>Line2D</code></td>
+            <td>2D 线条</td>
+        </tr>
+        <tr>
+            <td><code>Polygon2D</code></td>
+            <td>2D 多边形</td>
+        </tr>
+        <tr>
+            <td><code>CPUParticles2D / 3D</code></td>
+            <td>CPU 粒子系统</td>
+        </tr>
+        <tr>
+            <td><code>GPUParticles2D / 3D</code></td>
+            <td>GPU 粒子系统（性能更好）</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4 id="ui-nodes">UI 节点</h4>
+<table>
+    <thead>
+        <tr>
+            <th>节点</th>
+            <th>说明</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>CanvasLayer</code></td>
+            <td>UI 层级（独立于世界坐标系）</td>
+        </tr>
+        <tr>
+            <td><code>Control</code></td>
+            <td>所有 UI 控件基类</td>
+        </tr>
+        <tr>
+            <td><code>Panel</code></td>
+            <td>面板容器</td>
+        </tr>
+        <tr>
+            <td><code>VBoxContainer / HBoxContainer</code></td>
+            <td>垂直/水平布局容器</td>
+        </tr>
+        <tr>
+            <td><code>GridContainer</code></td>
+            <td>网格布局</td>
+        </tr>
+        <tr>
+            <td><code>Button</code></td>
+            <td>按钮</td>
+        </tr>
+        <tr>
+            <td><code>LineEdit</code></td>
+            <td>单行输入框</td>
+        </tr>
+        <tr>
+            <td><code>TextEdit</code></td>
+            <td>多行文本框</td>
+        </tr>
+        <tr>
+            <td><code>ProgressBar</code></td>
+            <td>进度条</td>
+        </tr>
+        <tr>
+            <td><code>Slider</code></td>
+            <td>滑块</td>
+        </tr>
+        <tr>
+            <td><code>OptionButton</code></td>
+            <td>下拉选择</td>
+        </tr>
+        <tr>
+            <td><code>CheckBox</code></td>
+            <td>复选框</td>
+        </tr>
+        <tr>
+            <td><code>TabContainer</code></td>
+            <td>标签页</td>
+        </tr>
+        <tr>
+            <td><code>ScrollContainer</code></td>
+            <td>滚动容器</td>
+        </tr>
+    </tbody>
+</table>
+
+<h4 id="animation-nodes">动画节点</h4>
+<table>
+    <thead>
+        <tr>
+            <th>节点</th>
+            <th>说明</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>AnimationPlayer</code></td>
+            <td>动画播放器（核心）</td>
+        </tr>
+        <tr>
+            <td><code>AnimationTree</code></td>
+            <td>动画状态机/混合树</td>
+        </tr>
+        <tr>
+            <td><code>AnimatedSprite2D</code></td>
+            <td>2D 帧动画</td>
+        </tr>
+        <tr>
+            <td><code>SpriteFrames</code></td>
+            <td>帧动画资源</td>
+        </tr>
+        <tr>
+            <td><code>Tween</code></td>
+            <td>补间动画（代码控制）</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="lifecycle">节点生命周期</h2>
+<p>每个节点都有以下生命周期方法，可以在脚本中重写：</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>方法</th>
+            <th>调用时机</th>
+            <th>用途</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>_EnterTree()</code></td>
+            <td>节点进入场景树时</td>
+            <td>初始化（早于 Ready）</td>
+        </tr>
+        <tr>
+            <td><code>_Ready()</code></td>
+            <td>节点及子节点都准备好时</td>
+            <td>初始化逻辑、获取节点引用</td>
+        </tr>
+        <tr>
+            <td><code>_Process(delta)</code></td>
+            <td>每帧调用</td>
+            <td>游戏逻辑、更新显示</td>
+        </tr>
+        <tr>
+            <td><code>_PhysicsProcess(delta)</code></td>
+            <td>固定帧率调用（物理帧）</td>
+            <td>物理相关逻辑、移动</td>
+        </tr>
+        <tr>
+            <td><code>_Input(event)</code></td>
+            <td>收到输入事件时</td>
+            <td>处理输入</td>
+        </tr>
+        <tr>
+            <td><code>_UnhandledInput(event)</code></td>
+            <td>UI 未处理的输入</td>
+            <td>游戏操作输入</td>
+        </tr>
+        <tr>
+            <td><code>_ExitTree()</code></td>
+            <td>节点离开场景树时</td>
+            <td>清理资源、断开信号</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3 id="lifecycle-example">生命周期示例（GDScript）</h3>
+<pre><code>extends Node2D
+
+var score = 0
+
+func _ready():
+    # 节点准备好时调用一次
+    print("节点已就绪")
+    # 获取子节点引用
+    $Label.text = "分数: 0"
+
+func _process(delta):
+    # 每帧调用
+    # delta 是距离上一帧的时间（秒）
+    pass
+
+func _physics_process(delta):
+    # 固定帧率（默认 60 FPS）
+    # 物理相关的逻辑放这里
+    pass
+
+func _exit_tree():
+    # 节点被移除时调用
+    print("节点已移除")</code></pre>
+
+<h2 id="scene-management">场景管理</h2>
+
+<h3 id="scene-basics">场景基础操作</h3>
+<pre><code># 切换场景
+get_tree().change_scene_to_file("res://scenes/Level2.tscn")
+
+# 重新加载当前场景
+get_tree().reload_current_scene()
+
+# 获取当前场景根节点
+var current_scene = get_tree().current_scene
+
+# 退出游戏
+get_tree().quit()
+
+# 暂停游戏
+get_tree().paused = true
+
+# 恢复游戏
+get_tree().paused = false
+
+# 获取根节点
+var root = get_tree().root
+
+# 获取自动加载的单例
+var game_manager = GameManager</code></pre>
+
+<h3 id="scene-instantiate">实例化场景</h3>
+<pre><code># 加载场景资源
+var enemy_scene = preload("res://enemy.tscn")
+
+func spawn_enemy(position: Vector2):
+    # 实例化
+    var enemy = enemy_scene.instantiate()
+    # 设置位置
+    enemy.position = position
+    # 添加到场景树
+    add_child(enemy)
+    # 或者添加到指定父节点
+    # get_node("Enemies").add_child(enemy)
+
+func spawn_multiple():
+    for i in range(10):
+        var enemy = enemy_scene.instantiate()
+        enemy.position = Vector2(i * 64, 100)
+        add_child(enemy)</code></pre>
+
+<h2 id="node-operations">节点操作</h2>
+
+<h3 id="get-node">获取节点</h3>
+<pre><code># 获取直接子节点（推荐）
+var player = $Player
+var sprite = $Player/Sprite2D
+
+# 用字符串路径
+var player = get_node("Player")
+var sprite = get_node("Player/Sprite2D")
+
+# 泛型方式（C# 风格，GDScript 也支持）
+var player = get_node&lt;CharacterBody2D&gt;("Player")
+
+# 获取不到时返回 null（不报错）
+var hp = get_node_or_null("HealthBar")
+if hp:
+    hp.value = 100
+
+# 获取父节点
+var parent = get_parent()
+
+# 获取根节点
+var root = get_tree().root</code></pre>
+
+<h3 id="add-remove">添加/删除节点</h3>
+<pre><code># 添加子节点
+var node = Node2D.new()
+add_child(node)
+
+# 添加到指定索引
+add_child(node, true)  # 保持现有层级
+
+# 移除节点（会在下一帧删除）
+node.queue_free()
+
+# 立即删除（不推荐）
+node.free()
+
+# 从父节点移除但不删除
+remove_child(node)
+
+# 重新设置父节点
+node.reparent(new_parent)</code></pre>
+
+<h3 id="iterate">遍历节点</h3>
+<pre><code># 遍历直接子节点
+for child in get_children():
+    print(child.name)
+
+# 递归遍历所有子节点
+for child in get_children():
+    _process_node(child)
+
+# 按类型查找
+var enemies = get_tree().get_nodes_in_group("enemy")
+
+# 查找第一个匹配的节点
+var player = get_tree().get_first_node_in_group("player")</code></pre>
+
+<h2 id="signals">信号系统</h2>
+<p>信号（Signal）是 Godot 的观察者模式实现，用于节点间的松耦合通信。</p>
+
+<h3 id="signal-basic">基础用法</h3>
+<pre><code># 连接信号（代码方式）
+func _ready():
+    # 按钮点击
+    $Button.pressed.connect(_on_button_pressed)
+    
+    # 带参数的信号
+    $Player.health_changed.connect(_on_health_changed)
+    
+    # Area 进入检测
+    $Area2D.body_entered.connect(_on_body_entered)
+
+# 信号处理函数
+func _on_button_pressed():
+    print("按钮被点击了")
+
+func _on_health_changed(new_health: int):
+    print("生命值变为: ", new_health)
+
+func _on_body_entered(body: Node):
+    print("有物体进入: ", body.name)</code></pre>
+
+<h3 id="custom-signals">自定义信号</h3>
+<pre><code># 定义信号
+signal game_over(score)
+signal player_died
+signal health_changed(new_value, old_value)
+
+# 发出信号
+func die():
+    game_over.emit(score)
+    player_died.emit()
+
+func set_health(value):
+    var old = health
+    health = value
+    health_changed.emit(value, old)</code></pre>
+
+<h3 id="signal-disconnect">断开和一次性</h3>
+<pre><code># 断开信号
+$Button.pressed.disconnect(_on_button_pressed)
+
+# 检查是否已连接
+if $Button.pressed.is_connected(_on_button_pressed):
+    print("已连接")
+
+# 等待信号（异步）
+await $Timer.timeout
+print("计时器到了")
+
+# 等待自定义信号
+await player.died
+print("玩家死亡")</code></pre>
+
+<h2 id="input-system">输入系统</h2>
+
+<h3 id="input-map">输入映射</h3>
+<p>推荐使用输入映射（项目设置 → 输入映射），而不是直接检查按键：</p>
+<pre><code># 检查持续按下
+if Input.is_action_pressed("move_left"):
+    velocity.x = -SPEED
+
+if Input.is_action_pressed("move_right"):
+    velocity.x = SPEED
+
+# 检查刚按下
+if Input.is_action_just_pressed("jump") and is_on_floor():
+    velocity.y = -JUMP_FORCE
+
+# 检查刚松开
+if Input.is_action_just_released("jump") and velocity.y < -200:
+    velocity.y = -200
+
+# 获取轴输入（-1 到 1）
+var dir = Input.get_axis("move_left", "move_right")
+velocity.x = dir * SPEED
+
+# 获取向量
+var move_dir = Input.get_vector("left", "right", "up", "down")
+velocity = move_dir * SPEED</code></pre>
+
+<h3 id="mouse-input">鼠标输入</h3>
+<pre><code># 鼠标位置（相对于当前节点）
+var mouse_pos = get_local_mouse_position()
+
+# 全局鼠标位置
+var mouse_global = get_global_mouse_position()
+
+# 鼠标按钮
+if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+    print("左键按下")
+
+if Input.is_action_just_pressed("click"):
+    shoot()
+
+# 鼠标滚轮
+func _input(event):
+    if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_WHEEL_UP:
+        zoom_in()</code></pre>
+
+<h3 id="key-input">键盘输入</h3>
+<pre><code># 直接检查按键（不推荐，优先用输入映射）
+if Input.is_key_pressed(KEY_A):
+    pass
+
+# 文本输入
+func _input(event):
+    if event is InputEventKey and event.pressed:
+        print("按下了: ", event.keycode)</code></pre>
+
+<h2 id="vector">向量与数学</h2>
+
+<h3 id="vector2">Vector2（2D 向量）</h3>
+<pre><code># 创建向量
+var pos = Vector2(100, 200)
+var pos2 = Vector2.ZERO  # (0, 0)
+var up = Vector2.UP      # (0, -1)
+var right = Vector2.RIGHT  # (1, 0)
+
+# 基本运算
+var result = a + b
+result = a - b
+result = a * 2.0
+result = a / 2.0
+
+# 常用属性
+pos.x = 100
+pos.y = 200
+pos.length()         # 长度
+pos.normalized()     # 单位向量
+pos.distance_to(b)   # 到另一点的距离
+pos.angle()          # 角度（弧度）
+pos.angle_to(b)      # 与另一向量的夹角
+pos.dot(b)           # 点积
+pos.cross(b)         # 叉积
+pos.rotated(angle)   # 旋转
+pos.move_toward(target, delta)  # 向目标移动
+
+# 插值
+var between = a.lerp(b, 0.5)  # 中间点</code></pre>
+
+<h3 id="vector3">Vector3（3D 向量）</h3>
+<pre><code>var pos = Vector3(1, 2, 3)
+var zero = Vector3.ZERO
+var up = Vector3.UP
+var forward = Vector3.FORWARD
+
+# 方法与 Vector2 类似
+pos.length()
+pos.normalized()
+pos.distance_to(other)
+pos.dot(other)
+pos.cross(other)
+pos.lerp(other, t)</code></pre>
+
+<h2 id="tween">Tween 动画</h2>
+<p>用代码创建补间动画：</p>
+<pre><code># 基本用法
+var tween = create_tween()
+tween.tween_property(self, "position:x", 200, 0.5)
+tween.tween_property(self, "modulate:a", 0, 0.3)
+
+# 设置缓动效果
+tween.set_ease(Tween.EASE_OUT)
+tween.set_trans(Tween.TRANS_CUBIC)
+
+# 循环
+tween.set_loops()
+
+# 回调
+tween.tween_callback(_on_complete)
+tween.finished.connect(_on_all_done)
+
+# 延迟
+tween.tween_interval(1.0)  # 等待 1 秒
+
+# 并行（同时执行）
+tween.parallel().tween_property(...)
+tween.parallel().tween_property(...)
+
+# 完整示例
+func fade_out_and_remove():
+    var tween = create_tween()
+    tween.tween_property(self, "modulate:a", 0, 0.3)
+    tween.tween_callback(queue_free)
+
+func punch_scale():
+    var tween = create_tween()
+    tween.tween_property(self, "scale", Vector2(1.2, 1.2), 0.1)
+    tween.tween_property(self, "scale", Vector2(1, 1), 0.2)
+    tween.set_trans(Tween.TRANS_BACK)</code></pre>
+
+<h3 id="tween-ease">缓动类型</h3>
+<table>
+    <thead>
+        <tr>
+            <th>Ease（缓动方向）</th>
+            <th>Trans（过渡曲线）</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><code>EASE_IN</code> — 慢入</td>
+            <td><code>TRANS_LINEAR</code> — 线性</td>
+        </tr>
+        <tr>
+            <td><code>EASE_OUT</code> — 慢出</td>
+            <td><code>TRANS_SINE</code> — 正弦</td>
+        </tr>
+        <tr>
+            <td><code>EASE_IN_OUT</code> — 慢入慢出</td>
+            <td><code>TRANS_QUINT</code> — 五次</td>
+        </tr>
+        <tr>
+            <td><code>EASE_OUT_IN</code> — 快入快出</td>
+            <td><code>TRANS_QUART</code> — 四次</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td><code>TRANS_EXPO</code> — 指数</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td><code>TRANS_ELASTIC</code> — 弹性</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td><code>TRANS_BACK</code> — 回退</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td><code>TRANS_BOUNCE</code> — 弹跳</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="timer">计时器</h2>
+<pre><code># 用 Timer 节点
+var timer = Timer.new()
+timer.wait_time = 2.0
+timer.timeout.connect(_on_timeout)
+add_child(timer)
+timer.start()
+
+func _on_timeout():
+    print("2 秒到了")
+
+# 一次性（简单场景）
+func start_countdown():
+    var timer = get_tree().create_timer(3.0)
+    timer.timeout.connect(_on_done)
+
+# 异步等待
+async_func do_something_after_delay():
+    await get_tree().create_timer(1.5).timeout
+    print("1.5 秒后")
+
+# 重复触发
+func _ready():
+    var timer = Timer.new()
+    timer.wait_time = 0.5
+    timer.timeout.connect(_on_tick)
+    add_child(timer)
+    timer.start()
+
+# 停止计时器
+timer.stop()
+timer.time_left = 5.0  # 重置时间</code></pre>
+
+<h2 id="groups">组系统</h2>
+<p>组（Group）是给节点打标签的机制，方便批量操作。</p>
+<pre><code># 添加到组
+add_to_group("enemy")
+add_to_group("boss")
+
+# 从组移除
+remove_from_group("temp")
+
+# 检查是否在组里
+if is_in_group("player"):
+    print("我是玩家")
+
+# 获取组里所有节点
+var enemies = get_tree().get_nodes_in_group("enemy")
+
+# 获取第一个
+var player = get_tree().get_first_node_in_group("player")
+
+# 给组里所有节点调用方法
+get_tree().call_group("enemy", "take_damage", 10)
+
+# 通知组
+get_tree().notify_group("enemy", NOTIFICATION_GAME_START)</code></pre>
+
+<h2 id="autoload">自动加载（单例）</h2>
+<p>在项目设置 → 自动加载中注册的脚本，可以全局访问：</p>
+<pre><code># 假设注册了 GameManager
+# 任何地方都可以直接调用
+GameManager.score += 100
+GameManager.save_game()
+
+# 常见用途
+# - 游戏状态管理
+# - 存档系统
+# - 全局事件总线
+# - 音频管理器
+# - 场景切换管理器</code></pre>
+
+<h2 id="resources">资源系统</h2>
+<pre><code># 加载资源
+var texture = load("res://icon.png")
+var scene = load("res://scene.tscn")
+
+# 预加载（编译时加载，更快）
+var player_scene = preload("res://player.tscn")
+
+# 动态加载
+var dynamic_resource = load(path)
+if dynamic_resource == null:
+    print("加载失败: ", path)
+
+# 保存资源
+var config = ConfigFile.new()
+config.set_value("player", "score", 100)
+config.save("user://save.cfg")
+
+# 用户数据路径
+var save_path = "user://savegame.dat"</code></pre>
+
+<h2 id="audio">音频</h2>
+<pre><code># AudioStreamPlayer
+$Music.stream = load("res://music.ogg")
+$Music.play()
+$Music.stop()
+$Music.volume_db = -10  # 音量（分贝）
+$Music.pitch_scale = 1.0  # 音调
+
+# AudioStreamPlayer2D（有位置的音效）
+$Sound2D.position = Vector2(100, 200)
+$Sound2D.play()
+
+# 常用方法
+player.play()
+player.stop()
+player.pause()
+player.seek(2.0)  # 跳到第 2 秒
+
+# 播放一次性音效
+func play_sfx(sound):
+    var sfx = AudioStreamPlayer.new()
+    sfx.stream = sound
+    add_child(sfx)
+    sfx.finished.connect(sfx.queue_free)
+    sfx.play()</code></pre>
+
+<h2 id="file-io">文件读写</h2>
+<pre><code># 读取文件
+var file = FileAccess.open("res://data.txt", FileAccess.READ)
+if file:
+    var content = file.get_as_text()
+    file.close()
+
+# 写入文件
+var file = FileAccess.open("user://save.txt", FileAccess.WRITE)
+if file:
+    file.store_string("hello")
+    file.close()
+
+# JSON 读写
+# 保存
+var data = {"score": 100, "name": "player"}
+var json_str = JSON.stringify(data)
+FileAccess.write_string("user://save.json", json_str)
+
+# 读取
+var json_str = FileAccess.get_file_as_string("user://save.json")
+var data = JSON.parse_string(json_str)</code></pre>
+
+<h2 id="csharp-api">C# API 参考</h2>
+<p>使用 C# 时，API 命名略有不同（PascalCase 风格）：</p>
+<pre><code>using Godot;
+
+public partial class Player : CharacterBody2D
+{
+    [Export] public float Speed = 200.0f;
+    [Export] public float JumpForce = -400.0f;
+
+    public override void _Ready()
+    {
+        // 节点准备好时
+        var sprite = GetNode&lt;Sprite2D&gt;("Sprite2D");
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        float dir = Input.GetAxis("move_left", "move_right");
+        Velocity = new Vector2(dir * Speed, Velocity.Y);
+
+        if (Input.IsActionJustPressed("jump") && IsOnFloor())
+        {
+            Velocity = new Vector2(Velocity.X, JumpForce);
+        }
+
+        MoveAndSlide();
+    }
+
+    // 信号定义
+    [Signal]
+    public delegate void DiedEventHandler();
+
+    public void Die()
+    {
+        EmitSignal(SignalName.Died);
+        QueueFree();
+    }
+}</code></pre>
+
+<h2 id="cheatsheet">常用 API 速查表</h2>
+<table>
+    <thead>
+        <tr>
+            <th>功能</th>
+            <th>GDScript</th>
+            <th>C#</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>获取节点</td>
+            <td><code>$NodeName</code> / <code>get_node()</code></td>
+            <td><code>GetNode&lt;T&gt;("NodeName")</code></td>
+        </tr>
+        <tr>
+            <td>获取子节点</td>
+            <td><code>get_children()</code></td>
+            <td><code>GetChildren()</code></td>
+        </tr>
+        <tr>
+            <td>添加子节点</td>
+            <td><code>add_child(node)</code></td>
+            <td><code>AddChild(node)</code></td>
+        </tr>
+        <tr>
+            <td>删除节点</td>
+            <td><code>queue_free()</code></td>
+            <td><code>QueueFree()</code></td>
+        </tr>
+        <tr>
+            <td>连接信号</td>
+            <td><code>signal.connect(func)</code></td>
+            <td><code>Signal += Handler</code></td>
+        </tr>
+        <tr>
+            <td>发出信号</td>
+            <td><code>signal.emit()</code></td>
+            <td><code>EmitSignal()</code></td>
+        </tr>
+        <tr>
+            <td>场景切换</td>
+            <td><code>get_tree().change_scene_to_file()</code></td>
+            <td><code>GetTree().ChangeSceneToFile()</code></td>
+        </tr>
+        <tr>
+            <td>创建 Tween</td>
+            <td><code>create_tween()</code></td>
+            <td><code>CreateTween()</code></td>
+        </tr>
+        <tr>
+            <td>等待时间</td>
+            <td><code>await get_tree().create_timer(t).timeout</code></td>
+            <td><code>await ToSignal(GetTree().CreateTimer(t), ...)</code></td>
+        </tr>
+        <tr>
+            <td>退出游戏</td>
+            <td><code>get_tree().quit()</code></td>
+            <td><code>GetTree().Quit()</code></td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="further-reading">更多资源</h2>
+<ul>
+    <li><a href="https://docs.godotengine.org/">Godot 官方文档</a> — 完整 API 参考</li>
+    <li><a href="https://docs.godotengine.org/en/stable/classes/class_@@gdscript.html">GDScript 内置函数</a></li>
+    <li><a href="https://godotengine.org/asset-library/">Godot 资源商店</a></li>
+    <li><a href="/docs/ai-assistant">AI 助手文档</a> — 用 AI 帮你写代码</li>
+</ul>

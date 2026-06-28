@@ -1,0 +1,74 @@
+<h1 id="quickstart">快速入门</h1>
+<p>用一个测试项目熟悉 Jundot 的核心流程：用户提出游戏想法，AI 创建项目并持续细化；如果当前引擎能完成，就只改项目；如果当前引擎做不到，再进入受控的引擎改动流程。</p>
+
+<h2 id="before-start">准备工作</h2>
+<ul>
+    <li>已完成 <a href="/docs/installation">安装指南</a> 中的启动验证。</li>
+    <li>准备一个空目录用于测试项目。</li>
+    <li>如需使用 AI Assistant，已配置 AI 服务地址和 API Key。</li>
+    <li>建议安装 Git，用于保存 AI 修改前后的项目状态。</li>
+</ul>
+
+<h2 id="create-project">创建或导入项目</h2>
+<ol>
+    <li>启动 Jundot，进入项目管理器。</li>
+    <li>点击「创建」或「导入」。</li>
+    <li>选择项目目录和项目名称。</li>
+    <li>进入编辑器后，先保存一个初始场景。</li>
+    <li>如果使用 Git，先提交一次初始状态。</li>
+</ol>
+
+<h2 id="editor-layout">认识编辑器区域</h2>
+<ul>
+    <li><strong>场景树</strong>：管理当前场景里的节点层级。</li>
+    <li><strong>视口</strong>：编辑 2D/3D 场景。</li>
+    <li><strong>检查器</strong>：查看和修改节点属性。</li>
+    <li><strong>文件系统</strong>：管理 <code>res://</code> 项目资源。</li>
+    <li><strong>AI Assistant</strong>：在右侧或底部面板中进行聊天、项目修改和工具调用。</li>
+</ul>
+
+<h2 id="first-ai-task">第一次让 AI 创建项目</h2>
+<p>你可以直接从一个游戏想法开始，让 AI 先帮你形成项目方案：</p>
+<pre><code>请先查看这个项目结构，然后告诉我当前适合先创建什么场景。</code></pre>
+<p>也可以让 AI 直接创建一个最小可运行版本：</p>
+<pre><code>创建一个最小 2D 测试场景：一个玩家方块、一个地面、左右移动和跳跃脚本。完成后检查脚本错误。</code></pre>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">好的提问方式</div>
+    <p>把游戏类型、主题、核心玩法、控制方式和验收标准说清楚。比如“先做一个可运行原型”“如果现有引擎能完成就不要改引擎”“如果必须改引擎，先说明原因和影响”。</p>
+</div>
+
+<h2 id="iterate">和 AI 细化项目</h2>
+<p>第一个版本跑起来后，继续和 AI 细化：</p>
+<pre><code>把玩家手感调得更轻快。
+增加一个敌人和简单巡逻逻辑。
+做一个开始菜单和失败重试界面。
+检查 UI 有没有重叠，脚本有没有错误。</code></pre>
+<p>每次迭代都建议让 AI 说明它改了什么，以及如何验证。</p>
+
+<h2 id="validate">验证并上传修改</h2>
+<ol>
+    <li>查看 AI 修改了哪些文件和场景。</li>
+    <li>保存场景并运行项目。</li>
+    <li>如果出现错误，把完整错误信息发回 AI Assistant。</li>
+    <li>让 AI 根据真实报错继续修复，而不是重新猜测。</li>
+    <li>用户确认可运行后，可以让 AI 提交并上传到 GitHub。</li>
+</ol>
+
+<h2 id="when-engine-change-needed">当 AI 认为需要改引擎</h2>
+<p>项目功能优先在项目内解决。只有当当前引擎能力确实无法满足项目需求时，才进入引擎改动流程。</p>
+<p>推荐让 AI 先输出：</p>
+<ul>
+    <li>为什么项目层无法解决。</li>
+    <li>需要改哪些引擎模块。</li>
+    <li>对当前项目的收益和维护成本。</li>
+    <li>如何验证改动没有破坏其他项目。</li>
+    <li>这个能力是否足够通用，是否值得整理进主引擎。</li>
+</ul>
+
+<h2 id="next-steps">下一步</h2>
+<ul>
+    <li><a href="/docs/ai-assistant">AI 助手</a> — 了解模式、工具和安全边界。</li>
+    <li><a href="/docs/scripting-api">脚本 API</a> — 查看 Jundot 与 Godot API 的关系。</li>
+    <li><a href="/docs/hot-update">更新与发布</a> — 了解 Package Builder 和 Launcher。</li>
+</ul>

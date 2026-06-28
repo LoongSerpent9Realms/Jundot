@@ -1,0 +1,28 @@
+<h1 id="updates-and-publishing">Updates and Publishing</h1>
+<p>Jundot publishing should preserve a clear record of what changed, what the user verified, and whether the work belongs to a project or the engine.</p>
+
+<h2 id="project-updates">Project updates</h2>
+<p>Project updates include scenes, scripts, assets, settings, and gameplay changes. They should be verified in the editor before GitHub upload.</p>
+
+<h2 id="engine-updates">Engine updates</h2>
+<p>Engine updates are used when project changes are not enough. If the new capability is useful beyond one project, it can be cleaned up and added to the main engine.</p>
+
+<h2 id="package-builder">Package Builder</h2>
+<p>Package Builder prepares release packages and metadata. Release notes should describe real user-visible changes, not generic promises.</p>
+
+<h2 id="github-flow">GitHub flow</h2>
+<ol>
+    <li>The AI applies the change.</li>
+    <li>The user runs and verifies the result.</li>
+    <li>The AI reviews the diff and removes accidental files.</li>
+    <li>The AI commits with a clear summary.</li>
+    <li>The AI uploads the verified change to GitHub when allowed.</li>
+</ol>
+
+<h2 id="release-checklist">Release checklist</h2>
+<ul>
+    <li>The build or project check completed successfully.</li>
+    <li>The user verified the important path manually.</li>
+    <li>Release notes match actual changes.</li>
+    <li>Engine changes are identified as project-specific or reusable.</li>
+</ul>

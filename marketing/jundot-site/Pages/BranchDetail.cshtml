@@ -1,0 +1,177 @@
+@page "/Branch/{slug}"
+@model BranchDetailModel
+@{
+}
+
+@if (Model.Branch != null)
+{
+    <section class="branch-hero">
+        <div class="section-inner">
+            <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; justify-content: space-between;">
+                <div style="flex: 1; min-width: 300px;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+                        <span class="badge" style="background: rgba(86, 213, 200, 0.15); color: #2d7d46;">
+                            @Model.GetGenreDisplayName(Model.Branch.Genre)
+                        </span>
+                        @if (Model.Branch.LicenseType == LicenseType.MIT)
+                        {
+                            <span class="badge badge-published">MIT 开源</span>
+                        }
+                        else if (Model.Branch.LicenseType == LicenseType.Commercial)
+                        {
+                            <span class="badge badge-beta">商业授权</span>
+                        }
+                        else
+                        {
+                            <span class="badge">@Model.GetLicenseDisplayName(Model.Branch.LicenseType)</span>
+                        }
+                        @if (Model.Branch.IsFeatured)
+                        {
+                            <span class="badge" style="background: linear-gradient(135deg, var(--amber), var(--orange)); color: #07100d;">⭐ 推荐</span>
+                        }
+                    </div>
+                    <h1 style="font-size: 42px; margin-bottom: 16px;">@Model.Branch.Name</h1>
+                    <p class="lead" style="margin-bottom: 24px; color: #4a4a4a;">@Model.Branch.Description</p>
+                    <div class="hero-actions">
+                        @if (Model.Branch.LicenseType == LicenseType.Commercial)
+                        {
+                            <a class="button primary" href="/Contact">
+                                📞 联系定制服务
+                            </a>
+                        }
+                        else if (Model.BranchReleases.Any())
+                        {
+                            var latest = Model.BranchReleases.First();
+                            <a class="button primary" href="/Download?version=@latest.VersionNumber&branch=@Model.Branch.Slug">
+                                下载最新版 (@latest.VersionNumber)
+                            </a>
+                        }
+                        else
+                        {
+                            <button class="button primary" disabled style="opacity: 0.6; cursor: not-allowed;">暂无可用版本</button>
+                        }
+                        <a class="button secondary" href="/Branches">← 返回分支列表</a>
+                    </div>
+                </div>
+                <div style="flex: 0 0 300px;">
+                    <div class="branch-info-card">
+                        <h4 style="margin-bottom: 16px; color: #1a1a1a;">分支信息</h4>
+                        <div class="info-row">
+                            <span class="info-label">游戏类型</span>
+                            <span class="info-value">@Model.GetGenreDisplayName(Model.Branch.Genre)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">许可方式</span>
+                            <span class="info-value">
+                                @if (!string.IsNullOrEmpty(Model.Branch.LicenseUrl))
+                                {
+                                    <a href="@Model.Branch.LicenseUrl" target="_blank" style="color: #2d7d46; text-decoration: underline;">
+                                        @(Model.Branch.LicenseName ?? Model.GetLicenseDisplayName(Model.Branch.LicenseType))
+                                    </a>
+                                }
+                                else
+                                {
+                                    @(Model.Branch.LicenseName ?? Model.GetLicenseDisplayName(Model.Branch.LicenseType))
+                                }
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">可用版本</span>
+                            <span class="info-value">@Model.BranchReleases.Count 个</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">总下载量</span>
+                            <span class="info-value">@Model.Branch.DownloadCount</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">更新时间</span>
+                            <span class="info-value">@Model.Branch.UpdatedAt.ToString("yyyy-MM-dd")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @if (Model.Branch.Features.Any())
+    {
+        <section class="light">
+            <div class="section-inner">
+                <div class="section-head">
+                    <h2>核心特性</h2>
+                    <p>这个分支为你准备的开箱即用能力。</p>
+                </div>
+                <div class="feature-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+                    @foreach (var feature in Model.Branch.Features.OrderBy(f => f.SortOrder))
+                    {
+                        <article class="feature">
+                            @if (!string.IsNullOrEmpty(feature.Icon))
+                            {
+                                <div style="font-size: 36px; margin-bottom: 12px;">@feature.Icon</div>
+                            }
+                            <h3>@feature.Title</h3>
+                            <p>@feature.Description</p>
+                        </article>
+                    }
+                </div>
+            </div>
+        </section>
+    }
+
+    <section class="release">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>可用版本</h2>
+                <p>选择适合你的版本下载使用。</p>
+            </div>
+
+            @if (Model.BranchReleases.Any())
+            {
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    @foreach (var release in Model.BranchReleases)
+                    {
+                        <div class="release-list-item">
+                            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap;">
+                                        <h3 style="margin: 0;">@release.Title</h3>
+                                        @if (release.IsBeta)
+                                        {
+                                            <span class="badge badge-beta">Beta</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(release.SupportedPlatforms))
+                                        {
+                                            <span class="badge" style="background: rgba(86, 213, 200, 0.1); color: #2d7d46;">
+                                                支持：@release.SupportedPlatforms
+                                            </span>
+                                        }
+                                    </div>
+                                    <div style="color: #6a6a6a; font-size: 14px;">
+                                        发布于 @release.ReleaseDate.ToString("yyyy-MM-dd") · 下载 @release.DownloadCount 次
+                                    </div>
+                                </div>
+                                <a class="button primary" href="/Download?version=@release.VersionNumber&branch=@Model.Branch.Slug">
+                                    下载
+                                </a>
+                            </div>
+                            @if (!string.IsNullOrEmpty(release.Description))
+                            {
+                                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0, 0, 0, 0.06);">
+                                    <div style="color: #5a5a5a; font-size: 14px; line-height: 1.7; white-space: pre-wrap;">
+                                        @release.Description
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div style="text-align: center; padding: 60px 0; color: #6a6a6a;">
+                    该分支暂无已发布版本，敬请期待。
+                </div>
+            }
+        </div>
+    </section>
+}

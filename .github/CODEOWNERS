@@ -1,0 +1,300 @@
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+# Owners can be @users, @org/teams or emails.
+
+# Core
+
+/core/                                        @jundotengine/core
+/core/crypto/                                 @jundotengine/network
+/core/debugger/                               @jundotengine/debugger
+/core/extension/                              @jundotengine/gdextension
+/core/input/                                  @jundotengine/input
+
+# Doc
+
+/doc/                                         @jundotengine/documentation
+/doc/translations/                            @jundotengine/i18n
+
+# Drivers
+
+## Audio
+/drivers/alsa/                                @jundotengine/audio
+/drivers/alsamidi/                            @jundotengine/audio
+/drivers/coreaudio/                           @jundotengine/audio
+/drivers/coremidi/                            @jundotengine/audio
+/drivers/pulseaudio/                          @jundotengine/audio
+/drivers/wasapi/                              @jundotengine/audio
+/drivers/winmidi/                             @jundotengine/audio
+/drivers/xaudio2/                             @jundotengine/audio
+
+## Input
+/drivers/sdl/                                 @jundotengine/input
+
+## Rendering
+/drivers/d3d12/                               @jundotengine/rendering
+/drivers/dummy/                               @jundotengine/rendering
+/drivers/egl/                                 @jundotengine/rendering
+/drivers/gles3/                               @jundotengine/rendering
+/drivers/metal/                               @jundotengine/rendering
+/drivers/spirv-reflect/                       @jundotengine/rendering
+/drivers/vulkan/                              @jundotengine/rendering
+
+## OS
+/drivers/apple/                               @jundotengine/macos @jundotengine/ios
+/drivers/apple_embedded/                      @jundotengine/ios
+/drivers/unix/                                @jundotengine/linux-bsd
+/drivers/windows/                             @jundotengine/windows
+
+## Misc
+/drivers/register_driver_types.*              @jundotengine/buildsystem
+/drivers/accesskit/                           @jundotengine/buildsystem
+/drivers/png/                                 @jundotengine/asset-pipeline
+
+# Editor
+
+/editor/                                      @jundotengine/editor
+/editor/animation/                            @jundotengine/editor @jundotengine/animation
+/editor/audio/                                @jundotengine/editor @jundotengine/audio
+/editor/debugger/                             @jundotengine/editor @jundotengine/debugger
+/editor/doc/                                  @jundotengine/editor @jundotengine/documentation
+/editor/gui/                                  @jundotengine/editor @jundotengine/gui-nodes
+/editor/import/                               @jundotengine/editor @jundotengine/asset-pipeline
+/editor/scene/2d/                             @jundotengine/editor @jundotengine/2d-nodes
+/editor/scene/2d/physics/                     @jundotengine/editor @jundotengine/physics
+/editor/scene/3d/                             @jundotengine/editor @jundotengine/3d-nodes
+/editor/scene/3d/physics/                     @jundotengine/editor @jundotengine/physics
+/editor/scene/gui/                            @jundotengine/editor @jundotengine/gui-nodes
+/editor/script/                               @jundotengine/editor @jundotengine/script-editor
+/editor/shader/                               @jundotengine/editor @jundotengine/script-editor @jundotengine/shaders
+/editor/themes/                               @jundotengine/editor @jundotengine/gui-nodes
+/editor/translations/                         @jundotengine/i18n
+
+# Main
+
+/main/                                        @jundotengine/core
+
+# Misc
+
+/misc/                                        @jundotengine/buildsystem
+/misc/extension_api_validation/               @jundotengine/gdextension @jundotengine/dotnet
+
+# Modules
+
+## Audio (+ video)
+/modules/interactive_music/                   @jundotengine/audio
+/modules/interactive_music/doc_classes/       @jundotengine/audio @jundotengine/documentation
+/modules/interactive_music/editor/            @jundotengine/audio @jundotengine/editor
+/modules/mp3/                                 @jundotengine/audio
+/modules/mp3/doc_classes/                     @jundotengine/audio @jundotengine/documentation
+/modules/ogg/                                 @jundotengine/audio
+/modules/ogg/doc_classes/                     @jundotengine/audio @jundotengine/documentation
+/modules/theora/                              @jundotengine/audio
+/modules/theora/doc_classes/                  @jundotengine/audio @jundotengine/documentation
+/modules/theora/editor/                       @jundotengine/audio @jundotengine/editor
+/modules/vorbis/                              @jundotengine/audio
+/modules/vorbis/doc_classes/                  @jundotengine/audio @jundotengine/documentation
+
+## Import
+/modules/astcenc/                             @jundotengine/asset-pipeline
+/modules/basis_universal/                     @jundotengine/asset-pipeline
+/modules/bcdec/                               @jundotengine/asset-pipeline
+/modules/betsy/                               @jundotengine/asset-pipeline
+/modules/bmp/                                 @jundotengine/asset-pipeline
+/modules/cvtt/                                @jundotengine/asset-pipeline
+/modules/dds/                                 @jundotengine/asset-pipeline
+/modules/dds/tests/                           @jundotengine/asset-pipeline @jundotengine/tests
+/modules/etcpak/                              @jundotengine/asset-pipeline
+/modules/fbx/                                 @jundotengine/asset-pipeline
+/modules/fbx/doc_classes/                     @jundotengine/asset-pipeline @jundotengine/documentation
+/modules/fbx/editor/                          @jundotengine/asset-pipeline @jundotengine/editor
+/modules/gltf/                                @jundotengine/asset-pipeline
+/modules/gltf/doc_classes/                    @jundotengine/asset-pipeline @jundotengine/documentation
+/modules/gltf/editor/                         @jundotengine/asset-pipeline @jundotengine/editor
+/modules/gltf/tests/                          @jundotengine/asset-pipeline @jundotengine/tests
+/modules/hdr/                                 @jundotengine/asset-pipeline
+/modules/jpg/                                 @jundotengine/asset-pipeline
+/modules/ktx/                                 @jundotengine/asset-pipeline
+/modules/svg/                                 @jundotengine/asset-pipeline
+/modules/tga/                                 @jundotengine/asset-pipeline
+/modules/tinyexr/                             @jundotengine/asset-pipeline
+/modules/webp/                                @jundotengine/asset-pipeline
+
+## Network
+/modules/enet/                                @jundotengine/network
+/modules/enet/doc_classes/                    @jundotengine/network @jundotengine/documentation
+/modules/mbedtls/                             @jundotengine/network
+/modules/mbedtls/tests/                       @jundotengine/network @jundotengine/tests
+/modules/multiplayer/                         @jundotengine/network
+/modules/multiplayer/doc_classes/             @jundotengine/network @jundotengine/documentation
+/modules/multiplayer/editor/                  @jundotengine/network @jundotengine/editor
+/modules/multiplayer/tests/                   @jundotengine/network @jundotengine/tests
+/modules/upnp/                                @jundotengine/network
+/modules/upnp/doc_classes/                    @jundotengine/network @jundotengine/documentation
+/modules/webrtc/                              @jundotengine/network
+/modules/webrtc/doc_classes/                  @jundotengine/network @jundotengine/documentation
+/modules/websocket/                           @jundotengine/network
+/modules/websocket/doc_classes/               @jundotengine/network @jundotengine/documentation
+/modules/websocket/editor/                    @jundotengine/network @jundotengine/editor
+
+## Physics
+/modules/jundot_physics_2d/                    @jundotengine/physics
+/modules/jundot_physics_3d/                    @jundotengine/physics
+/modules/jolt_physics/                        @jundotengine/physics @jundotengine/jolt-physics
+
+## Rendering
+/modules/glslang/                             @jundotengine/rendering
+/modules/lightmapper_rd/                      @jundotengine/rendering
+/modules/meshoptimizer/                       @jundotengine/rendering
+/modules/raycast/                             @jundotengine/rendering
+/modules/vhacd/                               @jundotengine/rendering
+/modules/visual_shader/                       @jundotengine/shaders
+/modules/visual_shader/doc_classes/           @jundotengine/shaders @jundotengine/documentation
+/modules/visual_shader/editor/                @jundotengine/shaders @jundotengine/editor
+/modules/visual_shader/tests/                 @jundotengine/shaders @jundotengine/tests
+/modules/xatlas_unwrap/                       @jundotengine/rendering
+
+## Scripting
+/modules/gdscript/                            @jundotengine/gdscript
+/modules/gdscript/doc_classes/                @jundotengine/gdscript @jundotengine/documentation
+/modules/gdscript/editor/                     @jundotengine/gdscript @jundotengine/script-editor
+/modules/gdscript/tests/                      @jundotengine/gdscript @jundotengine/tests
+/modules/jsonrpc/                             @jundotengine/gdscript @jundotengine/network
+/modules/jsonrpc/tests/                       @jundotengine/gdscript @jundotengine/network @jundotengine/tests
+/modules/mono/                                @jundotengine/dotnet
+/modules/mono/doc_classes/                    @jundotengine/dotnet @jundotengine/documentation
+/modules/mono/editor/                         @jundotengine/dotnet @jundotengine/editor
+
+## Text
+/modules/freetype/                            @jundotengine/buildsystem
+/modules/msdfgen/                             @jundotengine/buildsystem
+/modules/text_server_adv/                     @jundotengine/gui-nodes
+/modules/text_server_adv/doc_classes/         @jundotengine/gui-nodes @jundotengine/documentation
+/modules/text_server_fb/                      @jundotengine/gui-nodes
+/modules/text_server_fb/doc_classes/          @jundotengine/gui-nodes @jundotengine/documentation
+
+## XR
+/modules/camera/                              @jundotengine/xr
+/modules/mobile_vr/                           @jundotengine/xr
+/modules/mobile_vr/doc_classes/               @jundotengine/xr @jundotengine/documentation
+/modules/openxr/                              @jundotengine/xr
+/modules/openxr/doc_classes/                  @jundotengine/xr @jundotengine/documentation
+/modules/openxr/editor/                       @jundotengine/xr @jundotengine/editor
+/modules/webxr/                               @jundotengine/xr
+/modules/webxr/doc_classes/                   @jundotengine/xr @jundotengine/documentation
+
+## Misc
+/modules/register_module_types.*              @jundotengine/buildsystem
+/modules/csg/                                 @jundotengine/3d-nodes
+/modules/csg/doc_classes/                     @jundotengine/3d-nodes @jundotengine/documentation
+/modules/csg/editor/                          @jundotengine/3d-nodes @jundotengine/editor
+/modules/csg/tests/                           @jundotengine/3d-nodes @jundotengine/tests
+/modules/gridmap/                             @jundotengine/3d-nodes
+/modules/gridmap/doc_classes/                 @jundotengine/3d-nodes @jundotengine/documentation
+/modules/gridmap/editor/                      @jundotengine/3d-nodes @jundotengine/editor
+/modules/gridmap/tests/                       @jundotengine/3d-nodes @jundotengine/tests
+/modules/navigation_2d/                       @jundotengine/navigation
+/modules/navigation_2d/editor/                @jundotengine/navigation @jundotengine/editor
+/modules/navigation_3d/                       @jundotengine/navigation
+/modules/navigation_3d/editor/                @jundotengine/navigation @jundotengine/editor
+/modules/noise/                               @jundotengine/core
+/modules/noise/doc_classes/                   @jundotengine/core @jundotengine/documentation
+/modules/noise/editor/                        @jundotengine/core @jundotengine/editor
+/modules/noise/tests/                         @jundotengine/core @jundotengine/tests
+/modules/objectdb_profiler/                   @jundotengine/debugger
+/modules/objectdb_profiler/editor/            @jundotengine/debugger @jundotengine/editor
+/modules/regex/                               @jundotengine/core
+/modules/regex/doc_classes/                   @jundotengine/core @jundotengine/documentation
+/modules/regex/tests/                         @jundotengine/core @jundotengine/tests
+/modules/zip/                                 @jundotengine/core
+/modules/zip/doc_classes/                     @jundotengine/core @jundotengine/documentation
+/modules/zip/tests/                           @jundotengine/core @jundotengine/tests
+
+# Platform
+
+/platform/register_platform_apis.*            @jundotengine/buildsystem
+/platform/android/                            @jundotengine/android
+/platform/android/doc_classes/                @jundotengine/android @jundotengine/documentation
+/platform/ios/                                @jundotengine/ios
+/platform/ios/doc_classes/                    @jundotengine/ios @jundotengine/documentation
+/platform/linuxbsd/                           @jundotengine/linux-bsd
+/platform/linuxbsd/doc_classes/               @jundotengine/linux-bsd @jundotengine/documentation
+/platform/macos/                              @jundotengine/macos
+/platform/macos/doc_classes/                  @jundotengine/macos @jundotengine/documentation
+/platform/visionos/                           @jundotengine/xr
+/platform/visionos/doc_classes/               @jundotengine/xr @jundotengine/documentation
+/platform/web/                                @jundotengine/web
+/platform/web/doc_classes/                    @jundotengine/web @jundotengine/documentation
+/platform/windows/                            @jundotengine/windows
+/platform/windows/doc_classes/                @jundotengine/windows @jundotengine/documentation
+
+# Scene
+
+/scene/property_*                             @jundotengine/buildsystem
+/scene/register_scene_types.*                 @jundotengine/buildsystem
+/scene/scene_string_names.*                   @jundotengine/buildsystem
+/scene/2d/                                    @jundotengine/2d-nodes
+/scene/2d/navigation/                         @jundotengine/2d-nodes @jundotengine/navigation
+/scene/2d/physics/                            @jundotengine/2d-nodes @jundotengine/physics
+/scene/3d/                                    @jundotengine/3d-nodes
+/scene/3d/navigation/                         @jundotengine/3d-nodes @jundotengine/navigation
+/scene/3d/physics/                            @jundotengine/3d-nodes @jundotengine/physics
+/scene/3d/xr/                                 @jundotengine/3d-nodes @jundotengine/xr
+/scene/animation/                             @jundotengine/animation
+/scene/audio/                                 @jundotengine/audio
+/scene/debugger/                              @jundotengine/debugger
+/scene/gui/                                   @jundotengine/gui-nodes
+/scene/main/                                  @jundotengine/core
+/scene/resources/*                            @jundotengine/gui-nodes
+/scene/resources/2d/                          @jundotengine/2d-nodes
+/scene/resources/2d/skeleton/                 @jundotengine/2d-nodes @jundotengine/animation
+/scene/resources/3d/                          @jundotengine/3d-nodes
+/scene/resources/animated*                    @jundotengine/animation
+/scene/resources/animation*                   @jundotengine/animation
+/scene/resources/audio*                       @jundotengine/audio
+/scene/resources/bone*                        @jundotengine/animation
+/scene/resources/font*                        @jundotengine/gui-nodes
+/scene/resources/physics*                     @jundotengine/physics
+/scene/resources/shader*                      @jundotengine/shaders
+/scene/resources/skeleton*                    @jundotengine/animation
+/scene/resources/text_*                       @jundotengine/gui-nodes
+/scene/theme/                                 @jundotengine/gui-nodes
+
+# Servers
+
+/servers/nav_heap.*                           @jundotengine/navigation
+/servers/register_server_types.*              @jundotengine/buildsystem
+/servers/server_wrap_*                        @jundotengine/buildsystem
+/servers/audio/                               @jundotengine/audio
+/servers/camera/                              @jundotengine/xr
+/servers/debugger/                            @jundotengine/debugger
+/servers/display/                             @jundotengine/rendering
+/servers/movie_writer/                        @jundotengine/rendering
+/servers/navigation_2d/                       @jundotengine/navigation
+/servers/navigation_3d/                       @jundotengine/navigation
+/servers/physics_2d/                          @jundotengine/physics
+/servers/physics_3d/                          @jundotengine/physics
+/servers/rendering/                           @jundotengine/rendering
+/servers/text/                                @jundotengine/gui-nodes
+/servers/xr/                                  @jundotengine/xr
+
+# Tests
+
+/tests/                                       @jundotengine/tests
+
+# Thirdparty
+
+/thirdparty/                                  @jundotengine/buildsystem
+/thirdparty/jolt_physics/                     @jundotengine/buildsystem @jundotengine/jolt-physics
+
+# Downstream build and packaging tools
+
+/tools/PackageBuilder/                         @jundotengine/buildsystem
+/tools/Launcher/                               @jundotengine/buildsystem
+/scripts/package-jundot.ps1                    @jundotengine/buildsystem
+
+# Buildsystem (After everything to catch all)
+
+/*.*                                          @jundotengine/buildsystem
+*.py                                          @jundotengine/buildsystem
+SConstruct                                    @jundotengine/buildsystem
+SCsub                                         @jundotengine/buildsystem

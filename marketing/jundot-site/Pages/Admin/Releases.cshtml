@@ -1,0 +1,184 @@
+@page
+@model JundotSite.Pages.Admin.ReleasesModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+@if (Model.ShowForm)
+{
+    <div class="admin-card admin-form">
+        <h3>@(Model.IsEditing ? "编辑版本" : "新建版本")</h3>
+        <form method="post" asp-page-handler="@(Model.IsEditing ? "Edit" : "Create")">
+            @if (Model.IsEditing)
+            {
+                <input type="hidden" asp-for="EditId" />
+            }
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.VersionNumber"></label>
+                    <input asp-for="Input.VersionNumber" placeholder="例如：1.7.4 beta" />
+                    <span asp-validation-for="Input.VersionNumber" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.ReleaseDate">发布日期</label>
+                    <input asp-for="Input.ReleaseDate" type="datetime-local" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Title">标题</label>
+                <input asp-for="Input.Title" placeholder="例如：Jundot Engine 1.7.4 beta" />
+                <span asp-validation-for="Input.Title" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Description">描述（可选）</label>
+                <textarea asp-for="Input.Description" placeholder="版本描述信息"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.DownloadUrl">下载链接（可选）</label>
+                <input asp-for="Input.DownloadUrl" placeholder="例如：https://github.com/..." />
+                <span asp-validation-for="Input.DownloadUrl" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>状态设置</label>
+                    <div class="checkbox-inline" style="margin-bottom: 10px;">
+                        <input type="checkbox" asp-for="Input.IsPublished" id="isPublished" />
+                        <label for="isPublished" style="margin: 0; font-weight: normal;">已发布（在网站上显示）</label>
+                    </div>
+                    <div class="checkbox-inline">
+                        <input type="checkbox" asp-for="Input.IsBeta" id="isBeta" />
+                        <label for="isBeta" style="margin: 0; font-weight: normal;">Beta 版本</label>
+                    </div>
+                </div>
+                <div></div>
+            </div>
+
+<<<<<<< HEAD
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.LicenseType">许可类型</label>
+                    <select asp-for="Input.LicenseType">
+                        <option value="@LicenseType.MIT">MIT</option>
+                        <option value="@LicenseType.Commercial">商业授权</option>
+                        <option value="@LicenseType.GPL">GPL</option>
+                        <option value="@LicenseType.Apache">Apache</option>
+                        <option value="@LicenseType.Custom">自定义</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.EngineBranchId">所属分支</label>
+                    <select asp-for="Input.EngineBranchId">
+                        <option value="">不指定（通用版本）</option>
+                        @foreach (var branch in Model.Branches)
+                        {
+                            <option value="@branch.Id">@branch.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+=======
+>>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">@(Model.IsEditing ? "保存修改" : "创建版本")</button>
+                <a href="/Admin/Releases" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">版本列表</h3>
+            <div style="display: flex; gap: 10px;">
+                <form method="post" asp-page-handler="SyncFromGitHub" onsubmit="return confirm('确定要从 GitHub 同步最新 Release 吗？');">
+                    <button type="submit" class="btn btn-secondary">🔄 从 GitHub 同步</button>
+                </form>
+                <a href="/Admin/Releases?handler=Create" class="btn btn-primary">+ 新建版本</a>
+            </div>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>版本号</th>
+                    <th>标题</th>
+<<<<<<< HEAD
+                    <th>分支</th>
+                    <th>许可</th>
+=======
+>>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+                    <th>状态</th>
+                    <th>发布日期</th>
+                    <th>下载量</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var release in Model.Releases)
+                {
+                    <tr>
+                        <td><strong>@release.VersionNumber</strong></td>
+                        <td>@release.Title</td>
+<<<<<<< HEAD
+                        <td>@(release.EngineBranch?.Name ?? "通用")</td>
+                        <td>
+                            @if (release.LicenseType == LicenseType.MIT)
+                            {
+                                <span class="badge badge-published">MIT</span>
+                            }
+                            else if (release.LicenseType == LicenseType.Commercial)
+                            {
+                                <span class="badge badge-beta">商业</span>
+                            }
+                            else
+                            {
+                                <span>@release.LicenseType</span>
+                            }
+                        </td>
+=======
+>>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+                        <td>
+                            @if (release.IsPublished)
+                            {
+                                <span class="badge badge-published">已发布</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-draft">草稿</span>
+                            }
+                            @if (release.IsBeta)
+                            {
+                                <span class="badge badge-beta" style="margin-left: 6px;">Beta</span>
+                            }
+                        </td>
+                        <td>@release.ReleaseDate.ToString("yyyy-MM-dd")</td>
+                        <td>@release.DownloadCount</td>
+                        <td>
+                            <a href="/Admin/Releases?handler=Edit&id=@release.Id" class="btn btn-primary btn-sm">编辑</a>
+                            <form method="post" asp-page-handler="Delete" style="display: inline;" onsubmit="return confirm('确定要删除这个版本吗？');">
+                                <input type="hidden" name="id" value="@release.Id" />
+                                <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

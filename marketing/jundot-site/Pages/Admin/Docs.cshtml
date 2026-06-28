@@ -1,0 +1,125 @@
+@page
+@model JundotSite.Pages.Admin.DocsModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="docs-admin-layout">
+    <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px;">
+            <div>
+                <h3 style="margin-bottom: 6px;">文档页面</h3>
+                <p style="margin: 0; color: #53615c; line-height: 1.6;">选择一个文档页面进行编辑。保存后前台 <code>/docs</code> 会直接读取新的 HTML 内容。</p>
+            </div>
+            <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">预览当前页</a>
+        </div>
+
+        <div class="docs-language-tabs" aria-label="文档语言">
+            @foreach (var language in Model.SupportedLanguages)
+            {
+                <a href="/Admin/Docs?doc=@Model.CurrentDocId&lang=@language.Id" class="docs-language-tab @(Model.CurrentLanguage == language.Id ? "active" : "")">@language.Label</a>
+            }
+        </div>
+
+        <div class="docs-admin-list">
+            @foreach (var doc in Model.Documents)
+            {
+                <a href="/Admin/Docs?doc=@doc.Id&lang=@Model.CurrentLanguage" class="docs-admin-item @(Model.CurrentDocId == doc.Id ? "active" : "")">
+                    <strong>@doc.Title @if (!doc.IsBuiltIn) { <span class="docs-language-pill">自定义</span> }</strong>
+                    <span>@doc.Description</span>
+                </a>
+            }
+        </div>
+    </div>
+
+    <div class="admin-card admin-form">
+        <h3>编辑：@Model.CurrentDocTitle <span class="docs-language-pill">@Model.CurrentLanguageLabel</span></h3>
+        <form method="post" asp-page-handler="Save">
+            <input type="hidden" asp-for="Input.DocId" />
+            <input type="hidden" asp-for="Input.Language" />
+            <div class="form-group">
+                <label asp-for="Input.Html">文档 HTML</label>
+                <textarea asp-for="Input.Html" class="docs-admin-editor"></textarea>
+                <span asp-validation-for="Input.Html" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存文档</button>
+                <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">打开前台预览</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="admin-card admin-form">
+    <h3>新增文档页面</h3>
+    <p style="color: #53615c; line-height: 1.7; margin-top: -6px;">
+        页面地址会用于前台 URL，例如 <code>/docs/engine-workflow</code>。只能使用英文、数字和短横线。
+    </p>
+    <form method="post" asp-page-handler="Create">
+        <input type="hidden" asp-for="CreateInput.Language" value="@Model.CurrentLanguage" />
+        <div class="form-row">
+            <div class="form-group">
+                <label asp-for="CreateInput.Slug">页面地址</label>
+                <input asp-for="CreateInput.Slug" placeholder="例如：engine-workflow" />
+                <span asp-validation-for="CreateInput.Slug" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="CreateInput.Title">页面标题</label>
+                <input asp-for="CreateInput.Title" placeholder="例如：引擎改动流程" />
+                <span asp-validation-for="CreateInput.Title" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label asp-for="CreateInput.Category">分类</label>
+                <input asp-for="CreateInput.Category" placeholder="例如：核心功能" />
+            </div>
+            <div class="form-group">
+                <label asp-for="CreateInput.Description">列表描述</label>
+                <input asp-for="CreateInput.Description" placeholder="显示在后台文档列表里的简短说明" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">新增页面</button>
+        </div>
+    </form>
+</div>
+
+<div class="admin-card admin-form">
+    <h3>AI 生成文档草稿</h3>
+    <p style="color: #53615c; line-height: 1.7; margin-top: -6px;">
+        配置 <code>DocumentationAI:Endpoint</code>、<code>DocumentationAI:ApiKey</code> 和 <code>DocumentationAI:Model</code> 后会调用真实 AI 生成；未配置时使用内置草稿生成器。
+    </p>
+    <form method="post" asp-page-handler="Generate">
+        <input type="hidden" asp-for="GenerateInput.DocId" />
+        <input type="hidden" asp-for="GenerateInput.Language" />
+        <div class="form-row">
+            <div class="form-group">
+                <label asp-for="GenerateInput.Title">文档标题</label>
+                <input asp-for="GenerateInput.Title" />
+            </div>
+            <div class="form-group">
+                <label asp-for="GenerateInput.Audience">面向对象</label>
+                <input asp-for="GenerateInput.Audience" placeholder="例如：第一次使用 Jundot 的独立开发者" />
+            </div>
+        </div>
+        <div class="form-group">
+            <label asp-for="GenerateInput.Prompt">想生成什么内容</label>
+            <textarea asp-for="GenerateInput.Prompt" placeholder="例如：写一页说明 AI 如何在用户验证后把修改上传 GitHub，并强调项目改动和引擎改动的区别。"></textarea>
+            <span asp-validation-for="GenerateInput.Prompt" style="color: #c62828; font-size: 13px;"></span>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">生成草稿</button>
+        </div>
+    </form>
+</div>

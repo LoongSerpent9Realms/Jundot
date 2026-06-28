@@ -1,0 +1,108 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)\SdkPackageVersions.props" />
+
+  <PropertyGroup>
+    <UsingJundotNETSdk>true</UsingJundotNETSdk>
+
+    <!-- Determines if we should import Microsoft.NET.Sdk, if it wasn't already imported. -->
+    <JundotSdkImportsMicrosoftNetSdk Condition=" '$(UsingMicrosoftNETSdk)' != 'true' ">true</JundotSdkImportsMicrosoftNetSdk>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Configurations>Debug;ExportDebug;ExportRelease</Configurations>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+
+    <JundotProjectDir Condition=" '$(JundotProjectDir)' == '' ">$(MSBuildProjectDirectory)</JundotProjectDir>
+    <JundotProjectDir>$([MSBuild]::EnsureTrailingSlash('$(JundotProjectDir)'))</JundotProjectDir>
+    <JundotProjectDirBase64 Condition=" $([MSBuild]::VersionGreaterThanOrEquals($(MSBuildAssemblyVersion), '17.3')) ">$([MSBuild]::ConvertToBase64('$(JundotProjectDir)'))</JundotProjectDirBase64>
+
+    <!-- Custom output paths for Jundot projects. In brief, 'bin\' and 'obj\' are moved to '$(JundotProjectDir)\.jundot\mono\temp\'. -->
+    <BaseOutputPath>$(JundotProjectDir).jundot\mono\temp\bin\</BaseOutputPath>
+    <OutputPath>$(JundotProjectDir).jundot\mono\temp\bin\$(Configuration)\</OutputPath>
+    <!--
+    Use custom IntermediateOutputPath and BaseIntermediateOutputPath only if it wasn't already set.
+    Otherwise the old values may have already been changed by MSBuild which can cause problems with NuGet.
+    -->
+    <IntermediateOutputPath Condition=" '$(IntermediateOutputPath)' == '' ">$(JundotProjectDir).jundot\mono\temp\obj\$(Configuration)\</IntermediateOutputPath>
+    <BaseIntermediateOutputPath Condition=" '$(BaseIntermediateOutputPath)' == '' ">$(JundotProjectDir).jundot\mono\temp\obj\</BaseIntermediateOutputPath>
+
+    <!-- Do not append the target framework name to the output path. -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <Target Condition=" $([MSBuild]::VersionLessThan($(MSBuildAssemblyVersion), '17.3')) " Name="JundotProjectDir" BeforeTargets="Build">
+    <Error Text="Cannot build from path containing '%23', move your project or update dotnet to the latest version." Condition="$(JundotProjectDir.Contains('%23'))" /> <!-- # -->
+    <Error Text="Cannot build from path containing '%3B', move your project or update dotnet to the latest version." Condition="$(JundotProjectDir.Contains('%3B'))" /> <!-- ; -->
+    <Error Text="Cannot build from path containing newlines, move your project or update dotnet to the latest version." Condition="$(JundotProjectDir.Contains('%0A'))" /> <!-- \n -->
+    <Error Text="Cannot build from path containing newlines, move your project or update dotnet to the latest version." Condition="$(JundotProjectDir.Contains('%0D'))" /> <!-- \r -->
+  </Target>
+
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" Condition=" '$(JundotSdkImportsMicrosoftNetSdk)' == 'true' " />
+
+  <PropertyGroup>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+  </PropertyGroup>
+
+  <!--
+  The Microsoft.NET.Sdk only understands of the Debug and Release configurations.
+  We need to set the following properties manually for ExportDebug and ExportRelease.
+  -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' or '$(Configuration)' == 'ExportDebug' ">
+    <DebugSymbols Condition=" '$(DebugSymbols)' == '' ">true</DebugSymbols>
+    <Optimize Condition=" '$(Optimize)' == '' ">false</Optimize>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'ExportRelease' ">
+    <Optimize Condition=" '$(Optimize)' == '' ">true</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <JundotApiConfiguration Condition=" '$(Configuration)' != 'ExportRelease' ">Debug</JundotApiConfiguration>
+    <JundotApiConfiguration Condition=" '$(Configuration)' == 'ExportRelease' ">Release</JundotApiConfiguration>
+  </PropertyGroup>
+
+  <!-- Auto-detect the target Jundot platform if it was not specified. -->
+  <PropertyGroup Condition=" '$(JundotTargetPlatform)' == '' ">
+    <JundotTargetPlatform Condition=" $(RuntimeIdentifier.StartsWith('ios')) ">ios</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('android')) ">android</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('browser')) ">web</JundotTargetPlatform>
+
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('linux')) ">linuxbsd</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('freebsd')) ">linuxbsd</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('osx')) ">macos</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$(JundotTargetPlatform)' == '' and $(RuntimeIdentifier.StartsWith('win')) ">windows</JundotTargetPlatform>
+  </PropertyGroup>
+
+  <!-- Auto-detect the target Jundot platform if it was not specified and there's no runtime identifier information. -->
+  <PropertyGroup Condition=" '$(JundotTargetPlatform)' == '' ">
+    <JundotTargetPlatform Condition=" '$([MSBuild]::IsOsPlatform(Linux))' ">linuxbsd</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$([MSBuild]::IsOsPlatform(FreeBSD))' ">linuxbsd</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$([MSBuild]::IsOsPlatform(OSX))' ">macos</JundotTargetPlatform>
+    <JundotTargetPlatform Condition=" '$([MSBuild]::IsOsPlatform(Windows))' ">windows</JundotTargetPlatform>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <JundotFloat64 Condition=" '$(JundotFloat64)' == '' ">false</JundotFloat64>
+  </PropertyGroup>
+
+  <!-- Jundot DefineConstants. -->
+  <PropertyGroup>
+    <!-- Define constants to identify Jundot builds. -->
+    <_JundotDefineConstants>JUNDOT</_JundotDefineConstants>
+
+    <!--
+    Define constant to determine the target Jundot platform. This includes the
+    recognized platform names and the platform category (PC, MOBILE or WEB).
+    -->
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'windows' ">JUNDOT_WINDOWS;JUNDOT_PC</_JundotPlatformConstants>
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'linuxbsd' ">JUNDOT_LINUXBSD;JUNDOT_PC</_JundotPlatformConstants>
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'macos' ">JUNDOT_OSX;JUNDOT_MACOS;JUNDOT_PC</_JundotPlatformConstants>
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'android' ">JUNDOT_ANDROID;JUNDOT_MOBILE</_JundotPlatformConstants>
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'ios' ">JUNDOT_IPHONE;JUNDOT_IOS;JUNDOT_MOBILE</_JundotPlatformConstants>
+    <_JundotPlatformConstants Condition=" '$(JundotTargetPlatform)' == 'web' ">JUNDOT_JAVASCRIPT;JUNDOT_HTML5;JUNDOT_WASM;JUNDOT_WEB</_JundotPlatformConstants>
+
+    <_JundotDefineConstants>$(_JundotDefineConstants);$(_JundotPlatformConstants);$(_JundotVersionConstants)</_JundotDefineConstants>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)\Android.props" Condition=" '$(JundotTargetPlatform)' == 'android' " />
+  <Import Project="$(MSBuildThisFileDirectory)\iOS.props" Condition=" '$(JundotTargetPlatform)' == 'ios' " />
+</Project>

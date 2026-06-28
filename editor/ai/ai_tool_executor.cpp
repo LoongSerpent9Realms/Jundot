@@ -1,0 +1,3215 @@
+/*  ai_tool_executor.cpp                                                  */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                                JunDot                                  */
+/**************************************************************************/
+/* Copyright (c) 2024-present JunDot contributors.                        */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
+/**************************************************************************/
+
+#include "ai_tool_executor.h"
+
+#include "core/config/project_settings.h"
+#include "core/crypto/crypto_core.h"
+#include "core/error/error_macros.h"
+#include "core/input/input_enums.h"
+#include "core/io/dir_access.h"
+#include "core/io/file_access.h"
+#include "core/io/json.h"
+#include "core/math/rect2.h"
+#include "core/object/callable_mp.h"
+#include "core/object/class_db.h"
+#include "core/os/os.h"
+#include "core/os/thread.h"
+#include "core/os/thread_safe.h"
+#include "core/os/time.h"
+#include "core/templates/hash_map.h"
+#include "core/string/string_builder.h"
+#include "editor/ai/ai_code_fetcher.h"
+#include "editor/ai/ai_develop_flow.h"
+#include "editor/ai/ai_code_security_checker.h"
+#include "editor/ai/ai_code_uploader.h"
+#include "editor/ai/ai_feature_gate.h"
+#include "editor/ai/ai_mcp_runtime.h"
+#include "editor/ai/ai_modified_scene_tracker.h"
+#include "editor/ai/ai_restart_helper.h"
+#include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_source_update_service.h"
+#include "editor/ai/ai_tool_defs.h"
+#include "editor/ai/ai_tool_registry.h"
+#include "editor/editor_node.h"
+#include "editor/editor_undo_redo_manager.h"
+#include "editor/run/editor_run_bar.h"
+#include "editor/run/game_view_plugin.h"
+
+// ---- Async build state ----
+struct BuildState {
+	enum Status { IDLE,
+		RUNNING,
+		DONE,
+		FAILED };
+
+	Status status = IDLE;
+	String std_out;
+	int exit_code = -1;
+	String extra_args; // snapshot of args for the running build
+	String executable_path; // editor binary produced by the successful build
+	bool has_result = false;
+
+	Mutex mutex;
+	Thread thread;
+
+	void start(const String &p_extra_args) {
+		MutexLock lock(mutex);
+		if (status == RUNNING) {
+			return; // already running
+		}
+		status = RUNNING;
+		has_result = false;
+		std_out.clear();
+		exit_code = -1;
+		extra_args = p_extra_args;
+		executable_path.clear();
+	}
+
+	void complete(const String &p_std_out, int p_exit_code, const String &p_executable_path = String()) {
+		MutexLock lock(mutex);
+		std_out = p_std_out;
+		exit_code = p_exit_code;
+		executable_path = p_executable_path;
+		status = (p_exit_code == 0) ? DONE : FAILED;
+		has_result = true;
+	}
+
+	Dictionary get_result() {
+		MutexLock lock(mutex);
+		Dictionary r;
+		r["status"] = (status == RUNNING) ? "running" : (status == DONE ? "done" : (status == FAILED ? "failed" : "idle"));
+		r["exit_code"] = exit_code;
+		r["stdout"] = std_out;
+		r["has_result"] = has_result;
+		r["executable_path"] = executable_path;
+		return r;
+	}
+
+	bool is_running() {
+		MutexLock lock(mutex);
+		return status == RUNNING;
+	}
+
+	// Must be called from the main thread after the build finishes,
+	// to clean up the thread resource.
+	void join_thread() {
+		MutexLock lock(mutex);
+		if (status == RUNNING || status == IDLE) {
+			return; // thread is still running or never started, don't join
+		}
+		lock.temp_unlock();
+		if (thread.is_started()) {
+			thread.wait_to_finish();
+		}
+		lock.temp_relock();
+	}
+};
+
+static BuildState build_state;
+
+static String _find_sconstruct_root_from(String p_dir, int p_max_depth = 10) {
+	for (int i = 0; i < p_max_depth && !p_dir.is_empty(); i++) {
+		if (FileAccess::exists(p_dir.path_join("SConstruct"))) {
+			return p_dir;
+		}
+
+		String parent = p_dir.get_base_dir();
+		if (parent == p_dir) {
+			break;
+		}
+		p_dir = parent;
+	}
+
+	return String();
+}
+
+static String _get_default_engine_source_cache_root() {
+	String user_data_dir = OS::get_singleton()->get_user_data_dir();
+	if (user_data_dir.is_empty()) {
+		return String();
+	}
+	return user_data_dir.path_join("engine_source");
+}
+
+static String _get_configured_engine_source_cache_root(const AISettingsData &p_settings) {
+	if (!p_settings.engine_source_cache_root.is_empty()) {
+		return p_settings.engine_source_cache_root;
+	}
+	return _get_default_engine_source_cache_root();
+}
+
+static String _get_engine_build_root() {
+	AISettingsData settings = AISettings::load();
+
+	if (!settings.engine_source_root.is_empty() && FileAccess::exists(settings.engine_source_root.path_join("SConstruct"))) {
+		return settings.engine_source_root;
+	}
+
+	String detected = AISettings::get_engine_source_root(settings);
+	if (!detected.is_empty() && FileAccess::exists(detected.path_join("SConstruct"))) {
+		return detected;
+	}
+
+	String exe_path = OS::get_singleton()->get_executable_path();
+	if (!exe_path.is_empty()) {
+		detected = _find_sconstruct_root_from(exe_path.get_base_dir());
+		if (!detected.is_empty()) {
+			return detected;
+		}
+	}
+
+	String cache_root = _get_configured_engine_source_cache_root(settings);
+	if (!cache_root.is_empty() && FileAccess::exists(cache_root.path_join("SConstruct"))) {
+		return cache_root;
+	}
+
+	return _find_sconstruct_root_from(OS::get_singleton()->get_cwd());
+}
+
+static String _source_root_missing_message() {
+	AISettingsData settings = AISettings::load();
+	String cache_root = _get_configured_engine_source_cache_root(settings);
+	String message = "No JunDot engine source checkout is configured. A packaged editor executable does not contain source code.";
+	if (!cache_root.is_empty()) {
+		message += " Clone/download the JunDot source into the default cache directory (" + cache_root + ") or set AI engine_source_root to another source checkout, then retry.";
+	} else {
+		message += " Clone/download the JunDot source into a separate directory, set AI engine_source_root to that directory, then retry.";
+	}
+	return message;
+}
+
+static String _find_latest_built_editor_executable(const String &p_project_root, uint64_t p_build_started_at, bool p_mono_enabled) {
+	const String bin_dir = p_project_root.path_join("bin");
+	Ref<DirAccess> dir = DirAccess::open(bin_dir);
+	if (dir.is_null()) {
+		return String();
+	}
+
+	String latest_path;
+	uint64_t latest_mtime = 0;
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		const String lower_name = name.to_lower();
+		const bool is_mono = lower_name.contains(".mono.");
+		if (!dir->current_is_dir() && lower_name.contains(".windows.editor") &&
+				lower_name.ends_with(".exe") && !lower_name.ends_with(".console.exe") &&
+				is_mono == p_mono_enabled) {
+			const String candidate = bin_dir.path_join(name);
+			const uint64_t mtime = FileAccess::get_modified_time(candidate);
+			// Ignore stale editor binaries left by earlier build configurations.
+			// Allow a small tolerance for filesystems with coarse timestamp precision.
+			if (mtime + 2 >= p_build_started_at && mtime >= latest_mtime) {
+				latest_mtime = mtime;
+				latest_path = candidate;
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+
+	if (p_mono_enabled && !latest_path.is_empty()) {
+		const String assemblies_dir = bin_dir.path_join("JundotSharp").path_join("Api").path_join("Debug");
+		if (!DirAccess::dir_exists_absolute(assemblies_dir)) {
+			return String();
+		}
+	}
+	return latest_path;
+}
+
+static Error _run_prebuild_git_command(const List<String> &p_args, String &r_output, int &r_exit_code) {
+	r_output.clear();
+	r_exit_code = -1;
+
+	List<String> args;
+	args.push_back("-c");
+	args.push_back("http.sslBackend=openssl");
+	AISettingsData settings = AISettings::load();
+	bool has_token = false;
+	if (!settings.github_token.access_token.is_empty()) {
+		const String basic = "x-access-token:" + settings.github_token.access_token;
+		const CharString basic_utf8 = basic.utf8();
+		args.push_back("-c");
+		args.push_back("http.https://github.com/.extraHeader=Authorization: Basic " + CryptoCore::b64_encode_str((const uint8_t *)basic_utf8.get_data(), basic_utf8.length()));
+		has_token = true;
+	}
+	if (!settings.gitee_token.access_token.is_empty()) {
+		args.push_back("-c");
+		args.push_back(vformat("http.https://gitee.com/.extraHeader=Authorization: Bearer %s", settings.gitee_token.access_token));
+		has_token = true;
+	}
+	if (has_token) {
+		args.push_back("-c");
+		args.push_back("credential.helper=");
+	}
+	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
+		args.push_back(E->get());
+	}
+
+	const Error err = OS::get_singleton()->execute("git", args, &r_output, &r_exit_code, true);
+	if (err != OK) {
+		return err;
+	}
+	return r_exit_code == 0 ? OK : FAILED;
+}
+
+static void _restore_prebuild_stash_after_failed_update(const String &p_stash_ref, String &r_log) {
+	if (p_stash_ref.is_empty()) {
+		return;
+	}
+
+	String output;
+	int exit_code = -1;
+	List<String> abort_args;
+	abort_args.push_back("merge");
+	abort_args.push_back("--abort");
+	_run_prebuild_git_command(abort_args, output, exit_code);
+
+	List<String> apply_args;
+	apply_args.push_back("stash");
+	apply_args.push_back("apply");
+	apply_args.push_back("--index");
+	apply_args.push_back(p_stash_ref);
+	Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
+	if (apply_err != OK) {
+		List<String> conflicts_args;
+		conflicts_args.push_back("diff");
+		conflicts_args.push_back("--name-only");
+		conflicts_args.push_back("--diff-filter=U");
+		String conflicts;
+		int conflict_exit = -1;
+		_run_prebuild_git_command(conflicts_args, conflicts, conflict_exit);
+		if (!conflicts.strip_edges().is_empty()) {
+			List<String> theirs_args;
+			theirs_args.push_back("checkout");
+			theirs_args.push_back("--theirs");
+			theirs_args.push_back("--");
+			theirs_args.push_back(".");
+			if (_run_prebuild_git_command(theirs_args, output, exit_code) == OK) {
+				List<String> add_args;
+				add_args.push_back("add");
+				add_args.push_back("-A");
+				apply_err = _run_prebuild_git_command(add_args, output, exit_code);
+			}
+		}
+	}
+
+	if (apply_err == OK) {
+		List<String> drop_args;
+		drop_args.push_back("stash");
+		drop_args.push_back("drop");
+		drop_args.push_back(p_stash_ref);
+		_run_prebuild_git_command(drop_args, output, exit_code);
+		r_log += "[Source Update] Restored local changes after the failed update attempt.\n";
+	} else {
+		r_log += "[Source Update] Automatic update failed; local changes remain recoverable in " + p_stash_ref + ".\n";
+	}
+}
+
+static Error _auto_update_source_before_build(String &r_log) {
+	String output;
+	int exit_code = -1;
+
+	List<String> inside_args;
+	inside_args.push_back("rev-parse");
+	inside_args.push_back("--is-inside-work-tree");
+	if (_run_prebuild_git_command(inside_args, output, exit_code) != OK || output.strip_edges() != "true") {
+		r_log += "[Source Update] Current engine source is not a Git worktree; skipping update check.\n";
+		return OK;
+	}
+
+	List<String> upstream_args;
+	upstream_args.push_back("rev-parse");
+	upstream_args.push_back("--abbrev-ref");
+	upstream_args.push_back("--symbolic-full-name");
+	upstream_args.push_back("@{upstream}");
+	if (_run_prebuild_git_command(upstream_args, output, exit_code) != OK || output.strip_edges().is_empty()) {
+		r_log += "[Source Update] Current branch has no upstream; skipping automatic pull.\n";
+		return OK;
+	}
+	const String upstream = output.strip_edges();
+
+	List<String> fetch_args;
+	fetch_args.push_back("fetch");
+	fetch_args.push_back("--prune");
+	if (_run_prebuild_git_command(fetch_args, output, exit_code) != OK) {
+		r_log += "[Source Update] git fetch failed:\n" + output + "\n";
+		return FAILED;
+	}
+
+	List<String> behind_args;
+	behind_args.push_back("rev-list");
+	behind_args.push_back("--count");
+	behind_args.push_back("HEAD.." + upstream);
+	if (_run_prebuild_git_command(behind_args, output, exit_code) != OK) {
+		r_log += "[Source Update] Could not compare local and upstream revisions:\n" + output + "\n";
+		return FAILED;
+	}
+	const int behind_count = output.strip_edges().to_int();
+	if (behind_count <= 0) {
+		r_log += "[Source Update] Source is up to date.\n";
+		return OK;
+	}
+	r_log += vformat("[Source Update] Upstream has %d new commit(s); updating before build.\n", behind_count);
+
+	List<String> status_args;
+	status_args.push_back("status");
+	status_args.push_back("--porcelain");
+	if (_run_prebuild_git_command(status_args, output, exit_code) != OK) {
+		r_log += "[Source Update] Could not inspect local changes:\n" + output + "\n";
+		return FAILED;
+	}
+	const bool had_local_changes = !output.strip_edges().is_empty();
+	String stash_ref;
+	if (had_local_changes) {
+		const String stash_message = "jundot-ai-prebuild-" + String::num_int64(OS::get_singleton()->get_ticks_usec());
+		List<String> stash_args;
+		stash_args.push_back("stash");
+		stash_args.push_back("push");
+		stash_args.push_back("--include-untracked");
+		stash_args.push_back("--message");
+		stash_args.push_back(stash_message);
+		if (_run_prebuild_git_command(stash_args, output, exit_code) != OK) {
+			r_log += "[Source Update] Failed to preserve local changes before update:\n" + output + "\n";
+			return FAILED;
+		}
+		stash_ref = "stash@{0}";
+		r_log += "[Source Update] Preserved local tracked and untracked changes in " + stash_ref + ".\n";
+	}
+
+	List<String> merge_args;
+	merge_args.push_back("merge");
+	merge_args.push_back("--no-edit");
+	merge_args.push_back("-X");
+	merge_args.push_back("ours");
+	merge_args.push_back(upstream);
+	Error merge_err = _run_prebuild_git_command(merge_args, output, exit_code);
+	if (merge_err != OK) {
+		List<String> conflicts_args;
+		conflicts_args.push_back("diff");
+		conflicts_args.push_back("--name-only");
+		conflicts_args.push_back("--diff-filter=U");
+		String conflict_output;
+		int conflict_exit = -1;
+		_run_prebuild_git_command(conflicts_args, conflict_output, conflict_exit);
+		if (conflict_output.strip_edges().is_empty()) {
+			List<String> abort_args;
+			abort_args.push_back("merge");
+			abort_args.push_back("--abort");
+			String ignored;
+			int ignored_exit = -1;
+			_run_prebuild_git_command(abort_args, ignored, ignored_exit);
+			r_log += "[Source Update] Upstream merge failed without resolvable file conflicts:\n" + output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+
+		List<String> ours_args;
+		ours_args.push_back("checkout");
+		ours_args.push_back("--ours");
+		ours_args.push_back("--");
+		ours_args.push_back(".");
+		String resolve_output;
+		int resolve_exit = -1;
+		if (_run_prebuild_git_command(ours_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to resolve upstream conflicts with local branch versions:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		List<String> add_args;
+		add_args.push_back("add");
+		add_args.push_back("-A");
+		if (_run_prebuild_git_command(add_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to stage automatically resolved upstream conflicts:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		List<String> commit_args;
+		commit_args.push_back("-c");
+		commit_args.push_back("user.name=Jundot AI");
+		commit_args.push_back("-c");
+		commit_args.push_back("user.email=jundot-ai@local");
+		commit_args.push_back("commit");
+		commit_args.push_back("--no-edit");
+		if (_run_prebuild_git_command(commit_args, resolve_output, resolve_exit) != OK) {
+			r_log += "[Source Update] Failed to finalize automatically resolved upstream merge:\n" + resolve_output + "\n";
+			_restore_prebuild_stash_after_failed_update(stash_ref, r_log);
+			return FAILED;
+		}
+		r_log += "[Source Update] Resolved upstream conflicts by preserving current local branch versions.\n";
+	}
+
+	if (!stash_ref.is_empty()) {
+		List<String> apply_args;
+		apply_args.push_back("stash");
+		apply_args.push_back("apply");
+		apply_args.push_back("--index");
+		apply_args.push_back(stash_ref);
+		Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
+		if (apply_err != OK) {
+			List<String> conflicts_args;
+			conflicts_args.push_back("diff");
+			conflicts_args.push_back("--name-only");
+			conflicts_args.push_back("--diff-filter=U");
+			String conflict_output;
+			int conflict_exit = -1;
+			_run_prebuild_git_command(conflicts_args, conflict_output, conflict_exit);
+			if (conflict_output.strip_edges().is_empty()) {
+				r_log += "[Source Update] Updated source, but failed to restore local changes:\n" + output + "\n";
+				return FAILED;
+			}
+			List<String> theirs_args;
+			theirs_args.push_back("checkout");
+			theirs_args.push_back("--theirs");
+			theirs_args.push_back("--");
+			theirs_args.push_back(".");
+			if (_run_prebuild_git_command(theirs_args, output, exit_code) != OK) {
+				r_log += "[Source Update] Failed to restore local working changes during conflict resolution:\n" + output + "\n";
+				return FAILED;
+			}
+			List<String> add_args;
+			add_args.push_back("add");
+			add_args.push_back("-A");
+			if (_run_prebuild_git_command(add_args, output, exit_code) != OK) {
+				r_log += "[Source Update] Failed to stage restored local working changes:\n" + output + "\n";
+				return FAILED;
+			}
+			r_log += "[Source Update] Resolved restore conflicts by preserving the pre-build local working versions.\n";
+		}
+
+		List<String> drop_args;
+		drop_args.push_back("stash");
+		drop_args.push_back("drop");
+		drop_args.push_back(stash_ref);
+		if (_run_prebuild_git_command(drop_args, output, exit_code) != OK) {
+			r_log += "[Source Update] Warning: restored local changes, but could not remove " + stash_ref + ".\n";
+		}
+	}
+
+	List<String> unresolved_args;
+	unresolved_args.push_back("diff");
+	unresolved_args.push_back("--name-only");
+	unresolved_args.push_back("--diff-filter=U");
+	if (_run_prebuild_git_command(unresolved_args, output, exit_code) != OK || !output.strip_edges().is_empty()) {
+		r_log += "[Source Update] Unresolved conflicts remain; build cancelled.\n" + output + "\n";
+		return FAILED;
+	}
+
+	r_log += "[Source Update] Source update completed successfully.\n";
+	return OK;
+}
+
+static void _build_thread_callback(void *p_userdata) {
+	String extra_args = String();
+	if (p_userdata) {
+		extra_args = *(static_cast<String *>(p_userdata));
+		delete static_cast<String *>(p_userdata);
+	}
+
+	String project_root = _get_engine_build_root();
+	if (project_root.is_empty()) {
+		build_state.complete("Failed to start build: no JunDot engine source root with SConstruct was found. A packaged editor executable does not contain the engine source. Clone/download the JunDot source into a separate directory, set AI engine_source_root to that directory, then retry run_build.", -1);
+		return;
+	}
+
+	String previous_cwd = OS::get_singleton()->get_cwd();
+	Error cwd_err = OS::get_singleton()->set_cwd(project_root);
+	if (cwd_err != OK) {
+		build_state.complete("Failed to start build: could not switch to project root: " + project_root, -1);
+		return;
+	}
+
+	String source_update_log;
+	if (_auto_update_source_before_build(source_update_log) != OK) {
+		OS::get_singleton()->set_cwd(previous_cwd);
+		build_state.complete(source_update_log + "\nBuild cancelled because the engine source update did not complete safely.", -1);
+		return;
+	}
+
+	// Build scons arguments.
+	List<String> scons_args;
+	scons_args.push_back("platform=windows");
+	scons_args.push_back("target=editor");
+	scons_args.push_back("arch=x86_64");
+	scons_args.push_back("debug_symbols=no");
+	// AI builds default to the native editor. A Mono editor also requires a
+	// separate managed assemblies build, so never select it accidentally.
+	scons_args.push_back("module_mono_enabled=no");
+	scons_args.push_back("-j4");
+	scons_args.push_back("d3d12=no");
+	scons_args.push_back("accesskit=no");
+	scons_args.push_back("angle=no");
+
+	if (!extra_args.is_empty()) {
+		Vector<String> extras = extra_args.split(" ", false);
+		for (int i = 0; i < extras.size(); i++) {
+			if (extras[i].begins_with("module_mono_enabled=")) {
+				continue;
+			}
+			scons_args.push_back(extras[i]);
+		}
+	}
+
+	const bool mono_enabled = false;
+	const uint64_t build_started_at = OS::get_singleton()->get_unix_time();
+
+	// Try python -m SCons first, then scons, then python3 -m SCons.
+	String std_out;
+	int exit_code = -1;
+
+	// First try: python -m SCons
+	List<String> py_args;
+	py_args.push_back("-m");
+	py_args.push_back("SCons");
+	for (const String &arg : scons_args) {
+		py_args.push_back(arg);
+	}
+	Error err = OS::get_singleton()->execute("python", py_args, &std_out, &exit_code, true);
+
+	if (err != OK) {
+		// Second try: scons directly
+		err = OS::get_singleton()->execute("scons", scons_args, &std_out, &exit_code, true);
+		if (err != OK) {
+			// Third try: python3 -m SCons
+			err = OS::get_singleton()->execute("python3", py_args, &std_out, &exit_code, true);
+			if (err != OK) {
+				std_out = "Failed to start build: neither 'python -m SCons', 'scons', nor 'python3 -m SCons' was found.";
+				exit_code = -1;
+			}
+		}
+	}
+
+	OS::get_singleton()->set_cwd(previous_cwd);
+	std_out = source_update_log + "\n" + std_out;
+	const String built_executable = exit_code == 0 ? _find_latest_built_editor_executable(project_root, build_started_at, mono_enabled) : String();
+	if (exit_code == 0 && built_executable.is_empty()) {
+		std_out += mono_enabled ? "\n\nBuild succeeded, but the Mono editor or its JundotSharp/Api/Debug assemblies were not generated by this build." : "\n\nBuild succeeded, but no native non-console Windows editor executable generated by this build was found in: " + project_root.path_join("bin");
+	}
+	build_state.complete(std_out, exit_code, built_executable);
+}
+
+Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
+	const String tool_call_id = p_tool_call.get("id", String());
+	const Dictionary fn_def = p_tool_call.get("function", Dictionary());
+	String name = fn_def.get("name", String());
+	const String args_json = fn_def.get("arguments", "{}");
+
+	if (name == "read_file") {
+		name = AIToolNames::READ_FILES;
+	} else if (name == "glob" || name == "glob_search") {
+		name = AIToolNames::SEARCH_FILES;
+	}
+
+	Dictionary args;
+	Variant parsed = JSON::parse_string(args_json);
+	if (parsed.get_type() == Variant::DICTIONARY) {
+		args = parsed;
+	}
+	if (name == "memory_search") {
+		name = AIToolNames::READ_FILES;
+		Array paths;
+		paths.push_back(".JundotAI/memory.json");
+		args["paths"] = paths;
+	} else if (name == "session_list") {
+		name = AIToolNames::READ_FILES;
+		Array paths;
+		paths.push_back(".JundotAI/conversations.json");
+		args["paths"] = paths;
+	}
+
+	Dictionary result;
+	if (name == AIToolNames::READ_FILES) {
+		result = _read_files(args);
+	} else if (name == AIToolNames::WRITE_FILE) {
+		result = _write_file(args);
+	} else if (name == AIToolNames::EDIT_FILE) {
+		result = _edit_file(args);
+	} else if (name == AIToolNames::SEARCH_FILES) {
+		result = _search_files(args);
+	} else if (name == AIToolNames::LIST_FILES) {
+		result = _list_files(args);
+	} else if (name == AIToolNames::GREP_CODE) {
+		result = _grep_code(args);
+	} else if (name == AIToolNames::CHECK_PROJECT_SCRIPTS) {
+		result = _check_project_scripts(args);
+	} else if (name == AIToolNames::CHECK_UI_LAYOUT) {
+		result = _check_ui_layout(args);
+	} else if (name == AIToolNames::BUILD_PROJECT) {
+		result = _build_project(args);
+	} else if (name == AIToolNames::PLAY_SCENE) {
+		result = _play_scene(args);
+	} else if (name == AIToolNames::CLICK_UI_POSITION) {
+		result = _click_ui_position(args);
+	} else if (name == AIToolNames::STOP_PLAY_SCENE) {
+		result = _stop_play_scene(args);
+	} else if (name == AIToolNames::RUN_BUILD) {
+		result = _run_build(args);
+	} else if (name == AIToolNames::CHECK_BUILD_STATUS) {
+		result = _check_build_status(args);
+	} else if (name == AIToolNames::READ_BUILD_LOG) {
+		result = _read_build_log(args);
+	} else if (name == AIToolNames::FETCH_URL) {
+		result = _fetch_url(args);
+	} else if (name == AIToolNames::SHELL_COMMAND) {
+		result = _shell_command(args);
+	} else if (name == AIToolNames::UPLOAD_CODE) {
+		result = _upload_code(args);
+	} else if (name == AIToolNames::DEVELOP_AI_VERIFY) {
+		result = _develop_ai_verify(args);
+	} else if (name == AIToolNames::RESTART_ENGINE) {
+		result = _restart_engine(args);
+	} else if (name == AIToolNames::SETUP_ENGINE_WORKSPACE) {
+		result = _setup_engine_workspace(args);
+	} else if (name == AIToolNames::REQUEST_ENGINE_CHANGE) {
+		result = _request_engine_change(args);
+	} else if (name == AIToolNames::RETURN_TO_PROJECT_MODE) {
+		result = _return_to_project_mode(args);
+	} else if (name == AIToolNames::BATCH_TOOLS) {
+		result = _batch_tools(args);
+	} else if (name.find_char('.') >= 0) {
+		// Tool names with a dot separator indicate MCP tools (e.g. "server_name.tool_name").
+		int dot = name.find_char('.');
+		String server_name = name.substr(0, dot);
+		String tool_name = name.substr(dot + 1);
+		result = _execute_mcp_tool(server_name, tool_name, args_json);
+	} else {
+		result = _make_result(vformat("Unknown tool: %s", name), true);
+	}
+
+	result["role"] = "tool";
+	result["tool_call_id"] = tool_call_id;
+	return result;
+}
+
+Dictionary AIToolExecutor::_make_result(const String &p_content, bool p_is_error) {
+	Dictionary d;
+	d["content"] = p_content;
+	if (p_is_error) {
+		d["is_error"] = true;
+	}
+	return d;
+}
+
+String AIToolExecutor::_get_project_root() {
+	// In ENGINE mode, return the engine source directory from settings
+	// (auto-detected via AISettings::get_engine_source_root).
+	// In PROJECT mode, return the currently-opened project directory.
+	AISettingsData s = AISettings::load();
+	if (s.context_mode == AIContextMode::ENGINE) {
+		String engine_root = _get_engine_build_root();
+		if (!engine_root.is_empty()) {
+			return engine_root;
+		}
+		return String();
+	}
+
+	if (ProjectSettings::get_singleton()) {
+		String project_root = ProjectSettings::get_singleton()->get_resource_path();
+		if (!project_root.is_empty() && FileAccess::exists(project_root.path_join("project.godot"))) {
+			return project_root;
+		}
+	}
+
+	// Project mode may only operate on a verified game-project root. Falling
+	// back to the process cwd can accidentally expose an engine checkout when
+	// the editor was launched from its source directory.
+	String exe_path = OS::get_singleton()->get_executable_path();
+	if (!exe_path.is_empty() && FileAccess::exists(exe_path.get_base_dir().path_join("project.godot"))) {
+		return exe_path.get_base_dir();
+	}
+
+	return String();
+}
+
+static Error _ensure_engine_source_updated_before_mutation(String &r_message) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::ENGINE) {
+		return OK;
+	}
+	return AISourceUpdateService::ensure_updated_before_edit(r_message);
+}
+
+static bool _resolve_tool_file_path(const String &p_root, const String &p_input, String &r_full_path, String &r_error) {
+	String input = p_input.strip_edges().replace("\\", "/");
+	if (input.is_empty()) {
+		r_error = "Path is empty.";
+		return false;
+	}
+
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode == AIContextMode::ENGINE) {
+		r_full_path = input.is_absolute_path() ? input.simplify_path() : p_root.path_join(input).simplify_path();
+		return true;
+	}
+
+	input = input.trim_prefix("res://").simplify_path();
+	if (input.is_absolute_path() || input == ".." || input.begins_with("../") || input.contains("/../")) {
+		r_error = "PROJECT mode path rejected: the path must stay inside the open project root.";
+		return false;
+	}
+
+	const String normalized_root = p_root.replace("\\", "/").simplify_path().trim_suffix("/");
+	const String candidate = normalized_root.path_join(input).simplify_path();
+	const String root_lower = normalized_root.to_lower();
+	const String candidate_lower = candidate.to_lower();
+	if (candidate_lower != root_lower && !candidate_lower.begins_with(root_lower + "/")) {
+		r_error = "PROJECT mode path rejected: the resolved path escapes the open project root.";
+		return false;
+	}
+	r_full_path = candidate;
+	return true;
+}
+
+static bool _project_shell_command_stays_in_root(const String &p_command) {
+	const String command = p_command.to_lower().replace("\\", "/");
+	if (command.contains("..") || command.contains("pushd ") || command.contains("popd") || command.contains("cd /") || command.contains("sconstruct") || command.contains("editor/ai/")) {
+		return false;
+	}
+	for (int i = 0; i + 2 < command.length(); i++) {
+		const char32_t c = command[i];
+		if (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) && command[i + 1] == ':' && command[i + 2] == '/') {
+			return false;
+		}
+	}
+	return true;
+}
+
+static Error _run_command_in_root(const String &p_root, const String &p_program, const List<String> &p_args, String &r_output, int &r_exit_code);
+
+static String _ai_safe_git_segment(const String &p_value, const String &p_fallback) {
+	String value = p_value.strip_edges().to_lower().replace("\\", "-").replace("/", "-");
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
+			out += String::chr(c);
+		} else if (c == ' ' || c == '\t') {
+			out += "-";
+		}
+	}
+	out = out.strip_edges().trim_prefix(".").trim_suffix(".");
+	while (out.contains("--")) {
+		out = out.replace("--", "-");
+	}
+	return out.is_empty() ? p_fallback : out;
+}
+
+static Error _run_git_in_root(const String &p_root, const Vector<String> &p_args, String &r_output, int &r_exit_code) {
+	List<String> args;
+	for (const String &arg : p_args) {
+		args.push_back(arg);
+	}
+	return _run_command_in_root(p_root, "git", args, r_output, r_exit_code);
+}
+
+static bool _git_branch_exists(const String &p_root, const String &p_branch) {
+	String output;
+	int exit_code = -1;
+	_run_git_in_root(p_root, { "rev-parse", "--verify", "--quiet", p_branch }, output, exit_code);
+	return exit_code == 0;
+}
+
+static String _get_project_workspace_metadata_path(const String &p_project_root) {
+	return p_project_root.path_join(".JundotAI").path_join("engine_workspace.json");
+}
+
+static Error _write_project_engine_workspace_metadata(const String &p_project_root, const Dictionary &p_metadata, String &r_error) {
+	const String dir = p_project_root.path_join(".JundotAI");
+	Error err = DirAccess::make_dir_recursive_absolute(dir);
+	if (err != OK) {
+		r_error = "Could not create .JundotAI metadata directory.";
+		return err;
+	}
+
+	const String metadata_path = _get_project_workspace_metadata_path(p_project_root);
+	Ref<FileAccess> file = FileAccess::open(metadata_path, FileAccess::WRITE, &err);
+	if (err != OK || file.is_null()) {
+		r_error = "Could not write engine workspace metadata: " + metadata_path;
+		return err == OK ? ERR_CANT_OPEN : err;
+	}
+	file->store_string(JSON::stringify(p_metadata, "\t"));
+	return OK;
+}
+
+Dictionary AIToolExecutor::_setup_engine_workspace(const Dictionary &p_args) {
+	const AISettingsData current_settings = AISettings::load();
+	if (current_settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("setup_engine_workspace is only available in PROJECT mode.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("Project root not detected. Open a project with project.godot before creating an engine workspace.", true);
+	}
+
+	const String base_engine_root = _get_engine_build_root();
+	if (base_engine_root.is_empty() || !FileAccess::exists(base_engine_root.path_join("SConstruct"))) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+
+	const String project_name = _ai_safe_git_segment(project_root.get_file(), "jundot-project");
+	const String workspace_name = _ai_safe_git_segment(String(p_args.get("workspace_name", String())), project_name);
+	const String provider_raw = String(p_args.get("provider", "local")).strip_edges().to_lower();
+	const String provider = (provider_raw == "github" || provider_raw == "gitee") ? provider_raw : "local";
+	const String remote_url = String(p_args.get("remote_url", String())).strip_edges();
+	const String branch_arg = String(p_args.get("branch", String())).strip_edges();
+	const String branch = branch_arg.is_empty() ? "project/" + workspace_name : branch_arg;
+	const String base_ref_arg = String(p_args.get("base_ref", "HEAD")).strip_edges();
+	const String base_ref = base_ref_arg.is_empty() ? "HEAD" : base_ref_arg;
+
+	const String user_data_dir = OS::get_singleton()->get_user_data_dir();
+	if (user_data_dir.is_empty()) {
+		return _make_result("Could not resolve the editor user data directory for engine workspaces.", true);
+	}
+	const String workspace_parent = user_data_dir.path_join("project_engine_workspaces");
+	const String workspace_path = workspace_parent.path_join(workspace_name).simplify_path();
+
+	Error err = DirAccess::make_dir_recursive_absolute(workspace_parent);
+	if (err != OK) {
+		return _make_result("Could not create engine workspace parent directory: " + workspace_parent, true);
+	}
+
+	String output;
+	int exit_code = -1;
+	bool created_workspace = false;
+	if (!FileAccess::exists(workspace_path.path_join("SConstruct"))) {
+		Vector<String> worktree_args;
+		worktree_args.push_back("worktree");
+		worktree_args.push_back("add");
+		if (_git_branch_exists(base_engine_root, branch)) {
+			worktree_args.push_back(workspace_path);
+			worktree_args.push_back(branch);
+		} else {
+			worktree_args.push_back("-b");
+			worktree_args.push_back(branch);
+			worktree_args.push_back(workspace_path);
+			worktree_args.push_back(base_ref);
+		}
+		err = _run_git_in_root(base_engine_root, worktree_args, output, exit_code);
+		if (err != OK || exit_code != 0) {
+			return _make_result("Failed to create project engine worktree.\nCommand: git worktree add\nOutput:\n" + output, true);
+		}
+		created_workspace = true;
+	}
+
+	String remote_message;
+	if (!remote_url.is_empty()) {
+		_run_git_in_root(workspace_path, { "remote", "get-url", "project-engine" }, output, exit_code);
+		if (exit_code == 0) {
+			err = _run_git_in_root(workspace_path, { "remote", "set-url", "project-engine", remote_url }, output, exit_code);
+		} else {
+			err = _run_git_in_root(workspace_path, { "remote", "add", "project-engine", remote_url }, output, exit_code);
+		}
+		if (err != OK || exit_code != 0) {
+			return _make_result("Engine workspace was prepared, but the project-engine remote could not be configured.\nOutput:\n" + output, true);
+		}
+		remote_message = "Remote project-engine configured: " + remote_url;
+	} else if (provider != "local") {
+		remote_message = "Provider recorded as " + provider + ", but no remote_url was provided. The user can create/login to the remote provider and rerun setup_engine_workspace with remote_url.";
+	}
+
+	AISettingsData updated_settings = current_settings;
+	updated_settings.engine_source_root = workspace_path;
+	AISettings::save(updated_settings);
+
+	Dictionary metadata;
+	metadata["provider"] = provider;
+	metadata["remote_url"] = remote_url;
+	metadata["remote_name"] = remote_url.is_empty() ? String() : String("project-engine");
+	metadata["branch"] = branch;
+	metadata["local_path"] = workspace_path;
+	metadata["base_engine_root"] = base_engine_root;
+	metadata["base_ref"] = base_ref;
+	metadata["workspace_name"] = workspace_name;
+	metadata["created_or_updated_at"] = Time::get_singleton()->get_datetime_string_from_system(true);
+	metadata["schema_version"] = 1;
+
+	String metadata_error;
+	if (_write_project_engine_workspace_metadata(project_root, metadata, metadata_error) != OK) {
+		return _make_result("Engine workspace was prepared, but project metadata could not be saved. " + metadata_error, true);
+	}
+
+	String result = "ENGINE_WORKSPACE_READY\n";
+	result += "Workspace: " + workspace_path + "\n";
+	result += "Branch: " + branch + "\n";
+	result += "Provider: " + provider + "\n";
+	result += "Project metadata: " + _get_project_workspace_metadata_path(project_root) + "\n";
+	result += created_workspace ? "Created a new git worktree for this project.\n" : "Reused the existing project engine worktree.\n";
+	if (!remote_message.is_empty()) {
+		result += remote_message + "\n";
+	}
+	result += "Engine mode is now configured to use this project-specific workspace. If the project requires engine changes, call request_engine_change next.";
+	return _make_result(result);
+}
+
+
+Dictionary AIToolExecutor::_request_engine_change(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("request_engine_change is only needed in PROJECT mode; the assistant is already in ENGINE mode.");
+	}
+
+	const String reason = String(p_args.get("reason", String())).strip_edges();
+	const String required_change = String(p_args.get("required_change", String())).strip_edges();
+	const String project_work_done = String(p_args.get("project_work_done", String())).strip_edges();
+	if (reason.is_empty() || required_change.is_empty()) {
+		return _make_result("request_engine_change rejected: reason and required_change are required.", true);
+	}
+
+	String result = "ENGINE_MODE_REQUEST_ACCEPTED\n";
+	result += "Reason: " + reason + "\n";
+	result += "Required engine change: " + required_change + "\n";
+	if (!project_work_done.is_empty()) {
+		result += "Project-side work already done: " + project_work_done + "\n";
+	}
+	result += "The editor should switch to ENGINE mode, continue the same task with engine tools, build and verify engine changes when needed, then call return_to_project_mode.";
+	return _make_result(result);
+}
+
+Dictionary AIToolExecutor::_return_to_project_mode(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::ENGINE) {
+		return _make_result("return_to_project_mode is only needed in ENGINE mode; the assistant is already in PROJECT mode.");
+	}
+
+	const String summary = String(p_args.get("summary", String())).strip_edges();
+	if (summary.is_empty()) {
+		return _make_result("return_to_project_mode rejected: summary is required.", true);
+	}
+
+	String result = "PROJECT_MODE_RETURN_ACCEPTED\n";
+	result += "Engine work summary: " + summary + "\n";
+	result += "The editor should switch back to PROJECT mode and continue the original project task with project-scoped tools.";
+	return _make_result(result);
+}
+static Error _run_command_in_root(const String &p_root, const String &p_program, const List<String> &p_args, String &r_output, int &r_exit_code) {
+	const String previous_cwd = OS::get_singleton()->get_cwd();
+	if (OS::get_singleton()->set_cwd(p_root) != OK) {
+		r_output = "Could not switch command working directory to: " + p_root;
+		r_exit_code = -1;
+		return ERR_CANT_OPEN;
+	}
+
+	r_output.clear();
+	r_exit_code = -1;
+	const Error err = OS::get_singleton()->execute(p_program, p_args, &r_output, &r_exit_code, true);
+	OS::get_singleton()->set_cwd(previous_cwd);
+	return err;
+}
+
+static bool _is_script_check_path_rejected(const String &p_path) {
+	const String normalized = p_path.replace("\\", "/").trim_prefix("res://").simplify_path();
+	return normalized.is_absolute_path() || normalized == ".." || normalized.begins_with("../") || normalized.contains("/../");
+}
+
+static void _collect_gdscript_files(const String &p_root, const String &p_rel_dir, Vector<String> &r_paths, int p_limit) {
+	if (r_paths.size() >= p_limit) {
+		return;
+	}
+
+	const String abs_dir = p_rel_dir.is_empty() ? p_root : p_root.path_join(p_rel_dir);
+	Ref<DirAccess> da = DirAccess::open(abs_dir);
+	if (da.is_null()) {
+		return;
+	}
+
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty() && r_paths.size() < p_limit) {
+		if (name == "." || name == "..") {
+			name = da->get_next();
+			continue;
+		}
+
+		const String rel = p_rel_dir.is_empty() ? name : p_rel_dir.path_join(name);
+		if (da->current_is_dir()) {
+			if (!name.begins_with(".") && name != "bin" && name != "obj" && name != ".godot" && name != ".import" && name != "__pycache__") {
+				_collect_gdscript_files(p_root, rel, r_paths, p_limit);
+			}
+		} else if (name.to_lower().ends_with(".gd")) {
+			r_paths.push_back(rel);
+		}
+
+		name = da->get_next();
+	}
+	da->list_dir_end();
+}
+
+static bool _project_has_dotnet_project(const String &p_root) {
+	Ref<DirAccess> da = DirAccess::open(p_root);
+	if (da.is_null()) {
+		return false;
+	}
+
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty()) {
+		const String lower = name.to_lower();
+		if (!da->current_is_dir() && (lower.ends_with(".sln") || lower.ends_with(".csproj"))) {
+			da->list_dir_end();
+			return true;
+		}
+		name = da->get_next();
+	}
+	da->list_dir_end();
+	return false;
+}
+
+static String _find_single_root_dotnet_project(const String &p_root, bool &r_ambiguous) {
+	r_ambiguous = false;
+	Ref<DirAccess> da = DirAccess::open(p_root);
+	if (da.is_null()) {
+		return String();
+	}
+
+	String found;
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty()) {
+		const String lower = name.to_lower();
+		if (!da->current_is_dir() && (lower.ends_with(".sln") || lower.ends_with(".csproj"))) {
+			if (!found.is_empty()) {
+				r_ambiguous = true;
+				da->list_dir_end();
+				return String();
+			}
+			found = name;
+		}
+		name = da->get_next();
+	}
+	da->list_dir_end();
+	return found;
+}
+
+static String _truncate_tool_output(const String &p_output, int p_max_chars) {
+	if (p_output.length() <= p_max_chars) {
+		return p_output;
+	}
+	return p_output.substr(p_output.length() - p_max_chars) + vformat("\n\n[... output truncated to last %d chars]\n", p_max_chars);
+}
+
+static bool _save_open_scene_before_ai_write(const String &p_full_path, String &r_message) {
+	const String lower_path = p_full_path.to_lower();
+	if (!lower_path.ends_with(".tscn") && !lower_path.ends_with(".scn")) {
+		return false;
+	}
+	if (!EditorNode::get_singleton() || !ProjectSettings::get_singleton()) {
+		return false;
+	}
+
+	const String scene_path = ProjectSettings::get_singleton()->localize_path(p_full_path);
+	EditorData &editor_data = EditorNode::get_editor_data();
+	const int scene_idx = editor_data.get_edited_scene_from_path(scene_path);
+	if (scene_idx < 0) {
+		return false;
+	}
+
+	const int history_id = editor_data.get_scene_history_id(scene_idx);
+	if (!EditorUndoRedoManager::get_singleton()->is_history_unsaved(history_id)) {
+		return false;
+	}
+
+	EditorNode::get_singleton()->save_scene_if_open(scene_path);
+	if (EditorUndoRedoManager::get_singleton()->is_history_unsaved(history_id)) {
+		r_message = "AI scene write blocked: the scene is open in the editor and has unsaved changes that could not be saved automatically. Save the scene manually, then ask the AI to read the latest .tscn and try again.\nScene: " + scene_path;
+	} else {
+		r_message = "AI scene write paused: the open scene had unsaved editor changes, so Jundot saved them first. The AI must read the latest scene file again before editing, otherwise it may overwrite the user's just-saved changes.\nScene: " + scene_path;
+	}
+	return true;
+}
+
+// ---- Tool implementations ----
+
+Dictionary AIToolExecutor::_read_files(const Dictionary &p_args) {
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(String(p_args.get("path", String())));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(String(p_args["paths"]));
+	}
+	if (paths.is_empty()) {
+		return _make_result("No file paths provided.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	StringBuilder result;
+
+	for (int i = 0; i < paths.size(); i++) {
+		String rel_path = paths[i];
+		String full_path;
+		String path_error;
+		if (!_resolve_tool_file_path(project_root, rel_path, full_path, path_error)) {
+			result += vformat("[%s] Error: %s\n", rel_path, path_error);
+			continue;
+		}
+
+		if (!FileAccess::exists(full_path)) {
+			result += vformat("[%s] Error: file not found at %s\n", rel_path, full_path);
+			continue;
+		}
+
+		Error err = OK;
+		String content = FileAccess::get_file_as_string(full_path, &err);
+		if (err != OK) {
+			result += vformat("[%s] Error: failed to read file (err=%d)\n", rel_path, (int)err);
+			continue;
+		}
+
+		// Truncate very large files to avoid blowing the API context.
+		const int MAX_FILE_CHARS = 50000;
+		if (content.length() > MAX_FILE_CHARS) {
+			content = content.substr(0, MAX_FILE_CHARS) + vformat("\n\n[... truncated at %d characters]\n", MAX_FILE_CHARS);
+		}
+
+		result += vformat("=== %s ===\n%s\n", rel_path, content);
+	}
+
+	return _make_result(result.as_string());
+}
+
+Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
+	String path = p_args.get("path", String());
+	String content = p_args.get("content", String());
+	if (content.is_empty() && p_args.has("new_string")) {
+		// Compatibility with models that emit write_file(path, new_string)
+		// using edit-style argument naming in text-form tool calls.
+		content = p_args.get("new_string", String());
+	}
+
+	if (path.is_empty()) {
+		return _make_result("No file path provided.", true);
+	}
+	if (content.is_empty()) {
+		return _make_result(vformat("File write rejected: content is empty, so the existing file was not modified.\nPath: %s", path), true);
+	}
+
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before modification: " + source_update_message, true);
+	}
+
+	// Validate content: reject Markdown code fences, which usually mean the
+	// model returned a formatted snippet instead of raw file contents.
+	if (content.contains("```")) {
+		return _make_result(vformat("File write rejected: content contains Markdown code fences (```). Please call write_file again with raw file content only.\nPath: %s", path), true);
+	}
+
+	// Reject obviously truncated code (ends mid-statement).
+	String trimmed = content.strip_edges();
+	if (trimmed.ends_with("...") || trimmed.ends_with(",") || trimmed.ends_with("(") || trimmed.ends_with("=")) {
+		return _make_result(vformat("File write rejected: content appears truncated (ends with '%s'). Please regenerate the complete content.\nPath: %s", String::chr(trimmed[trimmed.length() - 1]), path), true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + path, true);
+	}
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		String save_message;
+		if (_save_open_scene_before_ai_write(full_path, save_message)) {
+			return _make_result(save_message, true);
+		}
+	}
+
+	// Create parent directories.
+	Ref<DirAccess> da = DirAccess::create_for_path(full_path);
+	if (da.is_valid()) {
+		Error mkdir_err = da->make_dir_recursive(full_path.get_base_dir());
+		if (mkdir_err != OK) {
+			return _make_result(vformat("Failed to create directory for %s", path), true);
+		}
+	} else {
+		return _make_result(vformat("Failed to access directory for %s", path), true);
+	}
+
+	// Write to a temporary file first so a failed write does not remove the
+	// previous version.
+	String tmp_path = full_path + ".ai_tmp";
+	Error err = OK;
+	Ref<FileAccess> file = FileAccess::open(tmp_path, FileAccess::WRITE, &err);
+	if (err != OK || file.is_null()) {
+		return _make_result(vformat("Failed to open temporary file for writing: %s", path), true);
+	}
+
+	const int64_t expected_size = content.utf8().length();
+	file->store_string(content);
+	file->flush();
+	file.unref();
+
+	const int64_t temporary_size = FileAccess::get_size(tmp_path);
+	if (temporary_size != expected_size) {
+		da->remove(tmp_path);
+		return _make_result(vformat("File write rejected: temporary file size mismatch (expected %d bytes, wrote %d bytes). The existing file was not modified.\nPath: %s", expected_size, temporary_size, path), true);
+	}
+
+	String bak_path = full_path + ".bak";
+	if (FileAccess::exists(bak_path)) {
+		Ref<DirAccess> bak_da = DirAccess::create_for_path(bak_path);
+		if (bak_da.is_valid()) {
+			bak_da->remove(bak_path);
+		}
+	}
+
+	if (FileAccess::exists(full_path)) {
+		Error backup_err = da->rename(full_path, bak_path);
+		if (backup_err != OK) {
+			da->remove(tmp_path);
+			return _make_result(vformat("Failed to create backup before writing: %s", path), true);
+		}
+	}
+
+	Error rename_err = da->rename(tmp_path, full_path);
+	if (rename_err != OK) {
+		if (FileAccess::exists(bak_path) && !FileAccess::exists(full_path)) {
+			da->rename(bak_path, full_path);
+		}
+		da->remove(tmp_path);
+		return _make_result(vformat("Failed to replace file after writing temporary content: %s", path), true);
+	}
+
+	const int64_t final_size = FileAccess::get_size(full_path);
+	if (final_size != expected_size) {
+		da->remove(full_path);
+		if (FileAccess::exists(bak_path)) {
+			da->rename(bak_path, full_path);
+		}
+		return _make_result(vformat("File write failed verification: final file size mismatch (expected %d bytes, got %d bytes). The previous file was restored when available.\nPath: %s", expected_size, final_size, path), true);
+	}
+
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_modified(path);
+	}
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		AIModifiedSceneTracker::mark_scene_written(path);
+	}
+	return _make_result(vformat("Successfully wrote %s (%d bytes).%s", path, expected_size, AISettings::load().develop_mode ? " [Develop Mode: local change only]" : ""));
+}
+
+Dictionary AIToolExecutor::_edit_file(const Dictionary &p_args) {
+	const String path = p_args.get("path", String());
+	const String old_string = p_args.get("old_string", String());
+	const String new_string = p_args.get("new_string", String());
+
+	if (path.is_empty()) {
+		return _make_result("No file path provided.", true);
+	}
+	if (old_string.is_empty()) {
+		return _make_result(vformat("File edit rejected: old_string is empty.\nPath: %s", path), true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + path, true);
+	}
+	if (!FileAccess::exists(full_path)) {
+		return _make_result(vformat("File edit rejected: file not found.\nPath: %s", path), true);
+	}
+
+	Error read_err = OK;
+	const String content = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		return _make_result(vformat("File edit rejected: failed to read file (err=%d).\nPath: %s", (int)read_err, path), true);
+	}
+
+	const int occurrence_count = content.count(old_string);
+	if (occurrence_count == 0) {
+		return _make_result(vformat("File edit rejected: old_string was not found.\nPath: %s", path), true);
+	}
+	if (occurrence_count > 1) {
+		return _make_result(vformat("File edit rejected: old_string occurs %d times; provide more surrounding context so it matches exactly once.\nPath: %s", occurrence_count, path), true);
+	}
+
+	Dictionary write_args;
+	write_args["path"] = path;
+	write_args["content"] = content.replace(old_string, new_string);
+	Dictionary result = _write_file(write_args);
+	if (!bool(result.get("is_error", false))) {
+		result["content"] = vformat("Successfully edited %s by replacing one exact match.", path);
+	}
+	return result;
+}
+
+Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
+	Array operations = p_args.get("operations", Array());
+	if (operations.is_empty()) {
+		return _make_result("No batch operations provided.", true);
+	}
+
+	const int MAX_BATCH_OPERATIONS = 8;
+	StringBuilder sb;
+	sb += vformat("Batch executed %d operation(s):\n", MIN(operations.size(), MAX_BATCH_OPERATIONS));
+	bool has_error = false;
+
+	for (int i = 0; i < operations.size() && i < MAX_BATCH_OPERATIONS; i++) {
+		if (operations[i].get_type() != Variant::DICTIONARY) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d ---\nError: operation must be an object.\n", i + 1);
+			continue;
+		}
+
+		Dictionary op = operations[i];
+		const String name = String(op.get("name", String())).strip_edges();
+		if (name.is_empty()) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d ---\nError: missing tool name.\n", i + 1);
+			continue;
+		}
+		if (name == AIToolNames::BATCH_TOOLS) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: nested batch_tools calls are not allowed.\n", i + 1, name);
+			continue;
+		}
+		AISettingsData settings = AISettings::load();
+		if (settings.context_mode != AIContextMode::ENGINE &&
+				(name == AIToolNames::RUN_BUILD ||
+						name == AIToolNames::READ_BUILD_LOG ||
+						name == AIToolNames::CHECK_BUILD_STATUS ||
+						name == AIToolNames::RESTART_ENGINE ||
+						name == AIToolNames::FETCH_URL ||
+						name == AIToolNames::UPLOAD_CODE ||
+						name == AIToolNames::RETURN_TO_PROJECT_MODE)) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in engine mode.\n", i + 1, name);
+			continue;
+		}
+		if (settings.context_mode != AIContextMode::PROJECT &&
+				(name == AIToolNames::SETUP_ENGINE_WORKSPACE ||
+						name == AIToolNames::CHECK_UI_LAYOUT ||
+						name == AIToolNames::BUILD_PROJECT ||
+						name == AIToolNames::REQUEST_ENGINE_CHANGE)) {
+			has_error = true;
+			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in project mode.\n", i + 1, name);
+			continue;
+		}
+
+		Dictionary op_args;
+		Variant raw_args = op.get("arguments", op.get("args", Dictionary()));
+		if (raw_args.get_type() == Variant::DICTIONARY) {
+			op_args = raw_args;
+		} else if (raw_args.get_type() == Variant::STRING) {
+			Variant parsed_args = JSON::parse_string(String(raw_args));
+			if (parsed_args.get_type() == Variant::DICTIONARY) {
+				op_args = parsed_args;
+			}
+		}
+
+		Dictionary fn;
+		fn["name"] = name;
+		fn["arguments"] = JSON::stringify(op_args);
+
+		Dictionary tool_call;
+		tool_call["id"] = vformat("batch_%d", i);
+		tool_call["type"] = "function";
+		tool_call["function"] = fn;
+
+		Dictionary result = execute(tool_call);
+		if (result.has("is_error")) {
+			has_error = true;
+		}
+
+		sb += vformat("\n--- Operation %d: %s ---\n", i + 1, name);
+		sb += String(result.get("content", String()));
+		sb += "\n";
+	}
+
+	if (operations.size() > MAX_BATCH_OPERATIONS) {
+		has_error = true;
+		sb += vformat("\nBatch stopped after %d operations. Split remaining work into another batch.\n", MAX_BATCH_OPERATIONS);
+	}
+
+	return _make_result(sb.as_string(), has_error);
+}
+
+struct AIUILayoutNodeInfo {
+	String name;
+	String path;
+	String parent;
+	String type;
+	int line = 0;
+	int order = 0;
+	Rect2 rect;
+	bool has_rect = false;
+	bool parent_is_container = false;
+	int mouse_filter = -1;
+	int z_index = 0;
+};
+
+static String _extract_tscn_quoted_attr(const String &p_line, const String &p_key) {
+	const String needle = p_key + "=\"";
+	const int start = p_line.find(needle);
+	if (start < 0) {
+		return String();
+	}
+	const int value_start = start + needle.length();
+	const int value_end = p_line.find("\"", value_start);
+	if (value_end < 0) {
+		return String();
+	}
+	return p_line.substr(value_start, value_end - value_start);
+}
+
+static bool _parse_tscn_vector2(const String &p_value, Vector2 &r_value) {
+	const int open = p_value.find("(");
+	const int comma = p_value.find(",", open + 1);
+	const int close = p_value.find(")", comma + 1);
+	if (open < 0 || comma < 0 || close < 0) {
+		return false;
+	}
+	r_value.x = p_value.substr(open + 1, comma - open - 1).strip_edges().to_float();
+	r_value.y = p_value.substr(comma + 1, close - comma - 1).strip_edges().to_float();
+	return true;
+}
+
+static bool _is_control_type(const String &p_type) {
+	return !p_type.is_empty() && ClassDB::class_exists(StringName(p_type)) && ClassDB::is_parent_class(StringName(p_type), SNAME("Control"));
+}
+
+static bool _is_container_type(const String &p_type) {
+	return !p_type.is_empty() && ClassDB::class_exists(StringName(p_type)) && ClassDB::is_parent_class(StringName(p_type), SNAME("Container"));
+}
+
+static bool _is_interactive_control_type(const String &p_type) {
+	if (p_type.is_empty() || !ClassDB::class_exists(StringName(p_type))) {
+		return false;
+	}
+
+	const StringName type_name(p_type);
+	return ClassDB::is_parent_class(type_name, SNAME("BaseButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("LineEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("TextEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("Slider")) ||
+			ClassDB::is_parent_class(type_name, SNAME("SpinBox")) ||
+			ClassDB::is_parent_class(type_name, SNAME("OptionButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("MenuButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("ItemList")) ||
+			ClassDB::is_parent_class(type_name, SNAME("Tree")) ||
+			ClassDB::is_parent_class(type_name, SNAME("GraphEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("ColorPicker")) ||
+			ClassDB::is_parent_class(type_name, SNAME("FileDialog")) ||
+			ClassDB::is_parent_class(type_name, SNAME("PopupMenu"));
+}
+
+static bool _has_blocking_mouse_filter(const AIUILayoutNodeInfo &p_node) {
+	// Godot Control::MouseFilter: STOP = 0, PASS = 1, IGNORE = 2.
+	// If absent from the scene file, treat it as potentially blocking so
+	// generated decoration must opt out explicitly.
+	return p_node.mouse_filter != 2;
+}
+
+static bool _is_pass_through_mouse_filter(const AIUILayoutNodeInfo &p_node) {
+	return p_node.mouse_filter == 1 || p_node.mouse_filter == 2;
+}
+
+static bool _is_modal_surface_candidate(const AIUILayoutNodeInfo &p_node) {
+	const String path = p_node.path.to_lower();
+	const String type = p_node.type.to_lower();
+	const bool modal_name =
+			path.contains("settings") ||
+			path.contains("options") ||
+			path.contains("dialog") ||
+			path.contains("popup") ||
+			path.contains("modal") ||
+			path.contains("pause") ||
+			path.contains("inventory") ||
+			path.contains("menu");
+	const bool surface_type =
+			type == "panel" ||
+			type == "panelcontainer" ||
+			type == "popup" ||
+			type == "popupmenu" ||
+			type == "popuppanel" ||
+			type == "window";
+	return modal_name && surface_type;
+}
+
+static bool _node_sorts_above(const AIUILayoutNodeInfo &p_a, const AIUILayoutNodeInfo &p_b) {
+	if (p_a.z_index != p_b.z_index) {
+		return p_a.z_index > p_b.z_index;
+	}
+	return p_a.order > p_b.order;
+}
+
+static String _scene_node_path(const String &p_parent, const String &p_name) {
+	if (p_parent.is_empty() || p_parent == ".") {
+		return p_name;
+	}
+	return p_parent.path_join(p_name).replace("\\", "/");
+}
+
+static bool _parse_tscn_ui_nodes(const String &p_content, Vector<AIUILayoutNodeInfo> &r_nodes, String &r_error) {
+	PackedStringArray lines = p_content.split("\n");
+
+	bool in_node = false;
+	bool current_is_control = false;
+	AIUILayoutNodeInfo current;
+	bool has_position = false;
+	bool has_size = false;
+	bool has_minimum_size = false;
+	Vector2 position;
+	Vector2 size;
+	Vector2 minimum_size;
+	bool has_offset_left = false;
+	bool has_offset_top = false;
+	bool has_offset_right = false;
+	bool has_offset_bottom = false;
+	real_t offset_left = 0.0;
+	real_t offset_top = 0.0;
+	real_t offset_right = 0.0;
+	real_t offset_bottom = 0.0;
+
+	HashMap<String, String> node_types;
+	String root_type;
+
+	auto flush_current = [&]() {
+		if (!in_node) {
+			return;
+		}
+		if (current.parent.is_empty() && root_type.is_empty()) {
+			root_type = current.type;
+		}
+		node_types[current.path] = current.type;
+		if (!current_is_control) {
+			return;
+		}
+
+		const real_t left = has_offset_left ? offset_left : (has_position ? position.x : 0.0);
+		const real_t top = has_offset_top ? offset_top : (has_position ? position.y : 0.0);
+		real_t width = 0.0;
+		real_t height = 0.0;
+
+		if (has_size) {
+			width = size.x;
+			height = size.y;
+		} else {
+			if (has_offset_right) {
+				width = offset_right - left;
+			}
+			if (has_offset_bottom) {
+				height = offset_bottom - top;
+			}
+		}
+
+		if (has_minimum_size) {
+			width = MAX(width, minimum_size.x);
+			height = MAX(height, minimum_size.y);
+		}
+
+		if (width > 0.0 && height > 0.0) {
+			current.rect = Rect2(left, top, width, height);
+			current.has_rect = true;
+		}
+		r_nodes.push_back(current);
+	};
+
+	for (int i = 0; i < lines.size(); i++) {
+		const String line = String(lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			flush_current();
+
+			in_node = true;
+			current_is_control = false;
+			current = AIUILayoutNodeInfo();
+			has_position = false;
+			has_size = false;
+			has_minimum_size = false;
+			position = Vector2();
+			size = Vector2();
+			minimum_size = Vector2();
+			has_offset_left = false;
+			has_offset_top = false;
+			has_offset_right = false;
+			has_offset_bottom = false;
+			offset_left = 0.0;
+			offset_top = 0.0;
+			offset_right = 0.0;
+			offset_bottom = 0.0;
+
+			const String name = _extract_tscn_quoted_attr(line, "name");
+			current.name = name;
+			current.type = _extract_tscn_quoted_attr(line, "type");
+			current.parent = _extract_tscn_quoted_attr(line, "parent");
+			current.path = _scene_node_path(current.parent, name);
+			current.line = i + 1;
+			current.order = i;
+			current_is_control = _is_control_type(current.type);
+			if (name.is_empty()) {
+				r_error = vformat("Could not parse node name at line %d.", i + 1);
+				return false;
+			}
+			continue;
+		}
+
+		if (!in_node || !current_is_control) {
+			continue;
+		}
+
+		const int eq = line.find("=");
+		if (eq < 0) {
+			continue;
+		}
+		const String key = line.substr(0, eq).strip_edges();
+		const String value = line.substr(eq + 1).strip_edges();
+
+		if (key == "position") {
+			has_position = _parse_tscn_vector2(value, position);
+		} else if (key == "size") {
+			has_size = _parse_tscn_vector2(value, size);
+		} else if (key == "custom_minimum_size") {
+			has_minimum_size = _parse_tscn_vector2(value, minimum_size);
+		} else if (key == "offset_left") {
+			has_offset_left = true;
+			offset_left = value.to_float();
+		} else if (key == "offset_top") {
+			has_offset_top = true;
+			offset_top = value.to_float();
+		} else if (key == "offset_right") {
+			has_offset_right = true;
+			offset_right = value.to_float();
+		} else if (key == "offset_bottom") {
+			has_offset_bottom = true;
+			offset_bottom = value.to_float();
+		} else if (key == "mouse_filter") {
+			if (value.is_valid_int()) {
+				current.mouse_filter = value.to_int();
+			} else if (value.contains("MOUSE_FILTER_IGNORE")) {
+				current.mouse_filter = 2;
+			} else if (value.contains("MOUSE_FILTER_PASS")) {
+				current.mouse_filter = 1;
+			} else if (value.contains("MOUSE_FILTER_STOP")) {
+				current.mouse_filter = 0;
+			}
+		} else if (key == "z_index") {
+			current.z_index = value.to_int();
+		}
+	}
+
+	flush_current();
+
+	for (int i = 0; i < r_nodes.size(); i++) {
+		if (r_nodes[i].parent == ".") {
+			r_nodes.write[i].parent_is_container = _is_container_type(root_type);
+			continue;
+		}
+		if (!node_types.has(r_nodes[i].parent)) {
+			continue;
+		}
+		r_nodes.write[i].parent_is_container = _is_container_type(node_types[r_nodes[i].parent]);
+	}
+
+	return true;
+}
+
+Dictionary AIToolExecutor::_check_ui_layout(const Dictionary &p_args) {
+	AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_ui_layout is only available in PROJECT mode.", true);
+	}
+
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(String(p_args.get("path", String())));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(String(p_args["paths"]));
+	}
+	if (paths.is_empty()) {
+		return _make_result("No scene paths provided.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for UI layout checking.", true);
+	}
+
+	StringBuilder result;
+	bool has_error = false;
+	bool has_warning = false;
+	const int MAX_WARNINGS_PER_SCENE = 20;
+
+	for (int p = 0; p < paths.size(); p++) {
+		String rel_path = paths[p];
+		String full_path;
+		String path_error;
+		result += vformat("=== %s ===\n", rel_path);
+
+		if (!_resolve_tool_file_path(project_root, rel_path, full_path, path_error)) {
+			has_error = true;
+			result += "Error: " + path_error + "\n";
+			continue;
+		}
+		if (!full_path.ends_with(".tscn")) {
+			has_error = true;
+			result += "Error: check_ui_layout only inspects .tscn scene files.\n";
+			continue;
+		}
+		if (!FileAccess::exists(full_path)) {
+			has_error = true;
+			result += "Error: file not found.\n";
+			continue;
+		}
+
+		Error err = OK;
+		const String content = FileAccess::get_file_as_string(full_path, &err);
+		if (err != OK) {
+			has_error = true;
+			result += vformat("Error: failed to read file (err=%d).\n", (int)err);
+			continue;
+		}
+
+		Vector<AIUILayoutNodeInfo> nodes;
+		String parse_error;
+		if (!_parse_tscn_ui_nodes(content, nodes, parse_error)) {
+			has_error = true;
+			result += "Error: " + parse_error + "\n";
+			continue;
+		}
+
+		int warnings = 0;
+		int skipped_managed = 0;
+		int skipped_without_rect = 0;
+		for (int i = 0; i < nodes.size(); i++) {
+			if (!nodes[i].has_rect) {
+				skipped_without_rect++;
+				continue;
+			}
+			if (_is_modal_surface_candidate(nodes[i]) && _is_pass_through_mouse_filter(nodes[i])) {
+				has_warning = true;
+				warnings++;
+				result += vformat(
+						"Possible click-through modal %d: node '%s' (line %d, %s) looks like a settings/dialog/menu surface but uses mouse_filter=%d, so clicks may pass through to UI underneath.\n",
+						warnings,
+						nodes[i].path,
+						nodes[i].line,
+						nodes[i].type,
+						nodes[i].mouse_filter);
+				result += "  Suggestion: set the modal surface or its full-screen blocker to mouse_filter = 0 (Stop), keep decorative children at mouse_filter = 2 (Ignore), and put the modal content above the blocker with a higher z_index or later scene order.\n";
+				if (warnings >= MAX_WARNINGS_PER_SCENE) {
+					result += vformat("Stopped after %d warnings for this scene; fix these first, then run check_ui_layout again.\n", MAX_WARNINGS_PER_SCENE);
+					break;
+				}
+			}
+			if (nodes[i].parent_is_container) {
+				skipped_managed++;
+				continue;
+			}
+			for (int j = i + 1; j < nodes.size(); j++) {
+				if (nodes[i].parent != nodes[j].parent) {
+					continue;
+				}
+				if (!nodes[j].has_rect) {
+					continue;
+				}
+				if (nodes[j].parent_is_container) {
+					continue;
+				}
+				if (!nodes[i].rect.intersects(nodes[j].rect, false)) {
+					continue;
+				}
+
+				has_warning = true;
+				warnings++;
+				const AIUILayoutNodeInfo &upper = _node_sorts_above(nodes[i], nodes[j]) ? nodes[i] : nodes[j];
+				const AIUILayoutNodeInfo &lower = _node_sorts_above(nodes[i], nodes[j]) ? nodes[j] : nodes[i];
+				const bool possible_click_blocker = _is_interactive_control_type(lower.type) && !_is_interactive_control_type(upper.type) && _has_blocking_mouse_filter(upper);
+				if (possible_click_blocker) {
+					result += vformat(
+							"Possible click blocker %d: parent='%s', upper node '%s' (line %d, %s) overlaps interactive node '%s' (line %d, %s) and may intercept mouse clicks.\n",
+							warnings,
+							lower.parent.is_empty() ? "." : lower.parent,
+							upper.path,
+							upper.line,
+							upper.type,
+							lower.path,
+							lower.line,
+							lower.type);
+				} else {
+					result += vformat(
+							"Possible overlap %d: parent='%s', nodes='%s' (line %d, %s) and '%s' (line %d, %s).\n",
+							warnings,
+							nodes[i].parent.is_empty() ? "." : nodes[i].parent,
+							nodes[i].path,
+							nodes[i].line,
+							nodes[i].type,
+							nodes[j].path,
+							nodes[j].line,
+							nodes[j].type);
+				}
+				result += vformat(
+						"  Rects: %s at (%.1f, %.1f, %.1f x %.1f), %s at (%.1f, %.1f, %.1f x %.1f).\n",
+						nodes[i].path,
+						nodes[i].rect.position.x,
+						nodes[i].rect.position.y,
+						nodes[i].rect.size.x,
+						nodes[i].rect.size.y,
+						nodes[j].path,
+						nodes[j].rect.position.x,
+						nodes[j].rect.position.y,
+						nodes[j].rect.size.x,
+						nodes[j].rect.size.y);
+				if (possible_click_blocker) {
+					result += "  Suggestion: move decorative/background controls behind interactive controls, put them in a separate lower CanvasLayer, reduce their z_index, or set mouse_filter = 2 (Ignore) on non-interactive overlay controls.\n";
+				} else {
+					result += "  Suggestion: put these controls under a VBoxContainer/HBoxContainer/GridContainer, adjust z_index intentionally, or split the parent into non-overlapping MarginContainer/PanelContainer regions.\n";
+				}
+				if (warnings >= MAX_WARNINGS_PER_SCENE) {
+					result += vformat("Stopped after %d warnings for this scene; fix these first, then run check_ui_layout again.\n", MAX_WARNINGS_PER_SCENE);
+					break;
+				}
+			}
+			if (warnings >= MAX_WARNINGS_PER_SCENE) {
+				break;
+			}
+		}
+
+		if (warnings == 0) {
+			result += "No obvious fixed-rectangle sibling Control overlaps found.\n";
+		}
+		result += vformat("Inspected %d Control node(s). Skipped %d container-managed node(s) and %d node(s) without enough static rectangle data.\n\n",
+				nodes.size(), skipped_managed, skipped_without_rect);
+	}
+
+	if (has_warning) {
+		result += "UI layout check found likely overlap or click-blocking risks. Read the warnings, adjust the scene layout or mouse_filter values, then run check_ui_layout again before finishing the UI task.";
+	}
+
+	return _make_result(result.as_string(), has_error);
+}
+
+Dictionary AIToolExecutor::_build_project(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("build_project is only available in PROJECT mode. Use run_build/check_build_status for engine source builds.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root was detected. Open a project with project.godot before building project code.", true);
+	}
+
+	String project_path = String(p_args.get("project_path", String())).strip_edges().replace("\\", "/");
+	if (project_path.is_empty() && p_args.has("path")) {
+		project_path = String(p_args.get("path", String())).strip_edges().replace("\\", "/");
+	}
+	if (project_path.is_empty()) {
+		bool ambiguous = false;
+		project_path = _find_single_root_dotnet_project(project_root, ambiguous);
+		if (ambiguous) {
+			return _make_result("build_project found more than one .csproj/.sln in the project root. Call build_project again with project_path set to the intended file.", true);
+		}
+	}
+	if (project_path.is_empty()) {
+		return _make_result("build_project could not find a .csproj or .sln in the project root. Provide project_path relative to the open project root.", true);
+	}
+
+	String full_project_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, project_path, full_project_path, path_error)) {
+		return _make_result(path_error + "\nProject path: " + project_path, true);
+	}
+	const String lower_project_path = full_project_path.to_lower();
+	if (!lower_project_path.ends_with(".csproj") && !lower_project_path.ends_with(".sln")) {
+		return _make_result("build_project only accepts .csproj or .sln files inside the open project root.\nProject path: " + project_path, true);
+	}
+	if (!FileAccess::exists(full_project_path)) {
+		return _make_result("build_project project file not found: " + project_path, true);
+	}
+
+	String configuration = String(p_args.get("configuration", String())).strip_edges();
+	if (!configuration.is_empty()) {
+		const String lowered = configuration.to_lower();
+		if (lowered != "debug" && lowered != "release") {
+			return _make_result("build_project configuration must be Debug, Release, or omitted.", true);
+		}
+		configuration = lowered == "release" ? "Release" : "Debug";
+	}
+
+	String target = String(p_args.get("target", String())).strip_edges();
+	if (target.is_empty()) {
+		target = "Build";
+	}
+	const String target_lower = target.to_lower();
+	if (target_lower != "build" && target_lower != "rebuild" && target_lower != "clean") {
+		return _make_result("build_project target must be Build, Rebuild, Clean, or omitted.", true);
+	}
+	target = target_lower == "rebuild" ? "Rebuild" : (target_lower == "clean" ? "Clean" : "Build");
+
+	List<String> dotnet_args;
+	dotnet_args.push_back("build");
+	dotnet_args.push_back(full_project_path);
+	dotnet_args.push_back("--nologo");
+	dotnet_args.push_back("-t:" + target);
+	if (!configuration.is_empty()) {
+		dotnet_args.push_back("-c");
+		dotnet_args.push_back(configuration);
+	}
+	if ((bool)p_args.get("no_restore", false)) {
+		dotnet_args.push_back("--no-restore");
+	}
+
+	String output;
+	int exit_code = -1;
+	const String build_root = full_project_path.get_base_dir();
+	const Error err = _run_command_in_root(build_root, "dotnet", dotnet_args, output, exit_code);
+
+	StringBuilder result;
+	result += "Tool: build_project\n";
+	result += "Program: dotnet build\n";
+	result += "Project: " + project_path + "\n";
+	result += "Workdir: " + build_root + "\n";
+	result += "Target: " + target + "\n";
+	if (!configuration.is_empty()) {
+		result += "Configuration: " + configuration + "\n";
+	}
+	result += vformat("Exit code: %d\n", exit_code);
+	if (err != OK) {
+		result += vformat("Failed to start dotnet build (err=%d). Ensure the .NET SDK is installed and available on PATH.\n", (int)err);
+	}
+	if (!output.strip_edges().is_empty()) {
+		result += "\n--- build output ---\n";
+		result += _truncate_tool_output(output, 20000).strip_edges();
+		result += "\n";
+	}
+	if (err == OK && exit_code == 0) {
+		result += "\nProject build passed.";
+	} else {
+		result += "\nProject build failed. Read the compiler output above, edit the affected project files, then run build_project again.";
+	}
+
+	return _make_result(result.as_string(), err != OK || exit_code != 0);
+}
+
+static MouseButton _parse_ai_mouse_button(const String &p_button) {
+	const String button = p_button.strip_edges().to_lower();
+	if (button == "right") {
+		return MouseButton::RIGHT;
+	}
+	if (button == "middle") {
+		return MouseButton::MIDDLE;
+	}
+	return MouseButton::LEFT;
+}
+
+Dictionary AIToolExecutor::_play_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("play_scene is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton()) {
+		return _make_result("play_scene failed: editor run bar is not available.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("play_scene failed: no open project root is available.", true);
+	}
+
+	String scene_path = String(p_args.get("scene_path", String())).strip_edges().replace("\\", "/");
+	if (scene_path.is_empty()) {
+		EditorRunBar::get_singleton()->play_main_scene(false, Vector<String>());
+		return _make_result("Started playing the project main scene. Wait briefly for the debugger session to connect before using click_ui_position.");
+	}
+
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result("play_scene failed: " + path_error, true);
+	}
+
+	const String lower_path = full_path.to_lower();
+	if (!lower_path.ends_with(".tscn") && !lower_path.ends_with(".scn")) {
+		return _make_result("play_scene only accepts .tscn or .scn scene files inside the open project root.\nScene path: " + scene_path, true);
+	}
+	if (!FileAccess::exists(full_path)) {
+		return _make_result("play_scene scene file not found: " + scene_path, true);
+	}
+
+	String resource_path = scene_path;
+	if (!resource_path.begins_with("res://")) {
+		resource_path = "res://" + resource_path.trim_prefix("./");
+	}
+
+	EditorRunBar::get_singleton()->play_custom_scene(resource_path, Vector<String>());
+	return _make_result("Started playing scene: " + resource_path + "\nWait briefly for the debugger session to connect before using click_ui_position.");
+}
+
+Dictionary AIToolExecutor::_click_ui_position(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("click_ui_position is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("click_ui_position failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("click_ui_position failed: Game View debugger is not available.", true);
+	}
+
+	const double x = p_args.get("x", 0.0);
+	const double y = p_args.get("y", 0.0);
+	if (x < 0.0 || y < 0.0) {
+		return _make_result("click_ui_position requires non-negative viewport coordinates.", true);
+	}
+
+	const MouseButton button = _parse_ai_mouse_button(String(p_args.get("button", "left")));
+	const int sent_count = debugger->click_ui_position(Vector2(x, y), button);
+	if (sent_count <= 0) {
+		return _make_result("click_ui_position failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 250.0), 0, 5000);
+	if (wait_ms > 0) {
+		OS::get_singleton()->delay_usec(wait_ms * 1000);
+	}
+
+	return _make_result(vformat("Sent %s mouse click to running game at viewport position (%.1f, %.1f). Active debugger session(s): %d.",
+			button == MouseButton::RIGHT ? "right" : (button == MouseButton::MIDDLE ? "middle" : "left"),
+			x,
+			y,
+			sent_count));
+}
+
+Dictionary AIToolExecutor::_stop_play_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("stop_play_scene is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton()) {
+		return _make_result("stop_play_scene failed: editor run bar is not available.", true);
+	}
+	if (!EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("No game scene is currently playing.");
+	}
+
+	const String playing_scene = EditorRunBar::get_singleton()->get_playing_scene();
+	EditorRunBar::get_singleton()->stop_playing();
+	return _make_result(playing_scene.is_empty() ? "Stopped the running game scene." : "Stopped the running game scene: " + playing_scene);
+}
+
+Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
+	String pattern = p_args.get("pattern", String());
+	if (pattern.is_empty()) {
+		return _make_result("No search pattern provided.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	const String normalized_pattern = pattern.replace("\\", "/").simplify_path();
+	if (AISettings::load().context_mode == AIContextMode::PROJECT &&
+			(normalized_pattern.is_absolute_path() || normalized_pattern == ".." || normalized_pattern.begins_with("../") || normalized_pattern.contains("/../"))) {
+		return _make_result("PROJECT mode search rejected: pattern must stay inside the open project root.", true);
+	}
+
+	// Use a simple recursive directory walk. Godot's DirAccess doesn't support
+	// globs natively, so we do a manual pattern match.
+	// For simplicity, we handle: **/*.cpp, **/*.h, src/**/*.cpp patterns.
+
+	// Split pattern into base_dir and file_filter.
+	String base_dir = project_root;
+	String file_filter = pattern;
+
+	// Extract base directory if pattern contains a path separator.
+	int sep = pattern.find("/");
+	if (sep >= 0) {
+		String dir_part = pattern.substr(0, sep);
+		if (dir_part == "**") {
+			// ** pattern �?search from root.
+			file_filter = pattern.substr(3).trim_prefix("/");
+		} else {
+			base_dir = project_root.path_join(dir_part);
+			file_filter = pattern.substr(sep + 1);
+		}
+	}
+
+	// Also handle src/**/*.cpp style.
+	int star_slash = pattern.find("**/");
+	if (star_slash >= 0) {
+		String prefix = pattern.substr(0, star_slash);
+		if (!prefix.is_empty()) {
+			base_dir = project_root.path_join(prefix.trim_suffix("/"));
+		}
+		file_filter = pattern.substr(star_slash + 3);
+		// If the filter starts with *, it's likely *.<ext>
+		if (!file_filter.begins_with("*")) {
+			file_filter = file_filter.trim_prefix("/");
+		}
+	}
+
+	// Convert simple glob to suffix/prefix matching.
+	String suffix;
+	String prefix;
+	if (file_filter.begins_with("*.")) {
+		suffix = file_filter.substr(1); // e.g. ".cpp"
+	} else if (file_filter.begins_with("*")) {
+		suffix = file_filter.substr(1);
+	} else if (file_filter.ends_with("*")) {
+		prefix = file_filter.substr(0, file_filter.length() - 1);
+	} else {
+		// Exact match.
+		suffix = file_filter;
+	}
+
+	// Recursively collect matching files.
+	Vector<String> results;
+	List<String> dirs;
+	dirs.push_back(base_dir);
+
+	const int MAX_RESULTS = 200;
+	while (!dirs.is_empty() && results.size() < MAX_RESULTS) {
+		String current_dir = dirs.front()->get();
+		dirs.pop_front();
+
+		Ref<DirAccess> da = DirAccess::open(current_dir);
+		if (da.is_null()) {
+			continue;
+		}
+
+		da->list_dir_begin();
+		String name = da->get_next();
+		while (!name.is_empty() && results.size() < MAX_RESULTS) {
+			if (name == "." || name == "..") {
+				name = da->get_next();
+				continue;
+			}
+
+			String full = current_dir.path_join(name);
+			if (da->current_is_dir()) {
+				// Skip hidden directories and common build artifacts.
+				if (!name.begins_with(".") && name != "bin" && name != "obj" && name != "__pycache__") {
+					dirs.push_back(full);
+				}
+			} else {
+				bool match = false;
+				if (!suffix.is_empty() && name.ends_with(suffix)) {
+					match = true;
+				} else if (!prefix.is_empty() && name.begins_with(prefix)) {
+					match = true;
+				} else if (suffix.is_empty() && prefix.is_empty()) {
+					match = (name == file_filter);
+				}
+				if (match) {
+					// Convert to relative path.
+					String rel = full.replace(project_root + "/", "");
+					results.push_back(rel);
+				}
+			}
+
+			name = da->get_next();
+		}
+		da->list_dir_end();
+	}
+
+	if (results.is_empty()) {
+		return _make_result(vformat("No files matching '%s' found.", pattern));
+	}
+
+	StringBuilder sb;
+	sb += vformat("Found %d files matching '%s':\n", results.size(), pattern);
+	for (int i = 0; i < results.size(); i++) {
+		sb += results[i] + "\n";
+	}
+
+	return _make_result(sb.as_string());
+}
+
+Dictionary AIToolExecutor::_list_files(const Dictionary &p_args) {
+	String path = p_args.get("path", ".");
+	if (path.is_empty()) {
+		path = ".";
+	}
+
+	int max_depth = (int)p_args.get("depth", 1);
+	if (max_depth < 0) {
+		max_depth = 0;
+	} else if (max_depth > 5) {
+		max_depth = 5;
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+
+	String rel_root = path.replace("\\", "/").simplify_path();
+	if (rel_root == ".") {
+		rel_root = "";
+	}
+	if (rel_root.is_absolute_path() || rel_root.begins_with("../") || rel_root == ".." || rel_root.contains("/../")) {
+		return _make_result("Directory listing rejected: path must stay inside the project root.", true);
+	}
+
+	String root_dir = rel_root.is_empty() ? project_root : project_root.path_join(rel_root);
+	Ref<DirAccess> root_da = DirAccess::open(root_dir);
+	if (root_da.is_null()) {
+		return _make_result("Directory not found: " + (rel_root.is_empty() ? String(".") : rel_root), true);
+	}
+
+	struct PendingDir {
+		String abs_path;
+		String rel_path;
+		int depth = 0;
+	};
+
+	Vector<String> entries;
+	List<PendingDir> dirs;
+	PendingDir root;
+	root.abs_path = root_dir;
+	root.rel_path = rel_root;
+	root.depth = 0;
+	dirs.push_back(root);
+
+	const int MAX_RESULTS = 200;
+	while (!dirs.is_empty() && entries.size() < MAX_RESULTS) {
+		PendingDir current = dirs.front()->get();
+		dirs.pop_front();
+
+		Ref<DirAccess> da = DirAccess::open(current.abs_path);
+		if (da.is_null()) {
+			continue;
+		}
+
+		da->list_dir_begin();
+		String name = da->get_next();
+		while (!name.is_empty() && entries.size() < MAX_RESULTS) {
+			if (name == "." || name == "..") {
+				name = da->get_next();
+				continue;
+			}
+
+			const bool is_dir = da->current_is_dir();
+			const String rel = current.rel_path.is_empty() ? name : current.rel_path.path_join(name);
+			if (is_dir) {
+				entries.push_back(rel + "/");
+				if (current.depth < max_depth && !name.begins_with(".") && name != "bin" && name != "obj" && name != "__pycache__") {
+					PendingDir child;
+					child.abs_path = current.abs_path.path_join(name);
+					child.rel_path = rel;
+					child.depth = current.depth + 1;
+					dirs.push_back(child);
+				}
+			} else {
+				entries.push_back(rel);
+			}
+
+			name = da->get_next();
+		}
+		da->list_dir_end();
+	}
+
+	StringBuilder sb;
+	sb += vformat("Listed %d item(s) under '%s' (depth %d):\n", entries.size(), rel_root.is_empty() ? String(".") : rel_root, max_depth);
+	for (int i = 0; i < entries.size(); i++) {
+		sb += entries[i] + "\n";
+	}
+	if (entries.size() >= MAX_RESULTS) {
+		sb += "... truncated at 200 items. Use a narrower path or lower depth.\n";
+	}
+
+	return _make_result(sb.as_string());
+}
+
+Dictionary AIToolExecutor::_grep_code(const Dictionary &p_args) {
+	String pattern = p_args.get("pattern", String());
+	String glob = p_args.get("glob", String());
+
+	if (pattern.is_empty()) {
+		return _make_result("No search pattern provided.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+
+	// Search the whole game project in PROJECT mode. ENGINE mode keeps the
+	// focused source-directory list to avoid scanning generated artifacts.
+	Vector<String> search_dirs;
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		search_dirs.push_back(project_root);
+	} else {
+		search_dirs.push_back(project_root.path_join("editor"));
+		search_dirs.push_back(project_root.path_join("modules"));
+		search_dirs.push_back(project_root.path_join("scene"));
+		search_dirs.push_back(project_root.path_join("servers"));
+		search_dirs.push_back(project_root.path_join("core"));
+		search_dirs.push_back(project_root.path_join("drivers"));
+		search_dirs.push_back(project_root.path_join("main"));
+		search_dirs.push_back(project_root.path_join("platform"));
+	}
+
+	// Use the glob to filter file extension.
+	String suffix_filter;
+	if (!glob.is_empty()) {
+		if (glob.begins_with("*.")) {
+			suffix_filter = glob.substr(1);
+		} else if (glob.begins_with("*")) {
+			suffix_filter = glob.substr(1);
+		} else {
+			suffix_filter = glob;
+		}
+	}
+
+	StringBuilder result;
+	int total_matches = 0;
+	const int MAX_MATCHES = 200;
+
+	for (int d = 0; d < search_dirs.size() && total_matches < MAX_MATCHES; d++) {
+		List<String> dirs;
+		dirs.push_back(search_dirs[d]);
+
+		while (!dirs.is_empty() && total_matches < MAX_MATCHES) {
+			String current_dir = dirs.front()->get();
+			dirs.pop_front();
+
+			Ref<DirAccess> da = DirAccess::open(current_dir);
+			if (da.is_null()) {
+				continue;
+			}
+
+			da->list_dir_begin();
+			String name = da->get_next();
+			while (!name.is_empty() && total_matches < MAX_MATCHES) {
+				if (name == "." || name == "..") {
+					name = da->get_next();
+					continue;
+				}
+
+				String full_path = current_dir.path_join(name);
+				if (da->current_is_dir()) {
+					if (!name.begins_with(".") && name != "bin" && name != "obj" && name != "__pycache__") {
+						dirs.push_back(full_path);
+					}
+				} else {
+					// Apply glob filter.
+					if (!suffix_filter.is_empty() && !name.ends_with(suffix_filter)) {
+						name = da->get_next();
+						continue;
+					}
+
+					// Skip large binary-like files.
+					if (name.ends_with(".obj") || name.ends_with(".lib") || name.ends_with(".dll") || name.ends_with(".exe")) {
+						name = da->get_next();
+						continue;
+					}
+
+					Error err = OK;
+					String content = FileAccess::get_file_as_string(full_path, &err);
+					if (err != OK) {
+						name = da->get_next();
+						continue;
+					}
+
+					// Simple line-by-line search.
+					Vector<String> lines = content.split("\n");
+					String rel_path = full_path.replace(project_root + "/", "");
+					for (int ln = 0; ln < lines.size() && total_matches < MAX_MATCHES; ln++) {
+						if (lines[ln].findn(pattern) >= 0) {
+							result += vformat("%s:%d: %s\n", rel_path, ln + 1, lines[ln].strip_edges());
+							total_matches++;
+						}
+					}
+				}
+
+				name = da->get_next();
+			}
+			da->list_dir_end();
+		}
+	}
+
+	if (total_matches == 0) {
+		return _make_result(vformat("No matches found for '%s'.", pattern));
+	}
+
+	String header = vformat("Found %d matches for '%s':\n", total_matches, pattern);
+	return _make_result(header + result.as_string());
+}
+
+
+Dictionary AIToolExecutor::_check_project_scripts(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_project_scripts is only available in PROJECT mode. Use run_build/check_build_status for engine source changes.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open Godot project root was detected. Open a project with project.godot before validating project scripts.", true);
+	}
+
+	Vector<String> script_paths;
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(p_args.get("path", String()));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(p_args["paths"]);
+	}
+
+	bool has_bad_path = false;
+	StringBuilder bad_paths;
+	for (int i = 0; i < paths.size(); i++) {
+		String rel = String(paths[i]).replace("\\", "/").strip_edges();
+		if (rel.is_empty()) {
+			continue;
+		}
+		if (_is_script_check_path_rejected(rel)) {
+			has_bad_path = true;
+			bad_paths += "Rejected path outside project root: " + rel + "\n";
+			continue;
+		}
+		rel = rel.trim_prefix("res://").simplify_path();
+		if (rel.to_lower().ends_with(".gd")) {
+			script_paths.push_back(rel);
+		}
+	}
+	if (has_bad_path) {
+		return _make_result(bad_paths.as_string(), true);
+	}
+	if (script_paths.is_empty() && paths.is_empty()) {
+		const int MAX_GDSCRIPT_CHECKS = 100;
+		_collect_gdscript_files(project_root, String(), script_paths, MAX_GDSCRIPT_CHECKS);
+	}
+
+	StringBuilder result;
+	bool failed = false;
+
+	const String editor_exe = OS::get_singleton()->get_executable_path();
+	if (script_paths.is_empty()) {
+		result += "No GDScript files selected or found for syntax checking.\n";
+	} else if (editor_exe.is_empty() || !FileAccess::exists(editor_exe)) {
+		failed = true;
+		result += "Could not locate the current editor executable for GDScript check-only validation.\n";
+	} else {
+		result += vformat("GDScript syntax check: %d file(s)\n", script_paths.size());
+		for (int i = 0; i < script_paths.size(); i++) {
+			const String rel = script_paths[i];
+			String full_path;
+			String path_error;
+			if (!_resolve_tool_file_path(project_root, rel, full_path, path_error) || !FileAccess::exists(full_path)) {
+				failed = true;
+				result += vformat("\n[%s]\nError: %s%s\n", rel, path_error, FileAccess::exists(full_path) ? String() : " File not found.");
+				continue;
+			}
+
+			List<String> args;
+			args.push_back("--headless");
+			args.push_back("--path");
+			args.push_back(project_root);
+			args.push_back("--check-only");
+			args.push_back("--script");
+			args.push_back("res://" + rel);
+
+			String output;
+			int exit_code = -1;
+			const Error err = _run_command_in_root(project_root, editor_exe, args, output, exit_code);
+			result += vformat("\n[%s]\nExit code: %d\n", rel, exit_code);
+			if (err != OK) {
+				failed = true;
+				result += vformat("Failed to start GDScript validator (err=%d).\n", (int)err);
+			}
+			if (!output.strip_edges().is_empty()) {
+				result += _truncate_tool_output(output, 12000).strip_edges() + "\n";
+			}
+			if (err != OK || exit_code != 0) {
+				failed = true;
+			}
+		}
+	}
+
+	bool explicit_cs_path = false;
+	for (int i = 0; i < paths.size(); i++) {
+		if (String(paths[i]).to_lower().ends_with(".cs")) {
+			explicit_cs_path = true;
+			break;
+		}
+	}
+
+	if (_project_has_dotnet_project(project_root) || explicit_cs_path) {
+		List<String> dotnet_args;
+		dotnet_args.push_back("build");
+		dotnet_args.push_back("--nologo");
+		String output;
+		int exit_code = -1;
+		const Error err = _run_command_in_root(project_root, "dotnet", dotnet_args, output, exit_code);
+		result += vformat("\nC#/.NET project build\nExit code: %d\n", exit_code);
+		if (err != OK) {
+			failed = true;
+			result += vformat("Failed to start dotnet build (err=%d). Ensure the .NET SDK is installed and available on PATH.\n", (int)err);
+		}
+		if (!output.strip_edges().is_empty()) {
+			result += _truncate_tool_output(output, 20000).strip_edges() + "\n";
+		}
+		if (err != OK || exit_code != 0) {
+			failed = true;
+		}
+	}
+
+	if (!failed) {
+		result += "\nProject script validation passed.";
+	} else {
+		result += "\nProject script validation failed. Read the errors above, edit the affected scripts, then run check_project_scripts again.";
+	}
+	return _make_result(result.as_string(), failed);
+}
+
+Dictionary AIToolExecutor::_run_build(const Dictionary &p_args) {
+	String extra_args = p_args.get("extra_args", String());
+
+	// Check if build is already running.
+	if (build_state.is_running()) {
+		return _make_result("A build is already running in the background. Use check_build_status to monitor progress.");
+	}
+
+	// Start the build in a background thread.
+	build_state.start(extra_args);
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_build_started();
+	}
+	String *args_copy = new String(extra_args);
+	build_state.thread.start(_build_thread_callback, args_copy);
+
+	return _make_result("Build started in background. Use check_build_status to check progress and get results when complete.");
+}
+
+Dictionary AIToolExecutor::_check_build_status(const Dictionary &p_args) {
+	if (build_state.is_running()) {
+		return _make_result("Build is still running in the background. Check again later.");
+	}
+
+	Dictionary r = build_state.get_result();
+	String status = r["status"];
+
+	if (status == "idle") {
+		return _make_result("No build has been started yet. Use run_build to start one.");
+	}
+
+	// Build is done �?retrieve the result.
+	String std_out = r["stdout"];
+	int exit_code = r["exit_code"];
+
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_build_result(exit_code == 0, exit_code == 0 ? "Build completed successfully." : "Build failed; inspect the build output.");
+	}
+
+	// Clean up the thread resource before returning.
+	build_state.join_thread();
+
+	StringBuilder result;
+	result += vformat("Build status: %s\n", status);
+	result += vformat("Exit code: %d\n", exit_code);
+	if (!std_out.is_empty()) {
+		result += "\n--- build output ---\n" + std_out;
+	}
+
+	if (result.as_string().length() > 10000) {
+		String truncated = result.as_string().substr(0, 10000);
+		truncated += vformat("\n\n[... truncated, full length = %d chars]\n", result.as_string().length());
+		return _make_result(truncated);
+	}
+
+	return _make_result(result.as_string());
+}
+
+Dictionary AIToolExecutor::_read_build_log(const Dictionary &p_args) {
+	Dictionary build_result = build_state.get_result();
+	const String build_status = build_result.get("status", "idle");
+	const String build_output = build_result.get("stdout", String());
+	if (build_status == "running") {
+		return _make_result("Build is still running. Use check_build_status to wait for completion.");
+	}
+	if (bool(build_result.get("has_result", false)) && !build_output.is_empty()) {
+		const int MAX_LOG_CHARS = 30000;
+		const String visible_output = build_output.length() > MAX_LOG_CHARS ? build_output.substr(build_output.length() - MAX_LOG_CHARS) : build_output;
+		return _make_result(vformat("Latest in-memory build output (status: %s, exit code: %d):\n\n%s", build_status, int(build_result.get("exit_code", -1)), visible_output));
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	String log_dir = project_root.path_join("artifacts").path_join("logs");
+
+	Ref<DirAccess> da = DirAccess::open(log_dir);
+	if (da.is_null()) {
+		return _make_result("Build log directory not found: " + log_dir, true);
+	}
+
+	// Find the most recent .log file.
+	String latest_log;
+	uint64_t latest_mtime = 0;
+
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty()) {
+		if (name.ends_with(".log")) {
+			String full = log_dir.path_join(name);
+			uint64_t mtime = FileAccess::get_modified_time(full);
+			if (mtime > latest_mtime) {
+				latest_mtime = mtime;
+				latest_log = full;
+			}
+		}
+		name = da->get_next();
+	}
+	da->list_dir_end();
+
+	if (latest_log.is_empty()) {
+		return _make_result("No build log files found in " + log_dir, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(latest_log, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read log file: %s", latest_log), true);
+	}
+
+	// Truncate if too large.
+	const int MAX_LOG_CHARS = 30000;
+	if (content.length() > MAX_LOG_CHARS) {
+		// Prefer the end of the log (build errors are at the end).
+		String tail = content.substr(content.length() - MAX_LOG_CHARS);
+		// Also include any error-like lines from the beginning.
+		String result = vformat("Log file: %s\n(full length: %d chars, showing last %d chars)\n\n%s",
+				latest_log, content.length(), MAX_LOG_CHARS, tail);
+		return _make_result(result);
+	}
+
+	return _make_result(vformat("Log file: %s\n\n%s", latest_log, content));
+}
+
+Dictionary AIToolExecutor::_fetch_url(const Dictionary &p_args) {
+	String url = p_args.get("url", String());
+	String dest_path = p_args.get("dest_path", String());
+
+	if (url.is_empty()) {
+		return _make_result("No URL provided.", true);
+	}
+	if (dest_path.is_empty()) {
+		return _make_result("No destination path provided.", true);
+	}
+
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode == AIContextMode::PROJECT) {
+		const String lower_url = url.to_lower();
+		const String normalized_dest = dest_path.replace("\\", "/").simplify_path();
+		const bool official_store = lower_url.begins_with("https://store.steampowered.com/") || lower_url.begins_with("https://store.epicgames.com/");
+		if (!official_store) {
+			return _make_result("PROJECT mode research rejected: fetch_url is limited to official Steam and Epic Games Store pages.", true);
+		}
+		if (!normalized_dest.begins_with(".JundotAI/research/")) {
+			return _make_result("PROJECT mode research rejected: downloads must be saved under .JundotAI/research/.", true);
+		}
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result(_source_root_missing_message(), true);
+	}
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before download: " + source_update_message, true);
+	}
+
+	String full_dest;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, dest_path, full_dest, path_error)) {
+		return _make_result(path_error + "\nPath: " + dest_path, true);
+	}
+
+	String sha256;
+	Error err = AICodeFetcher::fetch_file(url, full_dest, sha256);
+	if (err != OK) {
+		return _make_result(vformat("Failed to download %s to %s (err=%d)", url, dest_path, (int)err), true);
+	}
+
+	return _make_result(vformat("Successfully downloaded %s to %s (SHA256: %s)", url, dest_path, sha256));
+}
+
+Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
+	String command = p_args.get("command", String());
+	String workdir = p_args.get("workdir", String());
+	if (command.is_empty()) {
+		return _make_result("No command provided.", true);
+	}
+
+	String tool_root = _get_project_root();
+	if (tool_root.is_empty()) {
+		tool_root = _get_configured_engine_source_cache_root(AISettings::load());
+		if (tool_root.is_empty()) {
+			return _make_result("Project root not detected.", true);
+		}
+		Ref<DirAccess> da = DirAccess::create_for_path(tool_root);
+		if (da.is_null() || da->make_dir_recursive(tool_root) != OK) {
+			return _make_result("Project root not detected and failed to create engine source cache directory.", true);
+		}
+	}
+
+	String command_workdir = tool_root;
+	if (!workdir.strip_edges().is_empty() && workdir.strip_edges() != ".") {
+		String full_workdir;
+		String path_error;
+		if (!_resolve_tool_file_path(tool_root, workdir, full_workdir, path_error)) {
+			return _make_result(path_error + "\nWorkdir: " + workdir, true);
+		}
+		if (!DirAccess::dir_exists_absolute(full_workdir)) {
+			return _make_result("shell_command workdir does not exist: " + workdir, true);
+		}
+		command_workdir = full_workdir;
+	}
+
+	if (AISettings::load().context_mode == AIContextMode::PROJECT && !_project_shell_command_stays_in_root(command)) {
+		return _make_result("PROJECT mode shell command rejected: commands must stay inside the open project and may not reference parent, absolute, or engine-source paths.", true);
+	}
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before shell command: " + source_update_message, true);
+	}
+
+	if (AISettings::load().develop_mode) {
+		return _make_result("[Develop Mode] shell_command dry-run only; command was not executed: " + command);
+	}
+
+	// Split command into program and arguments.
+	Vector<String> parts = command.split(" ", false);
+	if (parts.is_empty()) {
+		return _make_result("Empty command.", true);
+	}
+
+	String program = parts[0];
+	List<String> shell_args;
+	for (int i = 1; i < parts.size(); i++) {
+		shell_args.push_back(parts[i]);
+	}
+
+	String std_out;
+	int exit_code = -1;
+
+	String previous_cwd = OS::get_singleton()->get_cwd();
+	Error cwd_err = OS::get_singleton()->set_cwd(command_workdir);
+	if (cwd_err != OK) {
+		return _make_result("Failed to switch command working directory to: " + command_workdir, true);
+	}
+
+#ifdef WINDOWS_ENABLED
+	// On Windows, use cmd /c for shell commands.
+	List<String> cmd_args;
+	cmd_args.push_back("/c");
+	cmd_args.push_back(command);
+	Error err = OS::get_singleton()->execute("cmd", cmd_args, &std_out, &exit_code, true);
+#else
+	Error err = OS::get_singleton()->execute(program, shell_args, &std_out, &exit_code, true);
+#endif
+
+	OS::get_singleton()->set_cwd(previous_cwd);
+
+	if (err != OK) {
+		return _make_result(vformat("Failed to execute command: %s (err=%d)", command, (int)err), true);
+	}
+
+	StringBuilder result;
+	result += vformat("Command: %s\n", command);
+	result += vformat("Workdir: %s\n", command_workdir);
+	result += vformat("Exit code: %d\n", exit_code);
+	if (!std_out.is_empty()) {
+		result += "\n--- stdout ---\n" + std_out;
+	}
+
+	// Truncate very large output.
+	if (result.as_string().length() > 30000) {
+		String truncated = result.as_string().substr(0, 30000);
+		truncated += vformat("\n\n[... truncated at 30000 chars]\n");
+		return _make_result(truncated);
+	}
+
+	return _make_result(result.as_string());
+}
+
+static void _restart_editor_on_main_thread(const String &p_executable_path) {
+	EditorNode *editor = EditorNode::get_singleton();
+	if (!editor) {
+		ERR_PRINT("AI engine restart failed: EditorNode is unavailable.");
+		return;
+	}
+
+	const Error state_err = AIRestartHelper::save_state();
+	if (state_err != OK) {
+		ERR_PRINT(vformat("AI engine restart could not save editor state (err=%d). Restarting with the standard editor session restore path.", (int)state_err));
+	}
+
+	// restart_editor() touches editor UI and configures OS restart-on-exit, so
+	// it must run on the main thread rather than the AI tool worker thread.
+	OS::get_singleton()->set_restart_executable_path(p_executable_path);
+	editor->restart_editor(false);
+}
+
+Dictionary AIToolExecutor::_restart_engine(const Dictionary &p_args) {
+	const Dictionary build_result = build_state.get_result();
+	if (String(build_result.get("status", "idle")) != "done" || int(build_result.get("exit_code", -1)) != 0) {
+		return _make_result("Engine switch rejected: no successful AI build is available. Run run_build and wait for check_build_status to report success first.", true);
+	}
+
+	const String executable_path = build_result.get("executable_path", String());
+	if (executable_path.is_empty() || !FileAccess::exists(executable_path)) {
+		return _make_result("Engine switch rejected: the executable produced by the successful AI build could not be found.", true);
+	}
+
+	if (AISettings::load().develop_mode) {
+		AIDevelopFlow::record_restart_requested();
+	}
+	callable_mp_static(&_restart_editor_on_main_thread).bind(executable_path).call_deferred();
+	return _make_result("Engine switch scheduled. The current editor will close, then launch the AI-compiled editor: " + executable_path);
+}
+
+static Error _run_upload_check(const String &p_root, const String &p_program, const Vector<String> &p_args, String &r_output) {
+	List<String> args;
+	for (const String &arg : p_args) {
+		args.push_back(arg);
+	}
+	const String previous_cwd = OS::get_singleton()->get_cwd();
+	if (OS::get_singleton()->set_cwd(p_root) != OK) {
+		r_output = "Could not switch to the engine source root.";
+		return ERR_CANT_OPEN;
+	}
+	int exit_code = -1;
+	r_output.clear();
+	const Error err = OS::get_singleton()->execute(p_program, args, &r_output, &exit_code, true);
+	OS::get_singleton()->set_cwd(previous_cwd);
+	if (err != OK) {
+		r_output = vformat("Could not start required quality tool '%s' (error %d).", p_program, (int)err);
+		return err;
+	}
+	return exit_code == 0 ? OK : FAILED;
+}
+
+static Error _run_mutating_format_check(const String &p_root, const String &p_file_path, const Vector<String> &p_script_args, String &r_error) {
+	const String full_path = p_root.path_join(p_file_path);
+	Error read_err = OK;
+	const String original = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		r_error = "Could not read the file before format validation.";
+		return read_err;
+	}
+
+	String output;
+	const Error command_err = _run_upload_check(p_root, "python", p_script_args, output);
+	Error after_err = OK;
+	const String after = FileAccess::get_file_as_string(full_path, &after_err);
+	if (after_err != OK) {
+		r_error = "Format validation could not read the resulting file.";
+		return after_err;
+	}
+	if (after != original) {
+		Ref<FileAccess> restore = FileAccess::open(full_path, FileAccess::WRITE);
+		if (restore.is_valid()) {
+			restore->store_string(original);
+		}
+		r_error = "File formatting check failed. Run the repository formatter before uploading. " + output.strip_edges();
+		return FAILED;
+	}
+	if (command_err != OK) {
+		r_error = "Formatting check could not complete: " + output.strip_edges();
+		return command_err;
+	}
+	return OK;
+}
+
+static Error _validate_upload_format_and_quality(const String &p_root, const String &p_file_path, const String &p_code, String &r_report) {
+	if (p_code.contains("<<<<<<<") || p_code.contains("=======") || p_code.contains(">>>>>>>")) {
+		r_report = "Code quality check failed: unresolved merge conflict markers were found.";
+		return FAILED;
+	}
+	if (p_code.contains("C:/Users/") || p_code.contains("C:\\Users\\") || p_code.contains("/home/")) {
+		r_report = "Code quality check failed: user-specific absolute paths were found.";
+		return FAILED;
+	}
+
+	String output;
+	if (_run_upload_check(p_root, "git", { "diff", "--check", "--", p_file_path }, output) != OK) {
+		r_report = "Code quality check failed (git diff --check): " + output.strip_edges();
+		return FAILED;
+	}
+
+	String format_error;
+	if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/file_format.py", p_file_path }, format_error) != OK) {
+		r_report = format_error;
+		return FAILED;
+	}
+
+	const String extension = p_file_path.get_extension().to_lower();
+	const bool is_cpp = extension == "c" || extension == "h" || extension == "cpp" || extension == "hpp" || extension == "cc" || extension == "hh" || extension == "cxx" || extension == "hxx" || extension == "m" || extension == "mm" || extension == "inc";
+	if (is_cpp) {
+		if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/validate_includes.py", p_file_path }, format_error) != OK ||
+				_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/copyright_headers.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+		if ((extension == "h" || extension == "hpp" || extension == "hh" || extension == "hxx") &&
+				_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/header_guards.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+		if (_run_upload_check(p_root, "clang-format", { "--dry-run", "--Werror", "--style=file", p_file_path }, output) != OK) {
+			r_report = "C/C++ style check failed. Run clang-format before uploading. " + output.strip_edges();
+			return FAILED;
+		}
+	} else if (extension == "py") {
+		if (_run_upload_check(p_root, "ruff", { "check", p_file_path }, output) != OK ||
+				_run_upload_check(p_root, "ruff", { "format", "--check", p_file_path }, output) != OK) {
+			r_report = "Python quality check failed. Run Ruff before uploading. " + output.strip_edges();
+			return FAILED;
+		}
+	} else if (extension == "cs") {
+		if (_run_mutating_format_check(p_root, p_file_path, { "misc/scripts/dotnet_format.py", p_file_path }, format_error) != OK) {
+			r_report = format_error;
+			return FAILED;
+		}
+	}
+
+	r_report = "Format and repository quality checks passed.";
+	return OK;
+}
+
+static double _estimate_code_universality(const String &p_file_path, const String &p_code, String &r_reason) {
+	double score = 88.0;
+	Vector<String> reasons;
+	if (p_code.length() < 120) {
+		score -= 18.0;
+		reasons.push_back("very small change surface");
+	}
+	const String lower = p_code.to_lower();
+	if (lower.contains("todo") || lower.contains("fixme")) {
+		score -= 12.0;
+		reasons.push_back("unfinished TODO/FIXME markers");
+	}
+	if (lower.contains("hardcoded") || lower.contains("workaround")) {
+		score -= 10.0;
+		reasons.push_back("hardcoded or workaround-specific behavior");
+	}
+	if (p_file_path.contains("test") || p_file_path.contains("_tmp") || p_file_path.contains("local")) {
+		score -= 8.0;
+		reasons.push_back("narrow test/local path");
+	}
+	if (p_file_path.begins_with("editor/") || p_file_path.begins_with("core/") || p_file_path.begins_with("scene/")) {
+		score += 4.0;
+		reasons.push_back("shared engine subsystem");
+	}
+	score = CLAMP(score, 0.0, 100.0);
+	String reason_text;
+	for (int i = 0; i < reasons.size(); i++) {
+		if (!reason_text.is_empty()) {
+			reason_text += ", ";
+		}
+		reason_text += reasons[i];
+	}
+	r_reason = reason_text.is_empty() ? "general reusable engine implementation" : reason_text;
+	return score;
+}
+
+Dictionary AIToolExecutor::_upload_code(const Dictionary &p_args) {
+	String file_path = p_args.get("file_path", String());
+	String commit_message = p_args.get("commit_message", String());
+
+	if (file_path.is_empty()) {
+		return _make_result("file_path is required.", true);
+	}
+	if (commit_message.is_empty()) {
+		return _make_result("commit_message is required.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("Project root not detected. Make sure you're in ENGINE mode with a valid godot.creator.json or SConstruct in the working directory.", true);
+	}
+
+	String source_update_message;
+	if (_ensure_engine_source_updated_before_mutation(source_update_message) != OK) {
+		return _make_result("Engine source update check failed before upload: " + source_update_message, true);
+	}
+
+	String full_path = project_root.path_join(file_path);
+
+	// Step 1: Verify file exists.
+	if (!FileAccess::exists(full_path)) {
+		return _make_result("File not found: " + full_path, true);
+	}
+
+	// Step 2: Read file content.
+	Error read_err;
+	String code = FileAccess::get_file_as_string(full_path, &read_err);
+	if (read_err != OK) {
+		return _make_result("Failed to read file: " + full_path, true);
+	}
+
+	// Step 3: Repository format and code-quality checks.
+	String quality_report;
+	if (_validate_upload_format_and_quality(project_root, file_path, code, quality_report) != OK) {
+		return _make_result("Upload rejected: " + quality_report, true);
+	}
+
+	// Step 4: Security check - detect suspicious patterns.
+	CodeSecurityReport security = AICodeSecurityChecker::check(code);
+	if (!security.is_safe) {
+		String warning_text = "Upload rejected: security check failed.\n";
+		for (int i = 0; i < security.warnings.size(); i++) {
+			warning_text += "  - " + security.warnings[i] + "\n";
+		}
+		warning_text += "\nPlease resolve the flagged code before uploading.";
+		return _make_result(warning_text, true);
+	}
+
+	// Step 5: Estimate whether the change belongs in a shared engine fork.
+	String universality_reason;
+	const double universality_score = _estimate_code_universality(file_path, code, universality_reason);
+
+	// Step 6: Check against the configured universality threshold.
+	AISettingsData settings = AISettings::load();
+	if (universality_score < settings.feature_universality_threshold) {
+		return _make_result(
+				"Upload rejected: estimated universality " + String::num(universality_score, 1) +
+						"% below threshold " + String::num(settings.feature_universality_threshold, 1) +
+						"%. Code should be more generally useful before committing.",
+				true);
+	}
+
+	// Step 7: Perform git add / commit / push.
+	if (settings.develop_mode) {
+		if (AIDevelopFlow::get_stage() != AIDevelopFlow::READY_TO_UPLOAD) {
+			return _make_result("[Develop Mode] Upload simulation is waiting for successful user verification and AI verification.", true);
+		}
+		AIDevelopFlow::record_simulated_upload(file_path);
+		return _make_result(
+				"[Develop Mode] Upload simulation successful: " + file_path +
+						"\n  Format and quality: PASSED"
+						"\n  Security: PASSED"
+						"\n  Universality: " + String::num(universality_score, 1) + "% (" + universality_reason + ")"
+						"\n  Git add/commit/push: SKIPPED (no GitHub files changed)");
+	}
+
+	String error_msg;
+	Error upload_err = AICodeUploader::upload(file_path, commit_message, project_root, &error_msg);
+	if (upload_err != OK) {
+		return _make_result("Upload failed: " + error_msg, true);
+	}
+
+	return _make_result(
+			"Upload successful: " + file_path +
+					"\n  Commit message: " + commit_message +
+					"\n  Format and quality: PASSED"
+					"\n  Security: PASSED"
+					"\n  Universality: " + String::num(universality_score, 1) + "% (" + universality_reason + ")");
+}
+
+Dictionary AIToolExecutor::_develop_ai_verify(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (!settings.develop_mode) {
+		return _make_result("Develop Mode is not enabled.", true);
+	}
+	if (AIDevelopFlow::get_stage() != AIDevelopFlow::AI_VERIFICATION) {
+		return _make_result("AI verification is not ready. The user must verify the restarted feature first.", true);
+	}
+	const bool passed = p_args.get("passed", false);
+	const String summary = p_args.get("summary", String());
+	AIDevelopFlow::record_ai_verification(passed, summary);
+	return _make_result(vformat("[Develop Mode] AI verification %s: %s", passed ? "PASSED" : "FAILED", summary), !passed);
+}
+
+Dictionary AIToolExecutor::_execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json) {
+	if (AISettings::load().develop_mode) {
+		return _make_result("[Develop Mode] External MCP tool execution is disabled during the safe workflow demonstration.", true);
+	}
+	// Look up the MCP server configuration.
+	Vector<AISkillEntry> skills;
+	Vector<AIMCPServerEntry> mcp_servers;
+	if (AIToolRegistry::load(skills, mcp_servers) != OK) {
+		return _make_result(vformat("MCP server '%s' not found (registry load failed).", p_server_name), true);
+	}
+
+	AIMCPServerEntry target_server;
+	bool found = false;
+	for (const AIMCPServerEntry &server : mcp_servers) {
+		if (server.name == p_server_name && server.enabled) {
+			target_server = server;
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		return _make_result(vformat("MCP server '%s' is not configured or not enabled.", p_server_name), true);
+	}
+
+	if (target_server.command.is_empty() && target_server.url.is_empty()) {
+		return _make_result(vformat("MCP server '%s' has no command or URL configured.", p_server_name), true);
+	}
+
+	// Use MCPServerRuntime for interactive MCP communication
+	MCPServerRuntime *runtime = MCPServerRuntime::get_singleton();
+
+	// Lazy start: if runtime not running for this server, start it
+	if (!runtime->is_running_server(p_server_name)) {
+		Error err = runtime->start(target_server);
+		if (err != OK) {
+			return _make_result(vformat("Failed to start MCP server '%s': %s", p_server_name, runtime->get_last_error()), true);
+		}
+	}
+
+	// Parse arguments JSON
+	Dictionary arguments;
+	Variant parsed_args = JSON::parse_string(p_args_json);
+	if (parsed_args.get_type() == Variant::DICTIONARY) {
+		arguments = parsed_args;
+	}
+
+	// Call the tool via runtime
+	Dictionary result = runtime->call_tool(p_tool_name, arguments);
+
+	if (result.has("is_error") && result["is_error"]) {
+		String error_content = result.get("content", "Unknown error");
+		return _make_result(vformat("MCP tool '%s.%s' error: %s", p_server_name, p_tool_name, error_content), true);
+	}
+
+	String content = result.get("content", "");
+	return _make_result(content);
+}

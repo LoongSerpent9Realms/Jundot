@@ -1,0 +1,211 @@
+@page
+@model BranchesModel
+@{
+}
+
+<section class="hero">
+    <div class="hero-inner">
+        <div>
+            <p class="eyebrow">引擎分支</p>
+            <h1>按游戏类型，选最合适的引擎。</h1>
+            <p class="lead">
+                Jundot Engine 不只是一个通用引擎——它可以针对不同游戏类型深度定制。
+                每一个分支都经过 AI 针对性优化，内置对应类型的核心模块，让你从零到原型更快一步。
+            </p>
+            <div class="hero-actions">
+                <a class="button primary" href="#featured">推荐分支</a>
+                <a class="button secondary" href="#all-branches">浏览全部分支</a>
+            </div>
+        </div>
+        <div class="stats" aria-label="分支亮点">
+            <div class="stat">
+                <strong>AI 定制</strong>
+                <span>每个分支都由 AI 针对游戏类型深度优化。</span>
+            </div>
+            <div class="stat">
+                <strong>多许可</strong>
+                <span>MIT 开源版和商业授权版，按需选择。</span>
+            </div>
+            <div class="stat">
+                <strong>即开即用</strong>
+                <span>内置核心模块，下载即可开始搭建原型。</span>
+            </div>
+            <div class="stat">
+                <strong>持续进化</strong>
+                <span>AI 持续迭代，分支能力越用越强。</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="filters" class="light">
+    <div class="section-inner">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <span style="font-weight: 600; color: var(--text-primary);">按游戏类型筛选：</span>
+            <a href="/Branches" class="filter-tag @(string.IsNullOrEmpty(Model.CurrentGenre) ? "active" : "")">全部</a>
+            @foreach (GameGenre genre in Enum.GetValues(typeof(GameGenre)))
+            {
+                var genreName = genre.ToString();
+                var isActive = Model.CurrentGenre == genreName;
+                <a href="/Branches?genre=@genreName" class="filter-tag @(isActive ? "active" : "")">
+                    @BranchesModel.GetGenreDisplayName(genre)
+                </a>
+            }
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px;">
+            <span style="font-weight: 600; color: var(--text-primary);">按许可类型筛选：</span>
+            <a href="/Branches@(!string.IsNullOrEmpty(Model.CurrentGenre) ? $"?genre={Model.CurrentGenre}" : "")" class="filter-tag @(string.IsNullOrEmpty(Model.CurrentLicense) ? "active" : "")">全部</a>
+            @foreach (LicenseType license in Enum.GetValues(typeof(LicenseType)))
+            {
+                var licenseName = license.ToString();
+                var isActive = Model.CurrentLicense == licenseName;
+                var queryParams = System.Web.HttpUtility.ParseQueryString("");
+                if (!string.IsNullOrEmpty(Model.CurrentGenre)) queryParams["genre"] = Model.CurrentGenre;
+                queryParams["license"] = licenseName;
+                <a href="/Branches?@queryParams" class="filter-tag @(isActive ? "active" : "")">
+                    @BranchesModel.GetLicenseDisplayName(license)
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+@if (Model.FeaturedBranches.Any() && string.IsNullOrEmpty(Model.CurrentGenre) && string.IsNullOrEmpty(Model.CurrentLicense))
+{
+    <section id="featured" class="release">
+        <div class="section-inner">
+            <div class="section-head">
+                <h2>🌟 推荐分支</h2>
+                <p>这些分支经过精心打磨，适合快速启动对应类型的游戏项目。</p>
+            </div>
+            <div class="branch-grid">
+                @foreach (var branch in Model.FeaturedBranches)
+                {
+                    <article class="branch-card featured">
+                        <div class="branch-card-header">
+                            <h3>@branch.Name</h3>
+                            <div class="branch-badges">
+                                @if (branch.LicenseType == LicenseType.MIT)
+                                {
+                                    <span class="badge badge-published">MIT</span>
+                                }
+                                else if (branch.LicenseType == LicenseType.Commercial)
+                                {
+                                    <span class="badge badge-beta">商业</span>
+                                }
+                                else
+                                {
+                                    <span class="badge">@BranchesModel.GetLicenseDisplayName(branch.LicenseType)</span>
+                                }
+                                <span class="badge" style="background: rgba(86, 213, 200, 0.15); color: var(--green);">
+                                    @BranchesModel.GetGenreDisplayName(branch.Genre)
+                                </span>
+                            </div>
+                        </div>
+                        <p class="branch-desc">@branch.Description</p>
+                        @if (branch.Features.Any())
+                        {
+                            <ul class="branch-features">
+                                @foreach (var feature in branch.Features.OrderBy(f => f.SortOrder).Take(3))
+                                {
+                                    <li>
+                                        @if (!string.IsNullOrEmpty(feature.Icon))
+                                        {
+                                            <span class="feature-icon">@feature.Icon</span>
+                                        }
+                                        <span>@feature.Title</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        <div class="branch-card-footer">
+                            <span style="color: #6a6a6a; font-size: 14px;">
+                                @branch.Releases.Count 个可用版本
+                            </span>
+                            <a href="/Branch/@branch.Slug" class="btn btn-primary btn-sm">查看详情 →</a>
+                        </div>
+                    </article>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<section id="all-branches" class="light">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2>全部分支</h2>
+            <p>共 @Model.PublishedBranches.Count 个引擎分支，覆盖多种游戏类型和许可方式。</p>
+        </div>
+
+        @if (Model.BranchesByGenre.Any())
+        {
+            @foreach (var genreGroup in Model.BranchesByGenre.OrderBy(g => g.Key))
+            {
+                <div class="genre-group">
+                    <h3 style="margin-bottom: 20px; color: var(--text-primary);">
+                        <span style="background: linear-gradient(135deg, var(--green), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                            #
+                        </span>
+                        @BranchesModel.GetGenreDisplayName(genreGroup.Key)
+                        <span style="font-size: 14px; font-weight: normal; color: var(--text-secondary);">
+                            （@genreGroup.Value.Count 个分支）
+                        </span>
+                    </h3>
+                    <div class="branch-grid">
+                        @foreach (var branch in genreGroup.Value)
+                        {
+                            <article class="branch-card">
+                                <div class="branch-card-header">
+                                    <h3>@branch.Name</h3>
+                                    <div class="branch-badges">
+                                        @if (branch.LicenseType == LicenseType.MIT)
+                                        {
+                                            <span class="badge badge-published">MIT</span>
+                                        }
+                                        else if (branch.LicenseType == LicenseType.Commercial)
+                                        {
+                                            <span class="badge badge-beta">商业</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge">@BranchesModel.GetLicenseDisplayName(branch.LicenseType)</span>
+                                        }
+                                    </div>
+                                </div>
+                                <p class="branch-desc">@branch.Description</p>
+                                @if (branch.Features.Any())
+                                {
+                                    <ul class="branch-features">
+                                        @foreach (var feature in branch.Features.OrderBy(f => f.SortOrder).Take(3))
+                                        {
+                                            <li>
+                                                @if (!string.IsNullOrEmpty(feature.Icon))
+                                                {
+                                                    <span class="feature-icon">@feature.Icon</span>
+                                                }
+                                                <span>@feature.Title</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                <div class="branch-card-footer">
+                                    <span style="color: var(--text-secondary); font-size: 14px;">
+                                        @branch.Releases.Count 个可用版本
+                                    </span>
+                                    <a href="/Branch/@branch.Slug" class="btn btn-primary btn-sm">查看详情 →</a>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div style="text-align: center; padding: 60px 0; color: var(--text-secondary);">
+                暂无符合条件的分支
+            </div>
+        }
+    </div>
+</section>

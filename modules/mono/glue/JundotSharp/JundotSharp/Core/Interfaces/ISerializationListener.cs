@@ -1,0 +1,21 @@
+namespace Jundot
+{
+    /// <summary>
+    /// Allows a JundotObject to react to the serialization/deserialization
+    /// that occurs when Jundot reloads assemblies.
+    /// </summary>
+    public interface ISerializationListener
+    {
+        /// <summary>
+        /// Executed before serializing this instance's state when reloading assemblies.
+        /// Clear any data that should not be serialized.
+        /// </summary>
+        public void OnBeforeSerialize();
+
+        /// <summary>
+        /// Executed after deserializing this instance's state after reloading assemblies.
+        /// Restore any state that has been lost.
+        /// </summary>
+        public void OnAfterDeserialize();
+    }
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AIInterface" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/jundotengine/jundot/master/doc/class.xsd">
+	<brief_description>
+		Node for sending OpenAI-compatible chat completion requests.
+	</brief_description>
+	<description>
+		[AIInterface] wraps [HTTPRequest] and exposes a simple scene node API for chat completion services that accept OpenAI-compatible [code]/chat/completions[/code] JSON requests.
+	</description>
+	<methods>
+		<method name="cancel_request">
+			<return type="void" />
+			<description>
+				Cancels the current HTTP request, if one is running.
+			</description>
+		</method>
+		<method name="is_requesting" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while the internal HTTP client is connected or processing a request.
+			</description>
+		</method>
+		<method name="send_chat">
+			<return type="int" enum="Error" />
+			<param index="0" name="message" type="String" />
+			<description>
+				Sends one user message. [member system_prompt] is added as a system message when it is not empty.
+			</description>
+		</method>
+		<method name="send_messages">
+			<return type="int" enum="Error" />
+			<param index="0" name="messages" type="Array" />
+			<description>
+				Sends a complete chat messages array. Each item should be a dictionary with [code]role[/code] and [code]content[/code].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="api_base_url" type="String" setter="set_api_base_url" getter="get_api_base_url" default="&quot;https://api.openai.com/v1&quot;">
+			Base API URL. [code]/chat/completions[/code] is appended automatically when the URL does not already end with it.
+		</member>
+		<member name="api_key" type="String" setter="set_api_key" getter="get_api_key" default="&quot;&quot;">
+			Bearer token used for the Authorization header.
+		</member>
+		<member name="max_tokens" type="int" setter="set_max_tokens" getter="get_max_tokens" default="1024">
+			Maximum tokens requested from the model.
+		</member>
+		<member name="model" type="String" setter="set_model" getter="get_model" default="&quot;gpt-4o-mini&quot;">
+			Model name sent in the request body.
+		</member>
+		<member name="system_prompt" type="String" setter="set_system_prompt" getter="get_system_prompt" default="&quot;&quot;">
+			Optional system prompt used by [method send_chat].
+		</member>
+		<member name="temperature" type="float" setter="set_temperature" getter="get_temperature" default="0.7">
+			Sampling temperature sent in the request body.
+		</member>
+		<member name="timeout" type="float" setter="set_timeout" getter="get_timeout" default="60.0">
+			HTTP request timeout in seconds.
+		</member>
+		<member name="use_threads" type="bool" setter="set_use_threads" getter="is_using_threads" default="true">
+			If [code]true[/code], the internal [HTTPRequest] uses a worker thread.
+		</member>
+	</members>
+	<signals>
+		<signal name="chat_completed">
+			<param index="0" name="result" type="int" />
+			<param index="1" name="response_code" type="int" />
+			<param index="2" name="content" type="String" />
+			<param index="3" name="json" type="Dictionary" />
+			<param index="4" name="raw_body" type="String" />
+			<description>
+				Emitted when a chat request completes. [param content] contains the first choice text when it can be found.
+			</description>
+		</signal>
+	</signals>
+</class>

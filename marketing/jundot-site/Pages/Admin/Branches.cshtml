@@ -1,0 +1,183 @@
+@page
+@model JundotSite.Pages.Admin.BranchesModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+@if (Model.ShowForm)
+{
+    <div class="admin-card admin-form">
+        <h3>@(Model.IsEditing ? "编辑分支" : "新建分支")</h3>
+        <form method="post" asp-page-handler="@(Model.IsEditing ? "Edit" : "Create")">
+            @if (Model.IsEditing)
+            {
+                <input type="hidden" asp-for="EditId" />
+            }
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.Name">分支名称</label>
+                    <input asp-for="Input.Name" placeholder="例如：2D 横版动作版" />
+                    <span asp-validation-for="Input.Name" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.Slug">标识（URL用）</label>
+                    <input asp-for="Input.Slug" placeholder="例如：action-2d" />
+                    <span asp-validation-for="Input.Slug" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.Genre">游戏类型</label>
+                    <select asp-for="Input.Genre">
+                        <option value="@GameGenre.Action2D">2D 动作</option>
+                        <option value="@GameGenre.Action3D">3D 动作</option>
+                        <option value="@GameGenre.RPG">角色扮演 (RPG)</option>
+                        <option value="@GameGenre.Puzzle">解谜益智</option>
+                        <option value="@GameGenre.Simulation">模拟经营</option>
+                        <option value="@GameGenre.Strategy">策略</option>
+                        <option value="@GameGenre.Adventure">冒险</option>
+                        <option value="@GameGenre.Platformer">平台跳跃</option>
+                        <option value="@GameGenre.Shooter">射击</option>
+                        <option value="@GameGenre.Racing">赛车</option>
+                        <option value="@GameGenre.Sports">体育</option>
+                        <option value="@GameGenre.Casual">休闲</option>
+                        <option value="@GameGenre.Other">通用/其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.LicenseType">许可类型</label>
+                    <select asp-for="Input.LicenseType">
+                        <option value="@LicenseType.MIT">MIT</option>
+                        <option value="@LicenseType.Commercial">商业授权</option>
+                        <option value="@LicenseType.GPL">GPL</option>
+                        <option value="@LicenseType.Apache">Apache</option>
+                        <option value="@LicenseType.Custom">自定义</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.LicenseName">许可名称</label>
+                    <input asp-for="Input.LicenseName" placeholder="例如：MIT License" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.LicenseUrl">许可链接</label>
+                    <input asp-for="Input.LicenseUrl" placeholder="https://..." />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.ThumbnailUrl">缩略图 URL（可选）</label>
+                <input asp-for="Input.ThumbnailUrl" placeholder="https://..." />
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Description">分支描述</label>
+                <textarea asp-for="Input.Description" placeholder="描述这个分支的特点和适用场景" rows="4"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>状态设置</label>
+                    <div class="checkbox-inline" style="margin-bottom: 10px;">
+                        <input type="checkbox" asp-for="Input.IsPublished" id="isPublished" />
+                        <label for="isPublished" style="margin: 0; font-weight: normal;">已发布（在网站上显示）</label>
+                    </div>
+                    <div class="checkbox-inline">
+                        <input type="checkbox" asp-for="Input.IsFeatured" id="isFeatured" />
+                        <label for="isFeatured" style="margin: 0; font-weight: normal;">推荐展示</label>
+                    </div>
+                </div>
+                <div></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">@(Model.IsEditing ? "保存修改" : "创建分支")</button>
+                <a href="/Admin/Branches" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">分支列表</h3>
+            <a href="/Admin/Branches?handler=Create" class="btn btn-primary">+ 新建分支</a>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>分支名称</th>
+                    <th>游戏类型</th>
+                    <th>许可类型</th>
+                    <th>状态</th>
+                    <th>版本数</th>
+                    <th>下载量</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var branch in Model.Branches)
+                {
+                    <tr>
+                        <td><strong>@branch.Name</strong></td>
+                        <td>@branch.Genre</td>
+                        <td>
+                            @if (branch.LicenseType == LicenseType.MIT)
+                            {
+                                <span class="badge badge-published">MIT</span>
+                            }
+                            else if (branch.LicenseType == LicenseType.Commercial)
+                            {
+                                <span class="badge badge-beta">商业</span>
+                            }
+                            else
+                            {
+                                <span>@branch.LicenseType</span>
+                            }
+                        </td>
+                        <td>
+                            @if (branch.IsPublished)
+                            {
+                                <span class="badge badge-published">已发布</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-draft">草稿</span>
+                            }
+                            @if (branch.IsFeatured)
+                            {
+                                <span class="badge badge-beta" style="margin-left: 6px;">推荐</span>
+                            }
+                        </td>
+                        <td>@branch.Releases.Count</td>
+                        <td>@branch.DownloadCount</td>
+                        <td>@branch.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <a href="/Admin/Branches?handler=Edit&id=@branch.Id" class="btn btn-primary btn-sm">编辑</a>
+                            <form method="post" asp-page-handler="Delete" style="display: inline;" onsubmit="return confirm('确定要删除这个分支吗？');">
+                                <input type="hidden" name="id" value="@branch.Id" />
+                                <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

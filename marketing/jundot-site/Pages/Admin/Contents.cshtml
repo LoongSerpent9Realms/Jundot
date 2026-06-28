@@ -1,0 +1,88 @@
+@page
+@model JundotSite.Pages.Admin.ContentsModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (Model.ShowEditForm)
+{
+    <div class="admin-card admin-form">
+        <h3>编辑内容</h3>
+<<<<<<< HEAD
+        <form method="post" asp-page-handler="Edit">
+=======
+        <form method="post">
+>>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+            <input type="hidden" asp-for="EditId" />
+
+            <div class="form-group">
+                <label asp-for="Input.Key">Key（键名）</label>
+                <input asp-for="Input.Key" />
+                <span asp-validation-for="Input.Key" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Value">Value（内容值）</label>
+                <textarea asp-for="Input.Value"></textarea>
+                <span asp-validation-for="Input.Value" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Description">描述（可选）</label>
+                <input asp-for="Input.Description" />
+                <span asp-validation-for="Input.Description" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存修改</button>
+                <a href="/Admin/Contents" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0;">网站内容列表</h3>
+            <span style="color: #53615c; font-size: 14px;">共 @Model.Contents.Count 条内容</span>
+        </div>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Key（键名）</th>
+                    <th>描述</th>
+                    <th>最后更新</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var content in Model.Contents)
+                {
+                    <tr>
+                        <td><strong>@content.Key</strong></td>
+                        <td>@(content.Description ?? "-")</td>
+                        <td>@content.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            <a href="/Admin/Contents?handler=Edit&id=@content.Id" class="btn btn-primary btn-sm">编辑</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="admin-card">
+        <h3>使用说明</h3>
+        <p style="color: #53615c; line-height: 1.7; margin: 0;">
+            这里管理网站的所有文本内容。点击"编辑"可以修改对应内容，保存后网站会立即显示新的内容。
+            <br />
+            <strong>提示：</strong>Value 字段支持纯文本和 HTML 内容，请谨慎修改。
+        </p>
+    </div>
+}

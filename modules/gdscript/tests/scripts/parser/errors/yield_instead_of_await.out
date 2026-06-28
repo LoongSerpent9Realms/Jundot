@@ -1,0 +1,2 @@
+GDTEST_PARSER_ERROR
+"yield" was removed in Jundot 4. Use "await" instead.

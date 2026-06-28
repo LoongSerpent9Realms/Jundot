@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="CppScript" inherits="Script" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A native C++ script source file.
+	</brief_description>
+	<description>
+		A native C++ script source file saved with the [code].cpp[/code] extension. C++ scripts are compiled code: the editor can create, save, inspect, and attach them as placeholder script resources, but they do not execute from source text at runtime.
+		To make a C++ class run in a project, compile and register it as an engine module or GDExtension class, then use the compiled native type.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

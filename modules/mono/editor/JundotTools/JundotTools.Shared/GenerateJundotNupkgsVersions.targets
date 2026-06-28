@@ -1,0 +1,39 @@
+<Project>
+  <!-- Generate C# file with the version of all the nupkgs bundled with Jundot -->
+
+  <Target Name="SetPropertiesForGenerateJundotNupkgsVersions">
+    <PropertyGroup>
+      <GeneratedJundotNupkgsVersionsFile>$(IntermediateOutputPath)JundotNupkgsVersions.g.cs</GeneratedJundotNupkgsVersionsFile>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="GenerateJundotNupkgsVersionsFile"
+          DependsOnTargets="_GenerateJundotNupkgsVersionsFile"
+          BeforeTargets="PrepareForBuild;CompileDesignTime;BeforeCompile;CoreCompile">
+    <ItemGroup>
+      <Compile Include="$(GeneratedJundotNupkgsVersionsFile)" />
+      <FileWrites Include="$(GeneratedJundotNupkgsVersionsFile)" />
+    </ItemGroup>
+  </Target>
+  <Target Name="_GenerateJundotNupkgsVersionsFile"
+          DependsOnTargets="SetPropertiesForGenerateJundotNupkgsVersions"
+          Inputs="$(MSBuildProjectFile);$(MSBuildThisFileDirectory);$(MSBuildProjectFile)\..\..\..\SdkPackageVersions.props"
+          Outputs="$(GeneratedJundotNupkgsVersionsFile)">
+    <PropertyGroup>
+      <GenerateJundotNupkgsVersionsCode><![CDATA[
+namespace $(RootNamespace)
+{
+    public class GeneratedJundotNupkgsVersions
+    {
+        public const string JundotNETSdk = "$(PackageVersion_Jundot_NET_Sdk)"%3b
+        public const string JundotSourceGenerators = "$(PackageVersion_Jundot_SourceGenerators)"%3b
+        public const string JundotSharp = "$(PackageVersion_JundotSharp)"%3b
+    }
+}
+]]></GenerateJundotNupkgsVersionsCode>
+    </PropertyGroup>
+    <WriteLinesToFile Lines="$(GenerateJundotNupkgsVersionsCode)"
+                      File="$(GeneratedJundotNupkgsVersionsFile)"
+                      Overwrite="True" WriteOnlyWhenDifferent="True" />
+  </Target>
+</Project>

@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- $(JundotProjectDir) would normally be defined by the Jundot.NET.Sdk -->
+    <JundotProjectDir>$(MSBuildProjectDirectory)</JundotProjectDir>
+    <JundotProjectDirBase64 Condition=" $([MSBuild]::VersionGreaterThanOrEquals($(MSBuildAssemblyVersion), '17.3')) ">$([MSBuild]::ConvertToBase64('$(JundotProjectDir)'))</JundotProjectDirBase64>
+    <!-- For compiling GetJundotPropertyDefaultValues. -->
+    <DefineConstants>$(DefineConstants);TOOLS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- The emitted files are not part of the compilation nor design.
+    They're only for peeking at the generated sources. Sometimes the
+    emitted files get corrupted, but that won't break anything. -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)\GeneratedFiles</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\glue\JundotSharp\JundotSharp\JundotSharp.csproj">
+      <Private>False</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Jundot.SourceGenerators\Jundot.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- This file is imported automatically when using PackageReference to
+  reference Jundot.SourceGenerators, but not when using ProjectReference -->
+  <Import Project="..\Jundot.SourceGenerators\Jundot.SourceGenerators.props" />
+
+</Project>

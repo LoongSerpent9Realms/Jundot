@@ -1,0 +1,20 @@
+# Configuration files with secrets
+appsettings.json
+appsettings.*.json
+!appsettings.json.example
+!appsettings.Development.json
+
+# Build output
+bin/
+obj/
+*.user
+*.suo
+
+# Database
+*.db
+*.db-journal
+
+# IDE
+.vs/
+.vscode/
+.idea/

@@ -1,0 +1,93 @@
+@page
+@model JundotSite.Pages.Admin.MessagesModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+<div class="stat-cards">
+    <div class="stat-card green">
+        <div class="stat-number">@Model.TotalMessages</div>
+        <div class="stat-label">留言总数</div>
+    </div>
+    <div class="stat-card amber">
+        <div class="stat-number">@Model.UnreadMessages</div>
+        <div class="stat-label">未读留言</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-number">@(Model.TotalMessages - Model.UnreadMessages)</div>
+        <div class="stat-label">已读留言</div>
+    </div>
+    <div class="stat-card coral">
+        <div class="stat-number">0</div>
+        <div class="stat-label">已回复</div>
+    </div>
+</div>
+
+<div class="admin-card">
+    <h3>留言列表</h3>
+    @if (Model.Messages.Any())
+    {
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>状态</th>
+                    <th>姓名</th>
+                    <th>邮箱</th>
+                    <th>主题</th>
+                    <th>时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var message in Model.Messages)
+                {
+                    <tr>
+                        <td>
+                            @if (message.IsRead)
+                            {
+                                <span class="badge badge-published">已读</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-draft">未读</span>
+                            }
+                        </td>
+                        <td><strong>@message.Name</strong></td>
+                        <td>@message.Email</td>
+                        <td>@(message.Subject ?? "-")</td>
+                        <td>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            @if (!message.IsRead)
+                            {
+                                <form method="post" asp-page-handler="MarkRead" style="display: inline;">
+                                    <input type="hidden" name="id" value="@message.Id" />
+                                    <button type="submit" class="btn btn-primary btn-sm">标记已读</button>
+                                </form>
+                            }
+                            <form method="post" asp-page-handler="Delete" style="display: inline;" onsubmit="return confirm('确定要删除这条留言吗？');">
+                                <input type="hidden" name="id" value="@message.Id" />
+                                <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="6" style="background: #f7faf7; padding: 16px 24px;">
+                            <div style="white-space: pre-wrap; color: #53615c; line-height: 1.7;">
+                                @message.Message
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p style="color: #53615c;">暂无留言</p>
+    }
+</div>

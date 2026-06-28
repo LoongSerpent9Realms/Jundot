@@ -1,0 +1,22 @@
+<h1 id="ai-assistant">AI Assistant</h1>
+<p>The AI Assistant is the main Jundot workflow surface. It can create projects, inspect code, edit files, run checks, fix problems, and prepare verified changes for GitHub.</p>
+
+<h2 id="project-creation">Project creation</h2>
+<p>Start by describing the game type, theme, controls, art direction, and target platform. The AI should summarize the plan, choose an English project name, and create the first runnable version.</p>
+
+<h2 id="project-mode">Project mode</h2>
+<p>In project mode, the AI works inside the current project. It should use project files, scenes, scripts, logs, and validation results as evidence before editing.</p>
+
+<h2 id="engine-change">Engine changes</h2>
+<p>If the current engine cannot complete the request, the AI can propose an engine change. The proposal should explain the limitation, the intended project behavior, the files likely affected, and how the user can verify the result.</p>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">Do not change the engine by default</div>
+    <p>When the engine already supports the requirement, the AI should keep work inside the project. Engine work is reserved for missing capability or reusable improvements.</p>
+</div>
+
+<h2 id="errors-performance">Errors and performance</h2>
+<p>When you see an error, crash, slow frame, or bad runtime behavior, give the AI the exact message and reproduction steps. The AI can inspect the project, apply a fix, and ask you to verify before upload.</p>
+
+<h2 id="github-upload">GitHub upload</h2>
+<p>After you verify the result, the AI can prepare a commit and upload changes to GitHub. The upload should not include secrets, temporary files, or unrelated edits.</p>

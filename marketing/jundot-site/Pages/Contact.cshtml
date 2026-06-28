@@ -1,0 +1,71 @@
+@page
+@model ContactModel
+@{
+    ViewData["Title"] = "联系我们";
+}
+
+<div class="page-content light">
+    <section>
+        <div class="section-inner" style="max-width: 800px;">
+            <h2>联系我们</h2>
+            <p style="margin-top: 16px; color: #53615c; line-height: 1.7;">
+                有任何问题、建议或合作意向？欢迎通过以下方式联系我们，我们会尽快回复。
+            </p>
+
+            @if (Model.IsSuccess)
+            {
+                <div class="text-success">
+                    ✅ 留言提交成功！我们会尽快与您联系。
+                </div>
+            }
+
+            <form method="post" style="margin-top: 32px;">
+                <div asp-validation-summary="All" class="text-error"></div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Name"></label>
+                    <input asp-for="Input.Name" type="text" placeholder="请输入您的姓名" />
+                    <span asp-validation-for="Input.Name" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Email"></label>
+                    <input asp-for="Input.Email" type="email" placeholder="请输入您的邮箱" />
+                    <span asp-validation-for="Input.Email" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Subject"></label>
+                    <input asp-for="Input.Subject" type="text" placeholder="可选：留言主题" />
+                    <span asp-validation-for="Input.Subject" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Message"></label>
+                    <textarea asp-for="Input.Message" placeholder="请输入您的留言内容"></textarea>
+                    <span asp-validation-for="Input.Message" style="color: #c62828; font-size: 13px;"></span>
+                </div>
+
+                <button type="submit" class="button primary">提交留言</button>
+            </form>
+
+            <div style="margin-top: 48px; padding-top: 32px; border-top: 1px solid #d9e3dd;">
+                <h3 style="margin-bottom: 20px;">其他联系方式</h3>
+                <div class="copy-list">
+                    <article class="copy-item">
+                        <h3>GitHub</h3>
+                        <p>
+                            <a href="https://github.com/LoongSerpent9Realms/Jundot" target="_blank" style="color: var(--green); font-weight: 600;">
+                                github.com/LoongSerpent9Realms/Jundot
+                            </a>
+                        </p>
+                    </article>
+                    <article class="copy-item">
+                        <h3>Issues</h3>
+                        <p>遇到问题或有功能建议？欢迎在 GitHub 上提交 Issue。</p>
+                    </article>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
