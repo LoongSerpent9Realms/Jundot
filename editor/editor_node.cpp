@@ -70,6 +70,7 @@
 #include "editor/editor_log.h"
 #include "editor/editor_main_screen.h"
 #include "editor/editor_string_names.h"
+#include "editor/ai/ai_modified_scene_tracker.h"
 #include "editor/ai/ai_restart_helper.h"
 #include "editor/ai/ai_chat_panel.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -1554,6 +1555,7 @@ void EditorNode::_scan_external_changes() {
 	TreeItem *r = disk_changed_list->create_item();
 	disk_changed_list->set_hide_root(true);
 	bool need_reload = false;
+	LocalVector<String> ai_changed_scenes;
 
 	disk_changed_scenes.clear();
 	disk_changed_project = false;
@@ -1572,6 +1574,12 @@ void EditorNode::_scan_external_changes() {
 		uint64_t date = FileAccess::get_modified_time(scene_path);
 
 		if (date > last_date) {
+			const bool scene_has_unsaved_changes = EditorUndoRedoManager::get_singleton()->is_history_unsaved(editor_data.get_scene_history_id(i));
+			if (!scene_has_unsaved_changes && AIModifiedSceneTracker::consume_scene_write(scene_path)) {
+				ai_changed_scenes.push_back(scene_path);
+				continue;
+			}
+
 			TreeItem *ti = disk_changed_list->create_item(r);
 			ti->set_text(0, scene_path.get_file());
 			need_reload = true;
@@ -1589,6 +1597,10 @@ void EditorNode::_scan_external_changes() {
 
 	if (need_reload) {
 		callable_mp((Window *)disk_changed, &Window::popup_centered_ratio).call_deferred(0.3);
+	}
+
+	for (const String &scene_path : ai_changed_scenes) {
+		callable_mp(this, &EditorNode::reload_scene).call_deferred(scene_path);
 	}
 }
 

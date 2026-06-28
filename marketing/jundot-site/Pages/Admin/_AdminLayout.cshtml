@@ -1,0 +1,99 @@
+@{
+    Layout = null;
+    var adminUser = Context.Session.GetString("AdminUser") ?? "管理员";
+    var currentPage = ViewContext.RouteData.Values["Page"]?.ToString();
+}
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Jundot Engine 管理后台</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/JundotSite.styles.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <div class="admin-brand">
+                <img src="~/images/jundot-icon.png" alt="Jundot Logo" class="admin-brand-logo" />
+                <span>Jundot 后台</span>
+            </div>
+            <ul class="admin-menu">
+                <li>
+                    <a href="/Admin/Index" class="@(currentPage == "/Admin/Index" ? "active" : "")">
+                        <span class="menu-icon">📊</span>
+                        <span>仪表盘</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Contents" class="@(currentPage == "/Admin/Contents" ? "active" : "")">
+                        <span class="menu-icon">📝</span>
+                        <span>内容管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Docs" class="@(currentPage == "/Admin/Docs" ? "active" : "")">
+                        <span class="menu-icon">📚</span>
+                        <span>文档管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Releases" class="@(currentPage == "/Admin/Releases" ? "active" : "")">
+                        <span class="menu-icon">🚀</span>
+                        <span>版本管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Downloads" class="@(currentPage == "/Admin/Downloads" ? "active" : "")">
+                        <span class="menu-icon">📥</span>
+                        <span>下载统计</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Messages" class="@(currentPage == "/Admin/Messages" ? "active" : "")">
+                        <span class="menu-icon">✉️</span>
+                        <span>留言管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Snapshots" class="@(currentPage == "/Admin/Snapshots" ? "active" : "")">
+                        <span class="menu-icon">💾</span>
+                        <span>存档管理</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="/Admin/Users" class="@(currentPage == "/Admin/Users" ? "active" : "")">
+                        <span class="menu-icon">👥</span>
+                        <span>用户管理</span>
+                    </a>
+                </li>
+                <li style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(246, 248, 246, 0.16);">
+                    <a href="/" target="_blank">
+                        <span class="menu-icon">👁️</span>
+                        <span>查看网站</span>
+                    </a>
+                </li>
+            </ul>
+        </aside>
+
+        <div class="admin-content">
+            <header class="admin-header">
+                <h1>@ViewData["Title"]</h1>
+                <div class="admin-header-right">
+                    <span class="admin-user">👤 @adminUser</span>
+                    <a href="/Admin/Logout" class="admin-logout">退出登录</a>
+                </div>
+            </header>
+            <div class="admin-body">
+                @RenderBody()
+            </div>
+        </div>
+    </div>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

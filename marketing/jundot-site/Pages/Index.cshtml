@@ -1,0 +1,174 @@
+@page
+@model IndexModel
+@{
+}
+
+<section class="hero">
+    <div class="hero-inner">
+        <div>
+            <p class="eyebrow">@Model.SiteContents.GetValueOrDefault("Hero_Subtitle", "基于 Godot 的 AI 辅助自动迭代引擎")</p>
+            <h1>@Model.SiteContents.GetValueOrDefault("Hero_Title", "Jundot Engine")</h1>
+            <p class="lead">@Model.SiteContents.GetValueOrDefault("Hero_Description", "AI 不只是帮你写代码——它还能让引擎跟着项目一起进化。用得越多，引擎越懂你。")</p>
+            <div class="hero-actions">
+                <a class="button primary" href="/Download?version=@(Model.PublishedReleases.FirstOrDefault()?.VersionNumber)">下载预览版</a>
+                <a class="button secondary" href="#workflow">查看工作流</a>
+            </div>
+        </div>
+        <div class="stats" aria-label="核心亮点">
+            <div class="stat">
+                <strong>AI Chat</strong>
+                <span>编辑器内直接分析问题、读取上下文、生成修复建议。</span>
+            </div>
+            <div class="stat">
+                <strong>Build Loop</strong>
+                <span>构建结果回到对话中，让 AI 根据真实报错继续修复。</span>
+            </div>
+            <div class="stat">
+                <strong>Package Builder</strong>
+                <span>引擎热更新底层机制，AI 自动构建和分发更新包。</span>
+            </div>
+            <div class="stat">
+                <strong>MIT</strong>
+                <span>继承 Godot 的开放基础，游戏成果归你所有。</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="features" class="light">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2>@Model.SiteContents.GetValueOrDefault("Features_Title", "双循环进化：项目推引擎，引擎助项目。")</h2>
+            <p>@Model.SiteContents.GetValueOrDefault("Features_Description", "Jundot 不只是把 AI 放进编辑器，而是建立了两个互相推动的循环——游戏开发循环解决你当下的问题，引擎进化循环让所有人的引擎一起变强。")</p>
+        </div>
+        <div class="feature-grid" style="grid-template-columns: repeat(2, 1fr);">
+            <article class="feature" style="padding: 32px;">
+                <b style="display: inline-block; background: linear-gradient(135deg, var(--green), var(--teal)); color: #07100d; font-size: 18px; font-weight: 800; padding: 8px 16px; border-radius: 8px;">游戏开发循环</b>
+                <h3 style="margin-top: 20px; font-size: 24px;">你的项目，AI 全力配合。</h3>
+                <p style="margin-top: 14px; line-height: 1.7; font-size: 16px;">
+                    从想法到可玩原型，AI 陪你搭建项目、写脚本、调玩法。遇到报错或性能问题，AI 读取现场、定位根因、生成补丁，你只需要确认结果。工具永远是你的延伸，不会反过来限制你。
+                </p>
+            </article>
+            <article class="feature" style="padding: 32px;">
+                <b style="display: inline-block; background: linear-gradient(135deg, var(--amber), var(--green)); color: #07100d; font-size: 18px; font-weight: 800; padding: 8px 16px; border-radius: 8px;">引擎进化循环</b>
+                <h3 style="margin-top: 20px; font-size: 24px;">用的人越多，引擎越强。</h3>
+                <p style="margin-top: 14px; line-height: 1.7; font-size: 16px;">
+                    当前引擎满足不了项目需求？AI 可以直接修改引擎源码来适配。经过你验证的通用能力，会通过 Package Builder 热更新分发给所有用户。每一个项目，都在让引擎变得更好。
+                </p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section id="workflow" class="flow">
+    <div class="section-inner">
+        <div class="section-head">
+            <h2>@Model.SiteContents.GetValueOrDefault("Workflow_Title", "双循环工作流：项目往前走，引擎也变强。")</h2>
+            <p>@Model.SiteContents.GetValueOrDefault("Workflow_Description", "游戏开发循环解决项目问题，引擎进化循环沉淀通用能力。两个循环互相推动，越用越快。")</p>
+        </div>
+        <div class="timeline">
+            <article class="step">
+                <em>01</em>
+                <h3>和 AI 一起做项目</h3>
+                <p>描述你的游戏想法，AI 帮你创建项目、搭框架、写脚本、做场景，边聊边细化。</p>
+            </article>
+            <article class="step">
+                <em>02</em>
+                <h3>遇到问题现场修</h3>
+                <p>报错、性能问题、逻辑 bug？AI 读取项目上下文，定位根因，生成补丁，验证后交给你确认。</p>
+            </article>
+            <article class="step">
+                <em>03</em>
+                <h3>引擎不够就改引擎</h3>
+                <p>当前引擎做不到？AI 判断是项目级修改还是引擎级修改，必要时直接改引擎源码来适配项目。</p>
+            </article>
+            <article class="step">
+                <em>04</em>
+                <h3>用户验证后上传 GitHub</h3>
+                <p>所有修改都经过你确认。验证通过的引擎改动，由 AI 自动提交到 GitHub，贡献给主分支。</p>
+            </article>
+            <article class="step">
+                <em>05</em>
+                <h3>热更新分发，引擎变强</h3>
+                <p>通过 Package Builder 构建更新包，所有用户都能热更到最新能力。项目越多，引擎越强。</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="light">
+    <div class="section-inner split">
+        <div>
+            <h2>适合什么人？</h2>
+        </div>
+        <div class="copy-list">
+            <article class="copy-item">
+                <h3>独立游戏开发者</h3>
+                <p>需要快速验证玩法、修复脚本问题、整理构建错误，希望少在重复排查上消耗时间。</p>
+            </article>
+            <article class="copy-item">
+                <h3>小型团队</h3>
+                <p>想把需求、修复、构建和发布流程沉淀下来，让 AI 作为团队里的工程助手。</p>
+            </article>
+            <article class="copy-item">
+                <h3>引擎实验者</h3>
+                <p>想在 Godot 的开放基础上探索 AI 参与引擎开发、工具开发和自动化迭代的可能性。</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+@if (Model.PublishedReleases.Any())
+{
+    var latestRelease = Model.PublishedReleases.First();
+    <section id="release" class="release">
+        <div class="section-inner">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                <div>
+                    <h2>@latestRelease.Title</h2>
+                    <p style="color: #8fa199; margin-top: 8px;">发布于 @latestRelease.ReleaseDate.ToString("yyyy-MM-dd") | 下载次数: @latestRelease.DownloadCount</p>
+                </div>
+                @if (!string.IsNullOrEmpty(latestRelease.SupportedPlatforms))
+                {
+                    <div style="background: rgba(86, 213, 200, 0.1); padding: 12px 20px; border-radius: 8px; border: 1px solid rgba(86, 213, 200, 0.2);">
+                        <div style="font-size: 13px; color: #8fa199; margin-bottom: 4px;">支持平台</div>
+                        <div style="font-weight: 600; color: var(--green); font-size: 14px;">@latestRelease.SupportedPlatforms</div>
+                    </div>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(latestRelease.Description))
+            {
+                <div style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 8px; margin-bottom: 24px;">
+                    <div style="font-weight: 600; margin-bottom: 12px; color: #f6f8f6;">更新日志</div>
+                    <div style="color: #c7d2ce; line-height: 1.7; white-space: pre-wrap;">@latestRelease.Description</div>
+                </div>
+            }
+
+            @if (latestRelease.Features.Any())
+            {
+                <div class="release-grid">
+                    @foreach (var feature in latestRelease.Features)
+                    {
+                        <article class="release-card">
+                            <h3>@feature.Title</h3>
+                            <p>@feature.Description</p>
+                        </article>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<section id="download" class="cta">
+    <div class="section-inner">
+        <div class="cta-box">
+            <div>
+                <h2>@Model.SiteContents.GetValueOrDefault("CTA_Title", "开始试用 Jundot。")</h2>
+                <p>@Model.SiteContents.GetValueOrDefault("CTA_Description", "下载预览版，打开项目，在编辑器里让 AI 帮你分析、修改、检查和迭代。")</p>
+            </div>
+            <a class="button primary" href="/Download?version=@(Model.PublishedReleases.FirstOrDefault()?.VersionNumber)">立即下载</a>
+        </div>
+    </div>
+</section>

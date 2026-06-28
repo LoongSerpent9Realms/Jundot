@@ -1,0 +1,126 @@
+@page
+@model JundotSite.Pages.Admin.LoginModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Jundot Engine 管理后台</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #070b0d 0%, #101719 100%);
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 420px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(246, 248, 246, 0.16);
+            border-radius: 12px;
+            backdrop-filter: blur(16px);
+        }
+
+        .login-box h2 {
+            color: #f6f8f6;
+            text-align: center;
+            margin-bottom: 32px;
+            font-size: 28px;
+        }
+
+        .login-box .form-group label {
+            color: #c7d2ce;
+        }
+
+        .login-box .form-group input {
+            background: rgba(7, 11, 13, 0.6);
+            border-color: rgba(246, 248, 246, 0.16);
+            color: #f6f8f6;
+        }
+
+        .login-box .form-group input:focus {
+            border-color: #7be495;
+        }
+
+        .login-box .button {
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .login-error {
+            padding: 12px;
+            background: rgba(255, 127, 104, 0.1);
+            border: 1px solid rgba(255, 127, 104, 0.3);
+            border-radius: 8px;
+            color: #ff7f68;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .login-logo .mark {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #c7d2ce;
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            color: #7be495;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="login-logo">
+            <span class="mark" aria-hidden="true"></span>
+        </div>
+        <h2>管理后台登录</h2>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="login-error">@Model.ErrorMessage</div>
+        }
+
+        <form method="post">
+            <div class="form-group">
+                <label asp-for="Input.Username"></label>
+                <input asp-for="Input.Username" type="text" placeholder="请输入用户名" />
+                <span asp-validation-for="Input.Username" style="color: #ff7f68; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Password"></label>
+                <input asp-for="Input.Password" type="password" placeholder="请输入密码" />
+                <span asp-validation-for="Input.Password" style="color: #ff7f68; font-size: 13px;"></span>
+            </div>
+
+            <button type="submit" class="button primary">登录</button>
+        </form>
+
+        <a href="/" class="back-link">← 返回首页</a>
+        <a href="/Login" class="back-link">← 用户登录</a>
+    </div>
+</body>
+</html>

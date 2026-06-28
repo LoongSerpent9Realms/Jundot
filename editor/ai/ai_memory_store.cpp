@@ -17,7 +17,7 @@
 String AIMemoryStore::_get_default_path() {
 	if (ProjectSettings::get_singleton()) {
 		const String project_root = ProjectSettings::get_singleton()->get_resource_path();
-		if (!project_root.is_empty() && FileAccess::exists(project_root.path_join("project.godot"))) {
+		if (!project_root.is_empty() && (FileAccess::exists(project_root.path_join("project.jundot")) || FileAccess::exists(project_root.path_join("project.godot")))) {
 			return project_root.path_join(".JundotAI").path_join("memory.json");
 		}
 	}

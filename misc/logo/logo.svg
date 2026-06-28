@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="414"><!-- Godot logo removed temporarily. --></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="414" viewBox="0 0 1024 414">
+<defs>
+<linearGradient id="word" x1="82" y1="72" x2="940" y2="318" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#7be495"/>
+<stop offset=".55" stop-color="#56d5c8"/>
+<stop offset="1" stop-color="#f2b84b"/>
+</linearGradient>
+</defs>
+<rect width="1024" height="414" fill="none"/>
+<text x="72" y="272" fill="url(#word)" font-family="Segoe UI, Arial, sans-serif" font-size="190" font-weight="800" letter-spacing="0">Jundot</text>
+<path d="M82 314h616" stroke="#56d5c8" stroke-width="18" stroke-linecap="round" opacity=".52"/>
+</svg>

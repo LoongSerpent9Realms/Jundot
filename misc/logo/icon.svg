@@ -1,1 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><!-- Godot icon removed temporarily. --></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+<linearGradient id="jundot-core" x1="146" y1="138" x2="878" y2="886" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#7be495"/>
+<stop offset=".52" stop-color="#56d5c8"/>
+<stop offset="1" stop-color="#f2b84b"/>
+</linearGradient>
+<linearGradient id="jundot-cut" x1="318" y1="242" x2="732" y2="796" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#101719"/>
+<stop offset="1" stop-color="#070b0d"/>
+</linearGradient>
+</defs>
+<rect width="1024" height="1024" rx="226" fill="#070b0d"/>
+<path d="M512 88 856 286v452L512 936 168 738V286L512 88z" fill="url(#jundot-core)"/>
+<path d="M512 182 774 333v358L512 842 250 691V333L512 182z" fill="url(#jundot-cut)"/>
+<path d="M429 291h248v408c0 108-73 178-186 178-89 0-154-43-187-112l104-61c17 38 44 57 81 57 44 0 71-28 71-78V405H429V291z" fill="#edf4ef"/>
+<circle cx="356" cy="318" r="54" fill="#ff7f68"/>
+<circle cx="704" cy="683" r="54" fill="#78a8ff"/>
+<circle cx="322" cy="716" r="24" fill="#7be495"/>
+<path d="M368 344 512 507l170 150" fill="none" stroke="#edf4ef" stroke-width="38" stroke-linecap="round" stroke-opacity=".28"/>
+</svg>

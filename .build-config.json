@@ -1,7 +1,7 @@
 ﻿{
-  "Target": "editor.dev",
-  "PlatformName": "windows",
-  "Arch": "x86_64",
+  "Target": "editor",
+  "PlatformName": "android",
+  "Arch": "arm64",
   "RepoRoot": "H:\\Godot-Auto",
   "OutputDir": "artifacts/packages",
   "LogDir": "artifacts/logs",
@@ -9,13 +9,13 @@
   "Jobs": 0,
   "SkipBuild": false,
   "InstallSCons": true,
-  "Mono": true,
+  "Mono": false,
   "UseMinGW": false,
   "MingwPrefix": "",
   "EnableWindowsOptionalDeps": false,
   "CleanPackageDir": false,
   "CleanBuild": false,
   "ExtraSConsArgs": "",
-  "AutoUpdateVersion": true,
+  "AutoUpdateVersion": false,
   "GenerateUpdateManifest": true
 }

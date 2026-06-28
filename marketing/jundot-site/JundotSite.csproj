@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.0" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="MailKit" Version="4.7.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="Pages\Docs\**\*.cshtml"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="Pages\Docs\docs-manifest.json"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="CopyDocumentationFilesToPublishDirectory" AfterTargets="Publish">
+    <ItemGroup>
+      <DocumentationFiles Include="$(MSBuildProjectDirectory)\Pages\Docs\**\*.cshtml" />
+      <DocumentationFiles Include="$(MSBuildProjectDirectory)\Pages\Docs\docs-manifest.json" Condition="Exists('$(MSBuildProjectDirectory)\Pages\Docs\docs-manifest.json')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DocumentationFiles)"
+          DestinationFiles="@(DocumentationFiles->'$(PublishDir)Pages\Docs\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

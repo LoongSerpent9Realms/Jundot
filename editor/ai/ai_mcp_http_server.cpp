@@ -248,6 +248,7 @@ Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 			Dictionary()));
 
 	Dictionary update_props;
+	update_props["backend_type"] = _external_mcp_str_property("AI backend type: jundot_plugin, codex, or legacy_openai.");
 	update_props["base_url"] = _external_mcp_str_property("OpenAI-compatible API base URL.");
 	update_props["model"] = _external_mcp_str_property("Model name used by the built-in AI assistant.");
 	update_props["api_key"] = _external_mcp_str_property("API key to store. Passing an empty string clears it.");
@@ -256,6 +257,7 @@ Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 	update_props["output_language"] = _external_mcp_str_property("Output language, such as auto, English, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, or German.");
 	update_props["tools_enabled"] = _external_mcp_bool_property("Enable built-in function calling tools.");
 	update_props["mcp_tools_enabled"] = _external_mcp_bool_property("Enable configured external MCP server tools.");
+	update_props["html_min_project_prototype_enabled"] = _external_mcp_bool_property("Allow project-concept requests to create a disposable standalone HTML prototype under .JundotAI/prototypes, then wait for user approval before real project implementation.");
 	update_props["context_char_budget"] = _external_mcp_int_property("Compressed context character budget.");
 	update_props["history_char_budget"] = _external_mcp_int_property("Conversation history character budget.");
 	update_props["max_tool_iterations"] = _external_mcp_int_property("Maximum tool-call loop iterations.");
@@ -290,6 +292,18 @@ Dictionary AIMCPHTTPServer::_get_ai_settings_server_info() const {
 Dictionary AIMCPHTTPServer::_get_ai_settings_snapshot() const {
 	const AISettingsData settings = AISettings::load();
 	Dictionary d;
+	switch (settings.backend_type) {
+		case AIBackendType::CODEX:
+			d["backend_type"] = "codex";
+			break;
+		case AIBackendType::LEGACY_OPENAI:
+			d["backend_type"] = "legacy_openai";
+			break;
+		case AIBackendType::JUNDOT_PLUGIN:
+		default:
+			d["backend_type"] = "jundot_plugin";
+			break;
+	}
 	d["base_url"] = settings.base_url;
 	d["model"] = settings.model;
 	d["api_key_configured"] = !settings.api_key.is_empty();
@@ -298,6 +312,7 @@ Dictionary AIMCPHTTPServer::_get_ai_settings_snapshot() const {
 	d["output_language"] = settings.output_language;
 	d["tools_enabled"] = settings.tools_enabled;
 	d["mcp_tools_enabled"] = settings.mcp_tools_enabled;
+	d["html_min_project_prototype_enabled"] = settings.html_min_project_prototype_enabled;
 	d["context_char_budget"] = settings.context_char_budget;
 	d["history_char_budget"] = settings.history_char_budget;
 	d["max_tool_iterations"] = settings.max_tool_iterations;
@@ -391,6 +406,20 @@ String AIMCPHTTPServer::_execute_ai_settings_tool(const String &p_tool_name, con
 			args.has("external_api_port") ||
 			args.has("external_api_bind_address");
 
+	if (args.has("backend_type")) {
+		const String backend_type = String(args["backend_type"]).strip_edges();
+		if (backend_type == "codex") {
+			settings.backend_type = AIBackendType::CODEX;
+		} else if (backend_type == "legacy_openai") {
+			settings.backend_type = AIBackendType::LEGACY_OPENAI;
+		} else if (backend_type == "jundot_plugin") {
+			settings.backend_type = AIBackendType::JUNDOT_PLUGIN;
+		} else {
+			response["ok"] = false;
+			response["error"] = "backend_type must be one of: jundot_plugin, codex, legacy_openai.";
+			return JSON::stringify(response);
+		}
+	}
 	if (args.has("base_url")) {
 		settings.base_url = String(args["base_url"]).strip_edges();
 	}
@@ -414,6 +443,9 @@ String AIMCPHTTPServer::_execute_ai_settings_tool(const String &p_tool_name, con
 	}
 	if (args.has("mcp_tools_enabled")) {
 		settings.mcp_tools_enabled = bool(args["mcp_tools_enabled"]);
+	}
+	if (args.has("html_min_project_prototype_enabled")) {
+		settings.html_min_project_prototype_enabled = bool(args["html_min_project_prototype_enabled"]);
 	}
 	if (args.has("context_char_budget")) {
 		settings.context_char_budget = int(args["context_char_budget"]);

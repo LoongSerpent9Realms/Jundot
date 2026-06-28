@@ -16,6 +16,7 @@ class AIUsageAgreementDialog : public ConfirmationDialog {
 
 	CheckBox *confirm_check = nullptr;
 	Label *agreement_label = nullptr;
+	String project_path;
 
 	void _confirmed();
 	void _canceled();
@@ -29,6 +30,7 @@ protected:
 
 public:
 	static String get_agreement_text();
+	void set_project_path(const String &p_project_path);
 
 	AIUsageAgreementDialog();
 };

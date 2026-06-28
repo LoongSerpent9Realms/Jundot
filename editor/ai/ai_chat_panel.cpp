@@ -30,8 +30,11 @@
 #include "editor/ai/ai_source_update_service.h"
 
 #include "core/config/project_settings.h"
+#include "core/core_bind.h"
+#include "core/input/input_event.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/image.h"
 #include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/os.h"
@@ -78,8 +81,40 @@
 #include "scene/main/timer.h"
 #include "scene/main/window.h"
 #include "scene/resources/style_box_flat.h"
+#include "servers/display/display_server.h"
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
+static constexpr int AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
+
+static bool _ai_chat_is_image_extension(const String &p_path) {
+	const String ext = p_path.get_extension().to_lower();
+	return ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp" || ext == "bmp";
+}
+
+static String _ai_chat_image_mime_type(const String &p_path) {
+	const String ext = p_path.get_extension().to_lower();
+	if (ext == "jpg" || ext == "jpeg") {
+		return "image/jpeg";
+	}
+	if (ext == "webp") {
+		return "image/webp";
+	}
+	if (ext == "bmp") {
+		return "image/bmp";
+	}
+	return "image/png";
+}
+
+static bool _ai_chat_is_tool_error_text(const String &p_text) {
+	const String lower = p_text.to_lower();
+	return lower.contains("<tool_call") ||
+			lower.contains("function calling tools are disabled") ||
+			lower.contains("no tools are available for the current mode") ||
+			lower.contains("tool calling did not run") ||
+			lower.contains("ai returned a text tool call") ||
+			lower.contains("当前模式没有可用的 function calling 工具") ||
+			lower.contains("工具调用");
+}
 
 static String _ai_chat_next_question_protocol() {
 	return String("=== Next Question Options Protocol ===\n"
@@ -144,6 +179,9 @@ Dictionary AIChatPanel::Conversation::to_dict(const Conversation &p_conv) {
 	d["id"] = p_conv.id;
 	d["title"] = p_conv.title;
 	d["context_mode"] = p_conv.context_mode == AIContextMode::ENGINE ? "engine" : "project";
+	d["project_brief"] = p_conv.project_brief;
+	d["task_intent"] = p_conv.task_intent;
+	d["task_brief"] = p_conv.task_brief;
 	d["created_at"] = (int64_t)p_conv.created_at;
 	d["updated_at"] = (int64_t)p_conv.updated_at;
 	d["tool_limit_options_available"] = p_conv.tool_limit_options_available;
@@ -187,6 +225,9 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 	conv.id = p_dict.get("id", String());
 	conv.title = p_dict.get("title", TTR("Untitled Chat"));
 	conv.context_mode = String(p_dict.get("context_mode", "project")) == "engine" ? AIContextMode::ENGINE : AIContextMode::PROJECT;
+	conv.project_brief = String(p_dict.get("project_brief", String())).strip_edges();
+	conv.task_intent = String(p_dict.get("task_intent", String())).strip_edges();
+	conv.task_brief = String(p_dict.get("task_brief", String())).strip_edges();
 	conv.created_at = (uint64_t)p_dict.get("created_at", 0);
 	conv.updated_at = (uint64_t)p_dict.get("updated_at", 0);
 	conv.tool_limit_options_available = p_dict.get("tool_limit_options_available", false);
@@ -229,6 +270,9 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 		m.is_user = md.get("is_user", false);
 		m.is_summary = md.get("is_summary", false);
 		m.content = md.get("content", String());
+		if (m.is_summary && _ai_chat_is_tool_error_text(m.content)) {
+			continue;
+		}
 		m.think_content = md.get("think_content", String());
 		m.think_time_seconds = md.get("think_time", 0.0);
 		m.prompt_tokens = md.get("prompt_tokens", 0);
@@ -239,6 +283,12 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 }
 
 String AIChatPanel::_get_conversations_file_path() const {
+	if (ProjectSettings::get_singleton()) {
+		const String project_root = ProjectSettings::get_singleton()->get_resource_path();
+		if (!project_root.is_empty() && (FileAccess::exists(project_root.path_join("project.jundot")) || FileAccess::exists(project_root.path_join("project.godot")))) {
+			return project_root.path_join(".JundotAI").path_join("conversations.json");
+		}
+	}
 	if (!EditorPaths::get_singleton()) {
 		return String();
 	}
@@ -249,6 +299,95 @@ String AIChatPanel::_generate_conversation_id() const {
 	uint64_t t = Time::get_singleton()->get_unix_time_from_system();
 	uint64_t r = (uint64_t)OS::get_singleton()->get_unix_time() ^ (uint64_t)OS::get_singleton()->get_process_id();
 	return vformat("conv_%x_%x", (uint64_t)t, (uint64_t)r);
+}
+
+String AIChatPanel::_infer_project_brief() const {
+	ProjectSettings *project_settings = ProjectSettings::get_singleton();
+	if (!project_settings) {
+		return String();
+	}
+
+	Vector<String> parts;
+	const String project_name = String(project_settings->get_setting("application/config/name", String())).strip_edges();
+	if (!project_name.is_empty()) {
+		parts.push_back(vformat("Project name: %s", project_name));
+	}
+
+	const String main_scene = String(project_settings->get_setting("application/run/main_scene", String())).strip_edges();
+	if (!main_scene.is_empty()) {
+		parts.push_back(vformat("Main scene: %s", main_scene));
+	}
+
+	const String root = project_settings->get_resource_path();
+	if (!root.is_empty()) {
+		parts.push_back(vformat("Project root: %s", root));
+	}
+
+	if (parts.is_empty()) {
+		return TTR("No project metadata was detected yet. Ask the user for the project goal before making broad changes.");
+	}
+
+	return String("\n").join(parts);
+}
+
+String AIChatPanel::_build_conversation_brief_prompt() const {
+	if (active_conversation_id.is_empty()) {
+		return String();
+	}
+
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id != active_conversation_id) {
+			continue;
+		}
+
+		const Conversation &conv = conversations[i];
+		String prompt = "=== Conversation Brief ===\n";
+		if (!conv.project_brief.strip_edges().is_empty()) {
+			prompt += conv.project_brief.strip_edges();
+		} else {
+			prompt += "Project: unknown. Infer carefully from the open project before making broad assumptions.";
+		}
+		prompt += "\n";
+
+		if (!conv.task_intent.strip_edges().is_empty()) {
+			prompt += vformat("Current task intent: %s\n", conv.task_intent.strip_edges());
+		} else {
+			prompt += "Current task intent: not selected yet. Infer from the latest user message and ask one concise clarifying question if the goal is ambiguous.\n";
+		}
+		if (!conv.task_brief.strip_edges().is_empty()) {
+			prompt += vformat("Active task brief: %s\n", conv.task_brief.strip_edges());
+		}
+
+		prompt += "Use this brief and the latest user request as the active instruction boundary. Treat older chat messages as historical evidence only; if old messages conflict with this brief or the latest request, follow this brief and the latest request. Do not revive abandoned plans, stale errors, or earlier guesses unless the user explicitly asks to continue them.";
+		return prompt;
+	}
+
+	return String();
+}
+
+void AIChatPanel::_set_current_conversation_task_intent(const String &p_intent, const String &p_brief) {
+	if (active_conversation_id.is_empty()) {
+		return;
+	}
+
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			conversations.write[i].task_intent = p_intent.strip_edges();
+			conversations.write[i].task_brief = p_brief.strip_edges();
+			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
+			_clear_structured_history();
+			_save_all_conversations();
+			break;
+		}
+	}
+}
+
+void AIChatPanel::_seed_new_conversation_options() {
+	Vector<String> questions;
+	questions.push_back(TTR("深入做功能：我会说明要新增或完善的功能目标"));
+	questions.push_back(TTR("修复 Bug：我会说明现象、复现步骤和期望结果"));
+	questions.push_back(TTR("讨论方案：先分析项目和设计思路，不直接改文件"));
+	_set_next_question_options(questions, true);
 }
 
 String AIChatPanel::_auto_generate_title(const Conversation &p_conv) const {
@@ -369,6 +508,9 @@ void AIChatPanel::_serialize_current_messages() {
 		// Skip suggestion cards and repair cards.
 		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
 		if (!msg) {
+			continue;
+		}
+		if (msg->is_summary_message() && _ai_chat_is_tool_error_text(msg->get_content())) {
 			continue;
 		}
 
@@ -505,14 +647,29 @@ void AIChatPanel::_refresh_queued_messages_ui() {
 
 void AIChatPanel::_enqueue_current_message() {
 	String queued_text = input ? input->get_text().strip_edges() : String();
-	if (queued_text.is_empty()) {
+	bool has_image_attachment = false;
+	for (int i = 0; i < attachments.size(); i++) {
+		if (attachments[i].image) {
+			has_image_attachment = true;
+			break;
+		}
+	}
+	if (has_image_attachment) {
+		status_label->set_text(TTR("Image attachments cannot be queued yet. Please wait for the current AI response to finish before sending images."));
+		return;
+	}
+
+	if (queued_text.is_empty() && attachments.is_empty()) {
 		status_label->set_text(TTR("Type a message to queue while the AI is responding."));
 		return;
 	}
 
 	const String attachment_context = _build_attachment_context();
 	if (!attachment_context.is_empty()) {
-		queued_text += "\n\n" + attachment_context;
+		if (!queued_text.is_empty()) {
+			queued_text += "\n\n";
+		}
+		queued_text += attachment_context;
 	}
 
 	QueuedChatMessage item;
@@ -608,6 +765,9 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 	// Re-populate messages.
 	for (int i = 0; i < p_conv.messages.size(); i++) {
 		const ConversationMessage &cm = p_conv.messages[i];
+		if (cm.is_summary && _ai_chat_is_tool_error_text(cm.content)) {
+			continue;
+		}
 		if (cm.is_summary) {
 			_add_summary_message(cm.content);
 		} else if (cm.is_user) {
@@ -681,6 +841,7 @@ void AIChatPanel::_new_conversation() {
 	conv.id = _generate_conversation_id();
 	conv.title = TTR("New Chat");
 	conv.context_mode = AISettings::load().context_mode;
+	conv.project_brief = _infer_project_brief();
 	conv.created_at = Time::get_singleton()->get_unix_time_from_system();
 	conv.updated_at = conv.created_at;
 
@@ -689,9 +850,10 @@ void AIChatPanel::_new_conversation() {
 
 	_load_conversation_to_ui(conv);
 	_refresh_conversation_list_ui();
+	_seed_new_conversation_options();
 	_save_all_conversations();
 
-	status_label->set_text(TTR("Started a new chat."));
+	status_label->set_text(TTR("Started a new chat. Choose the task type or type your own request."));
 }
 
 void AIChatPanel::_delete_current_conversation() {
@@ -936,6 +1098,9 @@ Array AIChatPanel::_build_message_history() const {
 		if (!msg) {
 			continue;
 		}
+		if (msg->is_summary_message() && _ai_chat_is_tool_error_text(msg->get_content())) {
+			continue;
+		}
 		Dictionary entry;
 		entry["role"] = msg->is_user_message() ? "user" : "assistant";
 		entry["content"] = msg->get_content();
@@ -944,13 +1109,32 @@ Array AIChatPanel::_build_message_history() const {
 	return history;
 }
 
+bool AIChatPanel::_is_project_memory_continue_request(const String &p_user_message) const {
+	const String msg = p_user_message.to_lower().strip_edges();
+	if (msg.is_empty()) {
+		return false;
+	}
+
+	return msg == "继续" || msg == "继续做" || msg == "继续吧" || msg == "接着做" || msg == "往下做" || msg == "按记忆继续" || msg == "根据记忆继续" ||
+		   msg == "开始制作" || msg == "开始做" || msg == "开始开发" || msg == "开始实现" || msg == "开始创建" || msg == "制作吧" || msg == "做吧" ||
+		   msg == "continue" || msg == "continue." || msg == "go on" || msg == "keep going" || msg == "resume" || msg == "proceed" ||
+		   msg == "start making" || msg == "start building" || msg == "start development" || msg == "build it" || msg == "make it";
+}
+
 String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	const String msg = p_user_message.to_lower().strip_edges();
 	const AISettingsData settings = AISettings::load();
+	String task_intent;
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id == active_conversation_id) {
+			task_intent = conversations[i].task_intent;
+			break;
+		}
+	}
 
 	if (settings.context_mode == AIContextMode::ENGINE) {
 		if (msg.contains("bug") || msg.contains("error") || msg.contains("crash") || msg.contains("修复") || msg.contains("报错") || msg.contains("崩溃")) {
-			return "Current request guidance: treat this as an engine defect investigation. Inspect evidence and real source paths, identify the root cause, implement the fix, build, and verify.";
+			return "Current request guidance: treat this as an engine defect investigation. First restate the understood failing feature, current behavior, expected behavior, and acceptance criteria. Inspect evidence and real source paths, identify the root cause, implement the fix, build, and verify. If the failing feature, reproduction steps, expected result, or error evidence is missing and cannot be inferred from engine context, ask one concise clarifying question through NEXT_QUESTION before editing.";
 		}
 		return "Current request guidance: work on the JunDot engine source according to the user's requested outcome, using a task breakdown when it materially improves execution clarity.";
 	}
@@ -962,13 +1146,38 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 			msg.contains("modify") || msg.contains("change") || msg.contains("fix") || msg.contains("add") || msg.contains("remove") || msg.contains("implement") ||
 			msg.contains("修改") || msg.contains("修复") || msg.contains("调整") || msg.contains("增加") || msg.contains("添加") || msg.contains("删除") || msg.contains("实现") || msg.contains("优化") ||
 			msg.contains("bug") || msg.contains("报错") || msg.contains("问题");
+	const bool vague_repair_request =
+			msg.contains("doesn't work") || msg.contains("does not work") || msg.contains("not working") || msg.contains("broken") || msg.contains("fix a feature") || msg.contains("fix this feature") ||
+			msg.contains("不好用") || msg.contains("不能用") || msg.contains("没反应") || msg.contains("没有反应") || msg.contains("不生效") || msg.contains("不对") || msg.contains("有问题") ||
+			msg.contains("修一个功能") || msg.contains("修下功能") || msg.contains("修一下功能") || msg.contains("修不好") || msg.contains("半天修不好");
+	const bool game_ui_request =
+			msg.contains("ui") || msg.contains("hud") || msg.contains("menu") || msg.contains("inventory") || msg.contains("shop") || msg.contains("dialog") || msg.contains("interface") ||
+			msg.contains("界面") || msg.contains("菜单") || msg.contains("背包") || msg.contains("商店") || msg.contains("对话框") || msg.contains("技能面板") || msg.contains("暂停界面") || msg.contains("设置界面") || msg.contains("游戏ui");
 	const bool consultation =
 			msg.contains("how should") || msg.contains("why") || msg.contains("explain") || msg.contains("recommend") ||
 			msg.contains("怎么设计") || msg.contains("为什么") || msg.contains("解释") || msg.contains("建议") || msg.contains("哪个好");
 
 	const String boundary = " Stay strictly inside the open game project. Never inspect or modify engine source in PROJECT mode; if an engine limitation is discovered, finish any safe project-side work, call setup_engine_workspace to create or bind this project's dedicated engine worktree, then call request_engine_change with the exact reason and required engine change.";
+	if (_is_project_memory_continue_request(p_user_message)) {
+		return "Current request guidance: the user asked to continue from this project's memory. Treat Project Memories as the primary source of the intended game concept, project name, style, mechanics, and pending direction. First inspect the open project enough to determine whether it is still empty/minimal or already has meaningful game content. If it is empty/minimal, continue from the remembered concept without asking the user to repeat it: produce a compact execution plan and begin building the first playable Jundot project structure using GDScript by default, or C# only if the memory/user explicitly asks for C#. If content already exists, continue from the newest project state and memory together. Do not use memories from other projects and do not ask the user to choose an engine." + boundary;
+	}
+	if (task_intent == "feature_development") {
+		return "Current request guidance: the user selected feature development for this chat. Work from the latest requested outcome, inspect the real project files, and implement directly when the request is concrete. Use a compact TASK_PLAN only when scope or sequencing materially benefits from it. If the latest message is just the starter option, ask what feature goal they want to build." + boundary;
+	}
+	if (task_intent == "bug_fix") {
+		return "Current request guidance: the user selected bug fixing for this chat. Treat this as a defect investigation: restate the failing feature, current behavior, expected behavior, reproduction evidence, root cause, and acceptance criteria. If the latest message is just the starter option or lacks the failing behavior, ask one concise NEXT_QUESTION before editing." + boundary;
+	}
+	if (task_intent == "design_discussion") {
+		return "Current request guidance: the user selected design discussion for this chat. Analyze the project and propose a path, but do not modify files until the user explicitly approves implementation." + boundary;
+	}
 	if (broad_project_idea && !concrete_change) {
 		return "Current request guidance: this is a new game concept. Produce a TASK_PLAN scaled to its size: concise for a small game or prototype, fuller for a larger project. Evaluate the core loop, moment-to-moment fun, mastery, rewards, replayability, boring/frustrating risks, and prototype tests. Use fetch_url to research relevant official Steam/Epic pages when available, identify concrete differentiation opportunities, and generate a .JundotAI/mockups/ SVG when a visual flow or interface will help the user judge the idea. If the user did not explicitly request direct implementation, expose NEXT_QUESTION choices for Plan review, a minimum playable prototype, or gameplay/reference discussion, and stop before modifying game content until they choose or approve." + boundary;
+	}
+	if (vague_repair_request) {
+		return "Current request guidance: this is a potentially ambiguous repair request. Before editing, briefly restate the understood target feature, current behavior, expected behavior, and observable acceptance criteria. Inspect project evidence and the real code path before changing files. If the target feature, reproduction steps, expected result, or error evidence cannot be inferred from the project context, ask one concise clarifying question through NEXT_QUESTION and do not guess-edit." + boundary;
+	}
+	if (game_ui_request) {
+		return "Current request guidance: this is a player-facing game UI request. Follow the Game UI Visual Quality Protocol: infer or inspect the game's existing style, use any attached images as the primary visual reference, define compact visual acceptance criteria, build with contemporary game-interface aesthetics rather than plain utility controls, then validate layout safety with check_ui_layout for changed Control scenes." + boundary;
 	}
 	if (concrete_change) {
 		return "Current request guidance: this is a concrete project implementation, adjustment, or bug-fix request. Inspect the relevant project files and implement it directly. Use a compact task breakdown only when useful; do not pause for separate Plan approval unless scope is destructive, highly ambiguous, or materially larger than requested." + boundary;
@@ -1082,10 +1291,11 @@ void AIChatPanel::_update_translations() {
 	set_name(TTRC("Chat"));
 	input->set_placeholder(TTR("Message Jundot AI..."));
 	add_file_menu->set_text(TTR("+"));
-	add_file_menu->set_tooltip_text(TTR("Attach or reference a text file"));
+	add_file_menu->set_tooltip_text(TTR("Attach or reference a file or image"));
 	PopupMenu *file_popup = add_file_menu->get_popup();
 	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_REFERENCE_PROJECT), TTR("Reference Project File"));
 	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_UPLOAD_TEXT), TTR("Upload Text File"));
+	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_UPLOAD_IMAGE), TTR("Upload Image"));
 	file_popup->set_item_text(file_popup->get_item_index(FILE_MENU_IMPORT), TTR("Import Skill / MCP / Memory..."));
 	clear_button->set_text(TTR("Clear"));
 	clear_button->set_tooltip_text(TTR("Clear input and attachments"));
@@ -1119,6 +1329,7 @@ void AIChatPanel::_update_translations() {
 	}
 	reference_file_dialog->set_title(TTR("Reference Project File"));
 	upload_file_dialog->set_title(TTR("Upload Text File"));
+	upload_image_dialog->set_title(TTR("Upload Image"));
 	import_file_dialog->set_title(TTR("Import Skill / MCP / Memory"));
 	add_all_button->set_text(TTR("Add All"));
 	dismiss_all_button->set_text(TTR("Dismiss All"));
@@ -1319,6 +1530,13 @@ void AIChatPanel::_use_next_question_option(const String &p_question) {
 	if (!input) {
 		return;
 	}
+	if (p_question.begins_with(TTR("深入做功能"))) {
+		_set_current_conversation_task_intent("feature_development", TTR("The user wants to build or deepen a project feature. Inspect the project first, then implement within project scope unless the user asks only for planning."));
+	} else if (p_question.begins_with(TTR("修复 Bug"))) {
+		_set_current_conversation_task_intent("bug_fix", TTR("The user wants to fix a defect. Identify current behavior, expected behavior, reproduction evidence, root cause, and acceptance criteria before editing."));
+	} else if (p_question.begins_with(TTR("讨论方案"))) {
+		_set_current_conversation_task_intent("design_discussion", TTR("The user wants analysis or design discussion first. Do not modify files unless the user later explicitly approves implementation."));
+	}
 	input->set_text(p_question);
 	input->grab_focus();
 	_hide_tool_limit_options();
@@ -1337,8 +1555,8 @@ void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
 	}
 
 	AISettingsData settings = AISettings::load();
-	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && settings.api_key.is_empty()) {
-		status_label->set_text(TTR("Configure an API key before sending AI messages."));
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
+		status_label->set_text(TTR("Configure Base URL, model, and API key before sending AI messages."));
 		return;
 	}
 	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.strip_edges().is_empty() || settings.jundot_ai_plugin_url.strip_edges().is_empty())) {
@@ -1358,10 +1576,15 @@ void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
 	if (settings.context_mode == AIContextMode::PROJECT) {
 		settings.system_prompt += "\n\n" + _ai_project_memory_protocol();
 	}
+	const String conversation_brief = _build_conversation_brief_prompt();
+	if (!conversation_brief.is_empty()) {
+		settings.system_prompt += "\n\n" + conversation_brief;
+	}
 	if (settings.develop_mode && settings.context_mode == AIContextMode::ENGINE) {
 		settings.system_prompt += "\n\n=== DEVELOP MODE DEMONSTRATION ===\nRun the visible workflow in order: modify locally, build, restart, wait for explicit user verification, inspect evidence and call develop_ai_verify, then call upload_code. upload_code is a dry run in this mode and MUST NOT commit or push. Never bypass this restriction with shell_command.";
 	}
-	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
+	const bool force_project_memories = settings.context_mode == AIContextMode::PROJECT && _is_project_memory_continue_request(instruction);
+	const String ai_context = AIContextBuilder::build_context(force_project_memories || settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
 	if (!ai_context.is_empty()) {
 		settings.system_prompt += "\n\n" + ai_context;
 	}
@@ -1499,6 +1722,8 @@ void AIChatPanel::_add_file_menu_id_pressed(int p_id) {
 		reference_file_dialog->popup_file_dialog();
 	} else if (p_id == FILE_MENU_UPLOAD_TEXT) {
 		upload_file_dialog->popup_file_dialog();
+	} else if (p_id == FILE_MENU_UPLOAD_IMAGE) {
+		upload_image_dialog->popup_file_dialog();
 	} else if (p_id == FILE_MENU_IMPORT) {
 		import_file_dialog->popup_file_dialog();
 	}
@@ -1510,6 +1735,84 @@ void AIChatPanel::_project_file_selected(const String &p_path) {
 
 void AIChatPanel::_external_file_selected(const String &p_path) {
 	_add_attachment(p_path, true);
+}
+
+void AIChatPanel::_image_file_selected(const String &p_path) {
+	_add_attachment(p_path, true);
+}
+
+void AIChatPanel::_add_clipboard_image() {
+	if (!DisplayServer::get_singleton() || !DisplayServer::get_singleton()->clipboard_has_image()) {
+		status_label->set_text(TTR("Clipboard does not contain an image."));
+		return;
+	}
+
+	Ref<Image> image = DisplayServer::get_singleton()->clipboard_get_image();
+	if (image.is_null() || image->is_empty()) {
+		status_label->set_text(TTR("Could not read the clipboard image."));
+		return;
+	}
+
+	Vector<uint8_t> png_data = image->save_png_to_buffer();
+	if (png_data.is_empty()) {
+		status_label->set_text(TTR("Could not encode the clipboard image."));
+		return;
+	}
+	if (png_data.size() > AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES) {
+		status_label->set_text(vformat(TTR("Clipboard image is larger than %d MB."), AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES / (1024 * 1024)));
+		return;
+	}
+
+	CoreBind::Marshalls *marshalls = CoreBind::Marshalls::get_singleton();
+	ERR_FAIL_NULL(marshalls);
+
+	ChatAttachment attachment;
+	attachment.path = TTR("Clipboard image");
+	attachment.display_name = vformat(TTR("Clipboard Image %d.png"), attachments.size() + 1);
+	attachment.mime_type = "image/png";
+	attachment.data_url = "data:image/png;base64," + marshalls->raw_to_base64(png_data);
+	attachment.external = true;
+	attachment.image = true;
+	attachments.push_back(attachment);
+
+	_refresh_attachment_chips();
+	status_label->set_text(vformat(TTR("Attached %s."), attachment.display_name));
+}
+
+void AIChatPanel::_input_gui_input(const Ref<InputEvent> &p_event) {
+	const Ref<InputEventKey> key = p_event;
+	if (key.is_null() || !key->is_pressed() || key->is_echo() || !key->is_command_or_control_pressed() || key->get_keycode() != Key::V) {
+		return;
+	}
+
+	if (DisplayServer::get_singleton() && DisplayServer::get_singleton()->clipboard_has_image()) {
+		_add_clipboard_image();
+		input->accept_event();
+		return;
+	}
+
+	if (!DisplayServer::get_singleton() || !DisplayServer::get_singleton()->clipboard_has()) {
+		return;
+	}
+
+	const String clipboard_text = DisplayServer::get_singleton()->clipboard_get().strip_edges();
+	if (clipboard_text.is_empty()) {
+		return;
+	}
+
+	Vector<String> files;
+	const Vector<String> lines = clipboard_text.split("\n", false);
+	for (int i = 0; i < lines.size(); i++) {
+		String path = String(lines[i]).strip_edges().trim_prefix("\"").trim_suffix("\"");
+		if (!path.is_empty() && FileAccess::exists(path)) {
+			files.push_back(path);
+		}
+	}
+
+	if (!files.is_empty() && files.size() == lines.size()) {
+		_add_dropped_files(files);
+		input->accept_event();
+	}
 }
 
 void AIChatPanel::_add_dropped_files(const Vector<String> &p_files) {
@@ -1568,6 +1871,36 @@ void AIChatPanel::_add_attachment(const String &p_path, bool p_external) {
 		status_label->set_text(TTR("Could not read the selected file."));
 		return;
 	}
+
+	if (_ai_chat_is_image_extension(p_path)) {
+		if (size > AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES) {
+			status_label->set_text(vformat(TTR("Selected image is larger than %d MB."), AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES / (1024 * 1024)));
+			return;
+		}
+
+		Vector<uint8_t> bytes = FileAccess::get_file_as_bytes(p_path, &err);
+		if (err != OK || bytes.is_empty()) {
+			status_label->set_text(TTR("Could not read the selected image."));
+			return;
+		}
+
+		CoreBind::Marshalls *marshalls = CoreBind::Marshalls::get_singleton();
+		ERR_FAIL_NULL(marshalls);
+
+		ChatAttachment attachment;
+		attachment.path = p_path;
+		attachment.display_name = p_path.get_file();
+		attachment.mime_type = _ai_chat_image_mime_type(p_path);
+		attachment.data_url = "data:" + attachment.mime_type + ";base64," + marshalls->raw_to_base64(bytes);
+		attachment.external = p_external;
+		attachment.image = true;
+		attachments.push_back(attachment);
+
+		_refresh_attachment_chips();
+		status_label->set_text(vformat(TTR("Attached image %s."), attachment.display_name));
+		return;
+	}
+
 	if (size > AI_CHAT_ATTACHMENT_MAX_BYTES) {
 		status_label->set_text(vformat(TTR("Selected file is larger than %d KB."), AI_CHAT_ATTACHMENT_MAX_BYTES / 1024));
 		return;
@@ -1625,9 +1958,23 @@ String AIChatPanel::_build_attachment_context() const {
 		return String();
 	}
 
+	bool has_text_attachment = false;
+	for (int i = 0; i < attachments.size(); i++) {
+		if (!attachments[i].image) {
+			has_text_attachment = true;
+			break;
+		}
+	}
+	if (!has_text_attachment) {
+		return String();
+	}
+
 	String context = TTR("Attached text files for this message:");
 	for (int i = 0; i < attachments.size(); i++) {
 		const ChatAttachment &attachment = attachments[i];
+		if (attachment.image) {
+			continue;
+		}
 		context += "\n\n";
 		context += vformat("[%s] %s\n%s\n", attachment.external ? TTR("Uploaded") : TTR("Referenced"), attachment.display_name, vformat(TTR("Path: %s"), attachment.path));
 		context += "```text\n";
@@ -1635,6 +1982,31 @@ String AIChatPanel::_build_attachment_context() const {
 		context += "\n```";
 	}
 	return context;
+}
+
+Array AIChatPanel::_build_multimodal_user_content(const String &p_text) const {
+	Array content;
+	Dictionary text_part;
+	text_part["type"] = "text";
+	text_part["text"] = p_text.is_empty() ? TTR("Please analyze the attached image or file.") : p_text;
+	content.push_back(text_part);
+
+	for (int i = 0; i < attachments.size(); i++) {
+		const ChatAttachment &attachment = attachments[i];
+		if (!attachment.image || attachment.data_url.is_empty()) {
+			continue;
+		}
+
+		Dictionary image_url;
+		image_url["url"] = attachment.data_url;
+
+		Dictionary image_part;
+		image_part["type"] = "image_url";
+		image_part["image_url"] = image_url;
+		content.push_back(image_part);
+	}
+
+	return content;
 }
 
 void AIChatPanel::_set_chat_display_scale(float p_scale) {
@@ -1709,14 +2081,14 @@ void AIChatPanel::_send_message() {
 	}
 
 	const String text = input->get_text().strip_edges();
-	if (text.is_empty()) {
+	if (text.is_empty() && attachments.is_empty()) {
 		return;
 	}
 	_hide_tool_limit_options();
 
 	AISettingsData settings = AISettings::load();
-	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && settings.api_key.is_empty()) {
-		status_label->set_text(TTR("Configure an API key before sending AI messages."));
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
+		status_label->set_text(TTR("Configure Base URL, model, and API key before sending AI messages."));
 		return;
 	}
 	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.strip_edges().is_empty() || settings.jundot_ai_plugin_url.strip_edges().is_empty())) {
@@ -1731,10 +2103,24 @@ void AIChatPanel::_send_message() {
 	// In edit mode, update the existing user message in-place and remove
 	// all messages after it so the upcoming AI reply overwrites the old one.
 	const bool editing_existing_message = editing_message_index >= 0;
+	String visible_user_text = text;
+	if (visible_user_text.is_empty()) {
+		visible_user_text = TTR("Attached files.");
+	}
+	if (!attachments.is_empty()) {
+		String attachment_names;
+		for (int i = 0; i < attachments.size(); i++) {
+			if (!attachment_names.is_empty()) {
+				attachment_names += ", ";
+			}
+			attachment_names += attachments[i].display_name;
+		}
+		visible_user_text += "\n\n" + vformat(TTR("Attachments: %s"), attachment_names);
+	}
 	if (editing_existing_message) {
 		AIChatMessage *user_msg = Object::cast_to<AIChatMessage>(message_list->get_child(editing_message_index));
 		if (user_msg) {
-			user_msg->set_content(text);
+			user_msg->set_content(visible_user_text);
 		}
 		for (int i = message_list->get_child_count() - 1; i > editing_message_index; i--) {
 			message_list->get_child(i)->queue_free();
@@ -1742,7 +2128,7 @@ void AIChatPanel::_send_message() {
 		editing_message_index = -1;
 		_clear_structured_history();
 	} else {
-		_add_user_message(text);
+		_add_user_message(visible_user_text);
 	}
 
 	// Persist the conversation after the user message has been added so that
@@ -1780,7 +2166,7 @@ void AIChatPanel::_send_message() {
 
 	// Queue an auto-title request for after this round completes.
 	if (needs_auto_title) {
-		pending_title_text = text;
+		pending_title_text = visible_user_text;
 		pending_title_attachments = attachments;
 	}
 
@@ -1791,7 +2177,11 @@ void AIChatPanel::_send_message() {
 	if (settings.context_mode == AIContextMode::PROJECT) {
 		settings.system_prompt += "\n\n" + _ai_project_memory_protocol();
 	}
-	settings.system_prompt += "\n\n=== Current Request Guidance ===\n" + _detect_mode_prompt(text);
+	const String conversation_brief = _build_conversation_brief_prompt();
+	if (!conversation_brief.is_empty()) {
+		settings.system_prompt += "\n\n" + conversation_brief;
+	}
+	settings.system_prompt += "\n\n=== Current Request Guidance ===\n" + _detect_mode_prompt(visible_user_text);
 	if (settings.develop_mode && settings.context_mode == AIContextMode::ENGINE) {
 		settings.system_prompt += "\n\n=== DEVELOP MODE DEMONSTRATION ===\nRun the visible workflow in order: modify locally, build, restart, wait for explicit user verification, inspect evidence and call develop_ai_verify, then call upload_code. upload_code is a dry run in this mode and MUST NOT commit or push. Never bypass this restriction with shell_command.";
 	}
@@ -1813,8 +2203,19 @@ void AIChatPanel::_send_message() {
 	String request_text = text;
 	const String attachment_context = _build_attachment_context();
 	if (!attachment_context.is_empty()) {
-		request_text += "\n\n" + attachment_context;
+		if (!request_text.is_empty()) {
+			request_text += "\n\n";
+		}
+		request_text += attachment_context;
 	}
+	bool has_image_attachment = false;
+	for (int i = 0; i < attachments.size(); i++) {
+		if (attachments[i].image) {
+			has_image_attachment = true;
+			break;
+		}
+	}
+	const Variant user_content = has_image_attachment ? Variant(_build_multimodal_user_content(request_text)) : Variant(request_text);
 
 	Array structured_history = _get_structured_history();
 	if (!structured_history.is_empty()) {
@@ -1823,13 +2224,13 @@ void AIChatPanel::_send_message() {
 		}
 		Dictionary user_message;
 		user_message["role"] = "user";
-		user_message["content"] = request_text;
+		user_message["content"] = user_content;
 		messages.push_back(user_message);
 	} else {
 		for (int i = 0; i < history.size(); i++) {
 			Dictionary entry = history[i];
 			if (i == history.size() - 1 && String(entry["role"]) == "user") {
-				entry["content"] = request_text;
+				entry["content"] = user_content;
 			}
 			messages.push_back(entry);
 		}
@@ -1875,7 +2276,7 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 	{
 		Dictionary summary_system;
 		summary_system["role"] = "system";
-		summary_system["content"] = TTR("You are a conversation summarizer. Summarize the following conversation concisely, preserving key decisions, code changes, root causes, and current state. Keep the summary under 500 characters.");
+		summary_system["content"] = TTR("You are a conversation summarizer. Return only a concise plain-text summary under 500 characters, preserving durable project facts, confirmed user decisions, code changes, root causes, and the current active state. Drop stale guesses, abandoned plans, transient tool errors, repeated failed attempts, and anything that conflicts with newer user direction. Do not call tools, do not request files, do not output XML, JSON, markdown fences, or tool_call blocks.");
 		summary_messages.push_back(summary_system);
 	}
 
@@ -1910,6 +2311,8 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 	AISettingsData summary_settings = AISettings::load();
 	summary_settings.max_tokens = 256;
 	summary_settings.temperature = 0.3; // Lower temperature for more deterministic summary.
+	summary_settings.tools_enabled = false;
+	summary_settings.mcp_tools_enabled = false;
 	chat_service->configure(summary_settings);
 
 	is_summarizing = true;
@@ -1925,6 +2328,8 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 
 void AIChatPanel::_summary_completed(const String &p_summary_text) {
 	is_summarizing = false;
+	const String summary_text = p_summary_text.strip_edges();
+	const bool valid_summary = !summary_text.is_empty() && !_ai_chat_is_tool_error_text(summary_text);
 
 	// Find which messages to replace (all non-summary messages before the last user message).
 	int replace_end = -1;
@@ -1940,7 +2345,7 @@ void AIChatPanel::_summary_completed(const String &p_summary_text) {
 		replace_end = message_list->get_child_count();
 	}
 
-	if (!p_summary_text.is_empty()) {
+	if (valid_summary) {
 		// Summary success: remove old messages and insert summary.
 		// Keep at most the last pair (user + assistant) of non-summary messages.
 		int keep_start = message_list->get_child_count() - 1;
@@ -1966,7 +2371,7 @@ void AIChatPanel::_summary_completed(const String &p_summary_text) {
 		}
 
 		// Insert summary message at the beginning.
-		_add_summary_message(p_summary_text.strip_edges());
+		_add_summary_message(summary_text);
 	} else {
 		// Summary failed: fall back to truncation.
 		// Remove the oldest ~1/3 of messages.
@@ -2286,7 +2691,12 @@ bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_too
 
 		String fn_name = block.substr(fn_name_start, fn_open_end - fn_name_start).strip_edges();
 		fn_name = fn_name.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'");
+		const String original_fn_name = fn_name;
 		if (fn_name == "read_file") {
+			fn_name = "read_files";
+		} else if (fn_name == "glob" || fn_name == "glob_search") {
+			fn_name = "search_files";
+		} else if (fn_name == "memory_search" || fn_name == "session_list") {
 			fn_name = "read_files";
 		}
 		if (fn_name.is_empty()) {
@@ -2355,7 +2765,15 @@ bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_too
 		// Be permissive with text-form tool calls generated by models. The
 		// read_files tool requires an array named "paths", but models often emit
 		// a single string or use "path" when producing XML-like pseudo calls.
-		if (fn_name == "read_files") {
+		if (original_fn_name == "memory_search") {
+			Array paths;
+			paths.push_back(".JundotAI/memory.json");
+			args["paths"] = paths;
+		} else if (original_fn_name == "session_list") {
+			Array paths;
+			paths.push_back(".JundotAI/conversations.json");
+			args["paths"] = paths;
+		} else if (fn_name == "read_files") {
 			if (!args.has("paths") && args.has("path")) {
 				args["paths"] = args["path"];
 				args.erase("path");
@@ -2365,6 +2783,15 @@ bool AIChatPanel::_extract_text_tool_calls(const String &p_content, Array &r_too
 				paths.push_back(String(args["paths"]));
 				args["paths"] = paths;
 			}
+		} else if (fn_name == "search_files" && args.has("pattern") && args["pattern"].get_type() == Variant::STRING) {
+			String pattern = String(args["pattern"]).replace("\\", "/").strip_edges();
+			if (pattern.begins_with("/") && !pattern.begins_with("//")) {
+				pattern = pattern.trim_prefix("/");
+			}
+			if (pattern.begins_with(".")) {
+				pattern = "*" + pattern;
+			}
+			args["pattern"] = pattern;
 		}
 
 		Dictionary fn;
@@ -2618,7 +3045,7 @@ bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
 
 	Dictionary correction_msg;
 	correction_msg["role"] = "user";
-	correction_msg["content"] = TTR("Your previous response described using a tool, but it did not include a structured tool_calls response, so the editor could not execute anything. Do not describe the tool use in prose. Return the appropriate function call now using the available tools. If you need to inspect directories, call list_files with path and depth. If you need to read a file, call read_files with the exact relative path.");
+	correction_msg["content"] = TTR("Your previous response described using a tool or returned a text-form tool call that the editor could not execute. Do not describe tool use in prose. Return a structured tool_calls response using only the tools actually provided in the current tool list. Do not call unavailable Codex/MiMo-style tools such as memory_search, session_list, read_file, or glob. If you need project memory, use the Project Memories already in context or call read_files for .JundotAI/memory.json. If you need to inspect directories, call list_files with path and depth. If you need to read a file, call read_files with the exact relative path.");
 	messages.push_back(correction_msg);
 
 	pending_tool_round.original_messages = messages.duplicate(true);
@@ -4007,6 +4434,7 @@ AIChatPanel::AIChatPanel() {
 	input->set_custom_minimum_size(Size2(0, 52) * EDSCALE);
 	input->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	input->set_drag_forwarding(Callable(), callable_mp(this, &AIChatPanel::_can_drop_files_fw).bind(input), callable_mp(this, &AIChatPanel::_drop_files_fw).bind(input));
+	input->connect(SceneStringName(gui_input), callable_mp(this, &AIChatPanel::_input_gui_input));
 	composer_vb->add_child(input);
 
 	HBoxContainer *actions = memnew(HBoxContainer);
@@ -4017,6 +4445,7 @@ AIChatPanel::AIChatPanel() {
 	add_file_menu->set_flat(true);
 	add_file_menu->get_popup()->add_item(TTR("Reference Project File"), FILE_MENU_REFERENCE_PROJECT);
 	add_file_menu->get_popup()->add_item(TTR("Upload Text File"), FILE_MENU_UPLOAD_TEXT);
+	add_file_menu->get_popup()->add_item(TTR("Upload Image"), FILE_MENU_UPLOAD_IMAGE);
 	add_file_menu->get_popup()->add_item(TTR("Import Skill / MCP / Memory..."), FILE_MENU_IMPORT);
 	add_file_menu->get_popup()->connect(SceneStringName(id_pressed), callable_mp(this, &AIChatPanel::_add_file_menu_id_pressed));
 	actions->add_child(add_file_menu);
@@ -4070,6 +4499,13 @@ AIChatPanel::AIChatPanel() {
 	upload_file_dialog->add_filter("*.txt,*.md,*.log,*.json,*.cfg,*.ini,*.cpp,*.h,*.hpp,*.cs,*.gd,*.shader", TTRC("Text Files"));
 	upload_file_dialog->connect(SNAME("file_selected"), callable_mp(this, &AIChatPanel::_external_file_selected));
 	add_child(upload_file_dialog);
+
+	upload_image_dialog = memnew(EditorFileDialog);
+	upload_image_dialog->set_access(EditorFileDialog::ACCESS_FILESYSTEM);
+	upload_image_dialog->set_file_mode(EditorFileDialog::FILE_MODE_OPEN_FILE);
+	upload_image_dialog->add_filter("*.png,*.jpg,*.jpeg,*.webp,*.bmp", TTRC("Image Files"));
+	upload_image_dialog->connect(SNAME("file_selected"), callable_mp(this, &AIChatPanel::_image_file_selected));
+	add_child(upload_image_dialog);
 
 	import_file_dialog = memnew(EditorFileDialog);
 	import_file_dialog->set_access(EditorFileDialog::ACCESS_FILESYSTEM);

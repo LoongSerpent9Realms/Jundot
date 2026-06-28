@@ -1,0 +1,240 @@
+@page
+@model JundotSite.Pages.User.DocsModel
+@{
+    ViewData["Title"] = "文档管理";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="user-docs-layout">
+    <div class="user-card">
+        <div class="user-card-header">
+            <h2>文档编辑</h2>
+            <div class="language-tabs">
+                @foreach (var language in Model.SupportedLanguages)
+                {
+                    <a href="/User/Docs?doc=@Model.CurrentDocId&lang=@language.Id" class="language-tab @(Model.CurrentLanguage == language.Id ? "active" : "")">@language.Label</a>
+                }
+            </div>
+        </div>
+
+        <div class="docs-list">
+            @foreach (var doc in Model.Documents)
+            {
+                <a href="/User/Docs?doc=@doc.Id&lang=@Model.CurrentLanguage" class="docs-item @(Model.CurrentDocId == doc.Id ? "active" : "")">
+                    <strong>@doc.Title</strong>
+                    <span>@doc.Description</span>
+                </a>
+            }
+        </div>
+    </div>
+
+    <div class="user-card">
+        <div class="user-card-header">
+            <h3>编辑：@Model.CurrentDocTitle <span class="lang-pill">@Model.CurrentLanguageLabel</span></h3>
+            <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">预览</a>
+        </div>
+
+        <form method="post">
+            <input type="hidden" asp-for="Input.DocId" />
+            <input type="hidden" asp-for="Input.Language" />
+            <div class="form-group">
+                <textarea asp-for="Input.Html" class="docs-editor"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">打开前台预览</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .user-docs-layout {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .user-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .user-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .user-card-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .user-card-header h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .language-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .language-tab {
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #666;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .language-tab:hover {
+            background: #f5f5f5;
+        }
+
+        .language-tab.active {
+            background: #4A90D9;
+            color: white;
+        }
+
+        .docs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .docs-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.2s;
+        }
+
+        .docs-item:hover {
+            background: #f8f9fa;
+        }
+
+        .docs-item.active {
+            background: #e8f0f8;
+            border-left: 3px solid #4A90D9;
+        }
+
+        .docs-item strong {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .docs-item span {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .docs-editor {
+            width: 100%;
+            min-height: 400px;
+            padding: 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .docs-editor:focus {
+            outline: none;
+            border-color: #4A90D9;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4A90D9;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3a7bc8;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .lang-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #e8f0f8;
+            color: #4A90D9;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+    </style>
+}

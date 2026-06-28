@@ -27,6 +27,7 @@
 
 #include "ai_settings.h"
 
+#include "core/config/project_settings.h"
 #include "core/error/error_macros.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
@@ -53,6 +54,7 @@ static constexpr const char *EDITOR_AI_API_KEY_KEY = "ai_settings/provider/api_k
 static constexpr const char *EDITOR_AI_TEMPERATURE_KEY = "ai_settings/provider/temperature";
 static constexpr const char *EDITOR_AI_MAX_TOKENS_KEY = "ai_settings/provider/max_tokens";
 static constexpr const char *EDITOR_AI_OUTPUT_LANGUAGE_KEY = "ai_settings/general/output_language";
+static constexpr const char *EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY = "ai_settings/project/enable_html_min_project_prototype";
 static constexpr const char *EDITOR_AI_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_function_calling";
 static constexpr const char *EDITOR_AI_MCP_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_mcp_tools";
 static constexpr const char *EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY = "ai_settings/context/context_char_budget";
@@ -142,6 +144,28 @@ static bool _should_read_editor_setting(const StringName &p_key, bool p_only_cha
 	return !p_only_changed || _editor_setting_was_changed(p_key);
 }
 
+static AIBackendType _backend_type_from_string(const String &p_backend_type) {
+	if (p_backend_type == "codex") {
+		return AIBackendType::CODEX;
+	}
+	if (p_backend_type == "legacy_openai") {
+		return AIBackendType::LEGACY_OPENAI;
+	}
+	return AIBackendType::JUNDOT_PLUGIN;
+}
+
+static String _backend_type_to_string(AIBackendType p_backend_type) {
+	switch (p_backend_type) {
+		case AIBackendType::CODEX:
+			return "codex";
+		case AIBackendType::LEGACY_OPENAI:
+			return "legacy_openai";
+		case AIBackendType::JUNDOT_PLUGIN:
+		default:
+			return "jundot_plugin";
+	}
+}
+
 static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_changed) {
 	EditorSettings *editor_settings = EditorSettings::get_singleton();
 	if (!editor_settings) {
@@ -153,7 +177,7 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	}
 	if (_should_read_editor_setting(EDITOR_AI_BACKEND_TYPE_KEY, p_only_changed)) {
 		const String backend_type = String(editor_settings->get_setting(EDITOR_AI_BACKEND_TYPE_KEY));
-		r_settings.backend_type = (backend_type == "legacy_openai") ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+		r_settings.backend_type = _backend_type_from_string(backend_type);
 	}
 	if (_should_read_editor_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY, p_only_changed)) {
 		r_settings.jundot_ai_plugin_id = editor_settings->get_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY);
@@ -178,6 +202,9 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	}
 	if (_should_read_editor_setting(EDITOR_AI_OUTPUT_LANGUAGE_KEY, p_only_changed)) {
 		r_settings.output_language = editor_settings->get_setting(EDITOR_AI_OUTPUT_LANGUAGE_KEY);
+	}
+	if (_should_read_editor_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY, p_only_changed)) {
+		r_settings.html_min_project_prototype_enabled = editor_settings->get_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY);
 	}
 	if (_should_read_editor_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_only_changed)) {
 		r_settings.tools_enabled = editor_settings->get_setting(EDITOR_AI_TOOLS_ENABLED_KEY);
@@ -218,7 +245,7 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	}
 
 	editor_settings->set_setting(EDITOR_AI_BASE_URL_KEY, p_settings.base_url);
-	editor_settings->set_setting(EDITOR_AI_BACKEND_TYPE_KEY, p_settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin");
+	editor_settings->set_setting(EDITOR_AI_BACKEND_TYPE_KEY, _backend_type_to_string(p_settings.backend_type));
 	editor_settings->set_setting(EDITOR_AI_JUNDOT_PLUGIN_ID_KEY, p_settings.jundot_ai_plugin_id);
 	editor_settings->set_setting(EDITOR_AI_JUNDOT_PLUGIN_URL_KEY, p_settings.jundot_ai_plugin_url);
 	editor_settings->set_setting(EDITOR_AI_ALLOW_LEGACY_OPENAI_BACKEND_KEY, p_settings.allow_legacy_openai_backend);
@@ -227,6 +254,7 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	editor_settings->set_setting(EDITOR_AI_TEMPERATURE_KEY, p_settings.temperature);
 	editor_settings->set_setting(EDITOR_AI_MAX_TOKENS_KEY, p_settings.max_tokens);
 	editor_settings->set_setting(EDITOR_AI_OUTPUT_LANGUAGE_KEY, p_settings.output_language);
+	editor_settings->set_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY, p_settings.html_min_project_prototype_enabled);
 	editor_settings->set_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_settings.tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_settings.mcp_tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY, p_settings.context_char_budget);
@@ -259,6 +287,8 @@ String AISettings::get_default_system_prompt() {
 			   "- Do not put code fences inside TASK_PLAN. Keep it compact.\n\n"
 			   "=== Tool Call Protocol ===\n"
 			   "- You MUST use the available tools to implement requests, not just describe solutions.\n"
+			   "- Use `search_files` for glob-style filename searches. Do not call a tool named `glob`; this editor exposes that capability as `search_files` with a `pattern` argument.\n"
+			   "- Only call tools that are explicitly provided in the current Function Calling tool list. Do not call Codex/MiMo-style tools such as `memory_search`, `session_list`, `read_file`, or `glob` unless they appear in the actual tool list. For project memory, use the Project Memories already included in context or read `.JundotAI/memory.json` with `read_files`.\n"
 			   "- Prefer batch_tools when you can combine independent local actions into one tool call, such as list_files + grep_code + read_files, reading several files, or writing several related files.\n"
 			   "- BEFORE writing or suggesting code changes, ALWAYS read the relevant source files first.\n"
 			   "- run_build runs in the background. After calling it, call check_build_status to get the result. If still running, call it again in subsequent rounds.\n"
@@ -291,8 +321,31 @@ double AISettings::get_default_feature_necessity_threshold() {
 	return 0.7;
 }
 
-bool AISettings::is_usage_agreement_current(const AISettingsData &p_settings) {
-	return p_settings.usage_agreement_accepted && p_settings.usage_agreement_version == AISettingsData::CURRENT_USAGE_AGREEMENT_VERSION;
+String AISettings::get_project_agreement_key(const String &p_project_path) {
+	String project_path = p_project_path.strip_edges();
+	if (project_path.is_empty() && ProjectSettings::get_singleton()) {
+		project_path = ProjectSettings::get_singleton()->get_resource_path();
+	}
+
+	project_path = project_path.replace("\\", "/").simplify_path();
+	if (project_path.is_empty()) {
+		return String();
+	}
+
+	return project_path.to_lower();
+}
+
+bool AISettings::is_usage_agreement_current(const AISettingsData &p_settings, const String &p_project_path) {
+	if (p_settings.usage_agreement_version != AISettingsData::CURRENT_USAGE_AGREEMENT_VERSION) {
+		return false;
+	}
+
+	const String project_key = get_project_agreement_key(p_project_path);
+	if (!project_key.is_empty()) {
+		return p_settings.usage_agreement_project_keys.has(project_key);
+	}
+
+	return p_settings.usage_agreement_accepted;
 }
 
 String AISettings::_get_config_path() {
@@ -350,7 +403,7 @@ AISettingsData AISettings::load() {
 
 	const Dictionary root = data;
 	const String backend_type = root.get("backend_type", String("jundot_plugin"));
-	settings.backend_type = (backend_type == "legacy_openai") ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+	settings.backend_type = _backend_type_from_string(backend_type);
 	settings.jundot_ai_plugin_id = root.get("jundot_ai_plugin_id", String(JUNDOT_MIMOCODE_PLUGIN_ID));
 	settings.jundot_ai_plugin_url = root.get("jundot_ai_plugin_url", String("http://127.0.0.1:4096"));
 	settings.allow_legacy_openai_backend = root.get("allow_legacy_openai_backend", false);
@@ -369,11 +422,22 @@ AISettingsData AISettings::load() {
 	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
 	settings.max_tool_iterations = root.get("max_tool_iterations", get_default_max_tool_iterations());
 	settings.auto_suggest_entries = root.get("auto_suggest_entries", true);
+	settings.html_min_project_prototype_enabled = root.get("html_min_project_prototype_enabled", false);
 	settings.user_extra_instructions = root.get("user_extra_instructions", String());
 	settings.output_language = root.get("output_language", "auto");
 	settings.usage_agreement_accepted = root.get("usage_agreement_accepted", false);
 	settings.usage_agreement_version = root.get("usage_agreement_version", 0);
 	settings.usage_agreement_accepted_at = root.get("usage_agreement_accepted_at", String());
+	const Variant project_keys_value = root.get("usage_agreement_project_keys", Array());
+	if (project_keys_value.get_type() == Variant::ARRAY) {
+		Array project_keys = project_keys_value;
+		for (int i = 0; i < project_keys.size(); i++) {
+			const String project_key = String(project_keys[i]).strip_edges();
+			if (!project_key.is_empty() && !settings.usage_agreement_project_keys.has(project_key)) {
+				settings.usage_agreement_project_keys.push_back(project_key);
+			}
+		}
+	}
 	settings.feature_universality_threshold = root.get("feature_universality_threshold", get_default_feature_universality_threshold());
 	settings.feature_necessity_threshold = root.get("feature_necessity_threshold", get_default_feature_necessity_threshold());
 	settings.feature_design_philosophy_check = root.get("feature_design_philosophy_check", true);
@@ -386,6 +450,45 @@ AISettingsData AISettings::load() {
 	settings.external_api_enabled = root.get("external_api_enabled", false);
 	settings.external_api_port = root.get("external_api_port", 8080);
 	settings.external_api_bind_address = root.get("external_api_bind_address", "127.0.0.1");
+
+	settings.github_oauth_client_id = root.get("github_oauth_client_id", String());
+	settings.github_oauth_client_secret = root.get("github_oauth_client_secret", String());
+	if (root.has("github_token")) {
+		Dictionary gt = root["github_token"];
+		settings.github_token.access_token = gt.get("access_token", String());
+		settings.github_token.refresh_token = gt.get("refresh_token", String());
+		settings.github_token.token_type = gt.get("token_type", String());
+		settings.github_token.scope = gt.get("scope", String());
+		settings.github_token.expires_at = gt.get("expires_at", 0);
+	}
+	if (root.has("github_user")) {
+		Dictionary gu = root["github_user"];
+		settings.github_user.login = gu.get("login", String());
+		settings.github_user.name = gu.get("name", String());
+		settings.github_user.avatar_url = gu.get("avatar_url", String());
+		settings.github_user.html_url = gu.get("html_url", String());
+		settings.github_user.email = gu.get("email", String());
+	}
+
+	settings.gitee_oauth_client_id = root.get("gitee_oauth_client_id", String());
+	settings.gitee_oauth_client_secret = root.get("gitee_oauth_client_secret", String());
+	if (root.has("gitee_token")) {
+		Dictionary gt = root["gitee_token"];
+		settings.gitee_token.access_token = gt.get("access_token", String());
+		settings.gitee_token.refresh_token = gt.get("refresh_token", String());
+		settings.gitee_token.token_type = gt.get("token_type", String());
+		settings.gitee_token.scope = gt.get("scope", String());
+		settings.gitee_token.expires_at = gt.get("expires_at", 0);
+	}
+	if (root.has("gitee_user")) {
+		Dictionary gu = root["gitee_user"];
+		settings.gitee_user.login = gu.get("login", String());
+		settings.gitee_user.name = gu.get("name", String());
+		settings.gitee_user.avatar_url = gu.get("avatar_url", String());
+		settings.gitee_user.html_url = gu.get("html_url", String());
+		settings.gitee_user.email = gu.get("email", String());
+	}
+
 	_apply_editor_settings(settings, true);
 	return settings;
 }
@@ -397,7 +500,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	}
 
 	Dictionary root;
-	root["backend_type"] = p_settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin";
+	root["backend_type"] = _backend_type_to_string(p_settings.backend_type);
 	root["jundot_ai_plugin_id"] = p_settings.jundot_ai_plugin_id;
 	root["jundot_ai_plugin_url"] = p_settings.jundot_ai_plugin_url;
 	root["allow_legacy_openai_backend"] = p_settings.allow_legacy_openai_backend;
@@ -416,11 +519,19 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["history_char_budget"] = p_settings.history_char_budget;
 	root["max_tool_iterations"] = p_settings.max_tool_iterations;
 	root["auto_suggest_entries"] = p_settings.auto_suggest_entries;
+	root["html_min_project_prototype_enabled"] = p_settings.html_min_project_prototype_enabled;
 	root["user_extra_instructions"] = p_settings.user_extra_instructions;
 	root["output_language"] = p_settings.output_language;
 	root["usage_agreement_accepted"] = p_settings.usage_agreement_accepted;
 	root["usage_agreement_version"] = p_settings.usage_agreement_version;
 	root["usage_agreement_accepted_at"] = p_settings.usage_agreement_accepted_at;
+	Array usage_agreement_project_keys;
+	for (const String &project_key : p_settings.usage_agreement_project_keys) {
+		if (!project_key.is_empty() && !usage_agreement_project_keys.has(project_key)) {
+			usage_agreement_project_keys.push_back(project_key);
+		}
+	}
+	root["usage_agreement_project_keys"] = usage_agreement_project_keys;
 	root["feature_universality_threshold"] = p_settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = p_settings.feature_necessity_threshold;
 	root["feature_design_philosophy_check"] = p_settings.feature_design_philosophy_check;
@@ -432,6 +543,41 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["external_api_enabled"] = p_settings.external_api_enabled;
 	root["external_api_port"] = p_settings.external_api_port;
 	root["external_api_bind_address"] = p_settings.external_api_bind_address;
+
+	root["github_oauth_client_id"] = p_settings.github_oauth_client_id;
+	root["github_oauth_client_secret"] = p_settings.github_oauth_client_secret;
+	Dictionary github_token;
+	github_token["access_token"] = p_settings.github_token.access_token;
+	github_token["refresh_token"] = p_settings.github_token.refresh_token;
+	github_token["token_type"] = p_settings.github_token.token_type;
+	github_token["scope"] = p_settings.github_token.scope;
+	github_token["expires_at"] = p_settings.github_token.expires_at;
+	root["github_token"] = github_token;
+	Dictionary github_user;
+	github_user["login"] = p_settings.github_user.login;
+	github_user["name"] = p_settings.github_user.name;
+	github_user["avatar_url"] = p_settings.github_user.avatar_url;
+	github_user["html_url"] = p_settings.github_user.html_url;
+	github_user["email"] = p_settings.github_user.email;
+	root["github_user"] = github_user;
+
+	root["gitee_oauth_client_id"] = p_settings.gitee_oauth_client_id;
+	root["gitee_oauth_client_secret"] = p_settings.gitee_oauth_client_secret;
+	Dictionary gitee_token;
+	gitee_token["access_token"] = p_settings.gitee_token.access_token;
+	gitee_token["refresh_token"] = p_settings.gitee_token.refresh_token;
+	gitee_token["token_type"] = p_settings.gitee_token.token_type;
+	gitee_token["scope"] = p_settings.gitee_token.scope;
+	gitee_token["expires_at"] = p_settings.gitee_token.expires_at;
+	root["gitee_token"] = gitee_token;
+	Dictionary gitee_user;
+	gitee_user["login"] = p_settings.gitee_user.login;
+	gitee_user["name"] = p_settings.gitee_user.name;
+	gitee_user["avatar_url"] = p_settings.gitee_user.avatar_url;
+	gitee_user["html_url"] = p_settings.gitee_user.html_url;
+	gitee_user["email"] = p_settings.gitee_user.email;
+	root["gitee_user"] = gitee_user;
+
 	root["schema_version"] = 1;
 
 	Error err = DirAccess::make_dir_recursive_absolute(path.get_base_dir());
@@ -453,19 +599,32 @@ Error AISettings::reset_to_defaults() {
 	return save(defaults);
 }
 
-Error AISettings::accept_usage_agreement() {
+Error AISettings::accept_usage_agreement(const String &p_project_path) {
 	AISettingsData settings = load();
-	settings.usage_agreement_accepted = true;
 	settings.usage_agreement_version = AISettingsData::CURRENT_USAGE_AGREEMENT_VERSION;
 	settings.usage_agreement_accepted_at = Time::get_singleton()->get_datetime_string_from_system(true);
+	const String project_key = get_project_agreement_key(p_project_path);
+	if (!project_key.is_empty()) {
+		if (!settings.usage_agreement_project_keys.has(project_key)) {
+			settings.usage_agreement_project_keys.push_back(project_key);
+		}
+	} else {
+		settings.usage_agreement_accepted = true;
+	}
 	return save(settings);
 }
 
-Error AISettings::reset_usage_agreement() {
+Error AISettings::reset_usage_agreement(const String &p_project_path) {
 	AISettingsData settings = load();
-	settings.usage_agreement_accepted = false;
-	settings.usage_agreement_version = 0;
-	settings.usage_agreement_accepted_at = String();
+	const String project_key = get_project_agreement_key(p_project_path);
+	if (!project_key.is_empty()) {
+		settings.usage_agreement_project_keys.erase(project_key);
+	} else {
+		settings.usage_agreement_accepted = false;
+		settings.usage_agreement_version = 0;
+		settings.usage_agreement_accepted_at = String();
+		settings.usage_agreement_project_keys.clear();
+	}
 	return save(settings);
 }
 
@@ -483,6 +642,14 @@ String AISettings::get_effective_system_prompt(const AISettingsData &p_settings)
 			prompt = p_settings.project_system_prompt;
 			if (prompt.is_empty()) {
 				prompt = get_default_system_prompt();
+			}
+			if (p_settings.html_min_project_prototype_enabled) {
+				prompt += "\n\n=== Optional HTML Minimum Project Prototype Gate ===\n"
+						  "When the user describes a new project or game idea and the feature is enabled, you may directly create a tiny standalone HTML prototype before touching Godot project files. Use this only when a fast playable or visual example would help the user judge direction, controls, screen flow, or core feel.\n"
+						  "- Keep the prototype minimal and disposable: one self-contained .html file under `.JundotAI/prototypes/`, with inline CSS/JavaScript and no external assets unless already present in the project.\n"
+						  "- During this preview step, do not create or modify Godot scenes, scripts, resources, or project settings. Only write the HTML prototype and any required `.JundotAI/prototypes/` support file.\n"
+						  "- After presenting the HTML prototype, ask the user for approval through the NEXT_QUESTION protocol before continuing into real Godot project work. Treat the HTML as a review aid, not production source.\n"
+						  "- If the user explicitly asks to skip the HTML preview, or gives a clear direct implementation request, continue with the normal project workflow.\n";
 			}
 			break;
 	}

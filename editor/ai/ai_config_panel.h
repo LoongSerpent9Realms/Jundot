@@ -66,6 +66,7 @@ class AIConfigPanel : public MarginContainer {
 	CheckBox *develop_mode_check = nullptr;
 	CheckBox *mcp_tools_enabled_check = nullptr;
 	CheckBox *auto_suggest_entries_check = nullptr;
+	CheckBox *html_min_project_prototype_check = nullptr;
 	CheckBox *feature_design_philosophy_check = nullptr;
 	TextEdit *system_prompt_edit = nullptr;
 	TextEdit *user_extra_instructions_edit = nullptr;
@@ -113,6 +114,29 @@ class AIConfigPanel : public MarginContainer {
 	Button *engine_source_update_button = nullptr;
 	Label *engine_source_status_label = nullptr;
 	LineEdit *engine_source_cache_path_edit = nullptr;
+
+	Label *github_account_label = nullptr;
+	Label *github_status_label = nullptr;
+	LineEdit *github_client_id_edit = nullptr;
+	Label *github_client_id_label = nullptr;
+	LineEdit *github_client_secret_edit = nullptr;
+	Label *github_client_secret_label = nullptr;
+	Button *github_login_button = nullptr;
+	Button *github_logout_button = nullptr;
+	uint32_t _github_auth_start_time = 0;
+	bool github_auth_polling = false;
+
+	Label *gitee_account_label = nullptr;
+	Label *gitee_status_label = nullptr;
+	LineEdit *gitee_client_id_edit = nullptr;
+	Label *gitee_client_id_label = nullptr;
+	LineEdit *gitee_client_secret_edit = nullptr;
+	Label *gitee_client_secret_label = nullptr;
+	Button *gitee_login_button = nullptr;
+	Button *gitee_logout_button = nullptr;
+	uint32_t _gitee_auth_start_time = 0;
+	bool gitee_auth_polling = false;
+
 	FileDialog *export_dialog = nullptr;
 	FileDialog *import_dialog = nullptr;
 	ScrollContainer *settings_scroll = nullptr;
@@ -146,6 +170,16 @@ class AIConfigPanel : public MarginContainer {
 	void _on_engine_source_update_button_pressed();
 	void _on_engine_source_cache_path_selected(const String &p_path);
 	void _update_adaptive_layout();
+
+	void _on_github_login_pressed();
+	void _on_github_logout_pressed();
+	void _update_github_status();
+	void _github_poll_auth();
+
+	void _on_gitee_login_pressed();
+	void _on_gitee_logout_pressed();
+	void _update_gitee_status();
+	void _gitee_poll_auth();
 
 	LineEdit *_add_line_edit_row(GridContainer *p_grid, Label **r_label, const String &p_label, const String &p_placeholder = String(), bool p_secret = false);
 	SpinBox *_add_spin_box_row(GridContainer *p_grid, Label **r_label, const String &p_label, double p_min, double p_max, double p_step);

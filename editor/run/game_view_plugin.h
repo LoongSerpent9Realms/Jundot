@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/input/input_enums.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/debugger/editor_debugger_plugin.h"
 #include "editor/editor_main_screen.h"
@@ -46,6 +47,7 @@ class GameViewDebugger : public EditorDebuggerPlugin {
 	GDCLASS(GameViewDebugger, EditorDebuggerPlugin);
 
 private:
+	static GameViewDebugger *singleton;
 	Vector<Ref<EditorDebuggerSession>> sessions;
 
 	bool is_feature_enabled = true;
@@ -77,6 +79,8 @@ protected:
 	static void _bind_methods();
 
 public:
+	static GameViewDebugger *get_singleton() { return singleton; }
+
 	virtual bool capture(const String &p_message, const Array &p_data, int p_session) override;
 	virtual bool has_capture(const String &p_capture) const override;
 
@@ -110,10 +114,12 @@ public:
 
 	void reset_camera_2d_position();
 	void reset_camera_3d_position();
+	int click_ui_position(const Vector2 &p_position, MouseButton p_button = MouseButton::LEFT);
 
 	virtual void setup_session(int p_session_id) override;
 
 	GameViewDebugger();
+	~GameViewDebugger();
 };
 
 class GameView : public VBoxContainer {

@@ -1,0 +1,30 @@
+<h1 id="jundot-engine-docs">Jundot Engine Documentation</h1>
+<p>Jundot is an AI-assisted game iteration engine based on Godot. Its documentation focuses on one practical workflow: describe a game, refine it with AI, let the AI change the project when the engine is enough, and only change the engine when the project truly needs new engine capability.</p>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">Core workflow</div>
+    <p>The user can create a project with AI and keep refining the idea with the AI. If the current engine can complete the task, the AI should not modify the engine. If it cannot, the AI can adapt the engine for this project. When the new capability is broadly useful, it can be prepared as a main-engine improvement.</p>
+</div>
+
+<h2 id="what-jundot-adds">What Jundot adds</h2>
+<ul>
+    <li>An AI project creation flow for turning a game idea into a runnable project.</li>
+    <li>A project-aware assistant that can inspect scripts, scenes, logs, and editor state.</li>
+    <li>A controlled path for engine changes when project work is not enough.</li>
+    <li>A verification-first GitHub workflow for saving changes after the user confirms the result.</li>
+</ul>
+
+<h2 id="relationship-to-godot">Relationship to Godot documentation</h2>
+<p>Jundot keeps Godot concepts, scene structure, nodes, resources, and scripting APIs. For general Godot usage, the official Godot documentation remains the primary reference. Jundot documentation explains the AI workflow, the engine-change boundary, and Jundot-specific tools built around that foundation.</p>
+
+<h2 id="recommended-reading">Recommended reading order</h2>
+<ol>
+    <li>Install Jundot and configure the AI backend.</li>
+    <li>Create a project from an idea with AI.</li>
+    <li>Use the AI Assistant to inspect, edit, run checks, and fix problems.</li>
+    <li>Review how engine changes are requested and verified.</li>
+    <li>Publish or upload verified changes to GitHub.</li>
+</ol>
+
+<h2 id="user-verification">User verification comes first</h2>
+<p>Jundot should not treat AI output as finished until the user has run and verified it. After verification, the AI can prepare commits, summarize the change, and upload it to GitHub when the workflow allows it.</p>

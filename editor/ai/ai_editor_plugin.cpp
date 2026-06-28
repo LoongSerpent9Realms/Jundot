@@ -33,6 +33,8 @@
 #include "ai_tools_panel.h"
 #include "ai_mcp_manager.h"
 #include "ai_inspector_context_menu.h"
+#include "github_auth_service.h"
+#include "gitee_auth_service.h"
 
 #include "editor/docks/editor_dock.h"
 #include "editor/docks/editor_dock_manager.h"
@@ -103,6 +105,9 @@ AIEditorPlugin::AIEditorPlugin() {
 	_create_dock();
 	AIMCPManager::get_singleton()->initialize();
 
+	github_auth_service = memnew(GitHubAuthService);
+	gitee_auth_service = memnew(GiteeAuthService);
+
 	// Register the inspector context menu plugin for "Ask AI" feature.
 	inspector_context_menu_plugin.instantiate();
 	EditorContextMenuPluginManager::get_singleton()->add_plugin(
@@ -119,6 +124,15 @@ AIEditorPlugin::~AIEditorPlugin() {
 	// Unregister the inspector context menu plugin.
 	if (inspector_context_menu_plugin.is_valid()) {
 		EditorContextMenuPluginManager::get_singleton()->remove_plugin(inspector_context_menu_plugin);
+	}
+
+	if (github_auth_service) {
+		memdelete(github_auth_service);
+		github_auth_service = nullptr;
+	}
+	if (gitee_auth_service) {
+		memdelete(gitee_auth_service);
+		gitee_auth_service = nullptr;
 	}
 
 	AIMCPManager::cleanup();

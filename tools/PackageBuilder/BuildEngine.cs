@@ -149,9 +149,13 @@ public class BuildEngine
 				Report("", "step");
 				Report("Checking build tools", "step");
 
+				ValidateBuildConfiguration();
 				await FindPythonAsync();
 				await FindSConsRunnerAsync();
-				await AssertWindowsCompilerAsync();
+				if (_cfg.PlatformName == "windows")
+					await AssertWindowsCompilerAsync();
+				else if (_cfg.PlatformName == "android")
+					await CheckAndroidToolsAsync();
 				await CheckMonoToolsAsync();
 
 				// Host platform guard: Jundot's SCons build can only build a
@@ -918,6 +922,73 @@ Install one of these toolchains, then run this tool again:
 
 		if (FindCommand("dotnet") == null)
 			throw new Exception("Mono builds require the .NET SDK. Install it and retry.");
+	}
+
+	private void ValidateBuildConfiguration()
+	{
+		if (_cfg.PlatformName == "android" && _cfg.Mono && _actualTarget == "editor")
+		{
+			throw new Exception(
+				"Android Mono editor builds are not supported by the Mono module. " +
+				"Disable Mono for an Android editor build, or switch Target to template_debug/template_release for Android Mono templates.");
+		}
+	}
+
+	private async Task CheckAndroidToolsAsync()
+	{
+		var androidHome = GetEnvironmentVariableAnyTarget("ANDROID_HOME");
+		var androidSdkRoot = GetEnvironmentVariableAnyTarget("ANDROID_SDK_ROOT");
+		var sdkRoot = !string.IsNullOrWhiteSpace(androidHome) ? androidHome : androidSdkRoot;
+
+		if (string.IsNullOrWhiteSpace(sdkRoot) || !Directory.Exists(sdkRoot))
+		{
+			throw new Exception(
+				"Android builds require the Android SDK. Set ANDROID_HOME or ANDROID_SDK_ROOT to your Android SDK folder, " +
+				"then retry. Without this environment variable, SCons hides the Android platform and reports " +
+				"'Invalid target platform \"android\"'.");
+		}
+
+		Environment.SetEnvironmentVariable("ANDROID_HOME", sdkRoot, EnvironmentVariableTarget.Process);
+		Environment.SetEnvironmentVariable("ANDROID_SDK_ROOT", sdkRoot, EnvironmentVariableTarget.Process);
+
+		var ndkVersion = GetRequiredAndroidNdkVersion();
+		var ndkRoot = Path.Combine(sdkRoot, "ndk", ndkVersion);
+		if (Directory.Exists(ndkRoot))
+		{
+			Report($"Android SDK found: {sdkRoot}", "success");
+			Report($"Android NDK found: {ndkRoot}", "success");
+			return;
+		}
+
+		var sdkManager = Path.Combine(sdkRoot, "cmdline-tools", "latest", "bin",
+			OperatingSystem.IsWindows() ? "sdkmanager.bat" : "sdkmanager");
+		if (!File.Exists(sdkManager))
+		{
+			throw new Exception(
+				$"Android SDK found, but required NDK {ndkVersion} is missing and sdkmanager was not found at '{sdkManager}'. " +
+				$"Install Android SDK Command-line Tools and NDK {ndkVersion}, then retry.");
+		}
+
+		Report($"Android SDK found: {sdkRoot}", "success");
+		Report($"Android NDK {ndkVersion} not found. SCons will try to install it with sdkmanager.", "warning");
+		await Task.CompletedTask;
+	}
+
+	private static string? GetEnvironmentVariableAnyTarget(string name)
+	{
+		return Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process)
+			?? Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.User)
+			?? Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Machine);
+	}
+
+	private string GetRequiredAndroidNdkVersion()
+	{
+		var detectPath = Path.Combine(_repoRoot, "platform", "android", "detect.py");
+		if (!File.Exists(detectPath))
+			return "29.0.14206865";
+
+		var match = Regex.Match(File.ReadAllText(detectPath), "def\\s+get_ndk_version\\s*\\(\\)\\s*:\\s*\\r?\\n\\s*return\\s+\"([^\"]+)\"");
+		return match.Success ? match.Groups[1].Value : "29.0.14206865";
 	}
 
 	// ══════════════════════════════════════════════════════════════�?    //  BUILD

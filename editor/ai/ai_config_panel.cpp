@@ -39,6 +39,8 @@
 #include "editor/ai/ai_mcp_manager.h"
 #include "editor/ai/ai_settings.h"
 #include "editor/ai/ai_usage_agreement_dialog.h"
+#include "editor/ai/github_auth_service.h"
+#include "editor/ai/gitee_auth_service.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
@@ -69,7 +71,8 @@ static constexpr int OUTPUT_LANGUAGE_SPANISH = 6;
 static constexpr int OUTPUT_LANGUAGE_FRENCH = 7;
 static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
 static constexpr int BACKEND_TYPE_JUNDOT_PLUGIN = 0;
-static constexpr int BACKEND_TYPE_LEGACY_OPENAI = 1;
+static constexpr int BACKEND_TYPE_CODEX = 1;
+static constexpr int BACKEND_TYPE_LEGACY_OPENAI = 2;
 
 struct ExternalMCPAppTarget {
 	String name;
@@ -252,10 +255,16 @@ static int _output_language_to_id(const String &p_language) {
 }
 
 static AIBackendType _backend_type_from_id(int p_id) {
+	if (p_id == BACKEND_TYPE_CODEX) {
+		return AIBackendType::CODEX;
+	}
 	return p_id == BACKEND_TYPE_LEGACY_OPENAI ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
 }
 
 static int _backend_type_to_id(AIBackendType p_backend_type) {
+	if (p_backend_type == AIBackendType::CODEX) {
+		return BACKEND_TYPE_CODEX;
+	}
 	return p_backend_type == AIBackendType::LEGACY_OPENAI ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN;
 }
 
@@ -331,6 +340,13 @@ void AIConfigPanel::_notification(int p_what) {
 		_update_translations();
 	} else if (p_what == NOTIFICATION_READY || p_what == NOTIFICATION_RESIZED) {
 		_update_adaptive_layout();
+	} else if (p_what == NOTIFICATION_PROCESS) {
+		if (github_auth_polling) {
+			_github_poll_auth();
+		}
+		if (gitee_auth_polling) {
+			_gitee_poll_auth();
+		}
 	}
 }
 
@@ -396,6 +412,7 @@ OptionButton *AIConfigPanel::_add_backend_type_row(GridContainer *p_grid, Label 
 	OptionButton *option = memnew(OptionButton);
 	option->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	option->add_item(TTR("jundot Plugin (MiMoCode)"), BACKEND_TYPE_JUNDOT_PLUGIN);
+	option->add_item(TTR("Codex"), BACKEND_TYPE_CODEX);
 	option->add_item(TTR("Legacy OpenAI-Compatible"), BACKEND_TYPE_LEGACY_OPENAI);
 	p_grid->add_child(option);
 	return option;
@@ -449,6 +466,8 @@ void AIConfigPanel::_update_translations() {
 	develop_mode_check->set_tooltip_text(TTR("Demonstrates modify, build, restart, user verification, AI verification, and upload validation. Git commit and push are always skipped."));
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
+	html_min_project_prototype_check->set_text(TTR("Allow HTML minimum prototype preview before project implementation"));
+	html_min_project_prototype_check->set_tooltip_text(TTR("When enabled, project-concept requests can create a disposable standalone HTML prototype under .JundotAI/prototypes, then wait for user approval before editing Godot project files."));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
 	external_api_enabled_check->set_text(TTR("Enable External API Server (for remote MCP tool calls)"));
 	external_mcp_config_label->set_text(TTR("External AI MCP Config"));
@@ -468,6 +487,7 @@ void AIConfigPanel::_update_translations() {
 	jundot_plugin_url_edit->set_placeholder("http://127.0.0.1:4096");
 	model_edit->set_placeholder(AISettings::get_default_model());
 	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_JUNDOT_PLUGIN), TTR("jundot Plugin (MiMoCode)"));
+	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_CODEX), TTR("Codex"));
 	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_LEGACY_OPENAI), TTR("Legacy OpenAI-Compatible"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_AUTO), TTR("System Language (Auto)"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_ENGLISH), TTR("English"));
@@ -713,15 +733,30 @@ void AIConfigPanel::_load_settings() {
 	develop_mode_check->set_pressed(settings.develop_mode);
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
+	html_min_project_prototype_check->set_pressed(settings.html_min_project_prototype_enabled);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
 	external_api_enabled_check->set_pressed(settings.external_api_enabled);
 	external_api_port_spin->set_value(settings.external_api_port);
 	external_api_bind_address_edit->set_text(settings.external_api_bind_address);
+	if (github_client_id_edit) {
+		github_client_id_edit->set_text(settings.github_oauth_client_id);
+	}
+	if (github_client_secret_edit) {
+		github_client_secret_edit->set_text(settings.github_oauth_client_secret);
+	}
+	if (gitee_client_id_edit) {
+		gitee_client_id_edit->set_text(settings.gitee_oauth_client_id);
+	}
+	if (gitee_client_secret_edit) {
+		gitee_client_secret_edit->set_text(settings.gitee_oauth_client_secret);
+	}
 	_update_external_mcp_config();
 	_update_backend_controls();
 	user_extra_instructions_edit->set_text(settings.user_extra_instructions);
 	status_label->set_text(TTR("AI settings loaded."));
 	_update_engine_source_status();
+	_update_github_status();
+	_update_gitee_status();
 }
 
 void AIConfigPanel::_save_settings() {
@@ -747,11 +782,16 @@ void AIConfigPanel::_save_settings() {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.user_extra_instructions = user_extra_instructions_edit->get_text();
 	settings.external_api_enabled = external_api_enabled_check->is_pressed();
 	settings.external_api_port = external_api_port_spin->get_value();
 	settings.external_api_bind_address = external_api_bind_address_edit->get_text().strip_edges();
+	settings.github_oauth_client_id = github_client_id_edit ? github_client_id_edit->get_text().strip_edges() : String();
+	settings.github_oauth_client_secret = github_client_secret_edit ? github_client_secret_edit->get_text().strip_edges() : String();
+	settings.gitee_oauth_client_id = gitee_client_id_edit ? gitee_client_id_edit->get_text().strip_edges() : String();
+	settings.gitee_oauth_client_secret = gitee_client_secret_edit ? gitee_client_secret_edit->get_text().strip_edges() : String();
 	const Error err = AISettings::save(settings);
 	if (err != OK) {
 		status_label->set_text(TTR("AI settings could not be saved."));
@@ -797,6 +837,7 @@ void AIConfigPanel::_test_connection() {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
 
@@ -805,7 +846,7 @@ void AIConfigPanel::_test_connection() {
 		return;
 	}
 
-	if (settings.backend_type == AIBackendType::LEGACY_OPENAI && (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty())) {
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty())) {
 		status_label->set_text(TTR("Base URL, model, and API key are required before testing the connection."));
 		return;
 	}
@@ -875,11 +916,12 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
 
 	Dictionary root;
-	root["backend_type"] = settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin";
+	root["backend_type"] = settings.backend_type == AIBackendType::CODEX ? "codex" : (settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin");
 	root["jundot_ai_plugin_id"] = settings.jundot_ai_plugin_id;
 	root["jundot_ai_plugin_url"] = settings.jundot_ai_plugin_url;
 	root["allow_legacy_openai_backend"] = settings.allow_legacy_openai_backend;
@@ -898,6 +940,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["history_char_budget"] = settings.history_char_budget;
 	root["max_tool_iterations"] = settings.max_tool_iterations;
 	root["auto_suggest_entries"] = settings.auto_suggest_entries;
+	root["html_min_project_prototype_enabled"] = settings.html_min_project_prototype_enabled;
 	root["output_language"] = settings.output_language;
 	root["feature_universality_threshold"] = settings.feature_universality_threshold;
 	root["feature_necessity_threshold"] = settings.feature_necessity_threshold;
@@ -1010,7 +1053,8 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 
 	const Dictionary root = json_data;
 	if (root.has("backend_type")) {
-		backend_type_option->select(backend_type_option->get_item_index(String(root["backend_type"]) == "legacy_openai" ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN));
+		const String backend_type = root["backend_type"];
+		backend_type_option->select(backend_type_option->get_item_index(backend_type == "codex" ? BACKEND_TYPE_CODEX : (backend_type == "legacy_openai" ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN)));
 	}
 	if (root.has("jundot_ai_plugin_id")) {
 		jundot_plugin_id_edit->set_text(root["jundot_ai_plugin_id"]);
@@ -1069,6 +1113,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	if (root.has("auto_suggest_entries")) {
 		auto_suggest_entries_check->set_pressed(root["auto_suggest_entries"]);
 	}
+	if (root.has("html_min_project_prototype_enabled")) {
+		html_min_project_prototype_check->set_pressed(root["html_min_project_prototype_enabled"]);
+	}
 	if (root.has("feature_design_philosophy_check")) {
 		feature_design_philosophy_check->set_pressed(root["feature_design_philosophy_check"]);
 	}
@@ -1091,6 +1138,288 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	AISettings::save(imported_settings);
 	status_label->set_text(vformat(TTR("Config imported from %s and saved."), p_path));
+}
+
+void AIConfigPanel::_update_github_status() {
+	if (!github_status_label || !github_login_button || !github_logout_button) {
+		return;
+	}
+
+	AISettingsData settings = AISettings::load();
+	GitHubAuthService *service = GitHubAuthService::get_singleton();
+	AIOAuthService::AuthState auth_state = service ? service->get_auth_state() : AIOAuthService::AUTH_STATE_IDLE;
+	bool logged_in = !settings.github_token.access_token.is_empty() || auth_state == AIOAuthService::AUTH_STATE_SUCCESS;
+
+	if (logged_in) {
+		String user_text = settings.github_user.login;
+		if (user_text.is_empty()) {
+			user_text = TTR("GitHub");
+		}
+		if (!settings.github_user.name.is_empty()) {
+			user_text = settings.github_user.name + " (" + settings.github_user.login + ")";
+		}
+		github_status_label->set_text(vformat(TTR("Logged in as: %s"), user_text));
+		github_login_button->set_text(TTR("Login with GitHub"));
+		github_login_button->set_disabled(true);
+		github_logout_button->set_disabled(false);
+	} else if (auth_state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		github_status_label->set_text(TTR("Waiting for GitHub authorization..."));
+		github_login_button->set_text(TTR("Cancel GitHub Login"));
+		github_login_button->set_disabled(false);
+		github_logout_button->set_disabled(true);
+	} else if (auth_state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		github_status_label->set_text(TTR("Exchanging authorization code..."));
+		github_login_button->set_text(TTR("Logging in..."));
+		github_login_button->set_disabled(true);
+		github_logout_button->set_disabled(true);
+	} else {
+		github_status_label->set_text(TTR("Not logged in"));
+		github_login_button->set_text(TTR("Login with GitHub"));
+		github_login_button->set_disabled(false);
+		github_logout_button->set_disabled(true);
+	}
+}
+
+void AIConfigPanel::_on_github_login_pressed() {
+	GitHubAuthService *service = GitHubAuthService::get_singleton();
+	if (!service) {
+		status_label->set_text(TTR("GitHub auth service is not available."));
+		return;
+	}
+
+	AIOAuthService::AuthState state = service->get_auth_state();
+	if (state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		service->cancel_login();
+		github_auth_polling = false;
+		set_process(gitee_auth_polling);
+		status_label->set_text(TTR("GitHub login canceled."));
+		_update_github_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		status_label->set_text(TTR("GitHub login is already exchanging the authorization code."));
+		_update_github_status();
+		return;
+	}
+
+	_save_settings();
+
+	Error err = service->start_login();
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Failed to start GitHub login: %s"), service->get_error_message()));
+		github_login_button->set_disabled(false);
+		return;
+	}
+
+	status_label->set_text(TTR("Opening GitHub authorization page in your browser..."));
+	_update_github_status();
+
+	// Start polling with timeout
+	_github_auth_start_time = OS::get_singleton()->get_ticks_msec();
+	github_auth_polling = true;
+	set_process(true);
+}
+
+void AIConfigPanel::_github_poll_auth() {
+	GitHubAuthService *service = GitHubAuthService::get_singleton();
+	if (!service) {
+		return;
+	}
+
+	AIOAuthService::AuthState state = service->get_auth_state();
+
+	if (state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		// Check for timeout (5 minutes)
+		uint32_t elapsed = OS::get_singleton()->get_ticks_msec() - _github_auth_start_time;
+		if (elapsed > 300000) {
+			// Timeout - user probably closed the browser
+			service->cancel_login();
+			github_auth_polling = false;
+			set_process(gitee_auth_polling);
+			status_label->set_text(TTR("GitHub login timed out."));
+			_update_github_status();
+			return;
+		}
+		_update_github_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		status_label->set_text(TTR("Exchanging authorization code..."));
+		_update_github_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_SUCCESS) {
+		github_auth_polling = false;
+		set_process(gitee_auth_polling);
+		status_label->set_text(TTR("GitHub login successful!"));
+		_update_github_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_FAILED) {
+		github_auth_polling = false;
+		set_process(gitee_auth_polling);
+		String err_msg = service->get_error_message();
+		status_label->set_text(vformat(TTR("GitHub login failed: %s"), err_msg));
+		_update_github_status();
+		return;
+	}
+
+	_update_github_status();
+}
+
+void AIConfigPanel::_on_github_logout_pressed() {
+	GitHubAuthService *service = GitHubAuthService::get_singleton();
+	if (!service) {
+		return;
+	}
+	service->logout();
+	status_label->set_text(TTR("Logged out of GitHub."));
+	_update_github_status();
+}
+
+void AIConfigPanel::_update_gitee_status() {
+	if (!gitee_status_label || !gitee_login_button || !gitee_logout_button) {
+		return;
+	}
+
+	AISettingsData settings = AISettings::load();
+	GiteeAuthService *service = GiteeAuthService::get_singleton();
+	AIOAuthService::AuthState auth_state = service ? service->get_auth_state() : AIOAuthService::AUTH_STATE_IDLE;
+	bool logged_in = !settings.gitee_token.access_token.is_empty() || auth_state == AIOAuthService::AUTH_STATE_SUCCESS;
+
+	if (logged_in) {
+		String user_text = settings.gitee_user.login;
+		if (user_text.is_empty()) {
+			user_text = TTR("Gitee");
+		}
+		if (!settings.gitee_user.name.is_empty()) {
+			user_text = settings.gitee_user.name + " (" + settings.gitee_user.login + ")";
+		}
+		gitee_status_label->set_text(vformat(TTR("Logged in as: %s"), user_text));
+		gitee_login_button->set_text(TTR("Login with Gitee"));
+		gitee_login_button->set_disabled(true);
+		gitee_logout_button->set_disabled(false);
+	} else if (auth_state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		gitee_status_label->set_text(TTR("Waiting for Gitee authorization..."));
+		gitee_login_button->set_text(TTR("Cancel Gitee Login"));
+		gitee_login_button->set_disabled(false);
+		gitee_logout_button->set_disabled(true);
+	} else if (auth_state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		gitee_status_label->set_text(TTR("Exchanging authorization code..."));
+		gitee_login_button->set_text(TTR("Logging in..."));
+		gitee_login_button->set_disabled(true);
+		gitee_logout_button->set_disabled(true);
+	} else {
+		gitee_status_label->set_text(TTR("Not logged in"));
+		gitee_login_button->set_text(TTR("Login with Gitee"));
+		gitee_login_button->set_disabled(false);
+		gitee_logout_button->set_disabled(true);
+	}
+}
+
+void AIConfigPanel::_on_gitee_login_pressed() {
+	GiteeAuthService *service = GiteeAuthService::get_singleton();
+	if (!service) {
+		status_label->set_text(TTR("Gitee auth service is not available."));
+		return;
+	}
+
+	AIOAuthService::AuthState state = service->get_auth_state();
+	if (state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		service->cancel_login();
+		gitee_auth_polling = false;
+		set_process(github_auth_polling);
+		status_label->set_text(TTR("Gitee login canceled."));
+		_update_gitee_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		status_label->set_text(TTR("Gitee login is already exchanging the authorization code."));
+		_update_gitee_status();
+		return;
+	}
+
+	_save_settings();
+
+	Error err = service->start_login();
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Failed to start Gitee login: %s"), service->get_error_message()));
+		gitee_login_button->set_disabled(false);
+		return;
+	}
+
+	status_label->set_text(TTR("Opening Gitee authorization page in your browser..."));
+	_update_gitee_status();
+
+	// Start polling with timeout
+	_gitee_auth_start_time = OS::get_singleton()->get_ticks_msec();
+	gitee_auth_polling = true;
+	set_process(true);
+}
+
+void AIConfigPanel::_gitee_poll_auth() {
+	GiteeAuthService *service = GiteeAuthService::get_singleton();
+	if (!service) {
+		return;
+	}
+
+	AIOAuthService::AuthState state = service->get_auth_state();
+
+	if (state == AIOAuthService::AUTH_STATE_AUTHORIZING) {
+		// Check for timeout (5 minutes)
+		uint32_t elapsed = OS::get_singleton()->get_ticks_msec() - _gitee_auth_start_time;
+		if (elapsed > 300000) {
+			// Timeout - user probably closed the browser
+			service->cancel_login();
+			gitee_auth_polling = false;
+			set_process(github_auth_polling);
+			status_label->set_text(TTR("Gitee login timed out."));
+			_update_gitee_status();
+			return;
+		}
+		_update_gitee_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_EXCHANGING) {
+		status_label->set_text(TTR("Exchanging authorization code..."));
+		_update_gitee_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_SUCCESS) {
+		gitee_auth_polling = false;
+		set_process(github_auth_polling);
+		status_label->set_text(TTR("Gitee login successful!"));
+		_update_gitee_status();
+		return;
+	}
+
+	if (state == AIOAuthService::AUTH_STATE_FAILED) {
+		gitee_auth_polling = false;
+		set_process(github_auth_polling);
+		String err_msg = service->get_error_message();
+		status_label->set_text(vformat(TTR("Gitee login failed: %s"), err_msg));
+		_update_gitee_status();
+		return;
+	}
+
+	_update_gitee_status();
+}
+
+void AIConfigPanel::_on_gitee_logout_pressed() {
+	GiteeAuthService *service = GiteeAuthService::get_singleton();
+	if (!service) {
+		return;
+	}
+	service->logout();
+	status_label->set_text(TTR("Logged out of Gitee."));
+	_update_gitee_status();
 }
 
 AIConfigPanel::AIConfigPanel() {
@@ -1168,6 +1497,9 @@ AIConfigPanel::AIConfigPanel() {
 	auto_suggest_entries_check = memnew(CheckBox);
 	root->add_child(auto_suggest_entries_check);
 
+	html_min_project_prototype_check = memnew(CheckBox);
+	root->add_child(html_min_project_prototype_check);
+
 	feature_design_philosophy_check = memnew(CheckBox);
 	root->add_child(feature_design_philosophy_check);
 
@@ -1243,6 +1575,92 @@ AIConfigPanel::AIConfigPanel() {
 		Label *engine_source_spacer = memnew(Label);
 		engine_source_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
 		root->add_child(engine_source_spacer);
+	}
+
+	// GitHub Account section.
+	{
+		Label *github_header = memnew(Label);
+		github_header->set_theme_type_variation("HeaderMedium");
+		github_header->set_text(TTR("GitHub Account"));
+		root->add_child(github_header);
+
+		github_status_label = memnew(Label);
+		github_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		root->add_child(github_status_label);
+
+		GridContainer *github_grid = memnew(GridContainer);
+		github_grid->set_columns(2);
+		github_grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		github_grid->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		github_grid->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(github_grid);
+
+		github_client_id_edit = _add_line_edit_row(github_grid, &github_client_id_label, TTR("OAuth Client ID"), "Enter your GitHub OAuth App Client ID");
+		github_client_secret_edit = _add_line_edit_row(github_grid, &github_client_secret_label, TTR("OAuth Client Secret"), "Enter your GitHub OAuth App Client Secret");
+		github_client_secret_edit->set_secret(true);
+
+		HFlowContainer *github_actions = memnew(HFlowContainer);
+		github_actions->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		github_actions->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		github_actions->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(github_actions);
+
+		github_login_button = memnew(Button);
+		github_login_button->set_text(TTR("Login with GitHub"));
+		github_login_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_github_login_pressed));
+		github_actions->add_child(github_login_button);
+
+		github_logout_button = memnew(Button);
+		github_logout_button->set_text(TTR("Logout"));
+		github_logout_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_github_logout_pressed));
+		github_actions->add_child(github_logout_button);
+
+		Label *github_spacer = memnew(Label);
+		github_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
+		root->add_child(github_spacer);
+	}
+
+	// Gitee Account section.
+	{
+		Label *gitee_header = memnew(Label);
+		gitee_header->set_theme_type_variation("HeaderMedium");
+		gitee_header->set_text(TTR("Gitee Account"));
+		root->add_child(gitee_header);
+
+		gitee_status_label = memnew(Label);
+		gitee_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		root->add_child(gitee_status_label);
+
+		GridContainer *gitee_grid = memnew(GridContainer);
+		gitee_grid->set_columns(2);
+		gitee_grid->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		gitee_grid->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		gitee_grid->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(gitee_grid);
+
+		gitee_client_id_edit = _add_line_edit_row(gitee_grid, &gitee_client_id_label, TTR("OAuth Client ID"), "Enter your Gitee OAuth App Client ID");
+		gitee_client_secret_edit = _add_line_edit_row(gitee_grid, &gitee_client_secret_label, TTR("OAuth Client Secret"), "Enter your Gitee OAuth App Client Secret");
+		gitee_client_secret_edit->set_secret(true);
+
+		HFlowContainer *gitee_actions = memnew(HFlowContainer);
+		gitee_actions->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		gitee_actions->add_theme_constant_override("h_separation", 6 * EDSCALE);
+		gitee_actions->add_theme_constant_override("v_separation", 6 * EDSCALE);
+		root->add_child(gitee_actions);
+
+		gitee_login_button = memnew(Button);
+		gitee_login_button->set_text(TTR("Login with Gitee"));
+		gitee_login_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_gitee_login_pressed));
+		gitee_actions->add_child(gitee_login_button);
+
+		gitee_logout_button = memnew(Button);
+		gitee_logout_button->set_text(TTR("Logout"));
+		gitee_logout_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_gitee_logout_pressed));
+		gitee_actions->add_child(gitee_logout_button);
+
+		Label *gitee_spacer = memnew(Label);
+		gitee_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
+		root->add_child(gitee_spacer);
 	}
 
 	usage_notice_label = memnew(Label);

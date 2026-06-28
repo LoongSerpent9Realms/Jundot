@@ -62,7 +62,8 @@ class AIChatPanel : public MarginContainer {
 	enum FileMenuId {
 		FILE_MENU_REFERENCE_PROJECT = 0,
 		FILE_MENU_UPLOAD_TEXT = 1,
-		FILE_MENU_IMPORT = 2,
+		FILE_MENU_UPLOAD_IMAGE = 2,
+		FILE_MENU_IMPORT = 3,
 	};
 
 	AIChatService *chat_service = nullptr;
@@ -91,6 +92,7 @@ class AIChatPanel : public MarginContainer {
 	Vector<String> next_question_options;
 	EditorFileDialog *reference_file_dialog = nullptr;
 	EditorFileDialog *upload_file_dialog = nullptr;
+	EditorFileDialog *upload_image_dialog = nullptr;
 	EditorFileDialog *import_file_dialog = nullptr;
 	AIUsageAgreementDialog *usage_agreement_dialog = nullptr;
 
@@ -128,7 +130,10 @@ class AIChatPanel : public MarginContainer {
 		String path;
 		String display_name;
 		String content;
+		String mime_type;
+		String data_url;
 		bool external = false;
+		bool image = false;
 	};
 
 	bool is_summarizing = false;
@@ -207,6 +212,9 @@ class AIChatPanel : public MarginContainer {
 		String id;
 		String title;
 		AIContextMode context_mode = AIContextMode::PROJECT;
+		String project_brief;
+		String task_intent;
+		String task_brief;
 		Vector<ConversationMessage> messages;
 		Array structured_messages;
 		uint64_t created_at = 0;
@@ -250,6 +258,10 @@ class AIChatPanel : public MarginContainer {
 	void _save_all_conversations() const;
 	void _load_all_conversations();
 	String _get_conversations_file_path() const;
+	String _infer_project_brief() const;
+	String _build_conversation_brief_prompt() const;
+	void _set_current_conversation_task_intent(const String &p_intent, const String &p_brief);
+	void _seed_new_conversation_options();
 	void _refresh_conversation_list_ui();
 	void _set_sidebar_collapsed(bool p_collapsed);
 	void _apply_sidebar_visibility();
@@ -294,7 +306,10 @@ class AIChatPanel : public MarginContainer {
 	void _add_file_menu_id_pressed(int p_id);
 	void _project_file_selected(const String &p_path);
 	void _external_file_selected(const String &p_path);
+	void _image_file_selected(const String &p_path);
 	void _add_attachment(const String &p_path, bool p_external);
+	void _add_clipboard_image();
+	void _input_gui_input(const Ref<InputEvent> &p_event);
 	void _add_dropped_files(const Vector<String> &p_files);
 	void _window_files_dropped(const Vector<String> &p_files);
 	bool _can_drop_files_fw(const Point2 &p_point, const Variant &p_data, Control *p_from) const;
@@ -302,6 +317,7 @@ class AIChatPanel : public MarginContainer {
 	void _remove_attachment(int p_index);
 	void _refresh_attachment_chips();
 	String _build_attachment_context() const;
+	Array _build_multimodal_user_content(const String &p_text) const;
 	void _set_chat_display_scale(float p_scale);
 	void _update_auto_chat_display_scale();
 	Array _build_message_history() const;
@@ -312,6 +328,7 @@ class AIChatPanel : public MarginContainer {
 	// Conversation title auto-summary.
 	void _try_auto_title(const String &p_user_first_message, const Array &p_history);
 	void _title_completed(int p_result, int p_response_code, const String &p_title_content);
+	bool _is_project_memory_continue_request(const String &p_user_message) const;
 	String _detect_mode_prompt(const String &p_user_message) const;
 	void _update_translations();
 	void _set_requesting(bool p_requesting);

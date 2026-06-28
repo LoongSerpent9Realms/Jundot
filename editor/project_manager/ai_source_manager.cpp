@@ -27,6 +27,7 @@
 
 #include "ai_source_manager.h"
 
+#include "core/crypto/crypto_core.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/object/callable_mp.h"
@@ -44,6 +45,30 @@
 #include "scene/gui/scroll_container.h"
 
 #include "modules/zip/zip_reader.h"
+
+static void _add_git_auth_headers(List<String> &r_args) {
+	AISettingsData settings = AISettings::load();
+	bool has_token = false;
+
+	if (!settings.github_token.access_token.is_empty()) {
+		const String basic = "x-access-token:" + settings.github_token.access_token;
+		const CharString basic_utf8 = basic.utf8();
+		r_args.push_back("-c");
+		r_args.push_back("http.https://github.com/.extraHeader=Authorization: Basic " + CryptoCore::b64_encode_str((const uint8_t *)basic_utf8.get_data(), basic_utf8.length()));
+		has_token = true;
+	}
+
+	if (!settings.gitee_token.access_token.is_empty()) {
+		r_args.push_back("-c");
+		r_args.push_back(vformat("http.https://gitee.com/.extraHeader=Authorization: Bearer %s", settings.gitee_token.access_token));
+		has_token = true;
+	}
+
+	if (has_token) {
+		r_args.push_back("-c");
+		r_args.push_back("credential.helper=");
+	}
+}
 
 #ifdef WINDOWS_ENABLED
 #include <windows.h>
@@ -278,6 +303,9 @@ bool AISourceManager::_run_git_status_command(const String &p_working_dir, const
 	}
 
 	List<String> args;
+	args.push_back("-c");
+	args.push_back("http.sslBackend=openssl");
+	_add_git_auth_headers(args);
 	args.push_back("-C");
 	args.push_back(p_working_dir);
 	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
@@ -369,7 +397,15 @@ Error AISourceManager::_run_git_process(const List<String> &p_args, const String
 
 	_defer_git_log(p_command, String(), OK);
 
-	Dictionary pipe_info = OS::get_singleton()->execute_with_pipe("git", p_args, false);
+	List<String> args;
+	args.push_back("-c");
+	args.push_back("http.sslBackend=openssl");
+	_add_git_auth_headers(args);
+	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
+		args.push_back(E->get());
+	}
+
+	Dictionary pipe_info = OS::get_singleton()->execute_with_pipe("git", args, false);
 	if (pipe_info.is_empty() || !pipe_info.has("pid")) {
 		_defer_git_log(String(), TTR("Failed to start Git process."), FAILED);
 		return ERR_CANT_FORK;

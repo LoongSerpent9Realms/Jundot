@@ -4,9 +4,9 @@ name = "Jundot Engine"
 
 major = 0
 
-minor = 2
+minor = 3
 
-patch = 80
+patch = 10
 
 status = "alpha"
 

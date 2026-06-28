@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Jundot Engine</title>
+    <meta name="description" content="Jundot Engine 是基于 Godot 的 AI 辅助自动迭代游戏引擎，把对话、日志分析、构建自检、补丁迭代和打包发布放进同一个开发闭环。">
+    <link rel="icon" type="image/png" href="~/images/jundot-icon.png" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/JundotSite.styles.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <header class="topbar">
+        @{
+            var isLoggedIn = Context.Session.GetString("UserId") != null || Context.Session.GetString("IsAdmin") == "true";
+            var username = Context.Session.GetString("Username") ?? Context.Session.GetString("AdminUser") ?? "";
+            var currentPath = Context.Request.Path.Value ?? "/";
+        }
+        <div class="topbar-inner">
+            <a class="brand" href="/" aria-label="Jundot Engine 首页">
+                <img src="~/images/jundot-icon.png" alt="Jundot Logo" class="brand-logo" />
+                <span class="brand-text">Jundot Engine</span>
+            </a>
+
+            <button class="nav-toggle" type="button" aria-controls="site-nav-panel" aria-expanded="false" onclick="toggleSiteNav(this)">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <div class="site-nav-panel" id="site-nav-panel">
+                <nav class="site-nav" aria-label="主导航">
+                    <a href="/" class="@(currentPath == "/" ? "active" : "")">首页</a>
+                    <a href="/#features">特性</a>
+                    <a href="/docs" class="@(currentPath.StartsWith("/docs", StringComparison.OrdinalIgnoreCase) ? "active" : "")">文档</a>
+                    <a href="/#download">下载</a>
+                    <a href="/About" class="@(currentPath.StartsWith("/About", StringComparison.OrdinalIgnoreCase) ? "active" : "")">关于</a>
+                    <a href="/Contact" class="@(currentPath.StartsWith("/Contact", StringComparison.OrdinalIgnoreCase) ? "active" : "")">联系</a>
+                </nav>
+
+                <div class="nav-account">
+                    @if (isLoggedIn)
+                    {
+                        <span class="nav-user">@username</span>
+                        <a href="/Logout">退出</a>
+                    }
+                    else
+                    {
+                        <a href="/Login">登录</a>
+                        <a class="nav-cta" href="/Register">注册</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="top">
+        @RenderBody()
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <span>@ViewData["FooterText"]</span>
+            <span>@ViewData["FooterCopyright"]</span>
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+    <script>
+        function toggleSiteNav(button) {
+            var panel = document.getElementById('site-nav-panel');
+            if (!panel) return;
+            var isOpen = panel.classList.toggle('show');
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+    </script>
+</body>
+</html>

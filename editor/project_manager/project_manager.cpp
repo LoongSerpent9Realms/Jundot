@@ -36,11 +36,16 @@
 #include "core/io/config_file.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
+#include "core/io/json.h"
 #include "core/object/callable_mp.h"
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/version.h"
+#include "editor/ai/ai_chat_service.h"
+#include "editor/ai/ai_config_panel.h"
+#include "editor/ai/ai_memory_store.h"
 #include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/asset_library/asset_library_editor_plugin.h"
 #include "editor/doc/editor_help.h"
 #include "editor/editor_string_names.h"
@@ -70,6 +75,7 @@
 #include "scene/gui/panel_container.h"
 #include "scene/gui/rich_text_label.h"
 #include "scene/gui/separator.h"
+#include "scene/main/http_request.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
 #include "scene/theme/theme_db.h"
@@ -890,6 +896,542 @@ void ProjectManager::_import_project() {
 	project_dialog->ask_for_path_and_show();
 }
 
+String ProjectManager::_ai_project_sanitize_english_name(const String &p_name) const {
+	String sanitized;
+	bool last_was_space = false;
+	for (int i = 0; i < p_name.length(); i++) {
+		const char32_t c = p_name.unicode_at(i);
+		const bool is_ascii_letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+		const bool is_digit = c >= '0' && c <= '9';
+		const bool is_separator = c == ' ' || c == '_' || c == '-';
+		if (is_ascii_letter || is_digit) {
+			sanitized += String::chr(c);
+			last_was_space = false;
+		} else if (is_separator && !last_was_space && !sanitized.is_empty()) {
+			sanitized += " ";
+			last_was_space = true;
+		}
+	}
+	sanitized = sanitized.strip_edges();
+	if (sanitized.is_empty()) {
+		return "New Project";
+	}
+	return sanitized;
+}
+
+String ProjectManager::_ai_project_extract_json_block(const String &p_content) const {
+	const int json_block_start = p_content.find("```json");
+	if (json_block_start >= 0) {
+		const int block_content_start = p_content.find("\n", json_block_start);
+		const int block_end = p_content.find("```", block_content_start + 1);
+		if (block_content_start >= 0 && block_end > block_content_start) {
+			return p_content.substr(block_content_start + 1, block_end - block_content_start - 1).strip_edges();
+		}
+	}
+
+	const int object_start = p_content.find("{");
+	const int object_end = p_content.rfind("}");
+	if (object_start >= 0 && object_end > object_start) {
+		return p_content.substr(object_start, object_end - object_start + 1).strip_edges();
+	}
+
+	return String();
+}
+
+static String _ai_project_escape_bbcode_text(const String &p_text) {
+	return p_text.replace("[", "[lb]");
+}
+
+static bool _ai_project_is_markdown_table_separator(const String &p_line) {
+	bool has_dash = false;
+	for (int i = 0; i < p_line.length(); i++) {
+		const char32_t c = p_line.unicode_at(i);
+		if (c == '-') {
+			has_dash = true;
+			continue;
+		}
+		if (c == '|' || c == ':' || c == ' ') {
+			continue;
+		}
+		return false;
+	}
+	return has_dash;
+}
+
+static String _ai_project_format_inline_markdown_for_bbcode(const String &p_text) {
+	String out;
+	bool bold = false;
+	int pos = 0;
+	while (pos < p_text.length()) {
+		const int marker = p_text.find("**", pos);
+		if (marker < 0) {
+			out += _ai_project_escape_bbcode_text(p_text.substr(pos));
+			break;
+		}
+		out += _ai_project_escape_bbcode_text(p_text.substr(pos, marker - pos));
+		out += bold ? "[/b]" : "[b]";
+		bold = !bold;
+		pos = marker + 2;
+	}
+	if (bold) {
+		out += "[/b]";
+	}
+	return out;
+}
+
+String ProjectManager::_ai_project_format_chat_text_for_panel(const String &p_text) const {
+	PackedStringArray lines = p_text.strip_edges().split("\n");
+	String out;
+	for (int i = 0; i < lines.size(); i++) {
+		String line = lines[i].strip_edges();
+		if (line.is_empty()) {
+			out += "\n";
+			continue;
+		}
+
+		if (line.begins_with("|") && line.ends_with("|")) {
+			if (_ai_project_is_markdown_table_separator(line)) {
+				continue;
+			}
+
+			PackedStringArray cells = line.split("|", false);
+			Vector<String> clean_cells;
+			for (int j = 0; j < cells.size(); j++) {
+				const String cell = cells[j].strip_edges();
+				if (!cell.is_empty()) {
+					clean_cells.push_back(cell);
+				}
+			}
+			if (clean_cells.size() >= 2) {
+				out += "- [b]" + _ai_project_escape_bbcode_text(clean_cells[0]) + "[/b]: ";
+				for (int j = 1; j < clean_cells.size(); j++) {
+					if (j > 1) {
+						out += " / ";
+					}
+					out += _ai_project_escape_bbcode_text(clean_cells[j]);
+				}
+				out += "\n";
+				continue;
+			}
+		}
+
+		while (line.begins_with("#")) {
+			line = line.substr(1).strip_edges();
+		}
+		out += _ai_project_format_inline_markdown_for_bbcode(line) + "\n";
+	}
+	return out.strip_edges();
+}
+
+void ProjectManager::_ai_project_chat_append(const String &p_speaker, const String &p_text) {
+	if (!ai_project_chat_log) {
+		return;
+	}
+
+	if (!ai_project_chat_log->get_parsed_text().is_empty()) {
+		ai_project_chat_log->append_text("\n\n");
+	}
+	ai_project_chat_log->append_text("[b]" + _ai_project_escape_bbcode_text(p_speaker) + "[/b]\n");
+	ai_project_chat_log->append_text(_ai_project_format_chat_text_for_panel(p_text));
+	ai_project_chat_log->scroll_to_line(100000);
+}
+
+void ProjectManager::_ai_project_send_user_message(const String &p_message) {
+	ERR_FAIL_NULL(ai_project_chat_service);
+
+	const String message = p_message.strip_edges();
+	if (message.is_empty() || ai_project_chat_service->is_requesting()) {
+		return;
+	}
+	if (!_ensure_ai_usage_agreement_for_project(String())) {
+		ai_usage_pending_ai_message = message;
+		return;
+	}
+
+	_ai_project_chat_append(TTR("You"), message);
+
+	Dictionary user_message;
+	user_message["role"] = "user";
+	user_message["content"] = message;
+	ai_project_chat_messages.push_back(user_message);
+
+	AISettingsData settings = AISettings::load();
+
+	Array messages;
+	Dictionary system_message;
+	String system_prompt =
+			"You are the Jundot Project Manager creation assistant. Talk with the user in their language, "
+			"summarize what project they want, and when enough information is available propose an ASCII English project name. "
+			"The project will be created with Jundot. Never ask the user to choose a game engine, technology stack, web framework, Unity, Godot, Python, Phaser, PixiJS, or similar platform. "
+			"Assume Jundot with GDScript by default; use C# only if the user explicitly asks for C#. "
+			"Ask only about game concept, art style, genre, theme, core mechanics, mood, target scope, and project name/content. "
+			"This chat is displayed in a narrow Project Manager panel: do not use Markdown tables, code blocks, wide comparison grids, or long option lists. Prefer short bullets and ask at most three concise questions at a time. "
+			"When you need the user to choose options, put them only in the final JSON questions array instead of writing Q1/Q2/Q3 in prose. Each question object must contain id, text, type, options, and allow_custom. type must be single or multiple. "
+			"The project_name must contain only English letters, digits, spaces, hyphens, or underscores. "
+			"Every reply must include a final JSON code block with exactly these fields: "
+			"project_name, project_brief, ready_to_create, questions. Set ready_to_create to true only when the project name and content are clear. "
+			"Do not claim the project was created; the editor will create it after the user confirms.";
+	const String configured_language = settings.output_language.strip_edges();
+	if (!configured_language.is_empty() && configured_language != "auto") {
+		system_prompt += "\nRespond to the user in " + configured_language + ". Keep project_name in English.";
+	}
+	system_message["role"] = "system";
+	system_message["content"] = system_prompt;
+	messages.push_back(system_message);
+	for (int i = 0; i < ai_project_chat_messages.size(); i++) {
+		messages.push_back(ai_project_chat_messages[i]);
+	}
+
+	ai_project_chat_send_btn->set_disabled(true);
+	ai_project_chat_input->set_editable(false);
+	if (ai_project_summary_label) {
+		ai_project_summary_label->set_text(TTR("Thinking..."));
+	}
+
+	ai_project_chat_service->configure(settings);
+	const Error err = ai_project_chat_service->send_messages(messages);
+	if (err != OK) {
+		ai_project_chat_send_btn->set_disabled(false);
+		ai_project_chat_input->set_editable(true);
+		if (ai_project_summary_label) {
+			ai_project_summary_label->set_text(TTR("AI chat is not ready."));
+		}
+		_ai_project_chat_append(TTR("Jundot AI"), TTR("AI chat is not ready. Check AI settings and usage agreement, then try again."));
+	}
+}
+
+void ProjectManager::_ai_project_chat_send() {
+	ERR_FAIL_NULL(ai_project_chat_input);
+
+	const String message = ai_project_chat_input->get_text().strip_edges();
+	if (message.is_empty()) {
+		return;
+	}
+	ai_project_chat_input->clear();
+	_ai_project_send_user_message(message);
+}
+
+void ProjectManager::_ai_project_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
+	ai_project_chat_send_btn->set_disabled(false);
+	ai_project_chat_input->set_editable(true);
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code < 200 || p_response_code >= 300) {
+		if (ai_project_summary_label) {
+			ai_project_summary_label->set_text(TTR("AI request failed."));
+		}
+		_ai_project_chat_append(TTR("Jundot AI"), vformat(TTR("AI request failed. Result: %d, response code: %d."), p_result, p_response_code));
+		return;
+	}
+
+	String visible_content = p_content.strip_edges();
+	const int json_block_start = visible_content.find("```json");
+	if (json_block_start >= 0) {
+		visible_content = visible_content.left(json_block_start).strip_edges();
+	}
+	if (visible_content.is_empty()) {
+		visible_content = TTR("I summarized the project. Review the project name below.");
+	}
+	_ai_project_chat_append(TTR("Jundot AI"), visible_content);
+
+	Dictionary assistant_message;
+	assistant_message["role"] = "assistant";
+	assistant_message["content"] = p_content.strip_edges();
+	ai_project_chat_messages.push_back(assistant_message);
+
+	_ai_project_update_summary_from_response(p_content);
+}
+
+void ProjectManager::_ai_project_chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens) {
+	// The compact Project Manager panel shows the finalized assistant message.
+}
+
+void ProjectManager::_ai_project_update_summary_from_response(const String &p_content) {
+	const String json_text = _ai_project_extract_json_block(p_content);
+	if (json_text.is_empty()) {
+		_ai_project_update_create_button();
+		return;
+	}
+
+	JSON json;
+	const Error err = json.parse(json_text);
+	if (err != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+		_ai_project_update_create_button();
+		return;
+	}
+
+	Dictionary summary_data = json.get_data();
+	const bool ready = summary_data.get("ready_to_create", false);
+	const String name = _ai_project_sanitize_english_name(String(summary_data.get("project_name", String())));
+	const String brief = String(summary_data.get("project_brief", String())).strip_edges();
+	if (ready && !name.is_empty() && !brief.is_empty()) {
+		ai_project_suggested_name = name;
+		ai_project_suggested_brief = brief;
+		if (ai_project_summary_label) {
+			ai_project_summary_label->set_text(vformat(TTR("Ready: %s"), ai_project_suggested_name));
+		}
+	}
+
+	const Variant questions_value = summary_data.get("questions", Array());
+	if (questions_value.get_type() == Variant::ARRAY) {
+		_ai_project_set_questions(questions_value);
+	}
+
+	_ai_project_update_create_button();
+}
+
+void ProjectManager::_ai_project_update_create_button() {
+	if (ai_project_create_btn) {
+		ai_project_create_btn->set_disabled(ai_project_suggested_name.is_empty() || ai_project_suggested_brief.is_empty());
+	}
+}
+
+void ProjectManager::_ai_project_create_from_summary() {
+	if (ai_project_suggested_name.is_empty()) {
+		return;
+	}
+
+	ai_project_pending_memory_name = ai_project_suggested_name;
+	ai_project_pending_memory_brief = ai_project_suggested_brief;
+
+	project_dialog->set_mode(ProjectDialog::MODE_NEW);
+	project_dialog->show_dialog();
+	project_dialog->set_project_name(ai_project_suggested_name);
+}
+
+void ProjectManager::_ai_project_save_memory(const String &p_project_path) {
+	if (ai_project_pending_memory_name.is_empty() || ai_project_pending_memory_brief.is_empty()) {
+		return;
+	}
+
+	const String memory_path = p_project_path.path_join(".JundotAI").path_join("memory.json");
+	Vector<AIMemoryEntry> entries;
+	AIMemoryStore::load(entries, memory_path);
+
+	String content = vformat("Project name: %s\n\nProject brief:\n%s", ai_project_pending_memory_name, ai_project_pending_memory_brief);
+	if (!ai_project_chat_messages.is_empty()) {
+		content += "\n\nCreation conversation summary:\n";
+		for (int i = MAX(0, ai_project_chat_messages.size() - 8); i < ai_project_chat_messages.size(); i++) {
+			Dictionary msg = ai_project_chat_messages[i];
+			content += vformat("- %s: %s\n", String(msg.get("role", String())), String(msg.get("content", String())).strip_edges().replace("\n", " "));
+		}
+	}
+
+	AIMemoryEntry entry = AIMemoryStore::make_entry("Project concept brief", content.strip_edges());
+	entry.tags.push_back("project_creation");
+	entry.tags.push_back("brief");
+	entries.push_back(entry);
+	AIMemoryStore::save(entries, memory_path);
+
+	_ai_project_chat_append(TTR("Jundot AI"), TTR("Project created. I saved this brief into the project's AI memory so the editor chat can continue from it."));
+	ai_project_pending_memory_name.clear();
+	ai_project_pending_memory_brief.clear();
+}
+
+void ProjectManager::_ai_project_set_questions(const Array &p_questions) {
+	ai_project_questions.clear();
+	for (int i = 0; i < p_questions.size(); i++) {
+		if (p_questions[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary question = p_questions[i];
+		const String text = String(question.get("text", String())).strip_edges();
+		const Variant options_value = question.get("options", Array());
+		if (text.is_empty() || options_value.get_type() != Variant::ARRAY || Array(options_value).is_empty()) {
+			continue;
+		}
+
+		String type = String(question.get("type", "single")).strip_edges().to_lower();
+		if (type != "multiple") {
+			type = "single";
+		}
+		question["type"] = type;
+		question["answer"] = Array();
+		question["custom_answer"] = String();
+		ai_project_questions.push_back(question);
+	}
+
+	ai_project_question_index = 0;
+	_ai_project_show_question(0);
+}
+
+void ProjectManager::_ai_project_store_current_question_answer() {
+	if (ai_project_question_index < 0 || ai_project_question_index >= ai_project_questions.size()) {
+		return;
+	}
+
+	Dictionary question = ai_project_questions[ai_project_question_index];
+	Array answer;
+	for (int i = 0; i < ai_project_question_option_checks.size(); i++) {
+		if (ai_project_question_option_checks[i]->is_pressed()) {
+			answer.push_back(ai_project_question_option_checks[i]->get_text());
+		}
+	}
+	question["answer"] = answer;
+	if (ai_project_question_custom) {
+		question["custom_answer"] = ai_project_question_custom->get_text().strip_edges();
+	}
+	ai_project_questions[ai_project_question_index] = question;
+}
+
+void ProjectManager::_ai_project_show_question(int p_index) {
+	if (!ai_project_questions_panel) {
+		return;
+	}
+	if (ai_project_questions.is_empty()) {
+		ai_project_questions_panel->hide();
+		return;
+	}
+
+	ai_project_question_index = CLAMP(p_index, 0, ai_project_questions.size() - 1);
+	Dictionary question = ai_project_questions[ai_project_question_index];
+	ai_project_questions_panel->show();
+
+	if (ai_project_question_title) {
+		ai_project_question_title->set_text(vformat(TTR("Question %d of %d"), ai_project_question_index + 1, ai_project_questions.size()));
+	}
+	if (ai_project_question_text) {
+		const String type = String(question.get("type", "single")) == "multiple" ? TTR("Multiple choice") : TTR("Single choice");
+		ai_project_question_text->set_text(String(question.get("text", String())) + "\n" + type);
+	}
+
+	if (ai_project_question_options) {
+		while (ai_project_question_options->get_child_count() > 0) {
+			Node *child = ai_project_question_options->get_child(0);
+			ai_project_question_options->remove_child(child);
+			child->queue_free();
+		}
+	}
+	ai_project_question_option_checks.clear();
+
+	const Array options = question.get("options", Array());
+	const Array answer = question.get("answer", Array());
+	for (int i = 0; i < options.size(); i++) {
+		CheckBox *option = memnew(CheckBox);
+		option->set_text(String(options[i]));
+		option->set_pressed(answer.has(String(options[i])));
+		option->connect(SceneStringName(toggled), callable_mp(this, &ProjectManager::_ai_project_question_option_toggled).bind(i));
+		ai_project_question_options->add_child(option);
+		ai_project_question_option_checks.push_back(option);
+	}
+
+	if (ai_project_question_custom) {
+		ai_project_question_custom->set_text(String(question.get("custom_answer", String())));
+		ai_project_question_custom->set_visible(bool(question.get("allow_custom", true)));
+	}
+
+	_ai_project_update_question_nav();
+}
+
+void ProjectManager::_ai_project_question_option_toggled(bool p_pressed, int p_option_index) {
+	if (p_pressed && ai_project_question_index >= 0 && ai_project_question_index < ai_project_questions.size()) {
+		Dictionary question = ai_project_questions[ai_project_question_index];
+		if (String(question.get("type", "single")) != "multiple") {
+			for (int i = 0; i < ai_project_question_option_checks.size(); i++) {
+				if (i != p_option_index) {
+					ai_project_question_option_checks[i]->set_pressed_no_signal(false);
+				}
+			}
+		}
+	}
+	_ai_project_store_current_question_answer();
+	_ai_project_update_question_nav();
+}
+
+void ProjectManager::_ai_project_question_custom_changed(const String &p_text) {
+	_ai_project_store_current_question_answer();
+	_ai_project_update_question_nav();
+}
+
+void ProjectManager::_ai_project_question_prev() {
+	_ai_project_store_current_question_answer();
+	_ai_project_show_question(ai_project_question_index - 1);
+}
+
+void ProjectManager::_ai_project_question_next() {
+	_ai_project_store_current_question_answer();
+	_ai_project_show_question(ai_project_question_index + 1);
+}
+
+void ProjectManager::_ai_project_question_submit() {
+	_ai_project_store_current_question_answer();
+	String message = TTR("My answers are:") + "\n";
+	for (int i = 0; i < ai_project_questions.size(); i++) {
+		Dictionary question = ai_project_questions[i];
+		Array answer = question.get("answer", Array());
+		const String custom_answer = String(question.get("custom_answer", String())).strip_edges();
+		String answer_text;
+		for (int j = 0; j < answer.size(); j++) {
+			if (j > 0) {
+				answer_text += ", ";
+			}
+			answer_text += String(answer[j]);
+		}
+		if (!custom_answer.is_empty()) {
+			if (!answer_text.is_empty()) {
+				answer_text += ", ";
+			}
+			answer_text += custom_answer;
+		}
+		if (answer_text.is_empty()) {
+			answer_text = TTR("Skipped");
+		}
+		message += vformat("Q%d: %s\n%s: %s\n", i + 1, String(question.get("text", String())), TTR("Answer"), answer_text);
+	}
+
+	ai_project_questions.clear();
+	_ai_project_show_question(0);
+	_ai_project_send_user_message(message);
+}
+
+void ProjectManager::_ai_project_update_question_nav() {
+	if (ai_project_question_prev_btn) {
+		ai_project_question_prev_btn->set_disabled(ai_project_question_index <= 0);
+	}
+	if (ai_project_question_next_btn) {
+		ai_project_question_next_btn->set_disabled(ai_project_question_index >= ai_project_questions.size() - 1);
+	}
+	if (ai_project_question_submit_btn) {
+		ai_project_question_submit_btn->set_disabled(ai_project_questions.is_empty());
+	}
+}
+
+void ProjectManager::_ai_project_clear_chat() {
+	if (ai_project_chat_service && ai_project_chat_service->is_requesting()) {
+		ai_project_chat_service->cancel_request();
+	}
+
+	ai_project_chat_messages.clear();
+	ai_project_suggested_name.clear();
+	ai_project_suggested_brief.clear();
+	ai_project_pending_memory_name.clear();
+	ai_project_pending_memory_brief.clear();
+	ai_project_questions.clear();
+	ai_project_question_index = 0;
+
+	if (ai_project_chat_log) {
+		ai_project_chat_log->clear();
+	}
+	if (ai_project_summary_label) {
+		ai_project_summary_label->set_text(TTR("Tell me what you want to create."));
+	}
+	if (ai_project_chat_input) {
+		ai_project_chat_input->clear();
+		ai_project_chat_input->set_editable(true);
+	}
+	if (ai_project_chat_send_btn) {
+		ai_project_chat_send_btn->set_disabled(false);
+	}
+
+	_ai_project_update_create_button();
+	_ai_project_show_question(0);
+	_ai_project_chat_append(TTR("Jundot AI"), TTR("Conversation cleared. Tell me the game concept you want to create with Jundot."));
+}
+
+void ProjectManager::_show_ai_config_dialog() {
+	ERR_FAIL_NULL(ai_config_dialog);
+	ai_config_dialog->popup_centered_clamped(Size2(760, 620) * EDSCALE, 0.9);
+}
+
 void ProjectManager::_new_project() {
 	project_dialog->set_mode(ProjectDialog::MODE_NEW);
 	project_dialog->show_dialog();
@@ -1001,6 +1543,37 @@ void ProjectManager::_update_project_buttons() {
 	erase_missing_btn->set_disabled(!project_list->is_any_project_missing());
 }
 
+bool ProjectManager::_ensure_ai_usage_agreement_for_project(const String &p_project_path, bool p_popup) {
+	if (AISettings::is_usage_agreement_current(AISettings::load(), p_project_path)) {
+		return true;
+	}
+
+	if (!p_popup || !ai_usage_agreement_dialog) {
+		return false;
+	}
+
+	if (ai_usage_agreement_dialog->is_visible()) {
+		return false;
+	}
+
+	ai_usage_agreement_project_path = p_project_path;
+	ai_usage_agreement_dialog->set_project_path(p_project_path);
+	ai_usage_agreement_dialog->popup_centered(Size2(420, 220) * EDSCALE);
+	return false;
+}
+
+void ProjectManager::_ai_usage_agreement_accepted() {
+	if (!ai_usage_pending_ai_message.is_empty()) {
+		const String pending_message = ai_usage_pending_ai_message;
+		ai_usage_pending_ai_message.clear();
+		_ai_project_send_user_message(pending_message);
+	}
+}
+
+void ProjectManager::_ai_usage_agreement_rejected() {
+	ai_usage_pending_ai_message.clear();
+}
+
 void ProjectManager::_open_options_popup() {
 	Rect2 rect = open_btn_container->get_screen_rect();
 	rect.position.y += rect.size.height;
@@ -1077,6 +1650,8 @@ void ProjectManager::_on_project_created(const String &dir, bool edit) {
 	int i = project_list->refresh_project(dir);
 	project_list->ensure_project_visible(i);
 	_update_list_placeholder();
+
+	_ai_project_save_memory(dir);
 
 	if (edit) {
 		_open_selected_projects_check_warnings();
@@ -1782,6 +2357,131 @@ ProjectManager::ProjectManager() {
 				empty_list_placeholder->add_child(empty_list_online_warning);
 			}
 
+			ai_project_chat_panel = memnew(PanelContainer);
+			ai_project_chat_panel->set_custom_minimum_size(Size2(320, 120) * EDSCALE);
+			ai_project_chat_panel->set_h_size_flags(Control::SIZE_FILL);
+			project_list_hbox->add_child(ai_project_chat_panel);
+
+			MarginContainer *ai_project_chat_margin = memnew(MarginContainer);
+			ai_project_chat_margin->add_theme_constant_override("margin_left", 10 * EDSCALE);
+			ai_project_chat_margin->add_theme_constant_override("margin_top", 10 * EDSCALE);
+			ai_project_chat_margin->add_theme_constant_override("margin_right", 10 * EDSCALE);
+			ai_project_chat_margin->add_theme_constant_override("margin_bottom", 10 * EDSCALE);
+			ai_project_chat_panel->add_child(ai_project_chat_margin);
+
+			VBoxContainer *ai_project_chat_vbox = memnew(VBoxContainer);
+			ai_project_chat_vbox->add_theme_constant_override("separation", 8 * EDSCALE);
+			ai_project_chat_margin->add_child(ai_project_chat_vbox);
+
+			HBoxContainer *ai_project_chat_header = memnew(HBoxContainer);
+			ai_project_chat_vbox->add_child(ai_project_chat_header);
+
+			Label *ai_project_chat_title = memnew(Label(TTRC("Jundot AI")));
+			ai_project_chat_title->add_theme_font_size_override("font_size", 15 * EDSCALE);
+			ai_project_chat_title->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+			ai_project_chat_header->add_child(ai_project_chat_title);
+
+			ai_project_settings_btn = memnew(Button);
+			ai_project_settings_btn->set_text(TTRC("AI Settings"));
+			ai_project_settings_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_show_ai_config_dialog));
+			ai_project_chat_header->add_child(ai_project_settings_btn);
+
+			ai_project_clear_btn = memnew(Button);
+			ai_project_clear_btn->set_text(TTRC("Clear"));
+			ai_project_clear_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_clear_chat));
+			ai_project_chat_header->add_child(ai_project_clear_btn);
+
+			ai_project_summary_label = memnew(Label(TTRC("Tell me what you want to create.")));
+			ai_project_summary_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+			ai_project_chat_vbox->add_child(ai_project_summary_label);
+
+			ai_project_chat_log = memnew(RichTextLabel);
+			ai_project_chat_log->set_fit_content(false);
+			ai_project_chat_log->set_scroll_active(true);
+			ai_project_chat_log->set_selection_enabled(true);
+			ai_project_chat_log->set_use_bbcode(true);
+			ai_project_chat_log->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+			ai_project_chat_vbox->add_child(ai_project_chat_log);
+
+			ai_project_questions_panel = memnew(PanelContainer);
+			ai_project_questions_panel->hide();
+			ai_project_chat_vbox->add_child(ai_project_questions_panel);
+
+			MarginContainer *ai_project_questions_margin = memnew(MarginContainer);
+			ai_project_questions_margin->add_theme_constant_override("margin_left", 8 * EDSCALE);
+			ai_project_questions_margin->add_theme_constant_override("margin_top", 8 * EDSCALE);
+			ai_project_questions_margin->add_theme_constant_override("margin_right", 8 * EDSCALE);
+			ai_project_questions_margin->add_theme_constant_override("margin_bottom", 8 * EDSCALE);
+			ai_project_questions_panel->add_child(ai_project_questions_margin);
+
+			VBoxContainer *ai_project_questions_vbox = memnew(VBoxContainer);
+			ai_project_questions_vbox->add_theme_constant_override("separation", 6 * EDSCALE);
+			ai_project_questions_margin->add_child(ai_project_questions_vbox);
+
+			HBoxContainer *ai_project_question_nav = memnew(HBoxContainer);
+			ai_project_questions_vbox->add_child(ai_project_question_nav);
+
+			ai_project_question_prev_btn = memnew(Button);
+			ai_project_question_prev_btn->set_text(TTRC("Previous"));
+			ai_project_question_prev_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_question_prev));
+			ai_project_question_nav->add_child(ai_project_question_prev_btn);
+
+			ai_project_question_title = memnew(Label);
+			ai_project_question_title->set_horizontal_alignment(HorizontalAlignment::HORIZONTAL_ALIGNMENT_CENTER);
+			ai_project_question_title->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+			ai_project_question_nav->add_child(ai_project_question_title);
+
+			ai_project_question_next_btn = memnew(Button);
+			ai_project_question_next_btn->set_text(TTRC("Next"));
+			ai_project_question_next_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_question_next));
+			ai_project_question_nav->add_child(ai_project_question_next_btn);
+
+			ai_project_question_text = memnew(Label);
+			ai_project_question_text->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+			ai_project_questions_vbox->add_child(ai_project_question_text);
+
+			ai_project_question_options = memnew(VBoxContainer);
+			ai_project_question_options->add_theme_constant_override("separation", 2 * EDSCALE);
+			ai_project_questions_vbox->add_child(ai_project_question_options);
+
+			ai_project_question_custom = memnew(LineEdit);
+			ai_project_question_custom->set_placeholder(TTRC("Custom answer"));
+			ai_project_question_custom->connect(SceneStringName(text_changed), callable_mp(this, &ProjectManager::_ai_project_question_custom_changed));
+			ai_project_questions_vbox->add_child(ai_project_question_custom);
+
+			ai_project_question_submit_btn = memnew(Button);
+			ai_project_question_submit_btn->set_text(TTRC("Submit Answers"));
+			ai_project_question_submit_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_question_submit));
+			ai_project_questions_vbox->add_child(ai_project_question_submit_btn);
+
+			HBoxContainer *ai_project_chat_input_hbox = memnew(HBoxContainer);
+			ai_project_chat_vbox->add_child(ai_project_chat_input_hbox);
+
+			ai_project_chat_input = memnew(LineEdit);
+			ai_project_chat_input->set_placeholder(TTRC("Project idea"));
+			ai_project_chat_input->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+			ai_project_chat_input->connect(SceneStringName(text_submitted), callable_mp(this, &ProjectManager::_ai_project_chat_send).unbind(1));
+			ai_project_chat_input_hbox->add_child(ai_project_chat_input);
+
+			ai_project_chat_send_btn = memnew(Button);
+			ai_project_chat_send_btn->set_text(TTRC("Send"));
+			ai_project_chat_send_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_chat_send));
+			ai_project_chat_input_hbox->add_child(ai_project_chat_send_btn);
+
+			ai_project_create_btn = memnew(Button);
+			ai_project_create_btn->set_text(TTRC("Create Project"));
+			ai_project_create_btn->set_disabled(true);
+			ai_project_create_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_ai_project_create_from_summary));
+			ai_project_chat_vbox->add_child(ai_project_create_btn);
+
+			ai_project_chat_service = memnew(AIChatService);
+			ai_project_chat_service->set_name("ProjectManagerAIChatService");
+			add_child(ai_project_chat_service);
+			ai_project_chat_service->connect("chat_completed", callable_mp(this, &ProjectManager::_ai_project_chat_completed));
+			ai_project_chat_service->connect("chat_stream_data", callable_mp(this, &ProjectManager::_ai_project_chat_stream_data));
+
+			_ai_project_chat_append(TTR("Jundot AI"), TTR("Tell me the type, theme, and core content of the project. I will summarize it and propose an English project name."));
+
 			// The side bar with the edit, run, rename, etc. buttons.
 			VBoxContainer *project_list_sidebar = memnew(VBoxContainer);
 			project_list_sidebar->set_custom_minimum_size(Size2(120, 120));
@@ -2000,6 +2700,21 @@ ProjectManager::ProjectManager() {
 		project_dialog->connect("project_created", callable_mp(this, &ProjectManager::_on_project_created));
 		project_dialog->connect("project_duplicated", callable_mp(this, &ProjectManager::_on_project_duplicated));
 		add_child(project_dialog);
+
+		ai_config_dialog = memnew(AcceptDialog);
+		ai_config_dialog->set_title(TTRC("AI Settings"));
+		ai_config_dialog->set_min_size(Size2(640, 420) * EDSCALE);
+		add_child(ai_config_dialog);
+
+		ai_config_panel = memnew(AIConfigPanel);
+		ai_config_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+		ai_config_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		ai_config_dialog->add_child(ai_config_panel);
+
+		ai_usage_agreement_dialog = memnew(AIUsageAgreementDialog);
+		ai_usage_agreement_dialog->connect(SNAME("agreement_accepted"), callable_mp(this, &ProjectManager::_ai_usage_agreement_accepted));
+		ai_usage_agreement_dialog->connect(SNAME("agreement_rejected"), callable_mp(this, &ProjectManager::_ai_usage_agreement_rejected));
+		add_child(ai_usage_agreement_dialog);
 
 		error_dialog = memnew(AcceptDialog);
 		error_dialog->set_title(TTRC("Error"));

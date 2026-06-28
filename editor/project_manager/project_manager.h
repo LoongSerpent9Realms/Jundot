@@ -55,6 +55,9 @@ class TextEdit;
 class UpdateDialog;
 class UpdateManager;
 class AISourceManager;
+class AIChatService;
+class AIConfigPanel;
+class AIUsageAgreementDialog;
 class VBoxContainer;
 
 class ProjectManager : public Control {
@@ -195,6 +198,64 @@ class ProjectManager : public Control {
 
 	HBoxContainer *open_btn_container = nullptr;
 	PopupMenu *open_options_popup = nullptr;
+
+	PanelContainer *ai_project_chat_panel = nullptr;
+	RichTextLabel *ai_project_chat_log = nullptr;
+	LineEdit *ai_project_chat_input = nullptr;
+	Button *ai_project_chat_send_btn = nullptr;
+	Button *ai_project_create_btn = nullptr;
+	Button *ai_project_settings_btn = nullptr;
+	Button *ai_project_clear_btn = nullptr;
+	Label *ai_project_summary_label = nullptr;
+	PanelContainer *ai_project_questions_panel = nullptr;
+	Label *ai_project_question_title = nullptr;
+	Label *ai_project_question_text = nullptr;
+	VBoxContainer *ai_project_question_options = nullptr;
+	LineEdit *ai_project_question_custom = nullptr;
+	Button *ai_project_question_prev_btn = nullptr;
+	Button *ai_project_question_next_btn = nullptr;
+	Button *ai_project_question_submit_btn = nullptr;
+	AIChatService *ai_project_chat_service = nullptr;
+	AcceptDialog *ai_config_dialog = nullptr;
+	AIConfigPanel *ai_config_panel = nullptr;
+	AIUsageAgreementDialog *ai_usage_agreement_dialog = nullptr;
+	Array ai_project_chat_messages;
+	String ai_project_suggested_name;
+	String ai_project_suggested_brief;
+	String ai_project_pending_memory_name;
+	String ai_project_pending_memory_brief;
+	Array ai_project_questions;
+	int ai_project_question_index = 0;
+	Vector<CheckBox *> ai_project_question_option_checks;
+	String ai_usage_agreement_project_path;
+	String ai_usage_pending_ai_message;
+
+	void _ai_project_chat_append(const String &p_speaker, const String &p_text);
+	String _ai_project_format_chat_text_for_panel(const String &p_text) const;
+	void _ai_project_send_user_message(const String &p_message);
+	void _ai_project_chat_send();
+	void _ai_project_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
+	void _ai_project_chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
+	void _ai_project_update_summary_from_response(const String &p_content);
+	void _ai_project_update_create_button();
+	void _ai_project_create_from_summary();
+	void _ai_project_save_memory(const String &p_project_path);
+	void _ai_project_set_questions(const Array &p_questions);
+	void _ai_project_show_question(int p_index);
+	void _ai_project_store_current_question_answer();
+	void _ai_project_question_option_toggled(bool p_pressed, int p_option_index);
+	void _ai_project_question_custom_changed(const String &p_text);
+	void _ai_project_question_prev();
+	void _ai_project_question_next();
+	void _ai_project_question_submit();
+	void _ai_project_update_question_nav();
+	void _ai_project_clear_chat();
+	void _show_ai_config_dialog();
+	bool _ensure_ai_usage_agreement_for_project(const String &p_project_path, bool p_popup = true);
+	void _ai_usage_agreement_accepted();
+	void _ai_usage_agreement_rejected();
+	String _ai_project_sanitize_english_name(const String &p_name) const;
+	String _ai_project_extract_json_block(const String &p_content) const;
 
 	EditorFileDialog *scan_dir = nullptr;
 

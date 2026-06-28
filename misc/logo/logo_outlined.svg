@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="414"><!-- Godot logo removed temporarily. --></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="414" viewBox="0 0 1024 414">
+<defs>
+<linearGradient id="mark" x1="70" y1="74" x2="282" y2="314" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#7be495"/>
+<stop offset=".56" stop-color="#56d5c8"/>
+<stop offset="1" stop-color="#f2b84b"/>
+</linearGradient>
+</defs>
+<rect width="1024" height="414" fill="none"/>
+<rect x="66" y="70" width="244" height="244" rx="58" fill="#070b0d" stroke="url(#mark)" stroke-width="28"/>
+<path d="M165 128h78v120c0 48-32 79-83 79-39 0-69-18-85-50l47-29c8 17 20 26 37 26 18 0 29-12 29-34v-59h-23v-53z" fill="#edf4ef"/>
+<circle cx="122" cy="140" r="20" fill="#ff7f68"/>
+<circle cx="264" cy="272" r="20" fill="#78a8ff"/>
+<text x="358" y="198" fill="#edf4ef" font-family="Segoe UI, Arial, sans-serif" font-size="112" font-weight="800" letter-spacing="0">Jundot</text>
+<text x="364" y="262" fill="#c7d2ce" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0">AI-assisted game iteration engine</text>
+<path d="M364 296h426" stroke="#56d5c8" stroke-width="10" stroke-linecap="round" opacity=".62"/>
+</svg>

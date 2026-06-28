@@ -28,15 +28,20 @@
 #include "ai_tool_executor.h"
 
 #include "core/config/project_settings.h"
+#include "core/crypto/crypto_core.h"
 #include "core/error/error_macros.h"
+#include "core/input/input_enums.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
+#include "core/math/rect2.h"
 #include "core/object/callable_mp.h"
+#include "core/object/class_db.h"
 #include "core/os/os.h"
 #include "core/os/thread.h"
 #include "core/os/thread_safe.h"
 #include "core/os/time.h"
+#include "core/templates/hash_map.h"
 #include "core/string/string_builder.h"
 #include "editor/ai/ai_code_fetcher.h"
 #include "editor/ai/ai_develop_flow.h"
@@ -44,12 +49,16 @@
 #include "editor/ai/ai_code_uploader.h"
 #include "editor/ai/ai_feature_gate.h"
 #include "editor/ai/ai_mcp_runtime.h"
+#include "editor/ai/ai_modified_scene_tracker.h"
 #include "editor/ai/ai_restart_helper.h"
 #include "editor/ai/ai_settings.h"
 #include "editor/ai/ai_source_update_service.h"
 #include "editor/ai/ai_tool_defs.h"
 #include "editor/ai/ai_tool_registry.h"
 #include "editor/editor_node.h"
+#include "editor/editor_undo_redo_manager.h"
+#include "editor/run/editor_run_bar.h"
+#include "editor/run/game_view_plugin.h"
 
 // ---- Async build state ----
 struct BuildState {
@@ -236,7 +245,33 @@ static String _find_latest_built_editor_executable(const String &p_project_root,
 static Error _run_prebuild_git_command(const List<String> &p_args, String &r_output, int &r_exit_code) {
 	r_output.clear();
 	r_exit_code = -1;
-	const Error err = OS::get_singleton()->execute("git", p_args, &r_output, &r_exit_code, true);
+
+	List<String> args;
+	args.push_back("-c");
+	args.push_back("http.sslBackend=openssl");
+	AISettingsData settings = AISettings::load();
+	bool has_token = false;
+	if (!settings.github_token.access_token.is_empty()) {
+		const String basic = "x-access-token:" + settings.github_token.access_token;
+		const CharString basic_utf8 = basic.utf8();
+		args.push_back("-c");
+		args.push_back("http.https://github.com/.extraHeader=Authorization: Basic " + CryptoCore::b64_encode_str((const uint8_t *)basic_utf8.get_data(), basic_utf8.length()));
+		has_token = true;
+	}
+	if (!settings.gitee_token.access_token.is_empty()) {
+		args.push_back("-c");
+		args.push_back(vformat("http.https://gitee.com/.extraHeader=Authorization: Bearer %s", settings.gitee_token.access_token));
+		has_token = true;
+	}
+	if (has_token) {
+		args.push_back("-c");
+		args.push_back("credential.helper=");
+	}
+	for (const List<String>::Element *E = p_args.front(); E; E = E->next()) {
+		args.push_back(E->get());
+	}
+
+	const Error err = OS::get_singleton()->execute("git", args, &r_output, &r_exit_code, true);
 	if (err != OK) {
 		return err;
 	}
@@ -581,13 +616,30 @@ static void _build_thread_callback(void *p_userdata) {
 Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 	const String tool_call_id = p_tool_call.get("id", String());
 	const Dictionary fn_def = p_tool_call.get("function", Dictionary());
-	const String name = fn_def.get("name", String());
+	String name = fn_def.get("name", String());
 	const String args_json = fn_def.get("arguments", "{}");
+
+	if (name == "read_file") {
+		name = AIToolNames::READ_FILES;
+	} else if (name == "glob" || name == "glob_search") {
+		name = AIToolNames::SEARCH_FILES;
+	}
 
 	Dictionary args;
 	Variant parsed = JSON::parse_string(args_json);
 	if (parsed.get_type() == Variant::DICTIONARY) {
 		args = parsed;
+	}
+	if (name == "memory_search") {
+		name = AIToolNames::READ_FILES;
+		Array paths;
+		paths.push_back(".JundotAI/memory.json");
+		args["paths"] = paths;
+	} else if (name == "session_list") {
+		name = AIToolNames::READ_FILES;
+		Array paths;
+		paths.push_back(".JundotAI/conversations.json");
+		args["paths"] = paths;
 	}
 
 	Dictionary result;
@@ -605,6 +657,16 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _grep_code(args);
 	} else if (name == AIToolNames::CHECK_PROJECT_SCRIPTS) {
 		result = _check_project_scripts(args);
+	} else if (name == AIToolNames::CHECK_UI_LAYOUT) {
+		result = _check_ui_layout(args);
+	} else if (name == AIToolNames::BUILD_PROJECT) {
+		result = _build_project(args);
+	} else if (name == AIToolNames::PLAY_SCENE) {
+		result = _play_scene(args);
+	} else if (name == AIToolNames::CLICK_UI_POSITION) {
+		result = _click_ui_position(args);
+	} else if (name == AIToolNames::STOP_PLAY_SCENE) {
+		result = _stop_play_scene(args);
 	} else if (name == AIToolNames::RUN_BUILD) {
 		result = _run_build(args);
 	} else if (name == AIToolNames::CHECK_BUILD_STATUS) {
@@ -1018,11 +1080,67 @@ static bool _project_has_dotnet_project(const String &p_root) {
 	return false;
 }
 
+static String _find_single_root_dotnet_project(const String &p_root, bool &r_ambiguous) {
+	r_ambiguous = false;
+	Ref<DirAccess> da = DirAccess::open(p_root);
+	if (da.is_null()) {
+		return String();
+	}
+
+	String found;
+	da->list_dir_begin();
+	String name = da->get_next();
+	while (!name.is_empty()) {
+		const String lower = name.to_lower();
+		if (!da->current_is_dir() && (lower.ends_with(".sln") || lower.ends_with(".csproj"))) {
+			if (!found.is_empty()) {
+				r_ambiguous = true;
+				da->list_dir_end();
+				return String();
+			}
+			found = name;
+		}
+		name = da->get_next();
+	}
+	da->list_dir_end();
+	return found;
+}
+
 static String _truncate_tool_output(const String &p_output, int p_max_chars) {
 	if (p_output.length() <= p_max_chars) {
 		return p_output;
 	}
 	return p_output.substr(p_output.length() - p_max_chars) + vformat("\n\n[... output truncated to last %d chars]\n", p_max_chars);
+}
+
+static bool _save_open_scene_before_ai_write(const String &p_full_path, String &r_message) {
+	const String lower_path = p_full_path.to_lower();
+	if (!lower_path.ends_with(".tscn") && !lower_path.ends_with(".scn")) {
+		return false;
+	}
+	if (!EditorNode::get_singleton() || !ProjectSettings::get_singleton()) {
+		return false;
+	}
+
+	const String scene_path = ProjectSettings::get_singleton()->localize_path(p_full_path);
+	EditorData &editor_data = EditorNode::get_editor_data();
+	const int scene_idx = editor_data.get_edited_scene_from_path(scene_path);
+	if (scene_idx < 0) {
+		return false;
+	}
+
+	const int history_id = editor_data.get_scene_history_id(scene_idx);
+	if (!EditorUndoRedoManager::get_singleton()->is_history_unsaved(history_id)) {
+		return false;
+	}
+
+	EditorNode::get_singleton()->save_scene_if_open(scene_path);
+	if (EditorUndoRedoManager::get_singleton()->is_history_unsaved(history_id)) {
+		r_message = "AI scene write blocked: the scene is open in the editor and has unsaved changes that could not be saved automatically. Save the scene manually, then ask the AI to read the latest .tscn and try again.\nScene: " + scene_path;
+	} else {
+		r_message = "AI scene write paused: the open scene had unsaved editor changes, so Jundot saved them first. The AI must read the latest scene file again before editing, otherwise it may overwrite the user's just-saved changes.\nScene: " + scene_path;
+	}
+	return true;
 }
 
 // ---- Tool implementations ----
@@ -1120,6 +1238,12 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 	if (!_resolve_tool_file_path(project_root, path, full_path, path_error)) {
 		return _make_result(path_error + "\nPath: " + path, true);
 	}
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		String save_message;
+		if (_save_open_scene_before_ai_write(full_path, save_message)) {
+			return _make_result(save_message, true);
+		}
+	}
 
 	// Create parent directories.
 	Ref<DirAccess> da = DirAccess::create_for_path(full_path);
@@ -1188,6 +1312,9 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 
 	if (AISettings::load().develop_mode) {
 		AIDevelopFlow::record_modified(path);
+	}
+	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
+		AIModifiedSceneTracker::mark_scene_written(path);
 	}
 	return _make_result(vformat("Successfully wrote %s (%d bytes).%s", path, expected_size, AISettings::load().develop_mode ? " [Develop Mode: local change only]" : ""));
 }
@@ -1286,6 +1413,8 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 		}
 		if (settings.context_mode != AIContextMode::PROJECT &&
 				(name == AIToolNames::SETUP_ENGINE_WORKSPACE ||
+						name == AIToolNames::CHECK_UI_LAYOUT ||
+						name == AIToolNames::BUILD_PROJECT ||
 						name == AIToolNames::REQUEST_ENGINE_CHANGE)) {
 			has_error = true;
 			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in project mode.\n", i + 1, name);
@@ -1328,6 +1457,673 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 	}
 
 	return _make_result(sb.as_string(), has_error);
+}
+
+struct AIUILayoutNodeInfo {
+	String name;
+	String path;
+	String parent;
+	String type;
+	int line = 0;
+	int order = 0;
+	Rect2 rect;
+	bool has_rect = false;
+	bool parent_is_container = false;
+	int mouse_filter = -1;
+	int z_index = 0;
+};
+
+static String _extract_tscn_quoted_attr(const String &p_line, const String &p_key) {
+	const String needle = p_key + "=\"";
+	const int start = p_line.find(needle);
+	if (start < 0) {
+		return String();
+	}
+	const int value_start = start + needle.length();
+	const int value_end = p_line.find("\"", value_start);
+	if (value_end < 0) {
+		return String();
+	}
+	return p_line.substr(value_start, value_end - value_start);
+}
+
+static bool _parse_tscn_vector2(const String &p_value, Vector2 &r_value) {
+	const int open = p_value.find("(");
+	const int comma = p_value.find(",", open + 1);
+	const int close = p_value.find(")", comma + 1);
+	if (open < 0 || comma < 0 || close < 0) {
+		return false;
+	}
+	r_value.x = p_value.substr(open + 1, comma - open - 1).strip_edges().to_float();
+	r_value.y = p_value.substr(comma + 1, close - comma - 1).strip_edges().to_float();
+	return true;
+}
+
+static bool _is_control_type(const String &p_type) {
+	return !p_type.is_empty() && ClassDB::class_exists(StringName(p_type)) && ClassDB::is_parent_class(StringName(p_type), SNAME("Control"));
+}
+
+static bool _is_container_type(const String &p_type) {
+	return !p_type.is_empty() && ClassDB::class_exists(StringName(p_type)) && ClassDB::is_parent_class(StringName(p_type), SNAME("Container"));
+}
+
+static bool _is_interactive_control_type(const String &p_type) {
+	if (p_type.is_empty() || !ClassDB::class_exists(StringName(p_type))) {
+		return false;
+	}
+
+	const StringName type_name(p_type);
+	return ClassDB::is_parent_class(type_name, SNAME("BaseButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("LineEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("TextEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("Slider")) ||
+			ClassDB::is_parent_class(type_name, SNAME("SpinBox")) ||
+			ClassDB::is_parent_class(type_name, SNAME("OptionButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("MenuButton")) ||
+			ClassDB::is_parent_class(type_name, SNAME("ItemList")) ||
+			ClassDB::is_parent_class(type_name, SNAME("Tree")) ||
+			ClassDB::is_parent_class(type_name, SNAME("GraphEdit")) ||
+			ClassDB::is_parent_class(type_name, SNAME("ColorPicker")) ||
+			ClassDB::is_parent_class(type_name, SNAME("FileDialog")) ||
+			ClassDB::is_parent_class(type_name, SNAME("PopupMenu"));
+}
+
+static bool _has_blocking_mouse_filter(const AIUILayoutNodeInfo &p_node) {
+	// Godot Control::MouseFilter: STOP = 0, PASS = 1, IGNORE = 2.
+	// If absent from the scene file, treat it as potentially blocking so
+	// generated decoration must opt out explicitly.
+	return p_node.mouse_filter != 2;
+}
+
+static bool _is_pass_through_mouse_filter(const AIUILayoutNodeInfo &p_node) {
+	return p_node.mouse_filter == 1 || p_node.mouse_filter == 2;
+}
+
+static bool _is_modal_surface_candidate(const AIUILayoutNodeInfo &p_node) {
+	const String path = p_node.path.to_lower();
+	const String type = p_node.type.to_lower();
+	const bool modal_name =
+			path.contains("settings") ||
+			path.contains("options") ||
+			path.contains("dialog") ||
+			path.contains("popup") ||
+			path.contains("modal") ||
+			path.contains("pause") ||
+			path.contains("inventory") ||
+			path.contains("menu");
+	const bool surface_type =
+			type == "panel" ||
+			type == "panelcontainer" ||
+			type == "popup" ||
+			type == "popupmenu" ||
+			type == "popuppanel" ||
+			type == "window";
+	return modal_name && surface_type;
+}
+
+static bool _node_sorts_above(const AIUILayoutNodeInfo &p_a, const AIUILayoutNodeInfo &p_b) {
+	if (p_a.z_index != p_b.z_index) {
+		return p_a.z_index > p_b.z_index;
+	}
+	return p_a.order > p_b.order;
+}
+
+static String _scene_node_path(const String &p_parent, const String &p_name) {
+	if (p_parent.is_empty() || p_parent == ".") {
+		return p_name;
+	}
+	return p_parent.path_join(p_name).replace("\\", "/");
+}
+
+static bool _parse_tscn_ui_nodes(const String &p_content, Vector<AIUILayoutNodeInfo> &r_nodes, String &r_error) {
+	PackedStringArray lines = p_content.split("\n");
+
+	bool in_node = false;
+	bool current_is_control = false;
+	AIUILayoutNodeInfo current;
+	bool has_position = false;
+	bool has_size = false;
+	bool has_minimum_size = false;
+	Vector2 position;
+	Vector2 size;
+	Vector2 minimum_size;
+	bool has_offset_left = false;
+	bool has_offset_top = false;
+	bool has_offset_right = false;
+	bool has_offset_bottom = false;
+	real_t offset_left = 0.0;
+	real_t offset_top = 0.0;
+	real_t offset_right = 0.0;
+	real_t offset_bottom = 0.0;
+
+	HashMap<String, String> node_types;
+	String root_type;
+
+	auto flush_current = [&]() {
+		if (!in_node) {
+			return;
+		}
+		if (current.parent.is_empty() && root_type.is_empty()) {
+			root_type = current.type;
+		}
+		node_types[current.path] = current.type;
+		if (!current_is_control) {
+			return;
+		}
+
+		const real_t left = has_offset_left ? offset_left : (has_position ? position.x : 0.0);
+		const real_t top = has_offset_top ? offset_top : (has_position ? position.y : 0.0);
+		real_t width = 0.0;
+		real_t height = 0.0;
+
+		if (has_size) {
+			width = size.x;
+			height = size.y;
+		} else {
+			if (has_offset_right) {
+				width = offset_right - left;
+			}
+			if (has_offset_bottom) {
+				height = offset_bottom - top;
+			}
+		}
+
+		if (has_minimum_size) {
+			width = MAX(width, minimum_size.x);
+			height = MAX(height, minimum_size.y);
+		}
+
+		if (width > 0.0 && height > 0.0) {
+			current.rect = Rect2(left, top, width, height);
+			current.has_rect = true;
+		}
+		r_nodes.push_back(current);
+	};
+
+	for (int i = 0; i < lines.size(); i++) {
+		const String line = String(lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			flush_current();
+
+			in_node = true;
+			current_is_control = false;
+			current = AIUILayoutNodeInfo();
+			has_position = false;
+			has_size = false;
+			has_minimum_size = false;
+			position = Vector2();
+			size = Vector2();
+			minimum_size = Vector2();
+			has_offset_left = false;
+			has_offset_top = false;
+			has_offset_right = false;
+			has_offset_bottom = false;
+			offset_left = 0.0;
+			offset_top = 0.0;
+			offset_right = 0.0;
+			offset_bottom = 0.0;
+
+			const String name = _extract_tscn_quoted_attr(line, "name");
+			current.name = name;
+			current.type = _extract_tscn_quoted_attr(line, "type");
+			current.parent = _extract_tscn_quoted_attr(line, "parent");
+			current.path = _scene_node_path(current.parent, name);
+			current.line = i + 1;
+			current.order = i;
+			current_is_control = _is_control_type(current.type);
+			if (name.is_empty()) {
+				r_error = vformat("Could not parse node name at line %d.", i + 1);
+				return false;
+			}
+			continue;
+		}
+
+		if (!in_node || !current_is_control) {
+			continue;
+		}
+
+		const int eq = line.find("=");
+		if (eq < 0) {
+			continue;
+		}
+		const String key = line.substr(0, eq).strip_edges();
+		const String value = line.substr(eq + 1).strip_edges();
+
+		if (key == "position") {
+			has_position = _parse_tscn_vector2(value, position);
+		} else if (key == "size") {
+			has_size = _parse_tscn_vector2(value, size);
+		} else if (key == "custom_minimum_size") {
+			has_minimum_size = _parse_tscn_vector2(value, minimum_size);
+		} else if (key == "offset_left") {
+			has_offset_left = true;
+			offset_left = value.to_float();
+		} else if (key == "offset_top") {
+			has_offset_top = true;
+			offset_top = value.to_float();
+		} else if (key == "offset_right") {
+			has_offset_right = true;
+			offset_right = value.to_float();
+		} else if (key == "offset_bottom") {
+			has_offset_bottom = true;
+			offset_bottom = value.to_float();
+		} else if (key == "mouse_filter") {
+			if (value.is_valid_int()) {
+				current.mouse_filter = value.to_int();
+			} else if (value.contains("MOUSE_FILTER_IGNORE")) {
+				current.mouse_filter = 2;
+			} else if (value.contains("MOUSE_FILTER_PASS")) {
+				current.mouse_filter = 1;
+			} else if (value.contains("MOUSE_FILTER_STOP")) {
+				current.mouse_filter = 0;
+			}
+		} else if (key == "z_index") {
+			current.z_index = value.to_int();
+		}
+	}
+
+	flush_current();
+
+	for (int i = 0; i < r_nodes.size(); i++) {
+		if (r_nodes[i].parent == ".") {
+			r_nodes.write[i].parent_is_container = _is_container_type(root_type);
+			continue;
+		}
+		if (!node_types.has(r_nodes[i].parent)) {
+			continue;
+		}
+		r_nodes.write[i].parent_is_container = _is_container_type(node_types[r_nodes[i].parent]);
+	}
+
+	return true;
+}
+
+Dictionary AIToolExecutor::_check_ui_layout(const Dictionary &p_args) {
+	AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_ui_layout is only available in PROJECT mode.", true);
+	}
+
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(String(p_args.get("path", String())));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(String(p_args["paths"]));
+	}
+	if (paths.is_empty()) {
+		return _make_result("No scene paths provided.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for UI layout checking.", true);
+	}
+
+	StringBuilder result;
+	bool has_error = false;
+	bool has_warning = false;
+	const int MAX_WARNINGS_PER_SCENE = 20;
+
+	for (int p = 0; p < paths.size(); p++) {
+		String rel_path = paths[p];
+		String full_path;
+		String path_error;
+		result += vformat("=== %s ===\n", rel_path);
+
+		if (!_resolve_tool_file_path(project_root, rel_path, full_path, path_error)) {
+			has_error = true;
+			result += "Error: " + path_error + "\n";
+			continue;
+		}
+		if (!full_path.ends_with(".tscn")) {
+			has_error = true;
+			result += "Error: check_ui_layout only inspects .tscn scene files.\n";
+			continue;
+		}
+		if (!FileAccess::exists(full_path)) {
+			has_error = true;
+			result += "Error: file not found.\n";
+			continue;
+		}
+
+		Error err = OK;
+		const String content = FileAccess::get_file_as_string(full_path, &err);
+		if (err != OK) {
+			has_error = true;
+			result += vformat("Error: failed to read file (err=%d).\n", (int)err);
+			continue;
+		}
+
+		Vector<AIUILayoutNodeInfo> nodes;
+		String parse_error;
+		if (!_parse_tscn_ui_nodes(content, nodes, parse_error)) {
+			has_error = true;
+			result += "Error: " + parse_error + "\n";
+			continue;
+		}
+
+		int warnings = 0;
+		int skipped_managed = 0;
+		int skipped_without_rect = 0;
+		for (int i = 0; i < nodes.size(); i++) {
+			if (!nodes[i].has_rect) {
+				skipped_without_rect++;
+				continue;
+			}
+			if (_is_modal_surface_candidate(nodes[i]) && _is_pass_through_mouse_filter(nodes[i])) {
+				has_warning = true;
+				warnings++;
+				result += vformat(
+						"Possible click-through modal %d: node '%s' (line %d, %s) looks like a settings/dialog/menu surface but uses mouse_filter=%d, so clicks may pass through to UI underneath.\n",
+						warnings,
+						nodes[i].path,
+						nodes[i].line,
+						nodes[i].type,
+						nodes[i].mouse_filter);
+				result += "  Suggestion: set the modal surface or its full-screen blocker to mouse_filter = 0 (Stop), keep decorative children at mouse_filter = 2 (Ignore), and put the modal content above the blocker with a higher z_index or later scene order.\n";
+				if (warnings >= MAX_WARNINGS_PER_SCENE) {
+					result += vformat("Stopped after %d warnings for this scene; fix these first, then run check_ui_layout again.\n", MAX_WARNINGS_PER_SCENE);
+					break;
+				}
+			}
+			if (nodes[i].parent_is_container) {
+				skipped_managed++;
+				continue;
+			}
+			for (int j = i + 1; j < nodes.size(); j++) {
+				if (nodes[i].parent != nodes[j].parent) {
+					continue;
+				}
+				if (!nodes[j].has_rect) {
+					continue;
+				}
+				if (nodes[j].parent_is_container) {
+					continue;
+				}
+				if (!nodes[i].rect.intersects(nodes[j].rect, false)) {
+					continue;
+				}
+
+				has_warning = true;
+				warnings++;
+				const AIUILayoutNodeInfo &upper = _node_sorts_above(nodes[i], nodes[j]) ? nodes[i] : nodes[j];
+				const AIUILayoutNodeInfo &lower = _node_sorts_above(nodes[i], nodes[j]) ? nodes[j] : nodes[i];
+				const bool possible_click_blocker = _is_interactive_control_type(lower.type) && !_is_interactive_control_type(upper.type) && _has_blocking_mouse_filter(upper);
+				if (possible_click_blocker) {
+					result += vformat(
+							"Possible click blocker %d: parent='%s', upper node '%s' (line %d, %s) overlaps interactive node '%s' (line %d, %s) and may intercept mouse clicks.\n",
+							warnings,
+							lower.parent.is_empty() ? "." : lower.parent,
+							upper.path,
+							upper.line,
+							upper.type,
+							lower.path,
+							lower.line,
+							lower.type);
+				} else {
+					result += vformat(
+							"Possible overlap %d: parent='%s', nodes='%s' (line %d, %s) and '%s' (line %d, %s).\n",
+							warnings,
+							nodes[i].parent.is_empty() ? "." : nodes[i].parent,
+							nodes[i].path,
+							nodes[i].line,
+							nodes[i].type,
+							nodes[j].path,
+							nodes[j].line,
+							nodes[j].type);
+				}
+				result += vformat(
+						"  Rects: %s at (%.1f, %.1f, %.1f x %.1f), %s at (%.1f, %.1f, %.1f x %.1f).\n",
+						nodes[i].path,
+						nodes[i].rect.position.x,
+						nodes[i].rect.position.y,
+						nodes[i].rect.size.x,
+						nodes[i].rect.size.y,
+						nodes[j].path,
+						nodes[j].rect.position.x,
+						nodes[j].rect.position.y,
+						nodes[j].rect.size.x,
+						nodes[j].rect.size.y);
+				if (possible_click_blocker) {
+					result += "  Suggestion: move decorative/background controls behind interactive controls, put them in a separate lower CanvasLayer, reduce their z_index, or set mouse_filter = 2 (Ignore) on non-interactive overlay controls.\n";
+				} else {
+					result += "  Suggestion: put these controls under a VBoxContainer/HBoxContainer/GridContainer, adjust z_index intentionally, or split the parent into non-overlapping MarginContainer/PanelContainer regions.\n";
+				}
+				if (warnings >= MAX_WARNINGS_PER_SCENE) {
+					result += vformat("Stopped after %d warnings for this scene; fix these first, then run check_ui_layout again.\n", MAX_WARNINGS_PER_SCENE);
+					break;
+				}
+			}
+			if (warnings >= MAX_WARNINGS_PER_SCENE) {
+				break;
+			}
+		}
+
+		if (warnings == 0) {
+			result += "No obvious fixed-rectangle sibling Control overlaps found.\n";
+		}
+		result += vformat("Inspected %d Control node(s). Skipped %d container-managed node(s) and %d node(s) without enough static rectangle data.\n\n",
+				nodes.size(), skipped_managed, skipped_without_rect);
+	}
+
+	if (has_warning) {
+		result += "UI layout check found likely overlap or click-blocking risks. Read the warnings, adjust the scene layout or mouse_filter values, then run check_ui_layout again before finishing the UI task.";
+	}
+
+	return _make_result(result.as_string(), has_error);
+}
+
+Dictionary AIToolExecutor::_build_project(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("build_project is only available in PROJECT mode. Use run_build/check_build_status for engine source builds.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root was detected. Open a project with project.godot before building project code.", true);
+	}
+
+	String project_path = String(p_args.get("project_path", String())).strip_edges().replace("\\", "/");
+	if (project_path.is_empty() && p_args.has("path")) {
+		project_path = String(p_args.get("path", String())).strip_edges().replace("\\", "/");
+	}
+	if (project_path.is_empty()) {
+		bool ambiguous = false;
+		project_path = _find_single_root_dotnet_project(project_root, ambiguous);
+		if (ambiguous) {
+			return _make_result("build_project found more than one .csproj/.sln in the project root. Call build_project again with project_path set to the intended file.", true);
+		}
+	}
+	if (project_path.is_empty()) {
+		return _make_result("build_project could not find a .csproj or .sln in the project root. Provide project_path relative to the open project root.", true);
+	}
+
+	String full_project_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, project_path, full_project_path, path_error)) {
+		return _make_result(path_error + "\nProject path: " + project_path, true);
+	}
+	const String lower_project_path = full_project_path.to_lower();
+	if (!lower_project_path.ends_with(".csproj") && !lower_project_path.ends_with(".sln")) {
+		return _make_result("build_project only accepts .csproj or .sln files inside the open project root.\nProject path: " + project_path, true);
+	}
+	if (!FileAccess::exists(full_project_path)) {
+		return _make_result("build_project project file not found: " + project_path, true);
+	}
+
+	String configuration = String(p_args.get("configuration", String())).strip_edges();
+	if (!configuration.is_empty()) {
+		const String lowered = configuration.to_lower();
+		if (lowered != "debug" && lowered != "release") {
+			return _make_result("build_project configuration must be Debug, Release, or omitted.", true);
+		}
+		configuration = lowered == "release" ? "Release" : "Debug";
+	}
+
+	String target = String(p_args.get("target", String())).strip_edges();
+	if (target.is_empty()) {
+		target = "Build";
+	}
+	const String target_lower = target.to_lower();
+	if (target_lower != "build" && target_lower != "rebuild" && target_lower != "clean") {
+		return _make_result("build_project target must be Build, Rebuild, Clean, or omitted.", true);
+	}
+	target = target_lower == "rebuild" ? "Rebuild" : (target_lower == "clean" ? "Clean" : "Build");
+
+	List<String> dotnet_args;
+	dotnet_args.push_back("build");
+	dotnet_args.push_back(full_project_path);
+	dotnet_args.push_back("--nologo");
+	dotnet_args.push_back("-t:" + target);
+	if (!configuration.is_empty()) {
+		dotnet_args.push_back("-c");
+		dotnet_args.push_back(configuration);
+	}
+	if ((bool)p_args.get("no_restore", false)) {
+		dotnet_args.push_back("--no-restore");
+	}
+
+	String output;
+	int exit_code = -1;
+	const String build_root = full_project_path.get_base_dir();
+	const Error err = _run_command_in_root(build_root, "dotnet", dotnet_args, output, exit_code);
+
+	StringBuilder result;
+	result += "Tool: build_project\n";
+	result += "Program: dotnet build\n";
+	result += "Project: " + project_path + "\n";
+	result += "Workdir: " + build_root + "\n";
+	result += "Target: " + target + "\n";
+	if (!configuration.is_empty()) {
+		result += "Configuration: " + configuration + "\n";
+	}
+	result += vformat("Exit code: %d\n", exit_code);
+	if (err != OK) {
+		result += vformat("Failed to start dotnet build (err=%d). Ensure the .NET SDK is installed and available on PATH.\n", (int)err);
+	}
+	if (!output.strip_edges().is_empty()) {
+		result += "\n--- build output ---\n";
+		result += _truncate_tool_output(output, 20000).strip_edges();
+		result += "\n";
+	}
+	if (err == OK && exit_code == 0) {
+		result += "\nProject build passed.";
+	} else {
+		result += "\nProject build failed. Read the compiler output above, edit the affected project files, then run build_project again.";
+	}
+
+	return _make_result(result.as_string(), err != OK || exit_code != 0);
+}
+
+static MouseButton _parse_ai_mouse_button(const String &p_button) {
+	const String button = p_button.strip_edges().to_lower();
+	if (button == "right") {
+		return MouseButton::RIGHT;
+	}
+	if (button == "middle") {
+		return MouseButton::MIDDLE;
+	}
+	return MouseButton::LEFT;
+}
+
+Dictionary AIToolExecutor::_play_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("play_scene is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton()) {
+		return _make_result("play_scene failed: editor run bar is not available.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("play_scene failed: no open project root is available.", true);
+	}
+
+	String scene_path = String(p_args.get("scene_path", String())).strip_edges().replace("\\", "/");
+	if (scene_path.is_empty()) {
+		EditorRunBar::get_singleton()->play_main_scene(false, Vector<String>());
+		return _make_result("Started playing the project main scene. Wait briefly for the debugger session to connect before using click_ui_position.");
+	}
+
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result("play_scene failed: " + path_error, true);
+	}
+
+	const String lower_path = full_path.to_lower();
+	if (!lower_path.ends_with(".tscn") && !lower_path.ends_with(".scn")) {
+		return _make_result("play_scene only accepts .tscn or .scn scene files inside the open project root.\nScene path: " + scene_path, true);
+	}
+	if (!FileAccess::exists(full_path)) {
+		return _make_result("play_scene scene file not found: " + scene_path, true);
+	}
+
+	String resource_path = scene_path;
+	if (!resource_path.begins_with("res://")) {
+		resource_path = "res://" + resource_path.trim_prefix("./");
+	}
+
+	EditorRunBar::get_singleton()->play_custom_scene(resource_path, Vector<String>());
+	return _make_result("Started playing scene: " + resource_path + "\nWait briefly for the debugger session to connect before using click_ui_position.");
+}
+
+Dictionary AIToolExecutor::_click_ui_position(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("click_ui_position is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("click_ui_position failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("click_ui_position failed: Game View debugger is not available.", true);
+	}
+
+	const double x = p_args.get("x", 0.0);
+	const double y = p_args.get("y", 0.0);
+	if (x < 0.0 || y < 0.0) {
+		return _make_result("click_ui_position requires non-negative viewport coordinates.", true);
+	}
+
+	const MouseButton button = _parse_ai_mouse_button(String(p_args.get("button", "left")));
+	const int sent_count = debugger->click_ui_position(Vector2(x, y), button);
+	if (sent_count <= 0) {
+		return _make_result("click_ui_position failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 250.0), 0, 5000);
+	if (wait_ms > 0) {
+		OS::get_singleton()->delay_usec(wait_ms * 1000);
+	}
+
+	return _make_result(vformat("Sent %s mouse click to running game at viewport position (%.1f, %.1f). Active debugger session(s): %d.",
+			button == MouseButton::RIGHT ? "right" : (button == MouseButton::MIDDLE ? "middle" : "left"),
+			x,
+			y,
+			sent_count));
+}
+
+Dictionary AIToolExecutor::_stop_play_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("stop_play_scene is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton()) {
+		return _make_result("stop_play_scene failed: editor run bar is not available.", true);
+	}
+	if (!EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("No game scene is currently playing.");
+	}
+
+	const String playing_scene = EditorRunBar::get_singleton()->get_playing_scene();
+	EditorRunBar::get_singleton()->stop_playing();
+	return _make_result(playing_scene.is_empty() ? "Stopped the running game scene." : "Stopped the running game scene: " + playing_scene);
 }
 
 Dictionary AIToolExecutor::_search_files(const Dictionary &p_args) {
@@ -1973,20 +2769,34 @@ Dictionary AIToolExecutor::_fetch_url(const Dictionary &p_args) {
 
 Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 	String command = p_args.get("command", String());
+	String workdir = p_args.get("workdir", String());
 	if (command.is_empty()) {
 		return _make_result("No command provided.", true);
 	}
 
-	String project_root = _get_project_root();
-	if (project_root.is_empty()) {
-		project_root = _get_configured_engine_source_cache_root(AISettings::load());
-		if (project_root.is_empty()) {
+	String tool_root = _get_project_root();
+	if (tool_root.is_empty()) {
+		tool_root = _get_configured_engine_source_cache_root(AISettings::load());
+		if (tool_root.is_empty()) {
 			return _make_result("Project root not detected.", true);
 		}
-		Ref<DirAccess> da = DirAccess::create_for_path(project_root);
-		if (da.is_null() || da->make_dir_recursive(project_root) != OK) {
+		Ref<DirAccess> da = DirAccess::create_for_path(tool_root);
+		if (da.is_null() || da->make_dir_recursive(tool_root) != OK) {
 			return _make_result("Project root not detected and failed to create engine source cache directory.", true);
 		}
+	}
+
+	String command_workdir = tool_root;
+	if (!workdir.strip_edges().is_empty() && workdir.strip_edges() != ".") {
+		String full_workdir;
+		String path_error;
+		if (!_resolve_tool_file_path(tool_root, workdir, full_workdir, path_error)) {
+			return _make_result(path_error + "\nWorkdir: " + workdir, true);
+		}
+		if (!DirAccess::dir_exists_absolute(full_workdir)) {
+			return _make_result("shell_command workdir does not exist: " + workdir, true);
+		}
+		command_workdir = full_workdir;
 	}
 
 	if (AISettings::load().context_mode == AIContextMode::PROJECT && !_project_shell_command_stays_in_root(command)) {
@@ -2017,9 +2827,9 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 	int exit_code = -1;
 
 	String previous_cwd = OS::get_singleton()->get_cwd();
-	Error cwd_err = OS::get_singleton()->set_cwd(project_root);
+	Error cwd_err = OS::get_singleton()->set_cwd(command_workdir);
 	if (cwd_err != OK) {
-		return _make_result("Failed to switch command working directory to: " + project_root, true);
+		return _make_result("Failed to switch command working directory to: " + command_workdir, true);
 	}
 
 #ifdef WINDOWS_ENABLED
@@ -2040,6 +2850,7 @@ Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {
 
 	StringBuilder result;
 	result += vformat("Command: %s\n", command);
+	result += vformat("Workdir: %s\n", command_workdir);
 	result += vformat("Exit code: %d\n", exit_code);
 	if (!std_out.is_empty()) {
 		result += "\n--- stdout ---\n" + std_out;

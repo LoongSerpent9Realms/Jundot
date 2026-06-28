@@ -839,6 +839,7 @@ void ProjectDialog::set_mode(Mode p_mode) {
 
 void ProjectDialog::set_project_name(const String &p_name) {
 	project_name->set_text(p_name);
+	_project_name_changed();
 }
 
 void ProjectDialog::set_project_path(const String &p_path) {

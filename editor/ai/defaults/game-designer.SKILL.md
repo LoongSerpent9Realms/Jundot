@@ -85,6 +85,21 @@ When asked to create a game interface mockup, output an SVG diagram:
 - Arrow indicators for navigation flow between screens
 - Layout measurements (margins, spacing)
 
+### Screen Flow Separation
+- For game interface mockups or UI implementation plans, separate the flow into
+  at least three scenes/screens: Start/Menu -> Loading -> Game/HUD
+- The Start/Menu screen covers title, New Game, Continue, Settings, Credits,
+  and Quit. Its primary action enters the Loading screen
+- The Loading screen shows loading progress, tips, transition art, or status
+  text, then switches to the Game/HUD screen when resources are ready
+- The Game/HUD screen focuses on gameplay, world view, player status, actions,
+  score, minimap, and contextual overlays. Do not combine the title menu and
+  in-game HUD into one screen unless the user explicitly asks for a tiny
+  single-scene prototype
+- In architecture docs, represent these as separate scene files, for example
+  `scenes/ui/start_menu.tscn`, `scenes/ui/loading_screen.tscn`, and
+  `scenes/game/game.tscn`, connected by a small state/scene-transition manager
+
 ---
 
 ## 2. Game Framework Document

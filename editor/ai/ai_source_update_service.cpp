@@ -29,6 +29,7 @@
 
 #include "editor/ai/ai_settings.h"
 
+#include "core/crypto/crypto_core.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/os/mutex.h"
@@ -42,6 +43,26 @@ static String last_edit_update_root;
 
 static Error _run_source_git(const String &p_root, const Vector<String> &p_args, String &r_output, int &r_exit_code) {
 	List<String> args;
+	args.push_back("-c");
+	args.push_back("http.sslBackend=openssl");
+	AISettingsData settings = AISettings::load();
+	bool has_token = false;
+	if (!settings.github_token.access_token.is_empty()) {
+		const String basic = "x-access-token:" + settings.github_token.access_token;
+		const CharString basic_utf8 = basic.utf8();
+		args.push_back("-c");
+		args.push_back("http.https://github.com/.extraHeader=Authorization: Basic " + CryptoCore::b64_encode_str((const uint8_t *)basic_utf8.get_data(), basic_utf8.length()));
+		has_token = true;
+	}
+	if (!settings.gitee_token.access_token.is_empty()) {
+		args.push_back("-c");
+		args.push_back(vformat("http.https://gitee.com/.extraHeader=Authorization: Bearer %s", settings.gitee_token.access_token));
+		has_token = true;
+	}
+	if (has_token) {
+		args.push_back("-c");
+		args.push_back("credential.helper=");
+	}
 	args.push_back("-C");
 	args.push_back(p_root);
 	for (const String &arg : p_args) {

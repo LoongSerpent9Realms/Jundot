@@ -1,0 +1,235 @@
+@page
+@model JundotSite.Pages.RegisterModel
+@{
+    ViewData["Title"] = "用户注册";
+}
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>创建账号</h1>
+        <p class="auth-subtitle">加入 Jundot Engine 文档社区</p>
+
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="alert alert-error">@Model.ErrorMessage</div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+        {
+            <div class="alert alert-success">@Model.SuccessMessage</div>
+        }
+
+        @if (Model.Step == 1)
+        {
+            <form method="post" asp-page-handler="SendCode">
+                <div class="form-group">
+                    <label asp-for="Input.Username">用户名</label>
+                    <input asp-for="Input.Username" class="form-control" placeholder="输入用户名" />
+                    <span asp-validation-for="Input.Username" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Email">邮箱</label>
+                    <input asp-for="Input.Email" type="email" class="form-control" placeholder="输入邮箱地址" />
+                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.Password">密码</label>
+                    <input asp-for="Input.Password" type="password" class="form-control" placeholder="输入密码（至少6位）" />
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="Input.ConfirmPassword">确认密码</label>
+                    <input asp-for="Input.ConfirmPassword" type="password" class="form-control" placeholder="再次输入密码" />
+                    <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">发送验证码到邮箱</button>
+            </form>
+        }
+        else if (Model.Step == 2)
+        {
+            <form method="post" asp-page-handler="VerifyCode">
+                <input type="hidden" asp-for="Input.Username" />
+                <input type="hidden" asp-for="Input.Email" />
+                <input type="hidden" asp-for="Input.Password" />
+
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <div class="email-display">@Model.Input.Email</div>
+                    <input type="hidden" name="email" value="@Model.Input.Email" />
+                </div>
+
+                <div class="form-group">
+                    <label asp-for="VerificationCode">验证码</label>
+                    <input asp-for="VerificationCode" class="form-control" placeholder="输入6位验证码" maxlength="6" />
+                    <span asp-validation-for="VerificationCode" class="text-danger"></span>
+                    <small class="form-text">验证码已发送到您的邮箱，有效期10分钟</small>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">验证并注册</button>
+                    <button type="submit" asp-page-handler="ResendCode" class="btn btn-secondary">重新发送</button>
+                </div>
+            </form>
+        }
+
+        <div class="auth-footer">
+            <p>已有账号？<a asp-page="/Login">立即登录</a></p>
+            <p><a asp-page="/Index">返回首页</a></p>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 200px);
+            padding: 40px 20px;
+        }
+
+        .auth-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .auth-card h1 {
+            text-align: center;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .auth-subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4A90D9;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #4A90D9;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #3a7bc8;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-group .btn {
+            flex: 1;
+        }
+
+        .email-display {
+            padding: 12px 16px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            color: #333;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .auth-footer {
+            margin-top: 24px;
+            text-align: center;
+            color: #666;
+        }
+
+        .auth-footer a {
+            color: #4A90D9;
+            text-decoration: none;
+        }
+
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .form-text {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .text-danger {
+            color: #dc2626;
+            font-size: 12px;
+        }
+    </style>
+}

@@ -1,0 +1,114 @@
+@page
+@model JundotSite.Pages.Admin.DownloadsModel
+@{
+    Layout = "_AdminLayout";
+}
+
+<div class="stat-cards">
+    <div class="stat-card green">
+        <div class="stat-number">@Model.TotalDownloads</div>
+        <div class="stat-label">总下载次数</div>
+    </div>
+    <div class="stat-card blue">
+        <div class="stat-number">@Model.DownloadsToday</div>
+        <div class="stat-label">今日下载</div>
+    </div>
+    <div class="stat-card amber">
+        <div class="stat-number">@Model.DownloadsThisWeek</div>
+        <div class="stat-label">本周下载</div>
+    </div>
+    <div class="stat-card coral">
+        <div class="stat-number">@Model.DownloadsThisMonth</div>
+        <div class="stat-label">本月下载</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+    <div class="admin-card">
+        <h3>按版本统计</h3>
+        @if (Model.DownloadsByVersion.Any())
+        {
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>版本</th>
+                        <th>下载次数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.DownloadsByVersion)
+                    {
+                        <tr>
+                            <td><strong>@item.Key</strong></td>
+                            <td>@item.Value</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p style="color: #53615c;">暂无数据</p>
+        }
+    </div>
+
+    <div class="admin-card">
+        <h3>按平台统计</h3>
+        @if (Model.DownloadsByPlatform.Any())
+        {
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>平台</th>
+                        <th>下载次数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.DownloadsByPlatform)
+                    {
+                        <tr>
+                            <td><strong>@item.Key</strong></td>
+                            <td>@item.Value</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p style="color: #53615c;">暂无数据</p>
+        }
+    </div>
+</div>
+
+<div class="admin-card">
+    <h3>最近下载记录（最近 100 条）</h3>
+    @if (Model.DownloadLogs.Any())
+    {
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>版本</th>
+                    <th>平台</th>
+                    <th>IP 地址</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var log in Model.DownloadLogs)
+                {
+                    <tr>
+                        <td>@log.DownloadedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@(log.VersionNumber ?? "-")</td>
+                        <td>@(log.Platform ?? "-")</td>
+                        <td>@(log.IpAddress ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p style="color: #53615c;">暂无下载记录</p>
+    }
+</div>

@@ -34,6 +34,7 @@
 #include "core/debugger/debugger_marshalls.h"
 #include "core/debugger/engine_debugger.h"
 #include "core/input/input.h"
+#include "core/input/input_event.h"
 #include "core/input/shortcut.h"
 #include "core/io/dir_access.h"
 #include "core/io/resource_loader.h"
@@ -578,6 +579,49 @@ Error SceneDebugger::_msg_report_window_focused(const Array &p_args) {
 	return OK;
 }
 
+Error SceneDebugger::_msg_ai_click_ui_position(const Array &p_args) {
+	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
+
+	const Vector2 position((double)p_args[0], (double)p_args[1]);
+	MouseButton button = MouseButton::LEFT;
+	if (p_args.size() >= 3) {
+		button = (MouseButton)(int)p_args[2];
+	}
+
+	MouseButtonMask button_mask = MouseButtonMask::LEFT;
+	if (button == MouseButton::RIGHT) {
+		button_mask = MouseButtonMask::RIGHT;
+	} else if (button == MouseButton::MIDDLE) {
+		button_mask = MouseButtonMask::MIDDLE;
+	}
+
+	Ref<InputEventMouseMotion> motion;
+	motion.instantiate();
+	motion->set_position(position);
+	motion->set_global_position(position);
+	Input::get_singleton()->parse_input_event(motion);
+
+	Ref<InputEventMouseButton> press;
+	press.instantiate();
+	press->set_position(position);
+	press->set_global_position(position);
+	press->set_button_index(button);
+	press->set_button_mask(button_mask);
+	press->set_pressed(true);
+	Input::get_singleton()->parse_input_event(press);
+
+	Ref<InputEventMouseButton> release;
+	release.instantiate();
+	release->set_position(position);
+	release->set_global_position(position);
+	release->set_button_index(button);
+	release->set_button_mask(MouseButtonMask::NONE);
+	release->set_pressed(false);
+	Input::get_singleton()->parse_input_event(release);
+
+	return OK;
+}
+
 // endregion
 
 HashMap<String, SceneDebugger::ParseMessageFunc> SceneDebugger::message_handlers;
@@ -659,6 +703,7 @@ void SceneDebugger::_init_message_handlers() {
 #endif
 	message_handlers["rq_screenshot"] = _msg_rq_screenshot;
 	message_handlers["report_window_focused"] = _msg_report_window_focused;
+	message_handlers["ai_click_ui_position"] = _msg_ai_click_ui_position;
 }
 
 void SceneDebugger::_save_node(ObjectID id, const String &p_path) {

@@ -1,0 +1,196 @@
+@page
+@model JundotSite.Pages.Admin.UsersModel
+@{
+    ViewData["Title"] = "用户管理";
+    Layout = "_AdminLayout";
+}
+
+<div class="admin-header">
+    <h1>用户管理</h1>
+    <p>查看和管理所有注册用户。用户可以编辑文档，但无法访问管理后台。</p>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="admin-card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>邮箱</th>
+                <th>角色</th>
+                <th>状态</th>
+                <th>注册时间</th>
+                <th>最后登录</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in Model.Users)
+            {
+                <tr>
+                    <td>@user.Id</td>
+                    <td><strong>@user.Username</strong></td>
+                    <td>@user.Email</td>
+                    <td>
+                        @if (user.Role == JundotSite.Models.UserRole.Admin)
+                        {
+                            <span class="role-badge admin">管理员</span>
+                        }
+                        else
+                        {
+                            <span class="role-badge user">用户</span>
+                        }
+                    </td>
+                    <td>
+                        @if (user.IsActive)
+                        {
+                            <span class="status-badge active">正常</span>
+                        }
+                        else
+                        {
+                            <span class="status-badge disabled">已禁用</span>
+                        }
+                    </td>
+                    <td>@user.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>@(user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                    <td>
+                        <div class="btn-group">
+                            <form method="post" asp-page-handler="ToggleActive" style="display: inline;">
+                                <input type="hidden" name="userId" value="@user.Id" />
+                                <button type="submit" class="btn btn-sm @(user.IsActive ? "btn-warning" : "btn-success")">
+                                    @(user.IsActive ? "禁用" : "启用")
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (!Model.Users.Any())
+    {
+        <p class="empty-message">暂无注册用户</p>
+    }
+</div>
+
+@section Styles {
+    <style>
+        .admin-header {
+            margin-bottom: 24px;
+        }
+
+        .admin-header h1 {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            color: #333;
+        }
+
+        .admin-header p {
+            margin: 0;
+            color: #666;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .role-badge.admin {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .role-badge.user {
+            background: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .status-badge.active {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .status-badge.disabled {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-warning {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fcd34d;
+        }
+
+        .btn-warning:hover {
+            background: #fde68a;
+        }
+
+        .btn-success {
+            background: #d1fae5;
+            color: #059669;
+            border: 1px solid #6ee7b7;
+        }
+
+        .btn-success:hover {
+            background: #a7f3d0;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+        }
+    </style>
+}

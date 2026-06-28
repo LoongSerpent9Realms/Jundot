@@ -192,7 +192,75 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_PROJECT_SCRIPTS, "", fn));
 	}
 
-	// 7. run_build
+	// 7. check_ui_layout
+	{
+		Dictionary props;
+		props["paths"] = _array_str_property("Scene file path(s) relative to the project root to inspect, e.g. 'scenes/main_menu.tscn' or 'res://scenes/hud.tscn'.");
+		Array required;
+		required.push_back("paths");
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_UI_LAYOUT,
+				"PROJECT mode only. Statically inspect Godot .tscn UI scenes for likely overlapping sibling Control nodes, z_index/order mistakes, non-interactive upper Controls that may block Button/input clicks, and modal settings/dialog/menu panels that pass clicks through because mouse_filter is Pass or Ignore. Use after creating or editing UI scenes. Container-managed children are treated as managed layout and are not flagged as fixed-rectangle overlaps.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CHECK_UI_LAYOUT, "", fn));
+	}
+
+	// 8. build_project
+	{
+		Dictionary props;
+		props["project_path"] = _str_property("Optional .csproj or .sln path relative to the open project root, e.g. '22.csproj' or 'src/Game.csproj'. If omitted, the tool auto-detects a single .csproj/.sln in the project root.");
+		props["configuration"] = _str_property("Optional build configuration, such as Debug or Release.");
+		props["target"] = _str_property("Optional MSBuild target, such as Build, Rebuild, or Clean. Defaults to Build.");
+		Dictionary bool_prop;
+		bool_prop["type"] = "boolean";
+		bool_prop["description"] = "If true, pass --no-restore to dotnet build.";
+		props["no_restore"] = bool_prop;
+		Dictionary fn = _make_fn(
+				AIToolNames::BUILD_PROJECT,
+				"PROJECT mode only. Build a C#/.NET project or solution inside the open project root without using shell_command. Use this instead of shell_command for dotnet build, including compiling a specified .csproj. Returns exit code and compiler output for the AI to fix errors.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::BUILD_PROJECT, "", fn));
+	}
+
+	// 9. play_scene
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Scene file path relative to the project root, e.g. 'scenes/main_menu.tscn' or 'res://scenes/main_menu.tscn'. If omitted, the project's main scene is played.");
+		Dictionary fn = _make_fn(
+				AIToolNames::PLAY_SCENE,
+				"PROJECT mode only. Play the project's main scene or a specified .tscn/.scn scene from the open project using the editor run bar. Use before click_ui_position when validating generated UI by actually running it.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::PLAY_SCENE, "", fn));
+	}
+
+	// 10. click_ui_position
+	{
+		Dictionary props;
+		props["x"] = _number_property("X coordinate in the running game's viewport/window, in pixels from the top-left corner.");
+		props["y"] = _number_property("Y coordinate in the running game's viewport/window, in pixels from the top-left corner.");
+		props["button"] = _str_property("Mouse button to click: left, right, or middle. Defaults to left.");
+		props["wait_ms"] = _number_property("Optional time to wait after sending the click before returning, in milliseconds. Defaults to 250.");
+		Array required;
+		required.push_back("x");
+		required.push_back("y");
+		Dictionary fn = _make_fn(
+				AIToolNames::CLICK_UI_POSITION,
+				"PROJECT mode only. Send a synthetic mouse click to the currently running game viewport at the given pixel coordinate through the debugger channel. Use after play_scene to validate that generated UI buttons can be clicked. This does not move the user's desktop cursor.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CLICK_UI_POSITION, "", fn));
+	}
+
+	// 11. stop_play_scene
+	{
+		Dictionary props;
+		Dictionary fn = _make_fn(
+				AIToolNames::STOP_PLAY_SCENE,
+				"PROJECT mode only. Stop the currently running game scene if one is playing.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::STOP_PLAY_SCENE, "", fn));
+	}
+
+	// 12. run_build
 	{
 		Dictionary props;
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
@@ -203,7 +271,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
 
-	// 8. read_build_log
+	// 13. read_build_log
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -213,7 +281,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::READ_BUILD_LOG, "", fn));
 	}
 
-	// 9. fetch_url
+	// 14. fetch_url
 	{
 		Dictionary props;
 		props["url"] = _str_property("The full URL to download from.");
@@ -228,20 +296,21 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::FETCH_URL, "", fn));
 	}
 
-	// 10. shell_command
+	// 15. shell_command
 	{
 		Dictionary props;
-		props["command"] = _str_property("Shell command to execute in the project root directory.");
+		props["command"] = _str_property("Shell command to execute.");
+		props["workdir"] = _str_property("Optional working directory. In PROJECT mode this must be the open project root or a directory inside it; use '.' or omit it for the project root. In ENGINE mode this must stay inside the configured engine source root.");
 		Array required;
 		required.push_back("command");
 		Dictionary fn = _make_fn(
 				AIToolNames::SHELL_COMMAND,
-				"Execute a shell command in the current tool root directory. In engine mode this is the configured source checkout when available; if no source exists yet, it runs in the default engine_source cache directory so the source can be cloned/downloaded. In project mode this is the open game project. Returns stdout, stderr, and the exit code. Use with caution.",
+				"Execute a shell command in the current tool root or an allowed subdirectory. In PROJECT mode, workdir must stay inside the open game project, so the AI can run commands such as dotnet build from a project subfolder. In ENGINE mode, workdir must stay inside the configured source checkout. Returns stdout, stderr, and the exit code. Use with caution.",
 				props, required);
 		tools.push_back(_tool(AIToolNames::SHELL_COMMAND, "", fn));
 	}
 
-	// 11. restart_engine
+	// 16. restart_engine
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -251,7 +320,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RESTART_ENGINE, "", fn));
 	}
 
-	// 12. check_build_status
+	// 17. check_build_status
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -261,7 +330,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_BUILD_STATUS, "", fn));
 	}
 
-	// 13. upload_code
+	// 18. upload_code
 	{
 		Dictionary props;
 		props["file_path"] = _str_property("File path relative to the project root to upload to the git remote repository.");
@@ -276,7 +345,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::UPLOAD_CODE, "", fn));
 	}
 
-	// 14. develop_ai_verify
+	// 19. develop_ai_verify
 	{
 		Dictionary props;
 		Dictionary passed;
@@ -294,7 +363,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::DEVELOP_AI_VERIFY, "", fn));
 	}
 
-	// 15. setup_engine_workspace
+	// 20. setup_engine_workspace
 	{
 		Dictionary props;
 		props["workspace_name"] = _str_property("Short project-specific engine workspace name. If omitted, the open project directory name is used.");
@@ -310,7 +379,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SETUP_ENGINE_WORKSPACE, "", fn));
 	}
 
-	// 16. request_engine_change
+	// 21. request_engine_change
 	{
 		Dictionary props;
 		props["reason"] = _str_property("The exact project requirement or engine limitation that makes an engine change necessary.");
@@ -326,7 +395,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::REQUEST_ENGINE_CHANGE, "", fn));
 	}
 
-	// 17. return_to_project_mode
+	// 22. return_to_project_mode
 	{
 		Dictionary props;
 		props["summary"] = _str_property("Summary of the engine change, validation result, and what the project-side continuation should do next.");
@@ -339,10 +408,10 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RETURN_TO_PROJECT_MODE, "", fn));
 	}
 
-	// 18. batch_tools
+	// 23. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, play_scene, click_ui_position, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -469,6 +538,11 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 
 	HashSet<StringName> project_only;
 	project_only.insert(StringName(AIToolNames::CHECK_PROJECT_SCRIPTS));
+	project_only.insert(StringName(AIToolNames::CHECK_UI_LAYOUT));
+	project_only.insert(StringName(AIToolNames::BUILD_PROJECT));
+	project_only.insert(StringName(AIToolNames::PLAY_SCENE));
+	project_only.insert(StringName(AIToolNames::CLICK_UI_POSITION));
+	project_only.insert(StringName(AIToolNames::STOP_PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::SETUP_ENGINE_WORKSPACE));
 	project_only.insert(StringName(AIToolNames::REQUEST_ENGINE_CHANGE));
 

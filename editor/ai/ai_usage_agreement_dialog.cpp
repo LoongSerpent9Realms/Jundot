@@ -34,12 +34,16 @@ String AIUsageAgreementDialog::get_agreement_text() {
 	return TTR("Using AI features sends your prompts, selected context, attachments, logs, test output, and generated analysis to the configured AI API provider. These requests consume API tokens. Adding project memories, tool context, files, logs, or automatic repair analysis can increase token usage, and multi-step defect analysis may trigger more than one request. You can cancel this agreement, disable automatic suggestions, or reset this consent from the AI Config panel. Actual billing is controlled by your API provider.");
 }
 
+void AIUsageAgreementDialog::set_project_path(const String &p_project_path) {
+	project_path = p_project_path;
+}
+
 void AIUsageAgreementDialog::_confirmed() {
 	if (!confirm_check->is_pressed()) {
 		return;
 	}
 
-	const Error err = AISettings::accept_usage_agreement();
+	const Error err = AISettings::accept_usage_agreement(project_path);
 	if (err == OK) {
 		emit_signal(SNAME("agreement_accepted"));
 	} else {

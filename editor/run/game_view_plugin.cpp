@@ -57,6 +57,8 @@
 #include "scene/main/scene_tree.h"
 #include "servers/display/display_server.h"
 
+GameViewDebugger *GameViewDebugger::singleton = nullptr;
+
 void GameViewDebugger::_session_started(Ref<EditorDebuggerSession> p_session) {
 	if (!is_feature_enabled) {
 		return;
@@ -339,6 +341,22 @@ void GameViewDebugger::reset_camera_3d_position() {
 	}
 }
 
+int GameViewDebugger::click_ui_position(const Vector2 &p_position, MouseButton p_button) {
+	Array message;
+	message.push_back(p_position.x);
+	message.push_back(p_position.y);
+	message.push_back((int)p_button);
+
+	int sent_count = 0;
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			I->send_message("scene:ai_click_ui_position", message);
+			sent_count++;
+		}
+	}
+	return sent_count;
+}
+
 void GameViewDebugger::setup_session(int p_session_id) {
 	Ref<EditorDebuggerSession> session = get_session(p_session_id);
 	ERR_FAIL_COND(session.is_null());
@@ -427,12 +445,19 @@ bool GameViewDebugger::has_capture(const String &p_capture) const {
 }
 
 GameViewDebugger::GameViewDebugger() {
+	singleton = this;
 	EditorFeatureProfileManager::get_singleton()->connect("current_feature_profile_changed", callable_mp(this, &GameViewDebugger::_feature_profile_changed));
 
 	ED_SHORTCUT("editor/suspend_resume_embedded_project", TTRC("Suspend/Resume Embedded Project"), Key::F9);
 	ED_SHORTCUT_OVERRIDE("editor/suspend_resume_embedded_project", "macos", KeyModifierMask::META | KeyModifierMask::SHIFT | Key::B);
 
 	ED_SHORTCUT("editor/next_frame_embedded_project", TTRC("Next Frame"), Key::F10);
+}
+
+GameViewDebugger::~GameViewDebugger() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
 }
 
 ///////

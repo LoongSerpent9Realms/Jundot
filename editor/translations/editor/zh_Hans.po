@@ -21538,3 +21538,81 @@ msgstr "正在发送下一条队列消息……"
 
 msgid "Queue this message while the AI is responding"
 msgstr "AI 正在回答时，将这条消息加入队列"
+
+msgid "Jundot AI"
+msgstr "Jundot AI"
+
+msgid "AI Settings"
+msgstr "AI 设置"
+
+msgid "Clear"
+msgstr "清空"
+
+msgid "Tell me what you want to create."
+msgstr "告诉我你想创建什么。"
+
+msgid "Project idea"
+msgstr "项目想法"
+
+msgid "Create Project"
+msgstr "创建项目"
+
+msgid "Tell me the type, theme, and core content of the project. I will summarize it and propose an English project name."
+msgstr "告诉我项目类型、主题和核心内容。我会总结它，并给出一个英文项目名。"
+
+msgid "Thinking..."
+msgstr "正在思考..."
+
+msgid "AI chat is not ready."
+msgstr "AI 对话尚未就绪。"
+
+msgid "AI chat is not ready. Check AI settings and usage agreement, then try again."
+msgstr "AI 对话尚未就绪。请检查 AI 设置和使用协议，然后重试。"
+
+msgid "AI request failed."
+msgstr "AI 请求失败。"
+
+msgid "AI request failed. Result: %d, response code: %d."
+msgstr "AI 请求失败。结果：%d，响应码：%d。"
+
+msgid "I summarized the project. Review the project name below."
+msgstr "我已经总结了项目。请查看下面的项目名。"
+
+msgid "Ready: %s"
+msgstr "已就绪：%s"
+
+msgid "Project created. I saved this brief into the project's AI memory so the editor chat can continue from it."
+msgstr "项目已创建。我已将这份简报保存到项目的 AI 记忆中，编辑器对话可以接着它继续。"
+
+msgid "Conversation cleared. Tell me the game concept you want to create with Jundot."
+msgstr "对话已清空。请告诉我你想用 Jundot 创建的游戏概念。"
+
+msgid "Previous"
+msgstr "上一题"
+
+msgid "Next"
+msgstr "下一题"
+
+msgid "Question %d of %d"
+msgstr "问题 %d / %d"
+
+msgid "Single choice"
+msgstr "单选"
+
+msgid "Multiple choice"
+msgstr "多选"
+
+msgid "Custom answer"
+msgstr "自定义答案"
+
+msgid "Submit Answers"
+msgstr "提交答案"
+
+msgid "My answers are:"
+msgstr "我的回答是："
+
+msgid "Skipped"
+msgstr "已跳过"
+
+msgid "Answer"
+msgstr "回答"

@@ -30,17 +30,43 @@
 
 #include "editor/ai/ai_settings.h"
 
+#include "core/crypto/crypto_core.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
 #include "core/os/os.h"
 
-// Execute a git command targeting a specific working directory.
-// Uses "git -C <dir> <args>" to change the working directory.
+static void _add_git_auth_headers(List<String> &r_args) {
+	AISettingsData settings = AISettings::load();
+	bool has_token = false;
+
+	if (!settings.github_token.access_token.is_empty()) {
+		const String basic = "x-access-token:" + settings.github_token.access_token;
+		const CharString basic_utf8 = basic.utf8();
+		r_args.push_back("-c");
+		r_args.push_back("http.https://github.com/.extraHeader=Authorization: Basic " + CryptoCore::b64_encode_str((const uint8_t *)basic_utf8.get_data(), basic_utf8.length()));
+		has_token = true;
+	}
+
+	if (!settings.gitee_token.access_token.is_empty()) {
+		r_args.push_back("-c");
+		r_args.push_back(vformat("http.https://gitee.com/.extraHeader=Authorization: Bearer %s", settings.gitee_token.access_token));
+		has_token = true;
+	}
+
+	if (has_token) {
+		r_args.push_back("-c");
+		r_args.push_back("credential.helper=");
+	}
+}
+
 static Error _run_git_cmd(const String &p_cwd,
 		const Vector<String> &p_args,
 		String *r_stdout = nullptr,
 		int *r_exit_code = nullptr) {
 	List<String> arg_list;
+	arg_list.push_back("-c");
+	arg_list.push_back("http.sslBackend=openssl");
+	_add_git_auth_headers(arg_list);
 	arg_list.push_back("-C");
 	arg_list.push_back(p_cwd);
 	for (int i = 0; i < p_args.size(); i++) {

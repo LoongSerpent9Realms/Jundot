@@ -51,6 +51,11 @@ private:
 	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _check_project_scripts(const Dictionary &p_args);
+	static Dictionary _check_ui_layout(const Dictionary &p_args);
+	static Dictionary _build_project(const Dictionary &p_args);
+	static Dictionary _play_scene(const Dictionary &p_args);
+	static Dictionary _click_ui_position(const Dictionary &p_args);
+	static Dictionary _stop_play_scene(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
 	static Dictionary _check_build_status(const Dictionary &p_args);
 	static Dictionary _read_build_log(const Dictionary &p_args);
