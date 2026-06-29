@@ -20,6 +20,8 @@ namespace JundotLauncher;
 /// </summary>
 public class Program
 {
+	private enum CrashDialogAction { Close, Restart, Rollback }
+
 	// ── CLI Arguments ────────────────────────────────────────
 	private enum Command { Start, CheckOnly, Update, Rollback, Version, Help }
 
@@ -191,10 +193,29 @@ public class Program
 
 		int finalExitCode = 1;
 		bool userWantsRestart;
+		bool rollbackRestartRequested = false;
 
 		do
 		{
 			userWantsRestart = false;
+			if (rollbackRestartRequested)
+			{
+				rollbackRestartRequested = false;
+				exes = Directory.GetFiles(engineDir, "jundot.*.editor.*.exe")
+					.Where(f => !f.EndsWith(".console.exe"))
+					.ToList();
+				if (exes.Count == 0)
+				{
+					exes = Directory.GetFiles(engineDir, "jundot.*.editor.*.exe").ToList();
+				}
+				if (exes.Count == 0)
+				{
+					ConsoleUI.Error("回滚后找不到 Jundot 引擎可执行文件。");
+					return 1;
+				}
+				exePath = exes.OrderByDescending(f => new FileInfo(f).Length).First();
+				ConsoleUI.Success($"回滚后启动引擎: {Path.GetFileName(exePath)}");
+			}
 
 			// ── 准备 stderr 日志文件路径（用 cmd /c 包装以让 GUI 引擎的 stderr 落地） ──
 			var stderrLogPath = Path.Combine(engineDir, "logs", $"engine-stderr-{DateTime.Now:yyyyMMdd-HHmmss}.log");
@@ -228,7 +249,17 @@ public class Program
 			{
 				ConsoleUI.Error($"启动引擎失败: {ex.Message}");
 				// 即使启动失败也弹出崩溃对话框
-				ShowCrashDialog(BuildCrashInfo(exePath, engineDir, 1, "", new List<string>(), 0));
+				var action = ShowCrashDialog(BuildCrashInfo(exePath, engineDir, 1, "", new List<string>(), 0));
+				if (action == CrashDialogAction.Rollback)
+				{
+					var rollbackOk = await RollbackAfterCrashAsync(engineDir);
+					if (rollbackOk)
+					{
+						userWantsRestart = true;
+						rollbackRestartRequested = true;
+						continue;
+					}
+				}
 				break;  // 启动失败不进入重启循环
 			}
 
@@ -281,7 +312,17 @@ public class Program
 			ConsoleUI.Error($"引擎{(finalExitCode != 0 ? $"以退出码 {finalExitCode}" : "异常")} 结束 (运行 {runDuration:F1} 秒)。正在准备崩溃报告...");
 
 			var crashInfo = BuildCrashInfo(exePath, engineDir, finalExitCode, capturedStderr, crashLogs, runDuration);
-			userWantsRestart = ShowCrashDialog(crashInfo);
+			var crashAction = ShowCrashDialog(crashInfo);
+			if (crashAction == CrashDialogAction.Restart)
+			{
+				userWantsRestart = true;
+			}
+			else if (crashAction == CrashDialogAction.Rollback)
+			{
+				var rollbackOk = await RollbackAfterCrashAsync(engineDir);
+				userWantsRestart = rollbackOk;
+				rollbackRestartRequested = rollbackOk;
+			}
 		}
 		while (userWantsRestart);
 
@@ -311,6 +352,35 @@ public class Program
 		catch
 		{
 			return string.Empty;
+		}
+	}
+
+	private static async Task<bool> RollbackAfterCrashAsync(string engineDir)
+	{
+		ConsoleUI.Header("引擎闪退回滚");
+		try
+		{
+			var state = new UpdateStateStore(engineDir);
+			var latestBackup = state.GetLatestBackup();
+			if (latestBackup == null)
+			{
+				ConsoleUI.Error("没有可用的上一版本备份，无法回滚。");
+				return false;
+			}
+
+			ConsoleUI.Info($"准备回滚到上一版本: {latestBackup.Version}");
+			var rollback = new RollbackManager(engineDir, state);
+			var ok = await rollback.RollbackAsync(confirm: false);
+			if (ok)
+			{
+				ConsoleUI.Success("已回滚到上一版本，即将重新启动引擎。");
+			}
+			return ok;
+		}
+		catch (Exception ex)
+		{
+			ConsoleUI.Error($"闪退回滚失败: {ex.Message}");
+			return false;
 		}
 	}
 
@@ -370,9 +440,9 @@ public class Program
 			var path = Path.Combine(engineDir, ".jundot-update-state.json");
 			if (!File.Exists(path)) return null;
 			var json = File.ReadAllText(path);
-			// 轻量解析：查找 "CurrentVersion" 字段
+			// 轻量解析：兼容旧 PascalCase 和当前 snake_case 状态字段。
 			var match = System.Text.RegularExpressions.Regex.Match(json,
-				@"""[Cc]urrent[Vv]ersion""\s*:\s*""([^""]+)""");
+				@"""(?:[Cc]urrent[Vv]ersion|current_version)""\s*:\s*""([^""]+)""");
 			return match.Success ? match.Groups[1].Value : null;
 		}
 		catch
@@ -381,8 +451,8 @@ public class Program
 		}
 	}
 
-	/// <summary>显示崩溃对话框，返回 true 表示用户选择重启。</summary>
-	private static bool ShowCrashDialog(CrashInfo info)
+	/// <summary>显示崩溃对话框，返回用户选择的恢复动作。</summary>
+	private static CrashDialogAction ShowCrashDialog(CrashInfo info)
 	{
 		// 避免在非 Windows 环境尝试 GUI
 		if (!OperatingSystem.IsWindows())
@@ -395,7 +465,7 @@ public class Program
 					? info.Stderr.Substring(0, 3000) + "..."
 					: info.Stderr);
 			}
-			return false;
+			return CrashDialogAction.Close;
 		}
 
 		try
@@ -414,7 +484,7 @@ public class Program
 				: info.Stderr);
 			ConsoleUI.Info($"完整日志: {info.CrashLogFiles.FirstOrDefault() ?? "(无)"}");
 			ConsoleUI.Error($"========================================");
-			return false;
+			return CrashDialogAction.Close;
 		}
 		catch (Exception ex)
 		{
@@ -425,12 +495,12 @@ public class Program
 				ConsoleUI.Info(info.Stderr.Length > 3000
 					? info.Stderr.Substring(0, 3000) + "..."
 					: info.Stderr);
-			return false;
+			return CrashDialogAction.Close;
 		}
 	}
 
-	/// <summary>调用 MAUI 崩溃对话框进程，返回 true 表示用户选择重启。</summary>
-	private static bool ShowMauiCrashDialog(CrashInfo info)
+	/// <summary>调用 MAUI 崩溃对话框进程，返回用户选择的恢复动作。</summary>
+	private static CrashDialogAction ShowMauiCrashDialog(CrashInfo info)
 	{
 		var launcherDir = AppContext.BaseDirectory;
 
@@ -489,12 +559,17 @@ public class Program
 
 			using var process = Process.Start(psi);
 			if (process == null)
-				return false;
+				return CrashDialogAction.Close;
 
 			process.WaitForExit();
 
 			// 退出码 100 表示用户选择重启
-			return process.ExitCode == 100;
+			return process.ExitCode switch
+			{
+				100 => CrashDialogAction.Restart,
+				101 => CrashDialogAction.Rollback,
+				_ => CrashDialogAction.Close
+			};
 		}
 		finally
 		{

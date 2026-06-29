@@ -5,11 +5,13 @@ namespace JundotCrashDialog;
 public partial class App : Application
 {
 	public static bool RestartRequested { get; set; }
+	public static bool RollbackRequested { get; set; }
 
 	public App()
 	{
 		InitializeComponent();
 		RestartRequested = false;
+		RollbackRequested = false;
 	}
 
 	protected override Window CreateWindow(IActivationState? activationState)
@@ -20,7 +22,8 @@ public partial class App : Application
 		mainPage.Disappearing += (s, e) =>
 		{
 			RestartRequested = mainPage.UserRequestedRestart;
-			Environment.ExitCode = RestartRequested ? 100 : 0;
+			RollbackRequested = mainPage.UserRequestedRollback;
+			Environment.ExitCode = RollbackRequested ? 101 : (RestartRequested ? 100 : 0);
 		};
 		
 		return new Window(mainPage);

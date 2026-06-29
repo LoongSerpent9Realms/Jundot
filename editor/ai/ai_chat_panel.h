@@ -49,6 +49,7 @@ class LineEdit;
 class MenuButton;
 class PanelContainer;
 class PopupMenu;
+class ProgressBar;
 class ScrollContainer;
 class TextEdit;
 class Timer;
@@ -79,6 +80,15 @@ class AIChatPanel : public MarginContainer {
 	Button *clear_button = nullptr;
 	MenuButton *add_file_menu = nullptr;
 	Label *status_label = nullptr;
+	PanelContainer *programming_onboarding_panel = nullptr;
+	PanelContainer *programming_mode_hint_panel = nullptr;
+	Label *programming_mode_hint_label = nullptr;
+	Button *programming_mode_switch_button = nullptr;
+	bool beginner_chat_mode = false;
+	PanelContainer *ai_activity_panel = nullptr;
+	ProgressBar *ai_activity_progress = nullptr;
+	Label *ai_activity_label = nullptr;
+	String ai_activity_text;
 	Label *tool_call_label = nullptr;
 	PanelContainer *tool_limit_options_panel = nullptr;
 	Button *tool_limit_toggle_button = nullptr;
@@ -203,6 +213,13 @@ class AIChatPanel : public MarginContainer {
 		int completion_tokens = 0;
 	};
 
+	struct IssueLedgerEntry {
+		String title;
+		String status;
+		String closed_by;
+		uint64_t updated_at = 0;
+	};
+
 	struct QueuedChatMessage {
 		String text;
 		bool guided = false;
@@ -216,6 +233,7 @@ class AIChatPanel : public MarginContainer {
 		String task_intent;
 		String task_brief;
 		Vector<ConversationMessage> messages;
+		Vector<IssueLedgerEntry> issue_ledger;
 		Array structured_messages;
 		uint64_t created_at = 0;
 		uint64_t updated_at = 0;
@@ -238,6 +256,7 @@ class AIChatPanel : public MarginContainer {
 	PanelContainer *sidebar_panel = nullptr;
 	PanelContainer *chat_surface_panel = nullptr;
 	PanelContainer *composer_panel = nullptr;
+	Control *chat_top_bar_container = nullptr;
 	VBoxContainer *sidebar = nullptr;
 	Button *new_conversation_button = nullptr;
 	Button *delete_conversation_button = nullptr;
@@ -260,6 +279,10 @@ class AIChatPanel : public MarginContainer {
 	String _get_conversations_file_path() const;
 	String _infer_project_brief() const;
 	String _build_conversation_brief_prompt() const;
+	String _build_issue_ledger_prompt() const;
+	bool _message_confirms_issue_closed(const String &p_message) const;
+	String _find_recent_issue_subject(const String &p_current_message) const;
+	void _record_issue_closed_from_user(const String &p_user_message);
 	void _set_current_conversation_task_intent(const String &p_intent, const String &p_brief);
 	void _seed_new_conversation_options();
 	void _refresh_conversation_list_ui();
@@ -331,6 +354,12 @@ class AIChatPanel : public MarginContainer {
 	bool _is_project_memory_continue_request(const String &p_user_message) const;
 	String _detect_mode_prompt(const String &p_user_message) const;
 	void _update_translations();
+	void _apply_programming_experience_layout();
+	void _apply_editor_beginner_workspace(bool p_enabled);
+	void _set_programming_experience(bool p_has_programming_experience);
+	void _toggle_programming_experience_mode();
+	void _set_ai_activity(const String &p_text, bool p_visible);
+	void _refresh_ai_activity();
 	void _set_requesting(bool p_requesting);
 	bool _ensure_usage_agreement();
 	void _usage_agreement_accepted();

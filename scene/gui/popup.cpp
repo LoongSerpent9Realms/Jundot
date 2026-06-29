@@ -167,9 +167,18 @@ Rect2i Popup::_popup_adjust_rect() const {
 
 	Rect2i current(get_position(), get_size());
 
-	if (!is_embedded() && DisplayServer::get_singleton()->has_feature(DisplayServerEnums::FEATURE_SELF_FITTING_WINDOWS)) {
-		// We're fine as is, the Display Server will take care of that for us.
-		return current;
+	// Early out if max size not set.
+	Size2i popup_max_size = get_max_size();
+	if (popup_max_size > Size2i()) {
+		current.size = current.size.min(popup_max_size);
+	}
+
+	if (current.size.y > parent_rect.size.y) {
+		current.size.y = parent_rect.size.y;
+	}
+
+	if (current.size.x > parent_rect.size.x) {
+		current.size.x = parent_rect.size.x;
 	}
 
 	if (current.position.x + current.size.x > parent_rect.position.x + parent_rect.size.x) {
@@ -186,28 +195,6 @@ Rect2i Popup::_popup_adjust_rect() const {
 
 	if (current.position.y < parent_rect.position.y) {
 		current.position.y = parent_rect.position.y;
-	}
-
-	if (current.size.y > parent_rect.size.y) {
-		current.size.y = parent_rect.size.y;
-	}
-
-	if (current.size.x > parent_rect.size.x) {
-		current.size.x = parent_rect.size.x;
-	}
-
-	// Early out if max size not set.
-	Size2i popup_max_size = get_max_size();
-	if (popup_max_size <= Size2()) {
-		return current;
-	}
-
-	if (current.size.x > popup_max_size.x) {
-		current.size.x = popup_max_size.x;
-	}
-
-	if (current.size.y > popup_max_size.y) {
-		current.size.y = popup_max_size.y;
 	}
 
 	return current;

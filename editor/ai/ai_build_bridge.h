@@ -29,6 +29,7 @@
 
 #include "core/error/error_list.h"
 #include "core/string/ustring.h"
+#include "core/variant/dictionary.h"
 
 // Lightweight bridge between AI panel and PackageBuilder.
 // PackageBuilder is a separate C# GUI process; the bridge communicates
@@ -36,7 +37,7 @@
 class AIBuildBridge {
 public:
 	// Write a build request config that PackageBuilder can pick up.
-	static Error write_build_request();
+	static Error write_build_request(const Dictionary &p_options = Dictionary());
 
 	// Launch PackageBuilder.exe as a subprocess. Returns immediately.
 	static Error launch_package_builder();
@@ -44,9 +45,13 @@ public:
 	// Check whether the latest build record exists and what its zip/manifest paths are.
 	// Returns true if a build record was found, and fills the output params.
 	static bool get_latest_build_info(String &r_version, String &r_zip_path, String &r_manifest_path, String &r_build_log_path);
+	static bool get_latest_package_launch_info(String &r_version, String &r_package_dir, String &r_exe_path, String &r_zip_path, String &r_build_log_path);
 
 	// Check whether the build request resulted in a successful build.
 	static bool is_build_ready();
+
+	// Read the status file written by an AI-triggered PackageBuilder run.
+	static bool get_ai_build_status(String &r_state, String &r_message, String &r_zip_path, String &r_manifest_path, String &r_build_log_path);
 
 	// Get the project root directory (where version.py lives).
 	static String detect_repo_root();

@@ -102,7 +102,8 @@ app.UseSession();
 
 app.UseAuthorization();
 
-<<<<<<< HEAD
+var assetStorePublicBaseUrl = builder.Configuration["AssetStore:PublicBaseUrl"] ?? "https://jundot.loongst.com";
+
 app.MapGet("/api/v1", () => Results.Json(new
 {
     name = "Jundot Asset Store",
@@ -127,7 +128,7 @@ app.MapGet("/api/v1/search/query/", (HttpContext context) =>
     var hits = new List<object>();
     if (string.IsNullOrWhiteSpace(query) || "jundot wwise audio audiokinetic integration".Contains(query, StringComparison.OrdinalIgnoreCase))
     {
-        hits.Add(new { asset = AssetStoreApi.CreateWwiseAsset(context) });
+        hits.Add(new { asset = AssetStoreApi.CreateWwiseAsset(assetStorePublicBaseUrl) });
     }
 
     return Results.Json(new
@@ -137,17 +138,17 @@ app.MapGet("/api/v1/search/query/", (HttpContext context) =>
     });
 });
 
-app.MapGet("/api/v1/assets/{slug}", (HttpContext context, string slug) =>
+app.MapGet("/api/v1/assets/{slug}", (string slug) =>
 {
     if (!string.Equals(slug, AssetStoreApi.WwiseSlug, StringComparison.OrdinalIgnoreCase))
     {
         return Results.NotFound();
     }
 
-    return Results.Json(AssetStoreApi.CreateWwiseAsset(context, includeDetails: true));
+    return Results.Json(AssetStoreApi.CreateWwiseAsset(assetStorePublicBaseUrl, includeDetails: true));
 });
 
-app.MapGet("/api/v1/releases/{publisher}/{asset}/", (HttpContext context, string publisher, string asset) =>
+app.MapGet("/api/v1/releases/{publisher}/{asset}/", (string publisher, string asset) =>
 {
     if (!string.Equals(asset, AssetStoreApi.WwiseSlug, StringComparison.OrdinalIgnoreCase))
     {
@@ -158,7 +159,7 @@ app.MapGet("/api/v1/releases/{publisher}/{asset}/", (HttpContext context, string
     {
         new
         {
-            download_url = AssetStoreApi.AbsoluteUrl(context, "/packages/jundot-wwise-addon.zip"),
+            download_url = AssetStoreApi.AbsoluteUrl(assetStorePublicBaseUrl, "/packages/jundot-wwise-addon.zip"),
             version = "0.1.0",
             stable = true,
             min_jundot_version = "4.0.0",
@@ -167,32 +168,28 @@ app.MapGet("/api/v1/releases/{publisher}/{asset}/", (HttpContext context, string
         }
     });
 });
-
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
 
 app.Run();
 
-<<<<<<< HEAD
 public static class AssetStoreApi
 {
     public const string WwiseSlug = "jundot-wwise";
 
-    public static string AbsoluteUrl(HttpContext context, string path)
+    public static string AbsoluteUrl(string publicBaseUrl, string path)
     {
-        return $"{context.Request.Scheme}://{context.Request.Host}{path}";
+        return publicBaseUrl.TrimEnd('/') + "/" + path.TrimStart('/');
     }
 
-    public static object CreateWwiseAsset(HttpContext context, bool includeDetails = false)
+    public static object CreateWwiseAsset(string publicBaseUrl, bool includeDetails = false)
     {
         var asset = new Dictionary<string, object?>
         {
             ["name"] = "Jundot Wwise",
             ["slug"] = WwiseSlug,
-            ["store_url"] = AbsoluteUrl(context, "/api/v1/assets/" + WwiseSlug),
+            ["store_url"] = AbsoluteUrl(publicBaseUrl, "/api/v1/assets/" + WwiseSlug),
             ["license_type"] = "MIT",
             ["license_url"] = "https://opensource.org/license/mit/",
             ["reviews_score"] = 0,
@@ -222,8 +219,6 @@ public static class AssetStoreApi
     }
 }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 public static class DbInitializer
 {
     public static async Task MigrateAsync(ApplicationDbContext context)
@@ -250,7 +245,6 @@ public static class DbInitializer
             Console.WriteLine("[Jundot] 数据库迁移完成：添加 SupportedPlatforms 列");
         }
 
-<<<<<<< HEAD
         if (!columns.Contains("LicenseType"))
         {
             using var alterCmd = connection.CreateCommand();
@@ -312,10 +306,6 @@ public static class DbInitializer
         }
 
         // 检查 Users 表是否存在
-=======
-        // 检查 Users 表是否存在
-        using var tableCheckCmd = connection.CreateCommand();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         tableCheckCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Users'";
         var usersTable = await tableCheckCmd.ExecuteScalarAsync();
         if (usersTable == null)
@@ -409,7 +399,6 @@ public static class DbInitializer
             context.SiteContents.AddRange(contents);
         }
 
-<<<<<<< HEAD
         EngineBranch? coreBranch = null;
         if (!context.EngineBranches.Any())
         {
@@ -524,27 +513,6 @@ public static class DbInitializer
                 };
                 coreBranch.Releases.Add(release);
             }
-=======
-        if (!context.ReleaseVersions.Any())
-        {
-            var release = new ReleaseVersion
-            {
-                VersionNumber = "1.7.4 beta",
-                Title = "Jundot Engine 1.7.4 beta",
-                Description = "首个公开测试版本",
-                DownloadUrl = "https://github.com/LoongSerpent9Realms/Jundot/releases",
-                IsPublished = true,
-                IsBeta = true,
-                ReleaseDate = new DateTime(2026, 6, 1),
-                Features = new List<ReleaseFeature>
-                {
-                    new() { Title = "基于 Godot 4.6.3", Description = "沿用成熟的 Godot 架构、编辑器体验、2D/3D 能力和导出流程。" },
-                    new() { Title = "内置 AI Chat 模块", Description = "包含编辑器对话入口、Skill 系统、记忆系统、安全确认和工具调用可视化。" },
-                    new() { Title = "图形化打包工具", Description = "配置平台、架构、版本、日志、更新检测和多平台发布，不必每次手写命令。" }
-                }
-            };
-            context.ReleaseVersions.Add(release);
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         }
 
         await context.SaveChangesAsync();

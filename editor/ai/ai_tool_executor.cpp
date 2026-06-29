@@ -30,6 +30,7 @@
 #include "core/config/project_settings.h"
 #include "core/crypto/crypto_core.h"
 #include "core/error/error_macros.h"
+#include "core/extension/gdextension_manager.h"
 #include "core/input/input_enums.h"
 #include "core/io/dir_access.h"
 #include "core/io/file_access.h"
@@ -43,6 +44,7 @@
 #include "core/os/time.h"
 #include "core/templates/hash_map.h"
 #include "core/string/string_builder.h"
+#include "editor/ai/ai_build_bridge.h"
 #include "editor/ai/ai_code_fetcher.h"
 #include "editor/ai/ai_develop_flow.h"
 #include "editor/ai/ai_code_security_checker.h"
@@ -659,8 +661,26 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _check_project_scripts(args);
 	} else if (name == AIToolNames::CHECK_UI_LAYOUT) {
 		result = _check_ui_layout(args);
+	} else if (name == AIToolNames::CREATE_3D_SCENE) {
+		result = _create_3d_scene(args);
+	} else if (name == AIToolNames::ADD_3D_OBJECT) {
+		result = _add_3d_object(args);
+	} else if (name == AIToolNames::ADD_3D_LIGHT) {
+		result = _add_3d_light(args);
+	} else if (name == AIToolNames::CHECK_3D_SCENE) {
+		result = _check_3d_scene(args);
 	} else if (name == AIToolNames::BUILD_PROJECT) {
 		result = _build_project(args);
+	} else if (name == AIToolNames::BUILD_CPP_HOT_MODULE) {
+		result = _build_cpp_hot_module(args);
+	} else if (name == AIToolNames::RELOAD_CPP_HOT_MODULE) {
+		result = _reload_cpp_hot_module(args);
+	} else if (name == AIToolNames::PACKAGE_PROJECT) {
+		result = _package_project(args);
+	} else if (name == AIToolNames::CHECK_PACKAGE_STATUS) {
+		result = _check_package_status(args);
+	} else if (name == AIToolNames::TEST_PACKAGE) {
+		result = _test_package(args);
 	} else if (name == AIToolNames::PLAY_SCENE) {
 		result = _play_scene(args);
 	} else if (name == AIToolNames::CLICK_UI_POSITION) {
@@ -1415,6 +1435,9 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 				(name == AIToolNames::SETUP_ENGINE_WORKSPACE ||
 						name == AIToolNames::CHECK_UI_LAYOUT ||
 						name == AIToolNames::BUILD_PROJECT ||
+						name == AIToolNames::PACKAGE_PROJECT ||
+						name == AIToolNames::CHECK_PACKAGE_STATUS ||
+						name == AIToolNames::TEST_PACKAGE ||
 						name == AIToolNames::REQUEST_ENGINE_CHANGE)) {
 			has_error = true;
 			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in project mode.\n", i + 1, name);
@@ -1914,6 +1937,575 @@ Dictionary AIToolExecutor::_check_ui_layout(const Dictionary &p_args) {
 	return _make_result(result.as_string(), has_error);
 }
 
+struct AI3DSceneNodeInfo {
+	String name;
+	String path;
+	String parent;
+	String type;
+	int line = 0;
+	bool has_position = false;
+	bool has_transform = false;
+	bool has_mesh = false;
+	bool has_shape = false;
+};
+
+static String _sanitize_scene_node_name(const String &p_name, const String &p_fallback) {
+	String value = p_name.strip_edges();
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == ' ') {
+			out += String::chr(c);
+		}
+	}
+	out = out.strip_edges();
+	return out.is_empty() ? p_fallback : out;
+}
+
+static Vector<double> _parse_number_list(String p_value) {
+	p_value = p_value.strip_edges();
+	const int open = p_value.find("(");
+	const int close = p_value.rfind(")");
+	if (open >= 0 && close > open) {
+		p_value = p_value.substr(open + 1, close - open - 1);
+	}
+	p_value = p_value.replace(";", ",").replace(" ", ",");
+	Vector<double> values;
+	PackedStringArray parts = p_value.split(",", false);
+	for (int i = 0; i < parts.size(); i++) {
+		const String part = String(parts[i]).strip_edges();
+		if (!part.is_empty() && part.is_valid_float()) {
+			values.push_back(part.to_float());
+		}
+	}
+	return values;
+}
+
+static Vector3 _parse_vector3_arg(const Dictionary &p_args, const String &p_key, const Vector3 &p_default, bool p_degrees_to_radians = false) {
+	if (!p_args.has(p_key)) {
+		return p_default;
+	}
+	const Vector<double> values = _parse_number_list(String(p_args.get(p_key, String())));
+	if (values.size() < 3) {
+		return p_default;
+	}
+	Vector3 result(values[0], values[1], values[2]);
+	if (p_degrees_to_radians) {
+		result.x = Math::deg_to_rad(result.x);
+		result.y = Math::deg_to_rad(result.y);
+		result.z = Math::deg_to_rad(result.z);
+	}
+	return result;
+}
+
+static String _format_vector2(const Vector2 &p_value) {
+	return vformat("Vector2(%.4f, %.4f)", p_value.x, p_value.y);
+}
+
+static String _format_vector3(const Vector3 &p_value) {
+	return vformat("Vector3(%.4f, %.4f, %.4f)", p_value.x, p_value.y, p_value.z);
+}
+
+static Vector3 _vector3_degrees_to_radians(const Vector3 &p_value) {
+	return Vector3(Math::deg_to_rad(p_value.x), Math::deg_to_rad(p_value.y), Math::deg_to_rad(p_value.z));
+}
+
+static String _format_color_arg(const Dictionary &p_args, const String &p_key, const String &p_default) {
+	if (!p_args.has(p_key)) {
+		return p_default;
+	}
+	String value = String(p_args.get(p_key, String())).strip_edges();
+	if (value.is_empty()) {
+		return p_default;
+	}
+	if (value.begins_with("Color(")) {
+		return value;
+	}
+	if (value.begins_with("#") && (value.length() == 7 || value.length() == 9)) {
+		const String hex = value.substr(1).to_lower();
+		int r = ("0x" + hex.substr(0, 2)).hex_to_int();
+		int g = ("0x" + hex.substr(2, 2)).hex_to_int();
+		int b = ("0x" + hex.substr(4, 2)).hex_to_int();
+		int a = hex.length() >= 8 ? ("0x" + hex.substr(6, 2)).hex_to_int() : 255;
+		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+	}
+	const Vector<double> values = _parse_number_list(value);
+	if (values.size() >= 3) {
+		const double scale = (values[0] > 1.0 || values[1] > 1.0 || values[2] > 1.0) ? 255.0 : 1.0;
+		const double alpha = values.size() >= 4 ? values[3] / (values[3] > 1.0 ? 255.0 : 1.0) : 1.0;
+		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", values[0] / scale, values[1] / scale, values[2] / scale, alpha);
+	}
+	return p_default;
+}
+
+static String _unique_tscn_id(const String &p_prefix, const String &p_name) {
+	String value = (p_prefix + "_" + p_name).to_lower();
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			out += String::chr(c);
+		} else if (c == '-' || c == ' ') {
+			out += "_";
+		}
+	}
+	return out.is_empty() ? p_prefix : out;
+}
+
+static String _increment_tscn_load_steps(String p_content, int p_added_steps) {
+	const int pos = p_content.find("load_steps=");
+	if (pos < 0) {
+		const int header_end = p_content.find("]");
+		if (header_end >= 0 && p_content.begins_with("[gd_scene")) {
+			return p_content.substr(0, header_end) + vformat(" load_steps=%d", MAX(1, p_added_steps)) + p_content.substr(header_end);
+		}
+		return p_content;
+	}
+	const int value_start = pos + String("load_steps=").length();
+	int value_end = value_start;
+	while (value_end < p_content.length() && p_content[value_end] >= '0' && p_content[value_end] <= '9') {
+		value_end++;
+	}
+	const int old_value = p_content.substr(value_start, value_end - value_start).to_int();
+	return p_content.substr(0, value_start) + String::num_int64(MAX(1, old_value + p_added_steps)) + p_content.substr(value_end);
+}
+
+static String _insert_tscn_subresources(const String &p_content, const String &p_resources) {
+	const int first_node = p_content.find("\n[node ");
+	if (first_node < 0) {
+		return p_content.strip_edges() + "\n\n" + p_resources.strip_edges() + "\n";
+	}
+	return p_content.substr(0, first_node + 1) + p_resources.strip_edges() + "\n\n" + p_content.substr(first_node + 1);
+}
+
+static String _mesh_resource_for_type(const String &p_mesh_type, const String &p_mesh_id, const Dictionary &p_args) {
+	const String mesh_type = p_mesh_type.strip_edges().to_lower();
+	const Vector<double> size_values = _parse_number_list(String(p_args.get("size", String())));
+	if (mesh_type == "sphere") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		return vformat("[sub_resource type=\"SphereMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius * 2.0);
+	}
+	if (mesh_type == "cylinder") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 1.0;
+		return vformat("[sub_resource type=\"CylinderMesh\" id=\"%s\"]\ntop_radius = %.4f\nbottom_radius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius, height);
+	}
+	if (mesh_type == "capsule") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
+		return vformat("[sub_resource type=\"CapsuleMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, height);
+	}
+	if (mesh_type == "plane" || mesh_type == "quad") {
+		const double width = size_values.size() >= 1 ? size_values[0] : 2.0;
+		const double depth = size_values.size() >= 2 ? size_values[1] : width;
+		const String resource_type = mesh_type == "quad" ? "QuadMesh" : "PlaneMesh";
+		return vformat("[sub_resource type=\"%s\" id=\"%s\"]\nsize = %s\n", resource_type, p_mesh_id, _format_vector2(Vector2(width, depth)));
+	}
+	const Vector3 size = size_values.size() >= 3 ? Vector3(size_values[0], size_values[1], size_values[2]) : Vector3(1, 1, 1);
+	return vformat("[sub_resource type=\"BoxMesh\" id=\"%s\"]\nsize = %s\n", p_mesh_id, _format_vector3(size));
+}
+
+static bool _parse_tscn_3d_nodes(const String &p_content, Vector<AI3DSceneNodeInfo> &r_nodes, String &r_error) {
+	PackedStringArray lines = p_content.split("\n");
+	bool in_node = false;
+	AI3DSceneNodeInfo current;
+
+	auto flush_current = [&]() {
+		if (in_node) {
+			r_nodes.push_back(current);
+		}
+	};
+
+	for (int i = 0; i < lines.size(); i++) {
+		const String line = String(lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			flush_current();
+			in_node = true;
+			current = AI3DSceneNodeInfo();
+			current.name = _extract_tscn_quoted_attr(line, "name");
+			current.type = _extract_tscn_quoted_attr(line, "type");
+			current.parent = _extract_tscn_quoted_attr(line, "parent");
+			current.path = _scene_node_path(current.parent, current.name);
+			current.line = i + 1;
+			if (current.name.is_empty()) {
+				r_error = vformat("Could not parse node name at line %d.", i + 1);
+				return false;
+			}
+			continue;
+		}
+		if (!in_node) {
+			continue;
+		}
+		if (line.begins_with("position =")) {
+			current.has_position = true;
+		} else if (line.begins_with("transform =")) {
+			current.has_transform = true;
+		} else if (line.begins_with("mesh =")) {
+			current.has_mesh = true;
+		} else if (line.begins_with("shape =")) {
+			current.has_shape = true;
+		}
+	}
+	flush_current();
+	return true;
+}
+
+Dictionary AIToolExecutor::_create_3d_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("create_3d_scene is only available in PROJECT mode.", true);
+	}
+
+	const String path = String(p_args.get("path", String())).strip_edges();
+	if (path.is_empty()) {
+		return _make_result("create_3d_scene rejected: path is required.", true);
+	}
+	if (!path.to_lower().ends_with(".tscn")) {
+		return _make_result("create_3d_scene only creates .tscn scene files.\nPath: " + path, true);
+	}
+
+	const String root_name = _sanitize_scene_node_name(String(p_args.get("root_name", "World")), "World");
+	const bool include_camera = !p_args.has("include_camera") || bool(p_args.get("include_camera", true));
+	const bool include_lighting = !p_args.has("include_lighting") || bool(p_args.get("include_lighting", true));
+	const bool include_floor = !p_args.has("include_floor") || bool(p_args.get("include_floor", true));
+
+	int load_steps = 1;
+	if (include_floor) {
+		load_steps += 2;
+	}
+	StringBuilder content;
+	content += vformat("[gd_scene load_steps=%d format=3]\n\n", load_steps);
+	if (include_floor) {
+		content += "[sub_resource type=\"PlaneMesh\" id=\"PlaneMesh_floor\"]\n";
+		content += "size = Vector2(20, 20)\n\n";
+		content += "[sub_resource type=\"StandardMaterial3D\" id=\"StandardMaterial3D_floor\"]\n";
+		content += "albedo_color = Color(0.45, 0.48, 0.42, 1)\n";
+		content += "roughness = 0.85\n\n";
+	}
+	content += vformat("[node name=\"%s\" type=\"Node3D\"]\n\n", root_name);
+	if (include_lighting) {
+		content += "[node name=\"Sun\" type=\"DirectionalLight3D\" parent=\".\"]\n";
+		content += "rotation = Vector3(-0.8727, -0.5236, 0)\n";
+		content += "light_energy = 1.8\n";
+		content += "shadow_enabled = true\n\n";
+	}
+	if (include_camera) {
+		content += "[node name=\"Camera3D\" type=\"Camera3D\" parent=\".\"]\n";
+		content += "position = Vector3(0, 4, 8)\n";
+		content += "rotation = Vector3(-0.4636, 0, 0)\n";
+		content += "current = true\n\n";
+	}
+	if (include_floor) {
+		content += "[node name=\"Floor\" type=\"MeshInstance3D\" parent=\".\"]\n";
+		content += "mesh = SubResource(\"PlaneMesh_floor\")\n";
+		content += "surface_material_override/0 = SubResource(\"StandardMaterial3D_floor\")\n";
+	}
+
+	Dictionary write_args;
+	write_args["path"] = path;
+	write_args["content"] = content.as_string();
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	String message = String(result.get("content", String()));
+	message += "\nCreated starter 3D scene. Next recommended step: call check_3d_scene on this path after adding gameplay objects.";
+	return _make_result(message);
+}
+
+Dictionary AIToolExecutor::_add_3d_object(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_3d_object is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "MeshInstance3D");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_3d_object rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for 3D scene editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_3d_object requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding 3D object (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	const String mesh_type = String(p_args.get("mesh_type", "box")).strip_edges().to_lower();
+	const String mesh_id = _unique_tscn_id("Mesh", node_name);
+	const String material_id = _unique_tscn_id("Material", node_name);
+	String resources = _mesh_resource_for_type(mesh_type, mesh_id, p_args);
+	resources += "\n";
+	resources += vformat("[sub_resource type=\"StandardMaterial3D\" id=\"%s\"]\n", material_id);
+	resources += "albedo_color = " + _format_color_arg(p_args, "color", "Color(0.72, 0.72, 0.68, 1)") + "\n";
+	resources += "roughness = 0.65\n";
+
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const Vector3 position = _parse_vector3_arg(p_args, "position", Vector3());
+	const Vector3 rotation = _parse_vector3_arg(p_args, "rotation_degrees", Vector3(), true);
+	const Vector3 scale = _parse_vector3_arg(p_args, "scale", Vector3(1, 1, 1));
+
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"MeshInstance3D\" parent=\"%s\"]\n", node_name, parent);
+	node_text += "position = " + _format_vector3(position) + "\n";
+	if (!rotation.is_zero_approx()) {
+		node_text += "rotation = " + _format_vector3(rotation) + "\n";
+	}
+	if (!scale.is_equal_approx(Vector3(1, 1, 1))) {
+		node_text += "scale = " + _format_vector3(scale) + "\n";
+	}
+	node_text += vformat("mesh = SubResource(\"%s\")\n", mesh_id);
+	node_text += vformat("surface_material_override/0 = SubResource(\"%s\")\n", material_id);
+
+	content = _increment_tscn_load_steps(content, 2);
+	content = _insert_tscn_subresources(content, resources);
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded MeshInstance3D '%s' (%s). Run check_3d_scene on %s after object edits.", node_name, mesh_type, scene_path));
+}
+
+Dictionary AIToolExecutor::_add_3d_light(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_3d_light is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "Light3D");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_3d_light rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for 3D light editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_3d_light requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding 3D light (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	String light_type = String(p_args.get("light_type", "directional")).strip_edges().to_lower();
+	String node_type = "DirectionalLight3D";
+	if (light_type == "omni" || light_type == "point") {
+		node_type = "OmniLight3D";
+	} else if (light_type == "spot" || light_type == "spotlight") {
+		node_type = "SpotLight3D";
+	} else {
+		light_type = "directional";
+	}
+
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const Vector3 position = _parse_vector3_arg(p_args, "position", light_type == "directional" ? Vector3() : Vector3(0, 4, 2));
+	const Vector3 rotation = _parse_vector3_arg(p_args, "rotation_degrees", _vector3_degrees_to_radians(light_type == "directional" ? Vector3(-50, -30, 0) : Vector3(-55, 0, 0)), true);
+	const double energy = double(p_args.get("energy", 1.5));
+	const bool shadows = !p_args.has("shadows") || bool(p_args.get("shadows", true));
+
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s\"]\n", node_name, node_type, parent);
+	if (light_type != "directional" || !position.is_zero_approx()) {
+		node_text += "position = " + _format_vector3(position) + "\n";
+	}
+	if (!rotation.is_zero_approx()) {
+		node_text += "rotation = " + _format_vector3(rotation) + "\n";
+	}
+	node_text += "light_color = " + _format_color_arg(p_args, "color", "Color(1, 1, 1, 1)") + "\n";
+	node_text += vformat("light_energy = %.4f\n", energy);
+	node_text += vformat("shadow_enabled = %s\n", shadows ? "true" : "false");
+	if (light_type == "omni") {
+		node_text += vformat("omni_range = %.4f\n", double(p_args.get("range", 8.0)));
+	} else if (light_type == "spot") {
+		node_text += vformat("spot_range = %.4f\n", double(p_args.get("range", 12.0)));
+		node_text += vformat("spot_angle = %.4f\n", double(p_args.get("spot_angle", 45.0)));
+	}
+
+	content = content.strip_edges() + "\n" + node_text;
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded %s '%s'. Run check_3d_scene on %s after lighting edits.", node_type, node_name, scene_path));
+}
+
+Dictionary AIToolExecutor::_check_3d_scene(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_3d_scene is only available in PROJECT mode.", true);
+	}
+
+	Array paths = p_args.get("paths", Array());
+	if (paths.is_empty() && p_args.has("path")) {
+		paths.push_back(String(p_args.get("path", String())));
+	}
+	if (paths.is_empty() && p_args.has("paths") && p_args["paths"].get_type() == Variant::STRING) {
+		paths.push_back(String(p_args["paths"]));
+	}
+	if (paths.is_empty()) {
+		return _make_result("No 3D scene paths provided.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for 3D scene checking.", true);
+	}
+
+	StringBuilder result;
+	bool has_error = false;
+	bool has_warning = false;
+	for (int p = 0; p < paths.size(); p++) {
+		const String rel_path = String(paths[p]);
+		String full_path;
+		String path_error;
+		result += vformat("=== %s ===\n", rel_path);
+		if (!_resolve_tool_file_path(project_root, rel_path, full_path, path_error)) {
+			has_error = true;
+			result += "Error: " + path_error + "\n";
+			continue;
+		}
+		if (!full_path.to_lower().ends_with(".tscn")) {
+			has_error = true;
+			result += "Error: check_3d_scene only inspects .tscn scene files.\n";
+			continue;
+		}
+		if (!FileAccess::exists(full_path)) {
+			has_error = true;
+			result += "Error: file not found.\n";
+			continue;
+		}
+
+		Error err = OK;
+		const String content = FileAccess::get_file_as_string(full_path, &err);
+		if (err != OK) {
+			has_error = true;
+			result += vformat("Error: failed to read file (err=%d).\n", (int)err);
+			continue;
+		}
+
+		Vector<AI3DSceneNodeInfo> nodes;
+		String parse_error;
+		if (!_parse_tscn_3d_nodes(content, nodes, parse_error)) {
+			has_error = true;
+			result += "Error: " + parse_error + "\n";
+			continue;
+		}
+
+		int node3d_count = 0;
+		int mesh_count = 0;
+		int light_count = 0;
+		int camera_count = 0;
+		int current_camera_count = content.count("current = true");
+		int collision_shape_count = 0;
+		int physics_body_count = 0;
+		bool has_world_environment = false;
+		bool has_navigation = false;
+		bool root_is_3d = false;
+
+		for (int i = 0; i < nodes.size(); i++) {
+			const String type = nodes[i].type;
+			if (i == 0 && (type == "Node3D" || (ClassDB::class_exists(StringName(type)) && ClassDB::is_parent_class(StringName(type), SNAME("Node3D"))))) {
+				root_is_3d = true;
+			}
+			if (ClassDB::class_exists(StringName(type)) && ClassDB::is_parent_class(StringName(type), SNAME("Node3D"))) {
+				node3d_count++;
+			}
+			if (type == "MeshInstance3D") {
+				mesh_count++;
+			} else if (type == "Camera3D") {
+				camera_count++;
+			} else if (type == "DirectionalLight3D" || type == "OmniLight3D" || type == "SpotLight3D") {
+				light_count++;
+			} else if (type == "CollisionShape3D") {
+				collision_shape_count++;
+			} else if (type == "StaticBody3D" || type == "RigidBody3D" || type == "CharacterBody3D" || type == "Area3D") {
+				physics_body_count++;
+			} else if (type == "WorldEnvironment") {
+				has_world_environment = true;
+			} else if (type == "NavigationRegion3D") {
+				has_navigation = true;
+			}
+		}
+
+		result += vformat("Nodes: %d total, %d Node3D-derived, %d MeshInstance3D, %d light(s), %d Camera3D, %d CollisionShape3D, %d physics/area body node(s).\n",
+				nodes.size(), node3d_count, mesh_count, light_count, camera_count, collision_shape_count, physics_body_count);
+
+		bool scene_has_warning = false;
+		if (!root_is_3d) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: scene root does not appear to be Node3D-derived. For a 3D gameplay scene, prefer a Node3D root.\n";
+		}
+		if (mesh_count == 0) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: no MeshInstance3D nodes found, so the scene may have no visible 3D geometry.\n";
+		}
+		if (camera_count == 0) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: no Camera3D found. Add one or ensure another scene supplies the active camera.\n";
+		} else if (current_camera_count == 0) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: Camera3D exists but no `current = true` camera was detected.\n";
+		}
+		if (light_count == 0 && !has_world_environment) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: no 3D light or WorldEnvironment found. Add lighting so generated objects are visible.\n";
+		}
+		if (mesh_count > 0 && collision_shape_count == 0 && physics_body_count == 0) {
+			has_warning = true;
+			scene_has_warning = true;
+			result += "Warning: visible meshes exist but no CollisionShape3D or physics body nodes were found. Add collision for walkable floors, blockers, pickups, or interactable props when gameplay requires it.\n";
+		}
+		if (has_navigation) {
+			result += "NavigationRegion3D detected; remember to assign/bake navigation data when NPC pathfinding is required.\n";
+		}
+		if (!scene_has_warning) {
+			result += "No obvious 3D scene basics are missing.\n";
+		}
+		result += "\n";
+	}
+
+	if (has_warning) {
+		result += "3D scene check found likely setup gaps. Fix the warnings, then run check_3d_scene again before considering the 3D scene ready.";
+	}
+	return _make_result(result.as_string(), has_error);
+}
+
 Dictionary AIToolExecutor::_build_project(const Dictionary &p_args) {
 	const AISettingsData settings = AISettings::load();
 	if (settings.context_mode != AIContextMode::PROJECT) {
@@ -2014,6 +2606,364 @@ Dictionary AIToolExecutor::_build_project(const Dictionary &p_args) {
 		result += "\nProject build failed. Read the compiler output above, edit the affected project files, then run build_project again.";
 	}
 
+	return _make_result(result.as_string(), err != OK || exit_code != 0);
+}
+
+Dictionary AIToolExecutor::_reload_cpp_hot_module(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("reload_cpp_hot_module is only available in PROJECT mode.", true);
+	}
+
+	const String extension_path_arg = String(p_args.get("extension_path", String())).strip_edges();
+	if (extension_path_arg.is_empty()) {
+		return _make_result("reload_cpp_hot_module rejected: extension_path is required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root was detected. Open a project with project.godot before reloading a C++ hot module.", true);
+	}
+
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, extension_path_arg, full_path, path_error)) {
+		return _make_result(path_error + "\nExtension path: " + extension_path_arg, true);
+	}
+	if (!full_path.ends_with(".gdextension")) {
+		return _make_result("reload_cpp_hot_module only accepts .gdextension files.\nExtension path: " + extension_path_arg, true);
+	}
+	if (!FileAccess::exists(full_path)) {
+		return _make_result("GDExtension file not found: " + extension_path_arg, true);
+	}
+
+	String normalized_arg = extension_path_arg.replace("\\", "/").strip_edges();
+	String resource_path = normalized_arg.begins_with("res://") ? normalized_arg.simplify_path() : "res://" + normalized_arg.trim_prefix("./").simplify_path();
+
+	GDExtensionManager *manager = GDExtensionManager::get_singleton();
+	if (!manager) {
+		return _make_result("GDExtensionManager is not available in this editor session.", true);
+	}
+
+	const bool was_loaded = manager->is_extension_loaded(resource_path);
+	GDExtensionManager::LoadStatus status = was_loaded ? manager->reload_extension(resource_path) : manager->load_extension(resource_path);
+
+	String result = "Tool: reload_cpp_hot_module\n";
+	result += "Extension: " + resource_path + "\n";
+	result += String("Operation: ") + (was_loaded ? "reload" : "load") + "\n";
+
+	switch (status) {
+		case GDExtensionManager::LOAD_STATUS_OK:
+			result += was_loaded ? "State: reloaded\nC++ hot module reloaded successfully." : "State: loaded\nC++ hot module loaded successfully.";
+			return _make_result(result);
+		case GDExtensionManager::LOAD_STATUS_ALREADY_LOADED:
+			result += "State: already_loaded\nThe extension was already loaded. Call reload_cpp_hot_module again after rebuilding its native library.";
+			return _make_result(result);
+		case GDExtensionManager::LOAD_STATUS_NOT_LOADED:
+			result += "State: not_loaded\nThe extension is not currently loaded. Check the .gdextension path and project settings, then retry.";
+			return _make_result(result, true);
+		case GDExtensionManager::LOAD_STATUS_NEEDS_RESTART:
+			result += "State: needs_restart\nThe extension changed in a way that cannot be hot-reloaded. Restart the editor before validating this module.";
+			return _make_result(result, true);
+		case GDExtensionManager::LOAD_STATUS_FAILED:
+		default:
+			result += "State: failed\nHot module reload failed. Ensure the native library was rebuilt, the .gdextension file has configuration/reloadable=true, and the extension classes did not change parent type or incompatible layout.";
+			return _make_result(result, true);
+	}
+}
+
+static bool _hot_module_program_allowed(const String &p_program) {
+	const String program = p_program.get_file().to_lower();
+	return program == "scons" ||
+			program == "scons.bat" ||
+			program == "python" ||
+			program == "python.exe" ||
+			program == "python3" ||
+			program == "cmake" ||
+			program == "cmake.exe" ||
+			program == "ninja" ||
+			program == "ninja.exe" ||
+			program == "msbuild" ||
+			program == "msbuild.exe" ||
+			program == "dotnet" ||
+			program == "dotnet.exe";
+}
+
+static bool _hot_module_arg_allowed(const String &p_arg) {
+	const String arg = p_arg.strip_edges().replace("\\", "/");
+	if (arg.contains("&&") || arg.contains("||") || arg.contains(";") || arg.contains("|") || arg.contains(">") || arg.contains("<")) {
+		return false;
+	}
+	if (arg == ".." || arg.begins_with("../") || arg.contains("/../")) {
+		return false;
+	}
+	for (int i = 0; i + 2 < arg.length(); i++) {
+		const char32_t c = arg[i];
+		if (((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) && arg[i + 1] == ':' && arg[i + 2] == '/') {
+			return false;
+		}
+	}
+	return true;
+}
+
+Dictionary AIToolExecutor::_build_cpp_hot_module(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("build_cpp_hot_module is only available in PROJECT mode.", true);
+	}
+
+	const String extension_path = String(p_args.get("extension_path", String())).strip_edges();
+	const String program = String(p_args.get("program", String())).strip_edges();
+	if (extension_path.is_empty() || program.is_empty()) {
+		return _make_result("build_cpp_hot_module rejected: extension_path and program are required.", true);
+	}
+	if (program.is_absolute_path() || !_hot_module_program_allowed(program)) {
+		return _make_result("build_cpp_hot_module rejected: program must be a known build tool name such as scons, python, cmake, ninja, msbuild, or dotnet.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root was detected. Open a project with project.godot before building a C++ hot module.", true);
+	}
+
+	String workdir_arg = String(p_args.get("workdir", ".")).strip_edges();
+	if (workdir_arg.is_empty()) {
+		workdir_arg = ".";
+	}
+	String workdir = project_root;
+	if (workdir_arg != ".") {
+		String path_error;
+		if (!_resolve_tool_file_path(project_root, workdir_arg, workdir, path_error)) {
+			return _make_result(path_error + "\nWorkdir: " + workdir_arg, true);
+		}
+	}
+	if (!DirAccess::dir_exists_absolute(workdir)) {
+		return _make_result("build_cpp_hot_module workdir does not exist: " + workdir_arg, true);
+	}
+
+	Array raw_args = p_args.get("args", Array());
+	List<String> command_args;
+	for (int i = 0; i < raw_args.size(); i++) {
+		const String arg = String(raw_args[i]).strip_edges();
+		if (!_hot_module_arg_allowed(arg)) {
+			return _make_result("build_cpp_hot_module rejected unsafe command argument: " + arg, true);
+		}
+		command_args.push_back(arg);
+	}
+
+	String build_output;
+	int exit_code = -1;
+	const Error err = _run_command_in_root(workdir, program, command_args, build_output, exit_code);
+
+	String result = "Tool: build_cpp_hot_module\n";
+	result += "Program: " + program + "\n";
+	result += "Workdir: " + workdir + "\n";
+	result += vformat("Exit code: %d\n", exit_code);
+	if (err != OK) {
+		result += vformat("Failed to start C++ hot module build (err=%d).\n", (int)err);
+	}
+	if (!build_output.is_empty()) {
+		const int MAX_OUTPUT = 30000;
+		const String visible_output = build_output.length() > MAX_OUTPUT ? build_output.substr(build_output.length() - MAX_OUTPUT) : build_output;
+		result += "\n--- build output ---\n" + visible_output + "\n";
+	}
+
+	if (err != OK || exit_code != 0) {
+		result += "\nC++ hot module build failed. Fix the compiler output above, then call build_cpp_hot_module again.";
+		return _make_result(result, true);
+	}
+
+	Dictionary reload_args;
+	reload_args["extension_path"] = extension_path;
+	Dictionary reload_result = _reload_cpp_hot_module(reload_args);
+	result += "\nC++ hot module build passed.\n\n";
+	result += String(reload_result.get("content", String()));
+	return _make_result(result, reload_result.has("is_error"));
+}
+
+Dictionary AIToolExecutor::_package_project(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("package_project is only available in PROJECT mode.", true);
+	}
+
+	Dictionary options;
+	const String target = String(p_args.get("target", "editor")).strip_edges().to_lower();
+	if (target != "editor" && target != "editor.dev" && target != "template_release" && target != "template_debug") {
+		return _make_result("package_project target must be editor, editor.dev, template_release, or template_debug.", true);
+	}
+	const String platform = String(p_args.get("platform", "windows")).strip_edges().to_lower();
+	if (platform != "windows" && platform != "android" && platform != "linuxbsd" && platform != "macos" && platform != "web" && platform != "ios") {
+		return _make_result("package_project platform must be windows, android, linuxbsd, macos, web, or ios.", true);
+	}
+	const String arch = String(p_args.get("arch", "x86_64")).strip_edges().to_lower();
+	if (arch != "x86_64" && arch != "x86_32" && arch != "arm64") {
+		return _make_result("package_project arch must be x86_64, x86_32, or arm64.", true);
+	}
+	const int jobs = (int)p_args.get("jobs", 0);
+	if (jobs < 0 || jobs > 1024) {
+		return _make_result("package_project jobs must be between 0 and 1024.", true);
+	}
+
+	options["target"] = target;
+	options["platform"] = platform;
+	options["arch"] = arch;
+	options["skip_build"] = (bool)p_args.get("skip_build", false);
+	options["mono"] = (bool)p_args.get("mono", false);
+	options["auto_update_version"] = (bool)p_args.get("auto_update_version", true);
+	options["generate_update_manifest"] = (bool)p_args.get("generate_update_manifest", true);
+	options["jobs"] = jobs;
+	options["extra_scons_args"] = String(p_args.get("extra_scons_args", String())).strip_edges();
+
+	const Error write_err = AIBuildBridge::write_build_request(options);
+	if (write_err != OK) {
+		return _make_result(vformat("package_project failed to write AI build request. Error: %d", (int)write_err), true);
+	}
+
+	const Error launch_err = AIBuildBridge::launch_package_builder();
+	if (launch_err != OK) {
+		return _make_result(vformat("package_project failed to launch PackageBuilder. Error: %d\nPackageBuilder path: %s", (int)launch_err, AIBuildBridge::detect_repo_root().path_join("tools/PackageBuilder")), true);
+	}
+
+	String result = "Tool: package_project\n";
+	result += "State: started\n";
+	result += "Target: " + target + "\n";
+	result += "Platform: " + platform + "\n";
+	result += "Arch: " + arch + "\n";
+	result += String("Skip build: ") + ((bool)options["skip_build"] ? "true" : "false") + "\n";
+	result += "PackageBuilder is running in unattended AI build mode.\n";
+	result += "Call check_package_status until it returns success or failed before telling the user that packaging is complete.";
+	return _make_result(result);
+}
+
+Dictionary AIToolExecutor::_check_package_status(const Dictionary &p_args) {
+	(void)p_args;
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_package_status is only available in PROJECT mode.", true);
+	}
+
+	String state;
+	String message;
+	String zip_path;
+	String manifest_path;
+	String build_log_path;
+	if (AIBuildBridge::get_ai_build_status(state, message, zip_path, manifest_path, build_log_path)) {
+		String result = "Tool: check_package_status\n";
+		result += "State: " + state + "\n";
+		if (!message.is_empty()) {
+			result += "Message: " + message + "\n";
+		}
+		if (!zip_path.is_empty()) {
+			result += "Package zip: " + zip_path + "\n";
+		}
+		if (!manifest_path.is_empty()) {
+			result += "Update manifest: " + manifest_path + "\n";
+		}
+		if (!build_log_path.is_empty()) {
+			result += "Build log: " + build_log_path + "\n";
+		}
+		if (state == "queued") {
+			result += "Packaging has been queued but PackageBuilder has not reported progress yet. Check again later.";
+		} else if (state == "running") {
+			result += "Packaging is still running. Check again later.";
+		} else if (state == "failed") {
+			result += "Packaging failed. Inspect the build log or reported message, fix the issue, then call package_project again.";
+		}
+		return _make_result(result, state == "failed");
+	}
+
+	String version;
+	String zip;
+	String manifest;
+	String log;
+	if (AIBuildBridge::get_latest_build_info(version, zip, manifest, log)) {
+		String result = "Tool: check_package_status\n";
+		result += "State: success\n";
+		result += "Message: Latest package record found.\n";
+		result += "Version: " + version + "\n";
+		result += "Package zip: " + zip + "\n";
+		if (!manifest.is_empty()) {
+			result += "Update manifest: " + manifest + "\n";
+		}
+		if (!log.is_empty()) {
+			result += "Build log: " + log + "\n";
+		}
+		return _make_result(result);
+	}
+
+	return _make_result("Tool: check_package_status\nState: not_started\nNo AI package status or package history was found. Call package_project after project validation passes.", true);
+}
+
+Dictionary AIToolExecutor::_test_package(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("test_package is only available in PROJECT mode.", true);
+	}
+
+	String version;
+	String package_dir;
+	String exe_path;
+	String zip_path;
+	String build_log_path;
+	if (!AIBuildBridge::get_latest_package_launch_info(version, package_dir, exe_path, zip_path, build_log_path)) {
+		return _make_result("test_package could not find a packaged executable in the latest PackageBuilder records. Run package_project and wait for check_package_status success first.", true);
+	}
+
+	const String exe_name = exe_path.get_file().to_lower();
+	if (exe_name.contains("template_")) {
+		return _make_result("test_package cannot directly launch template runtime packages; they require exported project data. Build/package the editor target or export a runnable game package first.", true);
+	}
+
+	String arg_text = String(p_args.get("args", "--version")).strip_edges();
+	if (arg_text.is_empty()) {
+		arg_text = "--version";
+	}
+	if (arg_text.find("&&") >= 0 || arg_text.find("||") >= 0 || arg_text.find(";") >= 0 || arg_text.find("|") >= 0) {
+		return _make_result("test_package args must be simple executable arguments, not shell operators.", true);
+	}
+
+	List<String> args;
+	Vector<String> split_args = arg_text.split(" ", false);
+	for (int i = 0; i < split_args.size(); i++) {
+		const String item = split_args[i].strip_edges();
+		if (!item.is_empty()) {
+			args.push_back(item);
+		}
+	}
+
+	String output;
+	int exit_code = -1;
+	const String workdir = package_dir.is_empty() ? exe_path.get_base_dir() : package_dir;
+	const Error err = _run_command_in_root(workdir, exe_path, args, output, exit_code);
+
+	StringBuilder result;
+	result += "Tool: test_package\n";
+	result += "Package smoke test: packaged executable startup\n";
+	result += "Version: " + version + "\n";
+	result += "Executable: " + exe_path + "\n";
+	if (!zip_path.is_empty()) {
+		result += "Package zip: " + zip_path + "\n";
+	}
+	result += "Workdir: " + workdir + "\n";
+	result += "Args: " + arg_text + "\n";
+	result += vformat("Exit code: %d\n", exit_code);
+	if (err != OK) {
+		result += vformat("Failed to start packaged executable (err=%d).\n", (int)err);
+	}
+	if (!output.strip_edges().is_empty()) {
+		result += "\n--- package test output ---\n";
+		result += _truncate_tool_output(output, 12000).strip_edges();
+		result += "\n";
+	}
+	if (err == OK && exit_code == 0) {
+		result += "\nPackage smoke test passed. The package can now be handed to the user with the zip path and validation summary.";
+	} else {
+		result += "\nPackage smoke test failed. Inspect the output, fix the issue, rebuild/repackage, and run test_package again before handoff.";
+	}
+	if (!build_log_path.is_empty()) {
+		result += "\nBuild log: " + build_log_path;
+	}
 	return _make_result(result.as_string(), err != OK || exit_code != 0);
 }
 

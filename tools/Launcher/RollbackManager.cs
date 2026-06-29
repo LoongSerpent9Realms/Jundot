@@ -26,7 +26,7 @@ public class RollbackManager
     /// </summary>
     /// <param name="targetVersion">Specific backup version to restore, or null for latest.</param>
     /// <returns>True on success.</returns>
-    public async Task<bool> RollbackAsync(string? targetVersion = null)
+    public async Task<bool> RollbackAsync(string? targetVersion = null, bool confirm = true)
     {
         BackupEntry? backup;
 
@@ -56,7 +56,7 @@ public class RollbackManager
         ConsoleUI.Info($"备份路径: {backup.BackupPath}");
         ConsoleUI.Info($"创建时间: {backup.CreatedAt:yyyy-MM-dd HH:mm:ss}");
 
-        if (!ConsoleUI.AskYesNo("确认回滚？当前版本将被替换。", defaultYes: false))
+        if (confirm && !ConsoleUI.AskYesNo("确认回滚？当前版本将被替换。", defaultYes: false))
         {
             ConsoleUI.Info("回滚已取消。");
             return false;

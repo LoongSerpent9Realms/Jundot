@@ -62,7 +62,10 @@
 #include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/docks/editor_dock.h"
 #include "editor/file_system/editor_paths.h"
+#include "editor/editor_main_screen.h"
+#include "editor/editor_node.h"
 #include "editor/gui/editor_file_dialog.h"
+#include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
@@ -72,6 +75,7 @@
 #include "scene/gui/menu_button.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/popup_menu.h"
+#include "scene/gui/progress_bar.h"
 #include "scene/gui/scroll_container.h"
 #include "scene/gui/split_container.h"
 #include "scene/gui/tab_container.h"
@@ -85,6 +89,9 @@
 
 static constexpr int AI_CHAT_ATTACHMENT_MAX_BYTES = 64 * 1024;
 static constexpr int AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
+static const char *AI_CHAT_METADATA_SECTION = "jundot_ai_chat";
+static const char *AI_CHAT_METADATA_PROGRAMMING_EXPERIENCE_ASKED = "programming_experience_asked";
+static const char *AI_CHAT_METADATA_HAS_PROGRAMMING_EXPERIENCE = "has_programming_experience";
 
 static bool _ai_chat_is_image_extension(const String &p_path) {
 	const String ext = p_path.get_extension().to_lower();
@@ -193,6 +200,17 @@ Dictionary AIChatPanel::Conversation::to_dict(const Conversation &p_conv) {
 	}
 	d["next_question_options"] = next_questions;
 	d["structured_messages"] = p_conv.structured_messages;
+	Array issues;
+	for (int i = 0; i < p_conv.issue_ledger.size(); i++) {
+		const IssueLedgerEntry &issue = p_conv.issue_ledger[i];
+		Dictionary item;
+		item["title"] = issue.title;
+		item["status"] = issue.status;
+		item["closed_by"] = issue.closed_by;
+		item["updated_at"] = (int64_t)issue.updated_at;
+		issues.push_back(item);
+	}
+	d["issue_ledger"] = issues;
 	Array queued;
 	for (int i = 0; i < p_conv.queued_messages.size(); i++) {
 		Dictionary q;
@@ -236,6 +254,21 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 	Variant structured_messages_var = p_dict.get("structured_messages", Array());
 	if (structured_messages_var.get_type() == Variant::ARRAY) {
 		conv.structured_messages = ((Array)structured_messages_var).duplicate(true);
+	}
+	Array issues = p_dict.get("issue_ledger", Array());
+	for (int i = 0; i < issues.size(); i++) {
+		if (issues[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary item = issues[i];
+		IssueLedgerEntry issue;
+		issue.title = String(item.get("title", String())).strip_edges();
+		issue.status = String(item.get("status", String())).strip_edges();
+		issue.closed_by = String(item.get("closed_by", String())).strip_edges();
+		issue.updated_at = (uint64_t)item.get("updated_at", 0);
+		if (!issue.title.is_empty() && !issue.status.is_empty()) {
+			conv.issue_ledger.push_back(issue);
+		}
 	}
 	Array queued = p_dict.get("queued_messages", Array());
 	for (int i = 0; i < queued.size(); i++) {
@@ -358,11 +391,131 @@ String AIChatPanel::_build_conversation_brief_prompt() const {
 			prompt += vformat("Active task brief: %s\n", conv.task_brief.strip_edges());
 		}
 
-		prompt += "Use this brief and the latest user request as the active instruction boundary. Treat older chat messages as historical evidence only; if old messages conflict with this brief or the latest request, follow this brief and the latest request. Do not revive abandoned plans, stale errors, or earlier guesses unless the user explicitly asks to continue them.";
+		const String issue_prompt = _build_issue_ledger_prompt();
+		if (!issue_prompt.is_empty()) {
+			prompt += issue_prompt;
+			prompt += "\n";
+		}
+
+		prompt += "Use this brief and the latest user request as the active instruction boundary. Treat older chat messages as historical evidence only; if old messages conflict with this brief or the latest request, follow this brief and the latest request. Do not revive abandoned plans, stale errors, fixed issues, verified-passed failures, or earlier guesses unless fresh logs, fresh tool checks, or a fresh user report prove they are active again.";
 		return prompt;
 	}
 
 	return String();
+}
+
+String AIChatPanel::_build_issue_ledger_prompt() const {
+	if (active_conversation_id.is_empty()) {
+		return String();
+	}
+
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id != active_conversation_id) {
+			continue;
+		}
+
+		const Conversation &conv = conversations[i];
+		Vector<String> closed_items;
+		for (int j = 0; j < conv.issue_ledger.size(); j++) {
+			const IssueLedgerEntry &issue = conv.issue_ledger[j];
+			const String status = issue.status.strip_edges();
+			if (status != "closed" && status != "verification_passed") {
+				continue;
+			}
+			String line = vformat("- [%s] %s", status, issue.title.strip_edges());
+			if (!issue.closed_by.strip_edges().is_empty()) {
+				line += vformat(" (by %s)", issue.closed_by.strip_edges());
+			}
+			closed_items.push_back(line);
+		}
+		if (closed_items.is_empty()) {
+			return String();
+		}
+
+		String prompt = "\n=== Issue Ledger ===\nClosed or verified-passed issues are historical records, not active failures. Do not keep repairing or diagnosing them from older chat history. Reopen one only when the latest user message, a fresh tool result, or a fresh log proves it is failing again.\n";
+		const int start = MAX(0, closed_items.size() - 8);
+		for (int j = start; j < closed_items.size(); j++) {
+			prompt += closed_items[j] + "\n";
+		}
+		prompt += "Evidence priority: current editor/project state > fresh tool checks > latest user confirmation > summaries > old chat messages.";
+		return prompt;
+	}
+
+	return String();
+}
+
+bool AIChatPanel::_message_confirms_issue_closed(const String &p_message) const {
+	const String msg = p_message.to_lower().strip_edges();
+	if (msg.is_empty()) {
+		return false;
+	}
+
+	return msg.contains("修好了") || msg.contains("已经好了") || msg.contains("好了") || msg.contains("可以了") ||
+		   msg.contains("不用管了") || msg.contains("别管了") || msg.contains("没问题了") || msg.contains("问题没了") ||
+		   msg.contains("检测通过") || msg.contains("验证通过") || msg.contains("通过了") || msg.contains("已修复") ||
+		   msg.contains("fixed") || msg.contains("it is fixed") || msg.contains("it's fixed") || msg.contains("works now") ||
+		   msg.contains("verified") || msg.contains("passed") || msg.contains("no longer happens") || msg.contains("ignore this");
+}
+
+String AIChatPanel::_find_recent_issue_subject(const String &p_current_message) const {
+	const String current = p_current_message.strip_edges();
+	for (int i = message_list->get_child_count() - 2; i >= 0; i--) {
+		AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+		if (!msg || !msg->is_user_message() || msg->is_summary_message()) {
+			continue;
+		}
+		const String content = msg->get_content().strip_edges();
+		const String lower = content.to_lower();
+		if (lower.contains("没反应") || lower.contains("没有反应") || lower.contains("不能用") || lower.contains("不好用") ||
+				lower.contains("不生效") || lower.contains("报错") || lower.contains("崩溃") || lower.contains("修复") ||
+				lower.contains("bug") || lower.contains("error") || lower.contains("crash") || lower.contains("not working") ||
+				lower.contains("doesn't work") || lower.contains("does not work") || lower.contains("broken") || lower.contains("fix")) {
+			return content.left(180);
+		}
+	}
+
+	if (!current.is_empty()) {
+		return current.left(180);
+	}
+	return TTR("Issue confirmed fixed by the user");
+}
+
+void AIChatPanel::_record_issue_closed_from_user(const String &p_user_message) {
+	if (!_message_confirms_issue_closed(p_user_message) || active_conversation_id.is_empty()) {
+		return;
+	}
+
+	const String subject = _find_recent_issue_subject(p_user_message).strip_edges();
+	if (subject.is_empty()) {
+		return;
+	}
+
+	for (int i = 0; i < conversations.size(); i++) {
+		if (conversations[i].id != active_conversation_id) {
+			continue;
+		}
+
+		Conversation &conv = conversations.write[i];
+		const uint64_t now = Time::get_singleton()->get_unix_time_from_system();
+		for (int j = 0; j < conv.issue_ledger.size(); j++) {
+			if (conv.issue_ledger[j].title == subject) {
+				conv.issue_ledger.write[j].status = "closed";
+				conv.issue_ledger.write[j].closed_by = "user_confirmation";
+				conv.issue_ledger.write[j].updated_at = now;
+				conv.updated_at = now;
+				return;
+			}
+		}
+
+		IssueLedgerEntry issue;
+		issue.title = subject;
+		issue.status = "closed";
+		issue.closed_by = "user_confirmation";
+		issue.updated_at = now;
+		conv.issue_ledger.push_back(issue);
+		conv.updated_at = now;
+		return;
+	}
 }
 
 void AIChatPanel::_set_current_conversation_task_intent(const String &p_intent, const String &p_brief) {
@@ -428,6 +581,16 @@ void AIChatPanel::_apply_sidebar_visibility() {
 	if (!chat_split || !sidebar_panel) {
 		return;
 	}
+	if (beginner_chat_mode) {
+		sidebar_panel->set_visible(false);
+		if (collapse_sidebar_button) {
+			collapse_sidebar_button->set_visible(false);
+		}
+		if (expand_sidebar_button) {
+			expand_sidebar_button->set_visible(false);
+		}
+		return;
+	}
 
 	sidebar_collapsed = sidebar_user_collapsed || sidebar_auto_collapsed;
 	sidebar_panel->set_visible(!sidebar_collapsed);
@@ -459,6 +622,10 @@ void AIChatPanel::_set_sidebar_collapsed(bool p_collapsed) {
 
 void AIChatPanel::_update_responsive_sidebar() {
 	if (!chat_split || !sidebar_panel || get_size().x <= 0.0f) {
+		return;
+	}
+	if (beginner_chat_mode) {
+		_apply_sidebar_visibility();
 		return;
 	}
 
@@ -685,6 +852,9 @@ void AIChatPanel::_enqueue_current_message() {
 	_serialize_current_messages();
 	_save_all_conversations();
 	status_label->set_text(vformat(TTR("Message queued. It will be sent after the current AI response finishes. (%d queued)"), queued_messages.size()));
+	if (ai_activity_panel && ai_activity_panel->is_visible()) {
+		_refresh_ai_activity();
+	}
 }
 
 void AIChatPanel::_guide_queued_message(int p_index) {
@@ -699,6 +869,9 @@ void AIChatPanel::_guide_queued_message(int p_index) {
 	_serialize_current_messages();
 	_save_all_conversations();
 	status_label->set_text(TTR("Queued message prioritized as guidance for the next turn."));
+	if (ai_activity_panel && ai_activity_panel->is_visible()) {
+		_refresh_ai_activity();
+	}
 }
 
 void AIChatPanel::_delete_queued_message(int p_index) {
@@ -710,6 +883,9 @@ void AIChatPanel::_delete_queued_message(int p_index) {
 	_serialize_current_messages();
 	_save_all_conversations();
 	status_label->set_text(TTR("Queued message removed."));
+	if (ai_activity_panel && ai_activity_panel->is_visible()) {
+		_refresh_ai_activity();
+	}
 }
 
 void AIChatPanel::_dispatch_next_queued_message() {
@@ -752,6 +928,7 @@ void AIChatPanel::_load_conversation_to_ui(const Conversation &p_conv) {
 	// Reset tool loop and editing state.
 	pending_tool_round = PendingToolRound();
 	in_tool_loop = false;
+	_set_ai_activity(String(), false);
 	editing_message_index = -1;
 	has_auto_titled = !p_conv.messages.is_empty();
 	attachments.clear();
@@ -1171,7 +1348,7 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 		return "Current request guidance: the user selected design discussion for this chat. Analyze the project and propose a path, but do not modify files until the user explicitly approves implementation." + boundary;
 	}
 	if (broad_project_idea && !concrete_change) {
-		return "Current request guidance: this is a new game concept. Produce a TASK_PLAN scaled to its size: concise for a small game or prototype, fuller for a larger project. Evaluate the core loop, moment-to-moment fun, mastery, rewards, replayability, boring/frustrating risks, and prototype tests. Use fetch_url to research relevant official Steam/Epic pages when available, identify concrete differentiation opportunities, and generate a .JundotAI/mockups/ SVG when a visual flow or interface will help the user judge the idea. If the user did not explicitly request direct implementation, expose NEXT_QUESTION choices for Plan review, a minimum playable prototype, or gameplay/reference discussion, and stop before modifying game content until they choose or approve." + boundary;
+		return "Current request guidance: this is a new game concept. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Produce a TASK_PLAN scaled to its size: concise for a small game or prototype, fuller for a larger project. Evaluate the core loop, moment-to-moment fun, mastery, rewards, replayability, boring/frustrating risks, and prototype tests. Use fetch_url to research relevant official Steam/Epic pages when available, identify concrete differentiation opportunities, and generate a .JundotAI/mockups/ SVG when a visual flow or interface will help the user judge the idea. If the user did not explicitly request direct implementation, expose NEXT_QUESTION choices for Plan review, a minimum playable prototype, or gameplay/reference discussion, and stop before modifying game content until they choose or approve. If the project is empty/minimal and the Plan is approved or the user's answers make the Plan complete, continue autonomously through implementation, compile/build validation, runtime/UI testing, package_project, repeated check_package_status polling, test_package, and final handoff with package paths and validation evidence. If the project already has meaningful content, insert NEXT_QUESTION dialogue checkpoints before any broad replacement, restructuring, or reinterpretation of existing content. Do not ask the user to operate PackageBuilder manually." + boundary;
 	}
 	if (vague_repair_request) {
 		return "Current request guidance: this is a potentially ambiguous repair request. Before editing, briefly restate the understood target feature, current behavior, expected behavior, and observable acceptance criteria. Inspect project evidence and the real code path before changing files. If the target feature, reproduction steps, expected result, or error evidence cannot be inferred from the project context, ask one concise clarifying question through NEXT_QUESTION and do not guess-edit." + boundary;
@@ -1227,6 +1404,15 @@ void AIChatPanel::_update_mode_indicator() {
 		return;
 	}
 	if (!engine_mode_btn->is_inside_tree() || !project_mode_btn->is_inside_tree()) {
+		return;
+	}
+	if (beginner_chat_mode) {
+		if (mode_bar) {
+			mode_bar->set_visible(false);
+		}
+		if (source_update_status_label) {
+			source_update_status_label->set_visible(false);
+		}
 		return;
 	}
 
@@ -1355,6 +1541,161 @@ void AIChatPanel::_update_translations() {
 	}
 	_refresh_attachment_chips();
 	_refresh_queued_messages_ui();
+	_apply_programming_experience_layout();
+}
+
+void AIChatPanel::_apply_programming_experience_layout() {
+	EditorSettings *editor_settings = EditorSettings::get_singleton();
+	const bool asked = editor_settings ? bool(editor_settings->get_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_PROGRAMMING_EXPERIENCE_ASKED, false)) : true;
+	const bool has_programming_experience = editor_settings ? bool(editor_settings->get_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_HAS_PROGRAMMING_EXPERIENCE, true)) : true;
+	beginner_chat_mode = asked && !has_programming_experience;
+
+	if (programming_onboarding_panel) {
+		programming_onboarding_panel->set_visible(!asked);
+	}
+	if (programming_mode_hint_panel) {
+		programming_mode_hint_panel->set_visible(asked);
+	}
+	if (programming_mode_hint_label) {
+		programming_mode_hint_label->set_text(beginner_chat_mode ? TTR("Beginner mode is on. You can switch back to the full AI workspace at any time.") : TTR("Full AI workspace is on. You can switch to beginner chat mode at any time."));
+	}
+	if (programming_mode_switch_button) {
+		programming_mode_switch_button->set_text(beginner_chat_mode ? TTR("Show Full UI") : TTR("Use Beginner Mode"));
+		programming_mode_switch_button->set_tooltip_text(beginner_chat_mode ? TTR("Show the full AI workspace with modes, files, and tools.") : TTR("Hide advanced controls and keep only chat and input."));
+	}
+	if (!asked) {
+		if (input) {
+			input->set_editable(false);
+			input->set_placeholder(TTR("Please choose whether you have programming experience first."));
+		}
+	}
+
+	if (sidebar_panel) {
+		sidebar_panel->set_visible(!beginner_chat_mode);
+	}
+	if (chat_top_bar_container) {
+		chat_top_bar_container->set_visible(!beginner_chat_mode);
+	}
+	if (expand_sidebar_button) {
+		expand_sidebar_button->set_visible(!beginner_chat_mode && sidebar_collapsed);
+	}
+	if (mode_bar) {
+		mode_bar->set_visible(!beginner_chat_mode);
+	}
+	if (beginner_chat_mode) {
+		if (source_update_status_label) {
+			source_update_status_label->set_visible(false);
+		}
+		if (develop_mode_status_label) {
+			develop_mode_status_label->set_visible(false);
+		}
+		if (develop_user_pass_button) {
+			develop_user_pass_button->set_visible(false);
+		}
+		if (develop_user_fail_button) {
+			develop_user_fail_button->set_visible(false);
+		}
+	} else {
+		_update_mode_indicator();
+	}
+	if (add_file_menu) {
+		add_file_menu->set_visible(!beginner_chat_mode);
+	}
+	if (clear_button) {
+		clear_button->set_visible(!beginner_chat_mode);
+	}
+	if (cancel_button) {
+		cancel_button->set_visible(!beginner_chat_mode);
+	}
+	if (bulk_action_bar) {
+		bulk_action_bar->set_visible(!beginner_chat_mode && bulk_action_bar->is_visible());
+	}
+	if (input && asked) {
+		input->set_editable(true);
+		input->set_placeholder(TTR("Message Jundot AI..."));
+	}
+	_apply_sidebar_visibility();
+	if (beginner_chat_mode && status_label) {
+		status_label->set_text(TTR("Beginner mode: describe what you want to make or change, and Jundot AI will guide you."));
+	}
+	if (asked) {
+		callable_mp(this, &AIChatPanel::_apply_editor_beginner_workspace).bind(beginner_chat_mode).call_deferred();
+	}
+}
+
+void AIChatPanel::_apply_editor_beginner_workspace(bool p_enabled) {
+	EditorNode *editor_node = EditorNode::get_singleton();
+	if (!editor_node || !editor_node->get_editor_main_screen()) {
+		return;
+	}
+
+	if (p_enabled) {
+		editor_node->get_editor_main_screen()->select_by_name("AI Assistant");
+		editor_node->set_distraction_free_mode(true);
+	} else {
+		if (editor_node->get_editor_main_screen()->get_selected_plugin() &&
+				editor_node->get_editor_main_screen()->get_selected_plugin()->get_plugin_name() == "AI Assistant") {
+			editor_node->get_editor_main_screen()->select(EditorMainScreen::EDITOR_2D);
+		}
+		editor_node->set_distraction_free_mode(false);
+	}
+}
+
+void AIChatPanel::_set_programming_experience(bool p_has_programming_experience) {
+	EditorSettings *editor_settings = EditorSettings::get_singleton();
+	if (editor_settings) {
+		editor_settings->set_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_PROGRAMMING_EXPERIENCE_ASKED, true);
+		editor_settings->set_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_HAS_PROGRAMMING_EXPERIENCE, p_has_programming_experience);
+		editor_settings->save_project_metadata();
+	}
+	_apply_programming_experience_layout();
+	if (status_label) {
+		status_label->set_text(p_has_programming_experience ? TTR("Full AI workspace enabled.") : TTR("Beginner chat mode enabled."));
+	}
+	if (input) {
+		input->grab_focus();
+	}
+}
+
+void AIChatPanel::_toggle_programming_experience_mode() {
+	_set_programming_experience(beginner_chat_mode);
+}
+
+void AIChatPanel::_set_ai_activity(const String &p_text, bool p_visible) {
+	ai_activity_text = p_text;
+	if (ai_activity_panel) {
+		ai_activity_panel->set_visible(p_visible);
+	}
+	if (ai_activity_progress) {
+		ai_activity_progress->set_indeterminate(true);
+	}
+	if (p_visible) {
+		_refresh_ai_activity();
+	}
+}
+
+void AIChatPanel::_refresh_ai_activity() {
+	if (!ai_activity_panel || !ai_activity_panel->is_visible() || !ai_activity_label) {
+		return;
+	}
+
+	String text = ai_activity_text.strip_edges();
+	if (text.is_empty()) {
+		text = TTR("AI is working...");
+	}
+	const double elapsed = _get_response_elapsed(0.0);
+	if (elapsed > 0.0) {
+		const int seconds = (int)elapsed;
+		if (seconds >= 60) {
+			text += " " + vformat(TTR("Elapsed %dm %ds"), seconds / 60, seconds % 60);
+		} else {
+			text += " " + vformat(TTR("Elapsed %ds"), seconds);
+		}
+	}
+	if (!queued_messages.is_empty()) {
+		text += " " + vformat(TTR("Queued messages: %d"), queued_messages.size());
+	}
+	ai_activity_label->set_text(text);
 }
 
 void AIChatPanel::_set_requesting(bool p_requesting) {
@@ -1372,6 +1713,13 @@ void AIChatPanel::_set_requesting(bool p_requesting) {
 	}
 	if (delete_conversation_button) {
 		delete_conversation_button->set_disabled(p_requesting);
+	}
+	if (!p_requesting) {
+		_set_ai_activity(String(), false);
+	} else if (ai_activity_text.strip_edges().is_empty()) {
+		_set_ai_activity(TTR("AI request is running..."), true);
+	} else {
+		_refresh_ai_activity();
 	}
 }
 
@@ -1633,10 +1981,12 @@ void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
 	pending_tool_round.original_tools = tools.duplicate(true);
 	in_tool_loop = false;
 	_start_response_tracking();
+	_set_ai_activity(TTR("Continuing AI response..."), true);
 
 	const Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
 		_clear_response_tracking();
+		_set_ai_activity(String(), false);
 		status_label->set_text(err == ERR_UNAUTHORIZED ? TTR("Please check and accept the AI usage agreement before continuing.") : TTR("AI continuation request could not start."));
 		request_conversation_id = String();
 		return;
@@ -2130,6 +2480,7 @@ void AIChatPanel::_send_message() {
 	} else {
 		_add_user_message(visible_user_text);
 	}
+	_record_issue_closed_from_user(visible_user_text);
 
 	// Persist the conversation after the user message has been added so that
 	// a crash or request failure does not lose the message.
@@ -2254,10 +2605,12 @@ void AIChatPanel::_send_message() {
 	pending_tool_round.original_tools = tools.duplicate(true);
 	in_tool_loop = false;
 	_start_response_tracking();
+	_set_ai_activity(TTR("Waiting for AI response..."), true);
 
 	const Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
 		_clear_response_tracking();
+		_set_ai_activity(String(), false);
 		status_label->set_text(err == ERR_UNAUTHORIZED ? TTR("Please check and accept the AI usage agreement before sending messages.") : TTR("AI request could not start."));
 		request_conversation_id = String();
 		return;
@@ -2276,7 +2629,7 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 	{
 		Dictionary summary_system;
 		summary_system["role"] = "system";
-		summary_system["content"] = TTR("You are a conversation summarizer. Return only a concise plain-text summary under 500 characters, preserving durable project facts, confirmed user decisions, code changes, root causes, and the current active state. Drop stale guesses, abandoned plans, transient tool errors, repeated failed attempts, and anything that conflicts with newer user direction. Do not call tools, do not request files, do not output XML, JSON, markdown fences, or tool_call blocks.");
+		summary_system["content"] = TTR("You are a conversation summarizer. Return only a concise plain-text summary under 500 characters, preserving durable project facts, confirmed user decisions, code changes, root causes, verified-passed or user-closed issues, and the current active state. Mark fixed/verified issues as resolved history, not active failures. Drop stale guesses, abandoned plans, transient tool errors, repeated failed attempts, and anything that conflicts with newer user direction. Do not call tools, do not request files, do not output XML, JSON, markdown fences, or tool_call blocks.");
 		summary_messages.push_back(summary_system);
 	}
 
@@ -2317,10 +2670,13 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 
 	is_summarizing = true;
 	status_label->set_text(TTR("Compressing conversation history..."));
+	_start_response_tracking();
+	_set_ai_activity(TTR("Compressing conversation history before continuing..."), true);
 	_set_requesting(true);
 
 	const Error err = chat_service->send_messages(summary_messages);
 	if (err != OK) {
+		_clear_response_tracking();
 		// Fall back to truncation if the summary request fails to send.
 		_summary_completed(String());
 	}
@@ -2328,6 +2684,7 @@ void AIChatPanel::_start_summarization(const Array &p_history, int p_budget) {
 
 void AIChatPanel::_summary_completed(const String &p_summary_text) {
 	is_summarizing = false;
+	_clear_response_tracking();
 	const String summary_text = p_summary_text.strip_edges();
 	const bool valid_summary = !summary_text.is_empty() && !_ai_chat_is_tool_error_text(summary_text);
 
@@ -2559,6 +2916,7 @@ void AIChatPanel::_clear_messages() {
 	if (tool_execution_running) {
 		tool_execution_cancelled = true;
 	}
+	_set_ai_activity(String(), false);
 	_hide_tool_limit_options();
 	if (conversation_name_edit) {
 		conversation_name_edit->set_text("");
@@ -2583,6 +2941,7 @@ void AIChatPanel::_chat_stream_data(const String &p_delta, const String &p_full_
 	if (!request_conversation_id.is_empty() && request_conversation_id != active_conversation_id) {
 		return;
 	}
+	_set_ai_activity(TTR("AI is writing a response..."), true);
 
 	String visible_stream_content = p_full_content;
 	const int memory_block_start = visible_stream_content.find("<!-- PROJECT_MEMORY -->");
@@ -2853,6 +3212,10 @@ void AIChatPanel::_on_response_elapsed_tick() {
 	}
 
 	const double elapsed = _get_response_elapsed(0.0);
+	if (is_summarizing || is_titling) {
+		_refresh_ai_activity();
+		return;
+	}
 	if (!streaming_message) {
 		streaming_message = memnew(AIChatMessage);
 		streaming_message->setup_ai(String(), String(), elapsed, 0, 0);
@@ -2862,6 +3225,7 @@ void AIChatPanel::_on_response_elapsed_tick() {
 	} else {
 		streaming_message->set_think_time_seconds(elapsed);
 	}
+	_refresh_ai_activity();
 	message_scroll->set_deferred(SNAME("scroll_vertical"), message_scroll->get_v_scroll_bar()->get_max());
 }
 
@@ -3053,6 +3417,7 @@ bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
 	tool_call_label->set_visible(true);
 	tool_call_label->set_text(TTR("AI described a tool action without calling it. Retrying once with a stricter tool-call instruction..."));
 	status_label->set_text(TTR("Retrying AI request for a real tool call..."));
+	_set_ai_activity(TTR("Retrying with a stricter tool-call instruction..."), true);
 
 	chat_service->configure(active_settings);
 	_set_requesting(true);
@@ -3120,6 +3485,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 
 						tool_call_label->set_visible(true);
 						tool_call_label->set_text(TTR("Tool iteration limit reached. Asking AI to summarize results..."));
+						_set_ai_activity(TTR("Tool iteration limit reached. Asking AI to summarize results..."), true);
 						in_tool_loop = false;
 						pending_tool_round.original_messages = final_messages.duplicate(true);
 						pending_tool_round.original_tools.clear();
@@ -3345,8 +3711,10 @@ void AIChatPanel::_execute_tool_calls(const Dictionary &p_json) {
 	int max_iterations = pending_tool_round.max_iterations;
 
 	// Show status with iteration progress.
-	status_label->set_text(vformat(TTR("AI tool call round %d of %d: executing %d tool call(s)..."),
-			current_iteration, max_iterations, tool_calls.size()));
+	const String tool_round_text = vformat(TTR("AI tool call round %d of %d: executing %d tool call(s)..."),
+			current_iteration, max_iterations, tool_calls.size());
+	status_label->set_text(tool_round_text);
+	_set_ai_activity(tool_round_text, true);
 
 	// Build tool call display label.
 	String tool_display;
@@ -3402,6 +3770,7 @@ void AIChatPanel::_start_build_status_poll() {
 	build_status_poll_count = 0;
 	build_status_poll_timer->start();
 	status_label->set_text(TTR("Build is running in the background. Monitoring until it completes..."));
+	_set_ai_activity(TTR("Build is running in the background. Monitoring real build status..."), true);
 	tool_call_label->set_visible(true);
 	tool_call_label->set_text(TTR("Build started. Waiting for build status..."));
 	_set_requesting(true);
@@ -3445,6 +3814,7 @@ void AIChatPanel::_append_forced_build_status_check() {
 	if (_tool_result_needs_build_poll(content)) {
 		tool_call_label->set_text(vformat(TTR("Build is still running. Status check #%d..."), build_status_poll_count));
 		status_label->set_text(TTR("Build is still running in the background..."));
+		_set_ai_activity(vformat(TTR("Build is still running. Status check #%d..."), build_status_poll_count), true);
 		return;
 	}
 
@@ -3476,6 +3846,7 @@ void AIChatPanel::_continue_after_build_poll() {
 
 	in_tool_loop = true;
 	chat_service->configure(settings);
+	_set_ai_activity(TTR("Build finished. Asking AI to continue with the results..."), true);
 	_set_requesting(true);
 	Error err = chat_service->send_messages(pending_tool_round.original_messages, tools);
 	if (err != OK) {
@@ -3551,8 +3922,10 @@ void AIChatPanel::_confirm_tool_execute(int p_tool_index) {
 	tool_execution_running = true;
 	in_tool_loop = true;
 
+	const String execution_text = vformat(TTR("Executing %d AI tool(s) in the background..."), tool_calls.size());
 	tool_call_label->set_text(vformat(TTR("Executing %d tool(s)..."), tool_calls.size()));
 	status_label->set_text(TTR("Executing AI tools in the background..."));
+	_set_ai_activity(execution_text, true);
 	_set_requesting(true);
 
 	tool_execution_thread.start(_tool_execution_thread_func, this);
@@ -3630,6 +4003,7 @@ void AIChatPanel::_finish_tool_execution_thread() {
 	}
 
 	chat_service->configure(active_settings);
+	_set_ai_activity(TTR("Tools finished. Asking AI to analyze the results..."), true);
 	_set_requesting(true);
 	Error err = chat_service->send_messages(messages, tools);
 	if (err != OK) {
@@ -3703,6 +4077,7 @@ void AIChatPanel::_confirm_tool_skip(int p_tool_index) {
 	tool_call_label->set_visible(false);
 	tool_call_label->set_text(String());
 	status_label->set_text(TTR("Tool skipped. Sending result to AI..."));
+	_set_ai_activity(TTR("Tool skipped. Sending result back to AI..."), true);
 
 	// Continue conversation.
 	chat_service->configure(settings);
@@ -4022,7 +4397,7 @@ void AIChatPanel::_repair_rebuild(AIRepairCard *p_card) {
 	if (err != OK) {
 		status_label->set_text(vformat(TTR("Could not launch PackageBuilder. Please run it manually from %s"), AIBuildBridge::detect_repo_root().path_join("tools/PackageBuilder")));
 	} else {
-		status_label->set_text(TTR("PackageBuilder launched. Complete the build and click 'Publish' when ready."));
+		status_label->set_text(TTR("PackageBuilder launched in unattended AI build mode."));
 		// Set current task info for post-restart question.
 		AINewBuildNotifier::get_singleton()->set_current_task(task.id, task.patch_summary);
 		// Start polling for build completion �?will show restart dialog when ready.
@@ -4200,7 +4575,66 @@ AIChatPanel::AIChatPanel() {
 	chat_vbox->add_theme_constant_override("separation", 0);
 	chat_surface_panel->add_child(chat_vbox);
 
+	programming_onboarding_panel = memnew(PanelContainer);
+	programming_onboarding_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	chat_vbox->add_child(programming_onboarding_panel);
+
+	MarginContainer *programming_onboarding_margin = memnew(MarginContainer);
+	programming_onboarding_margin->add_theme_constant_override("margin_left", 16 * EDSCALE);
+	programming_onboarding_margin->add_theme_constant_override("margin_right", 16 * EDSCALE);
+	programming_onboarding_margin->add_theme_constant_override("margin_top", 10 * EDSCALE);
+	programming_onboarding_margin->add_theme_constant_override("margin_bottom", 10 * EDSCALE);
+	programming_onboarding_panel->add_child(programming_onboarding_margin);
+
+	HBoxContainer *programming_onboarding_row = memnew(HBoxContainer);
+	programming_onboarding_row->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	programming_onboarding_row->add_theme_constant_override("separation", 8 * EDSCALE);
+	programming_onboarding_margin->add_child(programming_onboarding_row);
+
+	Label *programming_onboarding_label = memnew(Label);
+	programming_onboarding_label->set_text(TTR("Do you have programming experience?"));
+	programming_onboarding_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	programming_onboarding_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	programming_onboarding_row->add_child(programming_onboarding_label);
+
+	Button *programming_yes_button = memnew(Button);
+	programming_yes_button->set_text(TTR("Yes"));
+	programming_yes_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_set_programming_experience).bind(true));
+	programming_onboarding_row->add_child(programming_yes_button);
+
+	Button *programming_no_button = memnew(Button);
+	programming_no_button->set_text(TTR("No"));
+	programming_no_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_set_programming_experience).bind(false));
+	programming_onboarding_row->add_child(programming_no_button);
+
+	programming_mode_hint_panel = memnew(PanelContainer);
+	programming_mode_hint_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	programming_mode_hint_panel->set_visible(false);
+	chat_vbox->add_child(programming_mode_hint_panel);
+
+	MarginContainer *programming_mode_hint_margin = memnew(MarginContainer);
+	programming_mode_hint_margin->add_theme_constant_override("margin_left", 16 * EDSCALE);
+	programming_mode_hint_margin->add_theme_constant_override("margin_right", 16 * EDSCALE);
+	programming_mode_hint_margin->add_theme_constant_override("margin_top", 6 * EDSCALE);
+	programming_mode_hint_margin->add_theme_constant_override("margin_bottom", 6 * EDSCALE);
+	programming_mode_hint_panel->add_child(programming_mode_hint_margin);
+
+	HBoxContainer *programming_mode_hint_row = memnew(HBoxContainer);
+	programming_mode_hint_row->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	programming_mode_hint_row->add_theme_constant_override("separation", 8 * EDSCALE);
+	programming_mode_hint_margin->add_child(programming_mode_hint_row);
+
+	programming_mode_hint_label = memnew(Label);
+	programming_mode_hint_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	programming_mode_hint_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	programming_mode_hint_row->add_child(programming_mode_hint_label);
+
+	programming_mode_switch_button = memnew(Button);
+	programming_mode_switch_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_toggle_programming_experience_mode));
+	programming_mode_hint_row->add_child(programming_mode_switch_button);
+
 	MarginContainer *top_bar_margin = memnew(MarginContainer);
+	chat_top_bar_container = top_bar_margin;
 	top_bar_margin->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	top_bar_margin->add_theme_constant_override("margin_left", 16 * EDSCALE);
 	top_bar_margin->add_theme_constant_override("margin_right", 16 * EDSCALE);
@@ -4332,6 +4766,29 @@ AIChatPanel::AIChatPanel() {
 	dismiss_all_button = memnew(Button);
 	dismiss_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_dismiss_all_suggestions));
 	bulk_action_bar->add_child(dismiss_all_button);
+
+	ai_activity_panel = memnew(PanelContainer);
+	ai_activity_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	ai_activity_panel->set_visible(false);
+	chat_vbox->add_child(ai_activity_panel);
+
+	VBoxContainer *ai_activity_vb = memnew(VBoxContainer);
+	ai_activity_vb->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	ai_activity_vb->add_theme_constant_override("separation", 4 * EDSCALE);
+	ai_activity_panel->add_child(ai_activity_vb);
+
+	ai_activity_label = memnew(Label);
+	ai_activity_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	ai_activity_label->add_theme_font_size_override("font_size", 12 * EDSCALE);
+	ai_activity_label->add_theme_color_override("font_color", Color(0.55f, 0.7f, 1.0f));
+	ai_activity_vb->add_child(ai_activity_label);
+
+	ai_activity_progress = memnew(ProgressBar);
+	ai_activity_progress->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	ai_activity_progress->set_custom_minimum_size(Size2(0, 6) * EDSCALE);
+	ai_activity_progress->set_show_percentage(false);
+	ai_activity_progress->set_indeterminate(true);
+	ai_activity_vb->add_child(ai_activity_progress);
 
 	// Tool call label
 	tool_call_label = memnew(Label);
@@ -4540,4 +4997,5 @@ AIChatPanel::AIChatPanel() {
 	_set_requesting(false);
 	_update_auto_chat_display_scale();
 	status_label->set_text(TTR("AI assistant ready."));
+	_apply_programming_experience_layout();
 }

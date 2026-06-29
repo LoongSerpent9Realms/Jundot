@@ -52,7 +52,16 @@ private:
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _check_project_scripts(const Dictionary &p_args);
 	static Dictionary _check_ui_layout(const Dictionary &p_args);
+	static Dictionary _create_3d_scene(const Dictionary &p_args);
+	static Dictionary _add_3d_object(const Dictionary &p_args);
+	static Dictionary _add_3d_light(const Dictionary &p_args);
+	static Dictionary _check_3d_scene(const Dictionary &p_args);
 	static Dictionary _build_project(const Dictionary &p_args);
+	static Dictionary _build_cpp_hot_module(const Dictionary &p_args);
+	static Dictionary _reload_cpp_hot_module(const Dictionary &p_args);
+	static Dictionary _package_project(const Dictionary &p_args);
+	static Dictionary _check_package_status(const Dictionary &p_args);
+	static Dictionary _test_package(const Dictionary &p_args);
 	static Dictionary _play_scene(const Dictionary &p_args);
 	static Dictionary _click_ui_position(const Dictionary &p_args);
 	static Dictionary _stop_play_scene(const Dictionary &p_args);

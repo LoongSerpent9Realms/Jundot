@@ -38,6 +38,7 @@ class GiteeAuthService;
 class AIEditorPlugin : public EditorPlugin {
 	GDCLASS(AIEditorPlugin, EditorPlugin)
 
+	Control *main_screen_panel = nullptr;
 	EditorDock *ai_dock = nullptr;
 	TabContainer *tabs = nullptr;
 	Ref<AIInspectorContextMenu> inspector_context_menu_plugin;
@@ -48,6 +49,10 @@ class AIEditorPlugin : public EditorPlugin {
 	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
 
 public:
+	virtual String get_plugin_name() const override { return "AI Assistant"; }
+	virtual bool has_main_screen() const override { return true; }
+	virtual void make_visible(bool p_visible) override;
+
 	AIEditorPlugin();
 	~AIEditorPlugin();
 };

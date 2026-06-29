@@ -103,6 +103,11 @@ Root (Node2D/Node3D/Control)
 - `Camera2D` with drag margins and smoothing
 
 ### 3D Scene Layout
+- Use `create_3d_scene` for starter Node3D scenes with camera, lighting, and floor
+- Use `add_3d_object` for simple primitive MeshInstance3D prototype geometry
+- Use `add_3d_light` for DirectionalLight3D, OmniLight3D, and SpotLight3D setup
+- After creating or editing a 3D `.tscn`, run `check_3d_scene` and fix missing
+  camera, lighting, visible geometry, Node3D root, or gameplay collision warnings
 - `WorldEnvironment` for global settings (sky, fog, post-processing)
 - Use `GridMap` for block-based 3D levels
 - `NavigationRegion3D` for AI pathfinding

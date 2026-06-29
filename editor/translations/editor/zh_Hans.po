@@ -20924,6 +20924,48 @@ msgid "Config"
 msgstr "配置"
 
 # AI Chat Panel
+msgid "AI Assistant"
+msgstr "AI 助手"
+
+msgid "Open AI Assistant Dock"
+msgstr "打开 AI 助手停靠面板"
+
+msgid "Message Jundot AI..."
+msgstr "给 Jundot AI 发消息..."
+
+msgid "Do you have programming experience?"
+msgstr "你有编程基础吗？"
+
+msgid "Please choose whether you have programming experience first."
+msgstr "请先选择你是否有编程基础。"
+
+msgid "Beginner mode is on. You can switch back to the full AI workspace at any time."
+msgstr "新手模式已开启。你可以随时切回完整 AI 工作区。"
+
+msgid "Full AI workspace is on. You can switch to beginner chat mode at any time."
+msgstr "完整 AI 工作区已开启。你可以随时切换到新手聊天模式。"
+
+msgid "Show Full UI"
+msgstr "显示完整界面"
+
+msgid "Use Beginner Mode"
+msgstr "使用新手模式"
+
+msgid "Show the full AI workspace with modes, files, and tools."
+msgstr "显示包含模式、文件和工具的完整 AI 工作区。"
+
+msgid "Hide advanced controls and keep only chat and input."
+msgstr "隐藏高级控件，只保留聊天和输入。"
+
+msgid "Beginner mode: describe what you want to make or change, and Jundot AI will guide you."
+msgstr "新手模式：描述你想制作或修改的内容，Jundot AI 会引导你。"
+
+msgid "Full AI workspace enabled."
+msgstr "完整 AI 工作区已启用。"
+
+msgid "Beginner chat mode enabled."
+msgstr "新手聊天模式已启用。"
+
 msgid "Input message / drop files here"
 msgstr "输入消息/拖放文件到此处"
 

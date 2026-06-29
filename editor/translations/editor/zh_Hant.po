@@ -19401,3 +19401,46 @@ msgstr ""
 "您正嘗試將模型空間的 VERTEX 位置指派給裁剪空間的頂點 POSITION。裁剪空間定義在 "
 "4.3 版已變更，若程式碼寫於 4.3 之前將不再適用。請考慮直接指定裁剪空間的 z 分"
 "量，例如使用 `vec4(VERTEX.xy, 1.0, 1.0)`。"
+
+# AI Chat Panel
+msgid "AI Assistant"
+msgstr "AI 助手"
+
+msgid "Open AI Assistant Dock"
+msgstr "開啟 AI 助手停靠面板"
+
+msgid "Message Jundot AI..."
+msgstr "傳送訊息給 Jundot AI..."
+
+msgid "Do you have programming experience?"
+msgstr "你有程式設計基礎嗎？"
+
+msgid "Please choose whether you have programming experience first."
+msgstr "請先選擇你是否有程式設計基礎。"
+
+msgid "Beginner mode is on. You can switch back to the full AI workspace at any time."
+msgstr "新手模式已開啟。你可以隨時切回完整 AI 工作區。"
+
+msgid "Full AI workspace is on. You can switch to beginner chat mode at any time."
+msgstr "完整 AI 工作區已開啟。你可以隨時切換到新手聊天模式。"
+
+msgid "Show Full UI"
+msgstr "顯示完整介面"
+
+msgid "Use Beginner Mode"
+msgstr "使用新手模式"
+
+msgid "Show the full AI workspace with modes, files, and tools."
+msgstr "顯示包含模式、檔案和工具的完整 AI 工作區。"
+
+msgid "Hide advanced controls and keep only chat and input."
+msgstr "隱藏進階控制項，只保留聊天和輸入。"
+
+msgid "Beginner mode: describe what you want to make or change, and Jundot AI will guide you."
+msgstr "新手模式：描述你想製作或修改的內容，Jundot AI 會引導你。"
+
+msgid "Full AI workspace enabled."
+msgstr "完整 AI 工作區已啟用。"
+
+msgid "Beginner chat mode enabled."
+msgstr "新手聊天模式已啟用。"

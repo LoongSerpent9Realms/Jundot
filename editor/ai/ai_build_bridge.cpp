@@ -54,17 +54,29 @@ static String _tools_dir() {
 }
 
 static String _package_builder_exe_path() {
-	String base = _tools_dir().path_join("PackageBuilder").path_join("bin").path_join("Release").path_join("net8.0-windows");
-	String exe = base.path_join("JundotPackageBuilder.exe");
+	String package_builder_dir = _tools_dir().path_join("PackageBuilder").path_join("bin");
+	String exe = package_builder_dir.path_join("Release").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe");
 	if (FileAccess::exists(exe)) {
 		return exe;
 	}
-	// Try debug build
-	exe = base.path_join("Debug").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe").simplify_path();
+	exe = package_builder_dir.path_join("Debug").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe").simplify_path();
 	if (FileAccess::exists(exe)) {
 		return exe;
 	}
-	return _tools_dir().path_join("PackageBuilder").path_join("bin").path_join("Release").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe");
+	return package_builder_dir.path_join("Release").path_join("net8.0-windows").path_join("JundotPackageBuilder.exe");
+}
+
+static String _package_builder_dll_path() {
+	String package_builder_dir = _tools_dir().path_join("PackageBuilder").path_join("bin");
+	String dll = package_builder_dir.path_join("Release").path_join("net8.0-windows").path_join("JundotPackageBuilder.dll");
+	if (FileAccess::exists(dll)) {
+		return dll;
+	}
+	dll = package_builder_dir.path_join("Debug").path_join("net8.0-windows").path_join("JundotPackageBuilder.dll").simplify_path();
+	if (FileAccess::exists(dll)) {
+		return dll;
+	}
+	return String();
 }
 
 static String _artifacts_dir() {
@@ -73,6 +85,10 @@ static String _artifacts_dir() {
 
 static String _build_request_path() {
 	return _artifacts_dir().path_join("ai_build_request.json");
+}
+
+static String _build_status_path() {
+	return _artifacts_dir().path_join("ai_build_status.json");
 }
 
 static String _build_history_path() {
@@ -85,7 +101,28 @@ String AIBuildBridge::detect_repo_root() {
 	return _repo_root();
 }
 
-Error AIBuildBridge::write_build_request() {
+static String _request_string(const Dictionary &p_options, const String &p_key, const String &p_fallback) {
+	if (!p_options.has(p_key)) {
+		return p_fallback;
+	}
+	return String(p_options.get(p_key, p_fallback)).strip_edges();
+}
+
+static bool _request_bool(const Dictionary &p_options, const String &p_key, bool p_fallback) {
+	if (!p_options.has(p_key)) {
+		return p_fallback;
+	}
+	return (bool)p_options.get(p_key, p_fallback);
+}
+
+static int _request_int(const Dictionary &p_options, const String &p_key, int p_fallback) {
+	if (!p_options.has(p_key)) {
+		return p_fallback;
+	}
+	return (int)p_options.get(p_key, p_fallback);
+}
+
+Error AIBuildBridge::write_build_request(const Dictionary &p_options) {
 	String dir = _artifacts_dir();
 	Ref<DirAccess> da = DirAccess::create_for_path(dir);
 	if (da.is_valid()) {
@@ -93,13 +130,16 @@ Error AIBuildBridge::write_build_request() {
 	}
 
 	Dictionary req;
-	req["target"] = "editor";
-	req["platform"] = "windows";
-	req["arch"] = "x86_64";
-	req["skip_build"] = false;
-	req["mono"] = false;
-	req["auto_update_version"] = true;
-	req["generate_update_manifest"] = true;
+	req["repo_root"] = _repo_root();
+	req["target"] = _request_string(p_options, "target", "editor");
+	req["platform"] = _request_string(p_options, "platform", "windows");
+	req["arch"] = _request_string(p_options, "arch", "x86_64");
+	req["skip_build"] = _request_bool(p_options, "skip_build", false);
+	req["mono"] = _request_bool(p_options, "mono", false);
+	req["auto_update_version"] = _request_bool(p_options, "auto_update_version", true);
+	req["generate_update_manifest"] = _request_bool(p_options, "generate_update_manifest", true);
+	req["jobs"] = _request_int(p_options, "jobs", 0);
+	req["extra_scons_args"] = _request_string(p_options, "extra_scons_args", String());
 	req["language"] = "zh_CN";
 	req["requested_at"] = itos(static_cast<int64_t>(OS::get_singleton()->get_unix_time()));
 	req["source"] = "ai_chat_panel";
@@ -112,24 +152,44 @@ Error AIBuildBridge::write_build_request() {
 		return ERR_FILE_CANT_WRITE;
 	}
 	file->store_string(raw);
+
+	Dictionary status;
+	status["state"] = "queued";
+	status["message"] = "AI package request was written; PackageBuilder has not reported progress yet.";
+	status["zip_path"] = String();
+	status["manifest_path"] = String();
+	status["build_log_path"] = String();
+	Ref<FileAccess> status_file = FileAccess::open(_build_status_path(), FileAccess::WRITE);
+	if (status_file.is_valid()) {
+		status_file->store_string(json.stringify(status));
+	}
 	return OK;
 }
 
 Error AIBuildBridge::launch_package_builder() {
 	String exe = _package_builder_exe_path();
-	if (!FileAccess::exists(exe)) {
+	String dll = _package_builder_dll_path();
+	if (!FileAccess::exists(exe) && dll.is_empty()) {
 		return ERR_FILE_NOT_FOUND;
 	}
 
 	// Launch PackageBuilder as a detached process.
-	// It will pick up the build request from artifacts/ai_build_request.json
-	// if --ai-build flag is supported, or it opens the GUI for manual build.
+	// It will run the request in headless AI mode and write ai_build_status.json.
 	List<String> args;
+	if (!dll.is_empty()) {
+		args.push_back(dll);
+	}
 	args.push_back("--ai-build");
 	args.push_back(_build_request_path());
 
 	ProcessID pid = 0;
-	Error err = OS::get_singleton()->create_process(exe, args, &pid, false);
+	Error err = OS::get_singleton()->create_process(!dll.is_empty() ? String("dotnet") : exe, args, &pid, false);
+	if (err != OK && !dll.is_empty() && FileAccess::exists(exe)) {
+		args.clear();
+		args.push_back("--ai-build");
+		args.push_back(_build_request_path());
+		err = OS::get_singleton()->create_process(exe, args, &pid, false);
+	}
 	if (err != OK) {
 		return err;
 	}
@@ -182,7 +242,89 @@ bool AIBuildBridge::get_latest_build_info(String &r_version, String &r_zip_path,
 	return !r_zip_path.is_empty();
 }
 
+bool AIBuildBridge::get_latest_package_launch_info(String &r_version, String &r_package_dir, String &r_exe_path, String &r_zip_path, String &r_build_log_path) {
+	String path = _build_history_path();
+	if (!FileAccess::exists(path)) {
+		return false;
+	}
+
+	Error err = OK;
+	String raw = FileAccess::get_file_as_string(path, &err);
+	if (err != OK || raw.is_empty()) {
+		return false;
+	}
+
+	JSON json;
+	if (json.parse(raw) != OK) {
+		return false;
+	}
+
+	Variant data = json.get_data();
+	if (data.get_type() != Variant::DICTIONARY) {
+		return false;
+	}
+
+	Dictionary root = data;
+	Variant records_var = root.get("Records", Variant());
+	if (records_var.get_type() != Variant::ARRAY) {
+		return false;
+	}
+
+	Array records = records_var;
+	for (int i = records.size() - 1; i >= 0; i--) {
+		if (records[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary record = records[i];
+		const String exe_path = record.get("ExePath", String());
+		const String package_dir = record.get("PackageDir", String());
+		const String zip_path = record.get("ZipPath", String());
+		if (exe_path.is_empty() || !FileAccess::exists(exe_path)) {
+			continue;
+		}
+		r_version = record.get("Version", String());
+		r_package_dir = package_dir;
+		r_exe_path = exe_path;
+		r_zip_path = zip_path;
+		r_build_log_path = record.get("BuildLogPath", String());
+		return true;
+	}
+
+	return false;
+}
+
 bool AIBuildBridge::is_build_ready() {
 	String version, zip, manifest, log;
 	return get_latest_build_info(version, zip, manifest, log);
+}
+
+bool AIBuildBridge::get_ai_build_status(String &r_state, String &r_message, String &r_zip_path, String &r_manifest_path, String &r_build_log_path) {
+	String path = _build_status_path();
+	if (!FileAccess::exists(path)) {
+		return false;
+	}
+
+	Error err = OK;
+	String raw = FileAccess::get_file_as_string(path, &err);
+	if (err != OK || raw.is_empty()) {
+		return false;
+	}
+
+	JSON json;
+	if (json.parse(raw) != OK) {
+		return false;
+	}
+
+	Variant data = json.get_data();
+	if (data.get_type() != Variant::DICTIONARY) {
+		return false;
+	}
+
+	Dictionary root = data;
+	r_state = root.get("state", String());
+	r_message = root.get("message", String());
+	r_zip_path = root.get("zip_path", String());
+	r_manifest_path = root.get("manifest_path", String());
+	r_build_log_path = root.get("build_log_path", String());
+	return !r_state.is_empty();
 }

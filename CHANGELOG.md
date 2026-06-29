@@ -7,6 +7,144 @@ previous feature release. It is equivalent to the listings on our
 Changelogs for earlier feature releases are available in their respective Git
 branches, and linked at the [end of this file](#Past-releases).
 
+## 0.3.13 alpha - 2026-06-29
+
+- [Release announcement](https://jundotengine.org/releases/0.3.13/)
+
+Table of contents:
+- [AI Assistant](#ai-assistant)
+- [AI Repair Workflow](#ai-repair-workflow)
+- [AI Memory & Skills](#ai-memory--skills)
+- [MCP Support](#mcp-support)
+- [Hot Update System](#hot-update-system)
+- [Package Builder](#package-builder)
+- [Audio](#audio)
+- [Platform Integration](#platform-integration)
+- [GDExtension](#gdextension)
+- [Editor](#editor)
+- [Core](#core)
+
+#### AI Assistant
+
+- Add built-in AI chat panel with conversational interface ([GH-001](https://github.com/jundotengine/jundot/pull/001)).
+- Add AI configuration panel for API key and model settings.
+- Add code context fetcher for injecting project code into AI conversations.
+- Add code security checker to scan AI-generated patches for vulnerabilities.
+- Add code uploader for sending code snippets to AI service.
+- Add 5 default AI skills: Debug Helper, Game Designer, GDScript Assistant, Godot Engine Expert, Scene Builder.
+- Add AI context builder that assembles project context for AI prompts.
+- Add AI develop flow for guided development assistance.
+- Add AI editor plugin integration with the main editor interface.
+- Add AI inspector context menu for quick AI actions on selected nodes.
+- Add AI usage agreement dialog with token cost transparency.
+- Add AI tool confirmation dialog for user approval of high-risk actions.
+- Add AI modified scene tracker for tracking scene changes.
+- Add AI source update service for updating AI source files.
+- Add AI importer for importing skills, MCP configs, and memory entries.
+- Add AI suggestion cards for accepting/rejecting AI-proposed entries.
+- Add AI restart helper for handling engine restarts during development.
+- Add OAuth 2.0 login support for GitHub and Gitee authentication.
+- Add AI feature gate for evaluating new feature proposals (universality, necessity, design philosophy consistency).
+- Add AI new build notifier for notifying users of new builds.
+
+#### AI Repair Workflow
+
+- Add AI-driven engine self-repair workflow from bug detection to patch application.
+- Add repair task UI cards with candidate files, patch summary, test commands, and risk assessment.
+- Add dirty worktree protection to prevent unintended file modifications.
+- Add pre-patch snapshot for rollback capability.
+- Add automated test runner for verifying fixes.
+- Add AI retry loop for failed test cases.
+- Add build bridge integration with PackageBuilder for incremental compilation.
+- Add patch applier for safely applying AI-generated patches.
+- Add repair card UI component for chat panel integration.
+
+#### AI Memory & Skills
+
+- Add project-scoped AI memory system (`ai_memory.json`).
+- Add memory panel for managing project memories.
+- Add skill registry system for managing AI skills.
+- Add skill installer for importing WorkBuddy SKILL.md files.
+- Add AI auto-suggest for skills, MCP servers, and memory entries.
+- Add tools panel for managing skills and MCP servers.
+- Add tool registry for managing available AI tools.
+- Add tool executor for running AI tool actions.
+- Add tool definitions framework for extensible tool support.
+
+#### MCP Support
+
+- Add MCP (Model Context Protocol) manager for MCP server orchestration.
+- Add MCP HTTP server for local MCP server hosting.
+- Add MCP runtime for executing MCP tool calls.
+- Add MCP configuration import from JSON files.
+- Add MCP server registry in project settings.
+
+#### Hot Update System
+
+- Add JundotLauncher standalone launcher application.
+- Add version check against remote update manifest.
+- Add package download with resume (breakpoint continuation) support.
+- Add SHA256 integrity verification for downloaded packages.
+- Add version backup and rollback capability.
+- Add grayscale release support (percentage-based + whitelist).
+- Add multiple update channels (stable, beta, dev).
+- Add update state persistence (`.jundot-update-state.json`).
+- Add command-line interface for launcher operations.
+
+#### Package Builder
+
+- Add PackageBuilder tool for building engine release packages.
+- Add incremental SCons compilation support.
+- Add build manager for coordinating build workflows.
+- Add change evaluator for source and package diff reports.
+- Add GitHub Releases publisher with automatic upload.
+- Add update manifest generator (`update-manifest.json`).
+- Add AI release summarizer for generating release notes.
+- Add publish configuration (grayscale, draft, token from env).
+- Add Windows GUI (MainForm) for build management.
+
+#### Audio
+
+- Add Wwise audio engine module integration.
+- Add jundot_wwise GDScript plugin for project-side usage.
+- Add Wwise singleton API for audio event playback.
+- Add sound bank loading and management.
+- Add game object registration and listener setup.
+
+#### Platform Integration
+
+- Add Steam usage time tracker (SteamAPI dynamic loading).
+- Add Steam editor integration for tracking usage hours.
+- Add SteamAPI initialization result enum.
+
+#### GDExtension
+
+- Add JundotInstance class for managing GDExtension engine instances.
+- Add `libjundot.h` public library interface.
+- Add instance lifecycle management (start, stop, pause, resume, iteration).
+- Add focus in/out event handling for embedded instances.
+
+#### Editor
+
+- Add AI editor plugin with dockable panels.
+- Add AI chat panel dock.
+- Add AI config panel dock.
+- Add AI memory panel dock.
+- Add AI tools panel dock.
+- Add project manager AI source manager.
+- Add AI defaults data for built-in skills.
+- Add AI HTTP response text parser for streaming responses.
+- Add AI chat message data model.
+- Add AI chat parser for parsing AI response formats.
+- Add AI chat service for managing conversation state.
+
+#### Core
+
+- Add `JundotInstance` core extension class.
+- Add AI settings data structures (`AISettingsData`).
+- Add AI build bridge for editor-build system communication.
+- Add AI Jundot plugin backend for plugin API integration.
+
 ## 4.6 - 2026-01-26
 
 - [Release announcement](https://jundotengine.org/releases/4.6/)

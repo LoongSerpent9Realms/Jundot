@@ -1,17 +1,7 @@
 ﻿{
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-  "Target": "editor.dev",
-=======
   "Target": "editor",
->>>>>>> Stashed changes
   "PlatformName": "windows",
   "Arch": "x86_64",
-=======
-  "Target": "editor",
-  "PlatformName": "android",
-  "Arch": "arm64",
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
   "RepoRoot": "H:\\Godot-Auto",
   "OutputDir": "artifacts/packages",
   "LogDir": "artifacts/logs",
@@ -19,23 +9,13 @@
   "Jobs": 0,
   "SkipBuild": false,
   "InstallSCons": true,
-  "Mono": false,
+  "Mono": true,
   "UseMinGW": false,
   "MingwPrefix": "",
   "EnableWindowsOptionalDeps": false,
   "CleanPackageDir": false,
-<<<<<<< Updated upstream
   "CleanBuild": false,
-  "ExtraSConsArgs": "",
-<<<<<<< HEAD
-  "AutoUpdateVersion": true,
-=======
-  "CleanBuild": true,
   "ExtraSConsArgs": "module_wwise_enabled=no",
-  "AutoUpdateVersion": false,
->>>>>>> Stashed changes
-=======
-  "AutoUpdateVersion": false,
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+  "AutoUpdateVersion": true,
   "GenerateUpdateManifest": true
 }

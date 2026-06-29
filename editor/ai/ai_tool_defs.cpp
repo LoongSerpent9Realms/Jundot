@@ -85,6 +85,13 @@ static Dictionary _number_property(const String &p_description) {
 	return prop;
 }
 
+static Dictionary _bool_property(const String &p_description) {
+	Dictionary prop;
+	prop["type"] = "boolean";
+	prop["description"] = p_description;
+	return prop;
+}
+
 static Dictionary _tool(const String &p_name, const String &p_description, const Dictionary &p_fn) {
 	Dictionary tool;
 	tool["type"] = "function";
@@ -208,6 +215,82 @@ Array AIToolDefs::get_builtin_tools() {
 	// 8. build_project
 	{
 		Dictionary props;
+		props["path"] = _str_property("Scene file path to create relative to the project root, e.g. 'scenes/levels/test_arena.tscn' or 'res://scenes/levels/test_arena.tscn'.");
+		props["root_name"] = _str_property("Optional root Node3D name. Defaults to World.");
+		props["include_camera"] = _bool_property("If true or omitted, add a Camera3D looking at the origin.");
+		props["include_lighting"] = _bool_property("If true or omitted, add a DirectionalLight3D.");
+		props["include_floor"] = _bool_property("If true or omitted, add a simple floor MeshInstance3D.");
+		Array required;
+		required.push_back("path");
+		Dictionary fn = _make_fn(
+				AIToolNames::CREATE_3D_SCENE,
+				"PROJECT mode only. Create a new Godot .tscn 3D scene with a Node3D root and optional starter camera, directional light, and floor. Use this for quickly scaffolding playable 3D prototypes before adding objects and scripts.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CREATE_3D_SCENE, "", fn));
+	}
+
+	// 9. add_3d_object
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new MeshInstance3D node.");
+		props["mesh_type"] = _str_property("Primitive mesh type: box, sphere, cylinder, capsule, plane, or quad. Defaults to box.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["position"] = _str_property("Optional Vector3 position, e.g. '0,1,0' or 'Vector3(0, 1, 0)'. Defaults to 0,0,0.");
+		props["rotation_degrees"] = _str_property("Optional Euler rotation in degrees, e.g. '0,45,0'. Defaults to 0,0,0.");
+		props["scale"] = _str_property("Optional Vector3 scale, e.g. '1,1,1'. Defaults to 1,1,1.");
+		props["size"] = _str_property("Optional primitive size. For box use Vector3, for sphere/cylinder/capsule use one number as radius, for plane/quad use Vector2 or two numbers.");
+		props["color"] = _str_property("Optional material color as '#RRGGBB', 'r,g,b', or 'Color(r,g,b,a)'. Defaults to neutral gray.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_3D_OBJECT,
+				"PROJECT mode only. Add a primitive MeshInstance3D with a StandardMaterial3D to an existing .tscn scene. Use for simple generated 3D props, blockers, floors, pickups, and prototype geometry.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_3D_OBJECT, "", fn));
+	}
+
+	// 10. add_3d_light
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new light node.");
+		props["light_type"] = _str_property("Light type: directional, omni, or spot. Defaults to directional.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["position"] = _str_property("Optional Vector3 position, e.g. '0,4,2'. Mostly used for omni and spot lights.");
+		props["rotation_degrees"] = _str_property("Optional Euler rotation in degrees, e.g. '-45,30,0'. Useful for directional and spot lights.");
+		props["color"] = _str_property("Optional light color as '#RRGGBB', 'r,g,b', or 'Color(r,g,b,a)'. Defaults to white.");
+		props["energy"] = _number_property("Optional light_energy value. Defaults to 1.5.");
+		props["range"] = _number_property("Optional omni_range or spot_range. Defaults to 8 for omni and 12 for spot.");
+		props["spot_angle"] = _number_property("Optional spot_angle in degrees for SpotLight3D. Defaults to 45.");
+		props["shadows"] = _bool_property("If true or omitted, enable shadows.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_3D_LIGHT,
+				"PROJECT mode only. Add a DirectionalLight3D, OmniLight3D, or SpotLight3D to an existing .tscn scene with color, energy, transform, range, angle, and shadow settings.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_3D_LIGHT, "", fn));
+	}
+
+	// 11. check_3d_scene
+	{
+		Dictionary props;
+		props["paths"] = _array_str_property("3D .tscn scene file path(s) relative to the project root to inspect.");
+		Array required;
+		required.push_back("paths");
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_3D_SCENE,
+				"PROJECT mode only. Statically inspect .tscn 3D scenes for likely missing basics such as Node3D root, Camera3D, lighting/world environment, visible MeshInstance3D content, and physics/collision coverage. Use after creating or modifying 3D scenes.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CHECK_3D_SCENE, "", fn));
+	}
+
+	// 12. build_project
+	{
+		Dictionary props;
 		props["project_path"] = _str_property("Optional .csproj or .sln path relative to the open project root, e.g. '22.csproj' or 'src/Game.csproj'. If omitted, the tool auto-detects a single .csproj/.sln in the project root.");
 		props["configuration"] = _str_property("Optional build configuration, such as Debug or Release.");
 		props["target"] = _str_property("Optional MSBuild target, such as Build, Rebuild, or Clean. Defaults to Build.");
@@ -222,7 +305,97 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::BUILD_PROJECT, "", fn));
 	}
 
-	// 9. play_scene
+	// 13. build_cpp_hot_module
+	{
+		Dictionary props;
+		props["extension_path"] = _str_property("Path to the project .gdextension file that should be reloaded after a successful build, relative to the open project root or res://.");
+		props["program"] = _str_property("Build executable to run inside the project, such as scons, cmake, ninja, python, or dotnet.");
+		Dictionary args_prop;
+		args_prop["type"] = "array";
+		args_prop["items"] = _str_property("One command argument.");
+		args_prop["description"] = "Command arguments as an array, not a shell string. Example: ['--build', 'build', '--config', 'Debug'].";
+		props["args"] = args_prop;
+		props["workdir"] = _str_property("Optional working directory relative to the open project root. Defaults to '.'.");
+		Array required;
+		required.push_back("extension_path");
+		required.push_back("program");
+		Dictionary fn = _make_fn(
+				AIToolNames::BUILD_CPP_HOT_MODULE,
+				"PROJECT mode only. Build a project-local C++ hot module using an explicit program + args command, then hot-reload its reloadable .gdextension with reload_cpp_hot_module. Workdir must stay inside the open project root.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::BUILD_CPP_HOT_MODULE, "", fn));
+	}
+
+	// 14. reload_cpp_hot_module
+	{
+		Dictionary props;
+		props["extension_path"] = _str_property("Path to a project .gdextension file, relative to the open project root or res://, for example 'native/my_module.gdextension'. The extension must be marked reloadable=true to support hot reload.");
+		Array required;
+		required.push_back("extension_path");
+		Dictionary fn = _make_fn(
+				AIToolNames::RELOAD_CPP_HOT_MODULE,
+				"PROJECT mode only. Load or hot-reload a C++ module implemented as a reloadable GDExtension. Use after the module's native library has been rebuilt in place. Returns whether the extension was loaded, reloaded, or needs an editor restart.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::RELOAD_CPP_HOT_MODULE, "", fn));
+	}
+
+	// 15. package_project
+	{
+		Dictionary props;
+		props["target"] = _str_property("Optional PackageBuilder target: editor, editor.dev, template_release, or template_debug. Defaults to editor. Use template targets when only export templates are needed.");
+		props["platform"] = _str_property("Optional target platform, such as windows, android, linuxbsd, macos, or web. Defaults to windows. PackageBuilder will reject unsupported host/platform combinations early.");
+		props["arch"] = _str_property("Optional architecture, such as x86_64, x86_32, or arm64. Defaults to x86_64.");
+		Dictionary bool_prop;
+		bool_prop["type"] = "boolean";
+		bool_prop["description"] = "If true, package existing binaries from bin/ without rebuilding the engine. Defaults to false.";
+		props["skip_build"] = bool_prop;
+		Dictionary mono_prop;
+		mono_prop["type"] = "boolean";
+		mono_prop["description"] = "If true, build/package Mono artifacts. Defaults to false.";
+		props["mono"] = mono_prop;
+		Dictionary auto_version_prop;
+		auto_version_prop["type"] = "boolean";
+		auto_version_prop["description"] = "If true, auto-increment version.py before a real build. Defaults to true. Set false for quick package-only or diagnostic runs.";
+		props["auto_update_version"] = auto_version_prop;
+		Dictionary manifest_prop;
+		manifest_prop["type"] = "boolean";
+		manifest_prop["description"] = "If true, generate update-manifest.json after packaging. Defaults to true.";
+		props["generate_update_manifest"] = manifest_prop;
+		Dictionary jobs_prop;
+		jobs_prop["type"] = "integer";
+		jobs_prop["description"] = "Optional SCons job count. 0 or omitted lets PackageBuilder choose.";
+		props["jobs"] = jobs_prop;
+		props["extra_scons_args"] = _str_property("Optional extra key=value SCons arguments, for example 'd3d12=no accesskit=no'. Use sparingly and prefer defaults.");
+		props["note"] = _str_property("Optional short reason for starting this package run, such as the approved plan or validation summary.");
+		Dictionary fn = _make_fn(
+				AIToolNames::PACKAGE_PROJECT,
+				"PROJECT mode only. Start an unattended JunDot package build through PackageBuilder using the AI build request file. For fast repackaging, set skip_build=true to reuse existing bin/ products. Use target/platform/arch only when a smaller or different package is needed. Returns immediately; call check_package_status until the package succeeds or fails.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::PACKAGE_PROJECT, "", fn));
+	}
+
+	// 14. check_package_status
+	{
+		Dictionary props;
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_PACKAGE_STATUS,
+				"PROJECT mode only. Check the unattended PackageBuilder run started by package_project. Returns running, success, or failed plus package zip, manifest, and build log paths when available. If running, call it again later before telling the user packaging is complete.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CHECK_PACKAGE_STATUS, "", fn));
+	}
+
+	// 15. play_scene
+	{
+		Dictionary props;
+		props["args"] = _str_property("Optional command-line arguments for the packaged executable smoke test. Defaults to --version, which should start and exit quickly.");
+		Dictionary fn = _make_fn(
+				AIToolNames::TEST_PACKAGE,
+				"PROJECT mode only. Smoke-test the latest packaged build before handing it to the user. Finds the latest PackageBuilder record, runs the packaged executable with a quick command such as --version, and returns exit code/output. Use after check_package_status reports success.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::TEST_PACKAGE, "", fn));
+	}
+
+	// 16. play_scene
 	{
 		Dictionary props;
 		props["scene_path"] = _str_property("Scene file path relative to the project root, e.g. 'scenes/main_menu.tscn' or 'res://scenes/main_menu.tscn'. If omitted, the project's main scene is played.");
@@ -233,7 +406,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::PLAY_SCENE, "", fn));
 	}
 
-	// 10. click_ui_position
+	// 17. click_ui_position
 	{
 		Dictionary props;
 		props["x"] = _number_property("X coordinate in the running game's viewport/window, in pixels from the top-left corner.");
@@ -250,7 +423,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CLICK_UI_POSITION, "", fn));
 	}
 
-	// 11. stop_play_scene
+	// 18. stop_play_scene
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -260,7 +433,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::STOP_PLAY_SCENE, "", fn));
 	}
 
-	// 12. run_build
+	// 19. run_build
 	{
 		Dictionary props;
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
@@ -271,7 +444,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
 
-	// 13. read_build_log
+	// 20. read_build_log
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -281,7 +454,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::READ_BUILD_LOG, "", fn));
 	}
 
-	// 14. fetch_url
+	// 21. fetch_url
 	{
 		Dictionary props;
 		props["url"] = _str_property("The full URL to download from.");
@@ -296,7 +469,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::FETCH_URL, "", fn));
 	}
 
-	// 15. shell_command
+	// 18. shell_command
 	{
 		Dictionary props;
 		props["command"] = _str_property("Shell command to execute.");
@@ -310,7 +483,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SHELL_COMMAND, "", fn));
 	}
 
-	// 16. restart_engine
+	// 19. restart_engine
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -320,7 +493,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RESTART_ENGINE, "", fn));
 	}
 
-	// 17. check_build_status
+	// 20. check_build_status
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -330,7 +503,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_BUILD_STATUS, "", fn));
 	}
 
-	// 18. upload_code
+	// 21. upload_code
 	{
 		Dictionary props;
 		props["file_path"] = _str_property("File path relative to the project root to upload to the git remote repository.");
@@ -345,7 +518,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::UPLOAD_CODE, "", fn));
 	}
 
-	// 19. develop_ai_verify
+	// 22. develop_ai_verify
 	{
 		Dictionary props;
 		Dictionary passed;
@@ -363,7 +536,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::DEVELOP_AI_VERIFY, "", fn));
 	}
 
-	// 20. setup_engine_workspace
+	// 23. setup_engine_workspace
 	{
 		Dictionary props;
 		props["workspace_name"] = _str_property("Short project-specific engine workspace name. If omitted, the open project directory name is used.");
@@ -379,7 +552,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::SETUP_ENGINE_WORKSPACE, "", fn));
 	}
 
-	// 21. request_engine_change
+	// 24. request_engine_change
 	{
 		Dictionary props;
 		props["reason"] = _str_property("The exact project requirement or engine limitation that makes an engine change necessary.");
@@ -395,7 +568,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::REQUEST_ENGINE_CHANGE, "", fn));
 	}
 
-	// 22. return_to_project_mode
+	// 25. return_to_project_mode
 	{
 		Dictionary props;
 		props["summary"] = _str_property("Summary of the engine change, validation result, and what the project-side continuation should do next.");
@@ -408,10 +581,10 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RETURN_TO_PROJECT_MODE, "", fn));
 	}
 
-	// 23. batch_tools
+	// 26. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, play_scene, click_ui_position, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, play_scene, click_ui_position, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -539,7 +712,16 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	HashSet<StringName> project_only;
 	project_only.insert(StringName(AIToolNames::CHECK_PROJECT_SCRIPTS));
 	project_only.insert(StringName(AIToolNames::CHECK_UI_LAYOUT));
+	project_only.insert(StringName(AIToolNames::CREATE_3D_SCENE));
+	project_only.insert(StringName(AIToolNames::ADD_3D_OBJECT));
+	project_only.insert(StringName(AIToolNames::ADD_3D_LIGHT));
+	project_only.insert(StringName(AIToolNames::CHECK_3D_SCENE));
 	project_only.insert(StringName(AIToolNames::BUILD_PROJECT));
+	project_only.insert(StringName(AIToolNames::BUILD_CPP_HOT_MODULE));
+	project_only.insert(StringName(AIToolNames::RELOAD_CPP_HOT_MODULE));
+	project_only.insert(StringName(AIToolNames::PACKAGE_PROJECT));
+	project_only.insert(StringName(AIToolNames::CHECK_PACKAGE_STATUS));
+	project_only.insert(StringName(AIToolNames::TEST_PACKAGE));
 	project_only.insert(StringName(AIToolNames::PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::CLICK_UI_POSITION));
 	project_only.insert(StringName(AIToolNames::STOP_PLAY_SCENE));

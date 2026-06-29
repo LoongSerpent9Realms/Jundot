@@ -1,5 +1,6 @@
 using Microsoft.Maui.Controls;
 using System.Text;
+using System.Text.Json;
 
 namespace JundotCrashDialog;
 
@@ -7,12 +8,14 @@ public partial class MainPage : ContentPage
 {
     public CrashInfo CrashInfo { get; private set; }
     public bool UserRequestedRestart { get; private set; }
+    public bool UserRequestedRollback { get; private set; }
 
     public MainPage(CrashInfo info)
     {
         InitializeComponent();
         CrashInfo = info;
         UserRequestedRestart = false;
+        UserRequestedRollback = false;
         PopulateContent();
     }
 
@@ -67,6 +70,11 @@ public partial class MainPage : ContentPage
         FooterLabel.Text = string.IsNullOrEmpty(CrashInfo.LogOutputPath)
             ? "提示: 无法写入日志文件，请检查磁盘空间与权限。"
             : $"完整日志已写入: {CrashInfo.LogOutputPath}";
+
+        var rollbackAvailable = HasRollbackBackup(CrashInfo.EngineDir);
+        RollbackButton.IsEnabled = rollbackAvailable;
+        RollbackButton.Opacity = rollbackAvailable ? 1.0 : 0.45;
+        RollbackButton.Text = rollbackAvailable ? "回到上一版本" : "无可用备份";
     }
 
     private static string Truncate(string text, int maxChars)
@@ -83,12 +91,54 @@ public partial class MainPage : ContentPage
     private void OnRestartClicked(object sender, EventArgs e)
     {
         UserRequestedRestart = true;
+        UserRequestedRollback = false;
+        Application.Current?.Quit();
+    }
+
+    private void OnRollbackClicked(object sender, EventArgs e)
+    {
+        UserRequestedRollback = true;
+        UserRequestedRestart = false;
         Application.Current?.Quit();
     }
 
     private void OnCloseClicked(object sender, EventArgs e)
     {
         UserRequestedRestart = false;
+        UserRequestedRollback = false;
         Application.Current?.Quit();
+    }
+
+    private static bool HasRollbackBackup(string engineDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(engineDir))
+                return false;
+
+            var statePath = Path.Combine(engineDir, ".jundot-update-state.json");
+            if (!File.Exists(statePath))
+                return false;
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(statePath));
+            if (!doc.RootElement.TryGetProperty("backups", out var backups) || backups.ValueKind != JsonValueKind.Array)
+                return false;
+
+            foreach (var backup in backups.EnumerateArray())
+            {
+                if (!backup.TryGetProperty("backup_path", out var pathValue))
+                    continue;
+
+                var path = pathValue.GetString();
+                if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+                    return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

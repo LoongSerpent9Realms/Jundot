@@ -1701,12 +1701,21 @@ void Viewport::_gui_show_tooltip_at(const Point2i &p_pos) {
 	} else {
 		vr = window->get_usable_parent_rect();
 	}
+	if (vr.has_area()) {
+		panel->set_max_size(vr.size);
+	}
 	panel->content_scale_factor = popup_scale;
 	r.size *= popup_scale;
 	r.size = r.size.ceil();
-	r.size = r.size.min(panel->get_max_size());
+	Size2i popup_max_size = panel->get_max_size();
+	if (popup_max_size > Size2i()) {
+		r.size = r.size.min(popup_max_size);
+	}
+	if (vr.has_area()) {
+		r.size = r.size.min(vr.size);
+	}
 
-	if (!DisplayServer::get_singleton()->has_feature(DisplayServerEnums::FEATURE_SELF_FITTING_WINDOWS) || gui.tooltip_popup->is_embedded()) {
+	if (vr.has_area()) {
 		if (r.size.x + r.position.x > vr.size.x + vr.position.x) {
 			// Place it in the opposite direction. If it fails, just hug the border.
 			r.position.x = gui.tooltip_pos.x - r.size.x - tooltip_offset.x;

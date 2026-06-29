@@ -38,6 +38,7 @@
 
 #include "editor/docks/editor_dock.h"
 #include "editor/docks/editor_dock_manager.h"
+#include "editor/editor_main_screen.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/inspector/editor_context_menu_plugin.h"
@@ -76,6 +77,17 @@ Control *AIEditorPlugin::_create_placeholder_panel(const String &p_title, const 
 }
 
 void AIEditorPlugin::_create_dock() {
+	main_screen_panel = memnew(MarginContainer);
+	main_screen_panel->set_name(TTRC("AI Assistant"));
+	main_screen_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	main_screen_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	main_screen_panel->add_theme_constant_override("margin_left", 8 * EDSCALE);
+	main_screen_panel->add_theme_constant_override("margin_top", 8 * EDSCALE);
+	main_screen_panel->add_theme_constant_override("margin_right", 8 * EDSCALE);
+	main_screen_panel->add_theme_constant_override("margin_bottom", 8 * EDSCALE);
+	EditorNode::get_singleton()->get_editor_main_screen()->get_control()->add_child(main_screen_panel);
+	main_screen_panel->hide();
+
 	ai_dock = memnew(EditorDock);
 	ai_dock->set_visible(false);
 	ai_dock->set_title(TTRC("AI Assistant"));
@@ -101,6 +113,24 @@ void AIEditorPlugin::_create_dock() {
 	EditorDockManager::get_singleton()->add_dock(ai_dock);
 }
 
+void AIEditorPlugin::make_visible(bool p_visible) {
+	if (!main_screen_panel || !tabs || !ai_dock) {
+		return;
+	}
+
+	if (p_visible) {
+		if (tabs->get_parent() != main_screen_panel) {
+			tabs->reparent(main_screen_panel);
+		}
+		main_screen_panel->show();
+	} else {
+		main_screen_panel->hide();
+		if (tabs->get_parent() != ai_dock) {
+			tabs->reparent(ai_dock);
+		}
+	}
+}
+
 AIEditorPlugin::AIEditorPlugin() {
 	_create_dock();
 	AIMCPManager::get_singleton()->initialize();
@@ -116,6 +146,10 @@ AIEditorPlugin::AIEditorPlugin() {
 }
 
 AIEditorPlugin::~AIEditorPlugin() {
+	if (main_screen_panel) {
+		main_screen_panel->queue_free();
+		main_screen_panel = nullptr;
+	}
 	if (ai_dock) {
 		EditorDockManager::get_singleton()->remove_dock(ai_dock);
 		ai_dock->queue_free();

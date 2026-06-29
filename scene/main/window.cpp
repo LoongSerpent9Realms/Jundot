@@ -2224,6 +2224,25 @@ void Window::popup(const Rect2i &p_screen_rect) {
 	_popup_base(screen_rect);
 }
 
+static Rect2i _fit_popup_rect_to_screen(Rect2i p_rect, const Rect2i &p_screen_rect) {
+	if (p_screen_rect == Rect2i()) {
+		return p_rect;
+	}
+
+	p_rect.size = p_rect.size.min(p_screen_rect.size);
+
+	const Point2i screen_end = p_screen_rect.get_end();
+	if (p_rect.position.x + p_rect.size.x > screen_end.x) {
+		p_rect.position.x = screen_end.x - p_rect.size.x;
+	}
+	if (p_rect.position.y + p_rect.size.y > screen_end.y) {
+		p_rect.position.y = screen_end.y - p_rect.size.y;
+	}
+
+	p_rect.position = p_rect.position.max(p_screen_rect.position);
+	return p_rect;
+}
+
 void Window::_popup_base(const Rect2i &p_screen_rect) {
 	ERR_MAIN_THREAD_GUARD;
 
@@ -2241,15 +2260,29 @@ void Window::_popup_base(const Rect2i &p_screen_rect) {
 	bool should_fit = is_embedded() || !DisplayServer::get_singleton()->has_feature(DisplayServerEnums::FEATURE_SELF_FITTING_WINDOWS);
 
 	if (p_screen_rect != Rect2i()) {
-		set_position(p_screen_rect.position);
+		Rect2i fitted_rect = p_screen_rect;
+		if (!is_embedded()) {
+			int screen_id = DisplayServer::get_singleton()->get_screen_from_rect(fitted_rect);
+			if (screen_id == DisplayServerEnums::INVALID_SCREEN) {
+				Window *parent_window = get_parent_visible_window();
+				if (parent_window) {
+					screen_id = DisplayServer::get_singleton()->window_get_current_screen(parent_window->get_window_id());
+				}
+			}
+			if (screen_id != DisplayServerEnums::INVALID_SCREEN) {
+				fitted_rect = _fit_popup_rect_to_screen(fitted_rect, DisplayServer::get_singleton()->screen_get_usable_rect(screen_id));
+			}
+		}
+
+		set_position(fitted_rect.position);
 
 		if (should_fit) {
-			int screen_id = DisplayServer::get_singleton()->get_screen_from_rect(p_screen_rect);
-			Size2i screen_size = DisplayServer::get_singleton()->screen_get_usable_rect(screen_id).size;
-			Size2i new_size = p_screen_rect.size.min(screen_size);
+			int screen_id = is_embedded() ? DisplayServerEnums::INVALID_SCREEN : DisplayServer::get_singleton()->get_screen_from_rect(fitted_rect);
+			Size2i screen_size = is_embedded() || screen_id == DisplayServerEnums::INVALID_SCREEN ? fitted_rect.size : DisplayServer::get_singleton()->screen_get_usable_rect(screen_id).size;
+			Size2i new_size = fitted_rect.size.min(screen_size);
 			set_size(new_size);
 		} else {
-			set_size(p_screen_rect.size);
+			set_size(fitted_rect.size);
 		}
 	}
 
@@ -2275,8 +2308,19 @@ void Window::_popup_base(const Rect2i &p_screen_rect) {
 	if (is_embedded()) {
 		parent_rect = get_embedder()->get_visible_rect();
 	} else {
-		int screen_id = DisplayServer::get_singleton()->window_get_current_screen(get_window_id());
-		parent_rect = DisplayServer::get_singleton()->screen_get_usable_rect(screen_id);
+		int screen_id = DisplayServer::get_singleton()->get_screen_from_rect(Rect2i(position, size));
+		if (screen_id == DisplayServerEnums::INVALID_SCREEN) {
+			screen_id = DisplayServer::get_singleton()->window_get_current_screen(get_window_id());
+		}
+		if (screen_id == DisplayServerEnums::INVALID_SCREEN) {
+			Window *parent_window = get_parent_visible_window();
+			if (parent_window) {
+				screen_id = DisplayServer::get_singleton()->window_get_current_screen(parent_window->get_window_id());
+			}
+		}
+		if (screen_id != DisplayServerEnums::INVALID_SCREEN) {
+			parent_rect = DisplayServer::get_singleton()->screen_get_usable_rect(screen_id);
+		}
 	}
 	if (should_fit && parent_rect != Rect2i() && !parent_rect.intersects(Rect2i(position, size))) {
 		ERR_PRINT(vformat("Window %d spawned at invalid position: %s.", get_window_id(), position));
@@ -2284,6 +2328,10 @@ void Window::_popup_base(const Rect2i &p_screen_rect) {
 	}
 	if (parent_rect != Rect2i() && is_clamped_to_embedder() && is_embedded()) {
 		Rect2i new_rect = fit_rect_in_parent(Rect2i(position, size), parent_rect);
+		set_position(new_rect.position);
+		set_size(new_rect.size);
+	} else if (parent_rect != Rect2i() && !is_embedded()) {
+		Rect2i new_rect = _fit_popup_rect_to_screen(Rect2i(position, size), parent_rect);
 		set_position(new_rect.position);
 		set_size(new_rect.size);
 	}

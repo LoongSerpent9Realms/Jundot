@@ -60,6 +60,13 @@
                     Padding="16,8"
                     BackgroundColor="#3C78D8"
                     TextColor="White"/>
+            <Button Text="回到上一版本"
+                    x:Name="RollbackButton"
+                    Clicked="OnRollbackClicked"
+                    FontSize="14"
+                    Padding="16,8"
+                    BackgroundColor="#7A4D00"
+                    TextColor="White"/>
             <Button Text="关闭" 
                     Clicked="OnCloseClicked"
                     FontSize="14"
