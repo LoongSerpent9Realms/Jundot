@@ -302,7 +302,11 @@ String UpdateManager::find_launcher_path() {
 	const char *candidates[] = {
 		"JundotLauncher.exe",
 		"Tools/Launcher/JundotLauncher.exe",
+		"../Tools/Launcher/JundotLauncher.exe",
 		"../tools/Launcher/bin/Debug/net8.0/JundotLauncher.exe",
+		"../tools/Launcher/bin/Debug/net8.0/win-x64/JundotLauncher.exe",
+		"../tools/Launcher/bin/Release/net8.0/JundotLauncher.exe",
+		"../tools/Launcher/bin/Release/net8.0/win-x64/JundotLauncher.exe",
 	};
 
 	for (const char *candidate : candidates) {
@@ -331,12 +335,14 @@ int UpdateManager::trigger_launcher_update() {
 
 	List<String> args;
 	args.push_back("update");
-	args.push_back(vformat("--engine-path=%s", engine_dir));
+	args.push_back("--engine-path");
+	args.push_back(engine_dir);
 	args.push_back("--yes");
 
 	String channel = _get_user_channel();
 	if (channel != "stable" && channel != "disabled") {
-		args.push_back(vformat("--channel=%s", channel));
+		args.push_back("--channel");
+		args.push_back(channel);
 	}
 
 	Error err = OS::get_singleton()->create_process(launcher, args, &launcher_pid, true);
@@ -376,10 +382,12 @@ int UpdateManager::trigger_launcher_rollback(const String &p_target_version) {
 
 	List<String> args;
 	args.push_back("rollback");
-	args.push_back(vformat("--engine-path=%s", engine_dir));
+	args.push_back("--engine-path");
+	args.push_back(engine_dir);
 
 	if (!p_target_version.is_empty()) {
-		args.push_back(vformat("--target=%s", p_target_version));
+		args.push_back("--target");
+		args.push_back(p_target_version);
 	}
 
 	int exitcode = -1;

@@ -1760,6 +1760,9 @@ void Window::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_VISIBILITY_CHANGED: {
+			if (!is_visible()) {
+				popup_content_max_size = Size2i();
+			}
 			if (unparent_when_invisible && !is_visible()) {
 				Node *p = get_parent();
 				if (p) {
@@ -2109,11 +2112,13 @@ void Window::popup_centered_clamped(const Size2i &p_size, float p_fallback_ratio
 		parent_rect.position = DisplayServer::get_singleton()->screen_get_position(parent_screen);
 		parent_rect.size = DisplayServer::get_singleton()->screen_get_size(parent_screen);
 	}
-
 	Vector2i size_ratio = parent_rect.size * p_fallback_ratio;
 
 	Rect2i popup_rect;
 	popup_rect.size = size_ratio.min(expected_size);
+	if (popup_rect.size != Size2i()) {
+		popup_content_max_size = popup_rect.size;
+	}
 	popup_rect.size = _clamp_window_size(popup_rect.size);
 
 	if (parent_rect != Rect2()) {
@@ -2151,9 +2156,12 @@ void Window::popup_centered(const Size2i &p_minsize) {
 		parent_rect.position = DisplayServer::get_singleton()->screen_get_position(parent_screen);
 		parent_rect.size = DisplayServer::get_singleton()->screen_get_size(parent_screen);
 	}
-
 	Rect2i popup_rect;
 	popup_rect.size = _clamp_window_size(expected_size);
+	if (popup_rect.size != Size2i()) {
+		popup_content_max_size = popup_rect.size;
+		popup_rect.size = _clamp_window_size(expected_size);
+	}
 
 	if (parent_rect != Rect2()) {
 		popup_rect.position = parent_rect.position + (parent_rect.size - popup_rect.size) / 2;
@@ -2188,10 +2196,12 @@ void Window::popup_centered_ratio(float p_ratio) {
 		parent_rect.position = DisplayServer::get_singleton()->screen_get_position(parent_screen);
 		parent_rect.size = DisplayServer::get_singleton()->screen_get_size(parent_screen);
 	}
-
 	Rect2i popup_rect;
 	if (parent_rect != Rect2()) {
 		popup_rect.size = parent_rect.size * p_ratio;
+		if (popup_rect.size != Size2i()) {
+			popup_content_max_size = popup_rect.size;
+		}
 		popup_rect.size = _clamp_window_size(popup_rect.size);
 		popup_rect.position = parent_rect.position + (parent_rect.size - popup_rect.size) / 2;
 	}
@@ -2215,6 +2225,7 @@ void Window::popup(const Rect2i &p_screen_rect) {
 
 	Rect2i screen_rect = p_screen_rect;
 	if (screen_rect != Rect2i()) {
+		popup_content_max_size = screen_rect.size;
 		set_size(screen_rect.size);
 	}
 	_pre_popup();
@@ -2252,6 +2263,32 @@ void Window::_popup_base(const Rect2i &p_screen_rect) {
 		if (scene_tree) {
 			scene_tree->notify_group_flags(SceneTree::GROUP_CALL_DEFERRED, "_viewports", NOTIFICATION_WM_WINDOW_FOCUS_OUT);
 		}
+	}
+
+	Rect2i popup_limit_rect;
+	if (is_embedded()) {
+		popup_limit_rect = get_embedder()->get_visible_rect();
+	} else {
+		int screen_id = DisplayServerEnums::INVALID_SCREEN;
+		if (p_screen_rect != Rect2i()) {
+			screen_id = DisplayServer::get_singleton()->get_screen_from_rect(p_screen_rect);
+		}
+		if (screen_id == DisplayServerEnums::INVALID_SCREEN) {
+			Window *parent_window = get_parent_visible_window();
+			if (parent_window) {
+				screen_id = DisplayServer::get_singleton()->window_get_current_screen(parent_window->get_window_id());
+			}
+		}
+		if (screen_id != DisplayServerEnums::INVALID_SCREEN) {
+			popup_limit_rect = DisplayServer::get_singleton()->screen_get_usable_rect(screen_id);
+		}
+	}
+	if (p_screen_rect != Rect2i() && popup_limit_rect != Rect2i()) {
+		popup_content_max_size = p_screen_rect.size.min(popup_limit_rect.size);
+	} else if (p_screen_rect != Rect2i()) {
+		popup_content_max_size = p_screen_rect.size;
+	} else if (popup_limit_rect != Rect2i() && popup_content_max_size == Size2i()) {
+		popup_content_max_size = popup_limit_rect.size;
 	}
 
 	// Update window size to calculate the actual window size based on contents minimum size and minimum size.
@@ -2420,7 +2457,11 @@ Size2 Window::get_clamped_minimum_size() const {
 		return min_size;
 	}
 
-	return min_size.max(get_contents_minimum_size() * get_content_scale_factor());
+	Size2 content_minimum_size = get_contents_minimum_size() * get_content_scale_factor();
+	if (popup_content_max_size != Size2i()) {
+		content_minimum_size = content_minimum_size.min(popup_content_max_size);
+	}
+	return min_size.max(content_minimum_size);
 }
 
 void Window::grab_focus() {

@@ -56,6 +56,8 @@
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
 
+#include "modules/zip/zip_reader.h"
+
 #ifdef WINDOWS_ENABLED
 #include <windows.h>
 #undef FAILED
@@ -73,6 +75,10 @@ static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
 static constexpr int BACKEND_TYPE_JUNDOT_PLUGIN = 0;
 static constexpr int BACKEND_TYPE_CODEX = 1;
 static constexpr int BACKEND_TYPE_LEGACY_OPENAI = 2;
+static constexpr const char *MIMOCODE_RELEASE_TAG = "v0.4";
+static constexpr const char *MIMOCODE_RELEASE_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/tag/v0.4";
+static constexpr const char *MIMOCODE_DOWNLOAD_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/download/v0.4/mimocode-windows-x64.zip";
+static constexpr const char *MIMOCODE_EXE_NAME = "mimo.exe";
 
 struct ExternalMCPAppTarget {
 	String name;
@@ -332,6 +338,90 @@ static Error _write_external_ai_mcp_config(const String &p_path, const String &p
 	return OK;
 }
 
+static String _get_mimocode_install_dir() {
+	return OS::get_singleton()->get_user_data_dir().path_join("mimocode").path_join(MIMOCODE_RELEASE_TAG);
+}
+
+static String _get_mimocode_download_dir() {
+	return OS::get_singleton()->get_user_data_dir().path_join("mimocode").path_join("downloads");
+}
+
+static String _find_mimocode_executable_in_dir(const String &p_dir) {
+	const String direct_path = p_dir.path_join(MIMOCODE_EXE_NAME);
+	if (FileAccess::exists(direct_path)) {
+		return direct_path;
+	}
+
+	Ref<DirAccess> dir = DirAccess::open(p_dir);
+	if (dir.is_null()) {
+		return String();
+	}
+
+	dir->list_dir_begin();
+	String entry = dir->get_next();
+	while (!entry.is_empty()) {
+		if (dir->current_is_dir() && !entry.begins_with(".")) {
+			const String found = _find_mimocode_executable_in_dir(p_dir.path_join(entry));
+			if (!found.is_empty()) {
+				dir->list_dir_end();
+				return found;
+			}
+		} else if (entry.nocasecmp_to(MIMOCODE_EXE_NAME) == 0) {
+			dir->list_dir_end();
+			return p_dir.path_join(entry);
+		}
+		entry = dir->get_next();
+	}
+	dir->list_dir_end();
+	return String();
+}
+
+static Error _extract_mimocode_zip(const String &p_zip_path, const String &p_install_dir, String &r_executable_path) {
+	Ref<ZIPReader> zip;
+	zip.instantiate();
+	Error err = zip->open(p_zip_path);
+	ERR_FAIL_COND_V_MSG(err != OK, err, "Could not open MiMoCode ZIP package.");
+
+	err = DirAccess::make_dir_recursive_absolute(p_install_dir);
+	if (err != OK) {
+		zip->close();
+		return err;
+	}
+
+	const PackedStringArray files = zip->get_files();
+	for (int i = 0; i < files.size(); i++) {
+		String file_path = files[i].simplify_path();
+		if (file_path.is_empty() || file_path.begins_with("../") || file_path.contains("/../") || file_path.is_absolute_path()) {
+			continue;
+		}
+		if (file_path.ends_with("/")) {
+			DirAccess::make_dir_recursive_absolute(p_install_dir.path_join(file_path));
+			continue;
+		}
+
+		const PackedByteArray data = zip->read_file(files[i], true);
+		const String output_path = p_install_dir.path_join(file_path);
+		err = DirAccess::make_dir_recursive_absolute(output_path.get_base_dir());
+		if (err != OK) {
+			zip->close();
+			return err;
+		}
+
+		Ref<FileAccess> output = FileAccess::open(output_path, FileAccess::WRITE, &err);
+		if (err != OK || output.is_null()) {
+			zip->close();
+			return err != OK ? err : ERR_CANT_OPEN;
+		}
+		if (!data.is_empty()) {
+			output->store_buffer(data.ptr(), data.size());
+		}
+	}
+
+	zip->close();
+	r_executable_path = _find_mimocode_executable_in_dir(p_install_dir);
+	return r_executable_path.is_empty() ? ERR_FILE_NOT_FOUND : OK;
+}
+
 void AIConfigPanel::_bind_methods() {
 }
 
@@ -480,8 +570,8 @@ void AIConfigPanel::_update_translations() {
 	export_button->set_text(TTR("Export Config"));
 	import_button->set_text(TTR("Import Config"));
 	auto_configure_mcp_button->set_text(TTR("Auto Configure External MCP Apps"));
-	mimocode_download_button->set_text(TTR("Download MiMoCode"));
-	mimocode_download_button->set_tooltip_text(TTR("Open the packaged MiMoCode jundot plugin download page."));
+	mimocode_download_button->set_text(TTR("Download / Start MiMoCode"));
+	mimocode_download_button->set_tooltip_text(TTR("Download MiMoCode v0.4 if needed, then start it and save the local plugin connection settings."));
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	jundot_plugin_id_edit->set_placeholder(JUNDOT_MIMOCODE_PLUGIN_ID);
 	jundot_plugin_url_edit->set_placeholder("http://127.0.0.1:4096");
@@ -562,12 +652,102 @@ void AIConfigPanel::_on_backend_type_selected(int p_index) {
 }
 
 void AIConfigPanel::_on_mimocode_download_button_pressed() {
-	const Error err = OS::get_singleton()->shell_open(JUNDOT_MIMOCODE_RELEASES_URL);
-	if (err != OK) {
-		status_label->set_text(vformat(TTR("Could not open MiMoCode download page: %s"), JUNDOT_MIMOCODE_RELEASES_URL));
+	const String install_dir = _get_mimocode_install_dir();
+	const String executable_path = _find_mimocode_executable_in_dir(install_dir);
+	if (!executable_path.is_empty()) {
+		const Error launch_err = _start_mimocode(executable_path);
+		if (launch_err != OK) {
+			status_label->set_text(vformat(TTR("MiMoCode is installed, but could not be started. Error: %d"), (int)launch_err));
+		}
 		return;
 	}
-	status_label->set_text(TTR("Opened the MiMoCode packaged plugin download page."));
+
+	const Error dir_err = DirAccess::make_dir_recursive_absolute(_get_mimocode_download_dir());
+	if (dir_err != OK) {
+		status_label->set_text(TTR("Could not create MiMoCode download folder."));
+		return;
+	}
+
+	mimocode_download_zip_path = _get_mimocode_download_dir().path_join("mimocode-windows-x64-" + String(MIMOCODE_RELEASE_TAG) + ".zip");
+	if (FileAccess::exists(mimocode_download_zip_path)) {
+		String extracted_executable;
+		const Error extract_err = _extract_mimocode_zip(mimocode_download_zip_path, install_dir, extracted_executable);
+		if (extract_err == OK) {
+			const Error launch_err = _start_mimocode(extracted_executable);
+			if (launch_err != OK) {
+				status_label->set_text(vformat(TTR("MiMoCode was extracted, but could not be started. Error: %d"), (int)launch_err));
+			}
+			return;
+		}
+		DirAccess::remove_file_or_error(mimocode_download_zip_path);
+	}
+
+	if (!mimocode_download_request) {
+		status_label->set_text(TTR("MiMoCode downloader is not available."));
+		return;
+	}
+
+	mimocode_download_request->set_download_file(mimocode_download_zip_path);
+	PackedStringArray headers;
+	headers.push_back("User-Agent: Jundot-MiMoCode-Downloader/1.0");
+	const Error err = mimocode_download_request->request(MIMOCODE_DOWNLOAD_URL, headers);
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Could not start MiMoCode download: %s"), MIMOCODE_RELEASE_URL));
+		return;
+	}
+	if (mimocode_download_button) {
+		mimocode_download_button->set_disabled(true);
+	}
+	status_label->set_text(TTR("Downloading MiMoCode v0.4..."));
+}
+
+void AIConfigPanel::_on_mimocode_download_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
+	(void)p_headers;
+	(void)p_body;
+
+	if (mimocode_download_button) {
+		mimocode_download_button->set_disabled(false);
+	}
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code < 200 || p_response_code >= 300) {
+		status_label->set_text(vformat(TTR("MiMoCode download failed. HTTP %d, result %d."), p_response_code, p_result));
+		return;
+	}
+
+	String executable_path;
+	const Error extract_err = _extract_mimocode_zip(mimocode_download_zip_path, _get_mimocode_install_dir(), executable_path);
+	if (extract_err != OK) {
+		status_label->set_text(vformat(TTR("MiMoCode download completed, but extraction failed. Error: %d"), (int)extract_err));
+		return;
+	}
+
+	const Error launch_err = _start_mimocode(executable_path);
+	if (launch_err != OK) {
+		status_label->set_text(vformat(TTR("MiMoCode was installed, but could not be started. Error: %d"), (int)launch_err));
+	}
+}
+
+Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
+	List<String> args;
+	ProcessID pid = 0;
+	const Error err = OS::get_singleton()->create_process(p_executable_path, args, &pid, false);
+	if (err != OK) {
+		return err;
+	}
+
+	if (backend_type_option) {
+		backend_type_option->select(backend_type_option->get_item_index(BACKEND_TYPE_JUNDOT_PLUGIN));
+	}
+	if (jundot_plugin_id_edit) {
+		jundot_plugin_id_edit->set_text(JUNDOT_MIMOCODE_PLUGIN_ID);
+	}
+	if (jundot_plugin_url_edit) {
+		jundot_plugin_url_edit->set_text("http://127.0.0.1:4096");
+	}
+	_update_backend_controls();
+	_save_settings();
+	status_label->set_text(TTR("MiMoCode started. MiMoCode backend settings were saved; Jundot will connect to http://127.0.0.1:4096."));
+	return OK;
 }
 
 void AIConfigPanel::_update_engine_source_status() {
@@ -1748,6 +1928,11 @@ AIConfigPanel::AIConfigPanel() {
 	test_service = memnew(AIChatService);
 	test_service->connect(SNAME("chat_completed"), callable_mp(this, &AIConfigPanel::_test_connection_completed));
 	add_child(test_service, false, INTERNAL_MODE_BACK);
+
+	mimocode_download_request = memnew(HTTPRequest);
+	mimocode_download_request->set_timeout(120.0);
+	mimocode_download_request->connect(SNAME("request_completed"), callable_mp(this, &AIConfigPanel::_on_mimocode_download_completed));
+	add_child(mimocode_download_request, false, INTERNAL_MODE_BACK);
 
 	usage_agreement_dialog = memnew(AIUsageAgreementDialog);
 	add_child(usage_agreement_dialog);

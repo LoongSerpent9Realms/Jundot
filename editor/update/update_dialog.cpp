@@ -42,7 +42,7 @@
 
 UpdateDialog::UpdateDialog() {
 	set_title(TTRC("Engine Update Available"));
-	set_size(Size2(520, 420) * EDSCALE);
+	set_size(Size2(760, 640) * EDSCALE);
 	set_ok_button_text(TTRC("Remind Later"));
 
 	VBoxContainer *main_vbox = memnew(VBoxContainer);
@@ -88,8 +88,10 @@ UpdateDialog::UpdateDialog() {
 	_changelog->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	_changelog->set_v_size_flags(Control::SIZE_EXPAND_FILL);
 	_changelog->set_custom_minimum_size(Size2(0, 120) * EDSCALE);
+	_changelog->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	_changelog->set_fit_content(false);
+	_changelog->set_scroll_active(true);
 	_changelog->set_selection_enabled(true);
-	_changelog->set_scroll_follow(true);
 	main_vbox->add_child(_changelog);
 
 	// ── Action buttons ───────────────────────────────────────
@@ -162,7 +164,7 @@ void UpdateDialog::set_update_started() {
 	_update_button->set_disabled(true);
 	_skip_button->set_disabled(true);
 	get_ok_button()->set_disabled(true);
-	popup_centered();
+	popup_centered_clamped(Size2(760, 640) * EDSCALE, 0.9);
 }
 
 void UpdateDialog::set_update_finished(bool p_success, const String &p_message) {
@@ -173,7 +175,7 @@ void UpdateDialog::set_update_finished(bool p_success, const String &p_message) 
 	_skip_button->set_disabled(p_success);
 	get_ok_button()->set_disabled(false);
 	get_ok_button()->set_text(p_success ? TTR("Close") : TTR("Remind Later"));
-	popup_centered();
+	popup_centered_clamped(Size2(760, 640) * EDSCALE, 0.9);
 }
 
 // ═══════════════════════════════════════════════════════════════

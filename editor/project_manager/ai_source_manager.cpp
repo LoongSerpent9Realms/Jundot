@@ -818,11 +818,13 @@ void AISourceManager::_update_ui() {
 }
 
 void AISourceManager::_fit_to_contents() {
-	if (!is_visible() || !main_vbox) {
+	if (!main_vbox) {
 		return;
 	}
 
-	const Size2i base_size = Size2(640, 360) * EDSCALE;
+	const Size2i base_size = Size2(640, 300) * EDSCALE;
+	const Size2i target_content_width = Size2i(base_size.x - int(48 * EDSCALE), 0);
+	main_vbox->set_custom_minimum_size(target_content_width);
 	const Size2i content_size = main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE;
 	Size2i desired_size = base_size.max(content_size);
 	const Rect2i usable_parent_rect = get_usable_parent_rect();
@@ -830,6 +832,7 @@ void AISourceManager::_fit_to_contents() {
 		desired_size = desired_size.min(Size2i(usable_parent_rect.size * 0.9));
 	}
 	set_size(desired_size);
+	child_controls_changed();
 }
 
 void AISourceManager::_notification(int p_what) {
@@ -1469,9 +1472,8 @@ void AISourceManager::_on_processing_completed() {
 void AISourceManager::popup_centered_on_parent(const Window *p_parent) {
 	(void)p_parent;
 	_update_ui();
-	const Size2 base_size = Size2(640, 360) * EDSCALE;
-	const Size2 content_size = main_vbox ? main_vbox->get_combined_minimum_size() + Size2(48, 96) * EDSCALE : Size2();
-	popup_centered_clamped(base_size.max(content_size), 0.9);
+	_fit_to_contents();
+	popup_centered_clamped(get_size(), 0.9);
 }
 
 AISourceManager::AISourceManager() {
@@ -1548,7 +1550,7 @@ AISourceManager::AISourceManager() {
 
 		git_log_scroll = memnew(ScrollContainer);
 		git_log_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-		git_log_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+		git_log_scroll->set_v_size_flags(Control::SIZE_SHRINK_BEGIN);
 		git_log_scroll->set_custom_minimum_size(Size2(0, 140) * EDSCALE);
 		git_log_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED);
 		git_log_scroll->set_visible(false);

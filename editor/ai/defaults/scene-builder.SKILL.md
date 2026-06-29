@@ -86,11 +86,31 @@ Root (Node2D/Node3D/Control)
 - For important menus, dialogs, HUD buttons, or suspected input-blocking bugs,
   run the scene with `play_scene`, click the intended viewport coordinates with
   `click_ui_position`, then stop it with `stop_play_scene` after validation
+- For runtime UI audits, also inspect the related scripts and `project.godot`
+  input actions. Confirm that keyboard/controller users have a clear focus path,
+  confirm/cancel/back behavior, and explicit focus neighbors when automatic
+  navigation would be ambiguous
+- Rebind/settings screens must show current bindings, capture replacement input
+  without trapping the user, detect duplicate bindings, and keep a visible
+  cancel/back path
+- Before calling UI work complete, summarize what was checked: layout, click
+  blocking, modal pass-through, keyboard/controller flow, important visual
+  states, and any runtime click positions tested
+- For realtime UI or gameplay animation, prefer `AnimationPlayer` for authored
+  clips, `Tween` for local property transitions, `AnimationTree` or a small state
+  machine for character states, and particles/shaders only when they add clear
+  feedback. Audit that animated panels, effects, and transitions do not break
+  anchors, focus, click targets, or modal blocking
+- Make animation interruption rules explicit: what happens if the user clicks,
+  cancels, changes tabs, closes a panel, or triggers the same action again while
+  motion is still running
 
 ### Signal Wiring
 - Child nodes emit signals, parent nodes consume them
 - Use the Editor's "Node" tab to wire signals visually
 - For runtime wiring: `button.pressed.connect(_on_button_pressed)`
+- For animation flow, prefer `animation_finished`, Tween completion callbacks,
+  or explicit state transitions over arbitrary timers or sleeps
 
 ### Resource Separation
 - Extract shared resources (materials, themes, styles) into `.tres` files

@@ -34,6 +34,7 @@ class CheckBox;
 class FileDialog;
 class GridContainer;
 class HFlowContainer;
+class HTTPRequest;
 class ScrollContainer;
 class AIChatService;
 class AIUsageAgreementDialog;
@@ -108,6 +109,8 @@ class AIConfigPanel : public MarginContainer {
 	Button *import_button = nullptr;
 	Button *auto_configure_mcp_button = nullptr;
 	Button *mimocode_download_button = nullptr;
+	HTTPRequest *mimocode_download_request = nullptr;
+	String mimocode_download_zip_path;
 	Button *engine_source_download_button = nullptr;
 	Button *engine_source_delete_button = nullptr;
 	Button *engine_source_browse_button = nullptr;
@@ -163,6 +166,8 @@ class AIConfigPanel : public MarginContainer {
 	void _update_backend_controls();
 	void _on_backend_type_selected(int p_index);
 	void _on_mimocode_download_button_pressed();
+	void _on_mimocode_download_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	Error _start_mimocode(const String &p_executable_path);
 	void _update_engine_source_status();
 	void _on_engine_source_download_button_pressed();
 	void _on_engine_source_delete_button_pressed();

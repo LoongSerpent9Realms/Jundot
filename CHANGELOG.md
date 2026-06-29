@@ -7,6 +7,205 @@ previous feature release. It is equivalent to the listings on our
 Changelogs for earlier feature releases are available in their respective Git
 branches, and linked at the [end of this file](#Past-releases).
 
+## 0.3.20 alpha - 2026-06-29
+
+- [Release announcement](https://jundotengine.org/releases/0.3.20/)
+
+Table of contents:
+- [AI Assistant](#ai-assistant-1)
+- [AI Repair Workflow](#ai-repair-workflow-1)
+- [AI Memory & Skills](#ai-memory--skills-1)
+- [MCP Support](#mcp-support-1)
+- [Hot Update System](#hot-update-system-1)
+- [Package Builder](#package-builder-1)
+- [Audio](#audio-1)
+- [Editor](#editor-1)
+- [Core](#core-1)
+
+### New Features
+
+#### AI Assistant
+
+- Add AI code review functionality with inline suggestions and diff view.
+- Add multi-turn conversation support with context persistence across editor sessions.
+- Add AI refactoring suggestions for GDScript and C# code.
+- Add custom prompt templates manager for frequently used instructions.
+- Add AI-powered scene optimization suggestions.
+- Add batch code generation for multiple related files.
+
+#### AI Repair Workflow
+
+- Add partial patch application support (select which changes to apply).
+- Add repair history browser with search and filter capabilities.
+- Add auto-save of repair sessions for later continuation.
+- Add repair impact analysis showing affected systems and potential regressions.
+
+#### AI Memory & Skills
+
+- Add memory tagging system with hierarchical categories.
+- Add skill marketplace browser for discovering community skills.
+- Add memory importance ranking and automatic cleanup of low-value entries.
+- Add cross-project memory sharing via export/import.
+
+#### MCP Support
+
+- Add MCP tool call streaming with progress indicators.
+- Add MCP server health monitoring and automatic restart.
+- Add MCP tool permission presets (read-only, write, full access).
+- Add MCP connection pooling for improved performance.
+
+#### Hot Update System
+
+- Add delta update support (only download changed files).
+- Add update progress notifications in system tray.
+- Add scheduled update installation (download now, install later).
+- Add update rollback confirmation dialog.
+- Add bandwidth throttling for update downloads.
+
+#### Package Builder
+
+- Add parallel build support for multiple platforms.
+- Add build cache sharing across CI/CD pipelines.
+- Add automated release note generation from commit history.
+- Add build artifact verification (checksum, signature).
+
+### Improvements
+
+#### AI Assistant
+
+- Improve AI response streaming performance with chunked processing.
+- Improve code context retrieval accuracy with semantic search.
+- Reduce token usage by optimizing context window management.
+- Improve error messages when AI service is unavailable.
+- Add keyboard shortcuts for common AI actions (Ctrl+K, Ctrl+L).
+- Improve dark theme compatibility for AI panels.
+
+#### AI Repair Workflow
+
+- Improve patch application success rate with better conflict resolution.
+- Reduce test execution time by running only relevant tests.
+- Improve repair card UI with better visual hierarchy.
+- Add progress bar for long-running repair operations.
+
+#### AI Memory & Skills
+
+- Improve memory search performance with indexing.
+- Improve skill import with validation and error reporting.
+- Reduce memory panel load time for large memory stores.
+
+#### MCP Support
+
+- Improve MCP server startup time with lazy initialization.
+- Improve error handling for MCP tool call failures.
+- Add connection status indicator in the status bar.
+
+#### Hot Update System
+
+- Reduce launcher startup time by 30%.
+- Improve download resumption reliability on unstable connections.
+- Improve rollback speed with optimized file operations.
+- Better handling of file locks during update installation.
+
+#### Package Builder
+
+- Improve build speed with better caching of intermediate files.
+- Reduce package size through improved compression.
+- Better build log readability with color-coded output.
+
+#### Audio
+
+- Improve Wwise bank loading performance with async preloading.
+- Add Wwise event playback position tracking.
+- Improve memory usage for audio streaming.
+
+#### Editor
+
+- Improve editor startup time by 15% through lazy loading of AI modules.
+- Reduce memory footprint when AI features are disabled.
+- Improve dock panel layout persistence across restarts.
+- Better high-DPI scaling for AI panels.
+
+#### Core
+
+- Improve JundotInstance stability with better error recovery.
+- Reduce GDExtension call overhead.
+- Improve thread safety for shared resources.
+
+### Bug Fixes
+
+#### AI Assistant
+
+- Fix AI chat panel scroll position jumping during streaming.
+- Fix code block formatting issues in AI responses.
+- Fix occasional crash when switching projects with active AI conversation.
+- Fix OAuth token not being properly refreshed after expiration.
+- Fix AI settings not being saved when dialog is closed with Enter key.
+- Fix code fetcher not respecting .gitignore patterns.
+
+#### AI Repair Workflow
+
+- Fix patch application failing on files with CRLF line endings.
+- Fix dirty worktree detection giving false positives for line ending changes.
+- Fix test runner not properly capturing stderr output.
+- Fix repair card buttons being disabled incorrectly after cancellation.
+- Fix pre-patch snapshot not including all modified files.
+
+#### AI Memory & Skills
+
+- Fix memory panel not refreshing after import.
+- Fix skill installer failing on SKILL.md files with YAML frontmatter.
+- Fix memory entries not being sorted correctly by update date.
+- Fix auto-suggest cards appearing even when feature is disabled.
+
+#### MCP Support
+
+- Fix MCP HTTP server port conflict detection not working on Windows.
+- Fix MCP tool calls not timing out correctly on slow servers.
+- Fix MCP server not shutting down cleanly on editor exit.
+
+#### Hot Update System
+
+- Fix launcher crash when manifest URL is unreachable.
+- Fix SHA256 verification failing for files larger than 2GB.
+- Fix rollback not restoring registry entries on Windows.
+- Fix grayscale evaluation producing inconsistent results.
+- Fix update state file corruption on unexpected shutdown.
+
+#### Package Builder
+
+- Fix incremental build not detecting changes in header files.
+- Fix GitHub release upload failing on slow connections.
+- Fix manifest generator including temporary files.
+- Fix build not failing when unit tests fail.
+
+#### Audio
+
+- Fix Wwise plugin not loading banks with non-ASCII paths.
+- Fix audio playback stuttering when loading new banks.
+- Fix memory leak when unloading sound banks.
+
+#### Editor
+
+- Fix AI panels not properly restoring their dock positions.
+- Fix editor crash when opening project with invalid AI configuration.
+- Fix status bar AI indicator not updating correctly.
+- Fix project manager AI source manager UI layout issues.
+
+#### Core
+
+- Fix JundotInstance not properly cleaning up on shutdown.
+- Fix memory leak in AI chat message data model.
+- Fix thread safety issue in AI settings access.
+- Fix incorrect version string in about dialog.
+
+### Performance
+
+- Reduce AI context builder processing time by 25%.
+- Optimize memory panel rendering for large memory collections.
+- Improve patch applier performance for large files.
+- Reduce launcher memory usage by 20%.
+- Improve PackageBuilder build caching hit rate.
+
 ## 0.3.13 alpha - 2026-06-29
 
 - [Release announcement](https://jundotengine.org/releases/0.3.13/)

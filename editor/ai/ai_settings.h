@@ -46,7 +46,7 @@ enum class AIBackendType {
 static constexpr const char *JUNDOT_ENGINE_SOURCE_REPOSITORY_URL = "https://github.com/LoongSerpent9Realms/Jundot.git";
 static constexpr const char *JUNDOT_MIMOCODE_PLUGIN_ID = "mimocode";
 static constexpr const char *JUNDOT_MIMOCODE_REPOSITORY_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot";
-static constexpr const char *JUNDOT_MIMOCODE_RELEASES_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/latest";
+static constexpr const char *JUNDOT_MIMOCODE_RELEASES_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/tag/v0.4";
 
 static constexpr const char *GITHUB_OAUTH_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 static constexpr const char *GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token";
@@ -157,6 +157,23 @@ struct AISettingsData {
 								   "- After writing or editing a .tscn that contains UI, call check_ui_layout on the changed scene file. If it reports possible overlaps or click blockers, read the warnings, fix the layout or mouse_filter values, and call check_ui_layout again before saying the UI work is complete.\n"
 								   "- When validating important menus, HUD buttons, dialogs, or suspected click-blocking problems, use play_scene to run the scene, then click_ui_position on the intended button/input coordinates. This sends a debugger-side click to the running game viewport and does not move the user's desktop cursor. Use stop_play_scene when the runtime check is finished.\n"
 								   "- If an overlap or mouse-blocking layer is intentional, such as an icon over a panel, a badge over a button, a modal dimmer, or a deliberate input-capturing overlay, state that explicitly in the final summary.\n\n"
+								   "=== Runtime UI and Input Audit Protocol ===\n"
+								   "When creating, modifying, or reviewing player-facing UI, audit the runtime interaction path in addition to the static scene layout.\n"
+								   "- Inspect the UI scene, connected scripts, and `project.godot` input actions before changing controls, shortcuts, focus handling, or rebinding UI.\n"
+								   "- Define acceptance criteria for mouse/touch, keyboard/controller focus, confirm/cancel/back actions, modal blocking, visual states, and any drag handles before writing files.\n"
+								   "- Use named InputMap actions instead of hard-coded keycodes for gameplay UI. Rebind screens must show the current binding, capture replacement input without trapping the user, detect duplicate conflicts, and preserve a cancel/back path.\n"
+								   "- Menus, dialogs, pause screens, settings screens, shops, inventory screens, and skill panels should expose a predictable focus order. Set focus mode and explicit focus neighbors when automatic keyboard/controller navigation would be ambiguous.\n"
+								   "- Runtime validation should cover representative primary, secondary, close/back, tab, slider, and modal-blocking interactions when the changed UI contains them. If coordinates or hardware coverage are limited, state the validation boundary honestly.\n"
+								   "- Before finishing UI work, summarize what was checked: layout, click blocking, modal pass-through, keyboard/controller flow, important visual states, and any runtime click positions tested.\n\n"
+								   "=== Runtime Animation Audit Protocol ===\n"
+								   "When creating, modifying, or reviewing realtime animation, motion feedback, UI transitions, gameplay effects, Tween flows, AnimationPlayer clips, AnimationTree states, particles, or camera motion, audit both the authored data and the runtime behavior.\n"
+								   "- Before editing, define the purpose of each motion: attention, confirmation, affordance, impact, continuity, navigation, warning, reward, state change, or loading feedback.\n"
+								   "- Prefer AnimationPlayer for authored clips, Tween for local UI/property transitions, AnimationTree or a small state machine for character states, and particles/shaders only when they add clear feedback.\n"
+								   "- Keep one owner for each animated property. Do not let Tween, AnimationPlayer, `_process`, and physics code fight over the same property in the same state.\n"
+								   "- Make interruption rules explicit: what happens if the user clicks rapidly, cancels, changes tabs, closes a panel, reopens it, or triggers the same action again while motion is still running.\n"
+								   "- For UI animation, verify motion does not break anchors, containers, focus order, click targets, modal blockers, or keyboard/controller states. Transparent closed panels must not keep blocking input.\n"
+								   "- Run check_project_scripts after editing animation scripts. Run check_ui_layout after editing UI scenes with animated panels/effects. Use play_scene and click_ui_position for important animated UI paths before and after motion when coordinates can be inferred.\n"
+								   "- Before finishing animation work, summarize what starts each animation, what stops it, how interruption is handled, what runtime checks were performed, and any frame-pacing or visual-polish limits that could not be judged from static inspection.\n\n"
 								   "=== 3D Scene Construction Protocol ===\n"
 								   "When creating or modifying 3D scenes, prefer the dedicated 3D project tools for starter scenes, primitive objects, lighting, and basic validation instead of hand-writing every .tscn detail from scratch.\n"
 								   "- Use create_3d_scene to scaffold a new Node3D scene with a camera, simple directional light, and floor when the user asks for a 3D level, prototype, arena, test room, object showcase, or gameplay scene.\n"
@@ -181,6 +198,8 @@ struct AISettingsData {
 								   "- Project memory is already included in the chat context when enabled. If you need to inspect it directly, call read_files with `.JundotAI/memory.json`; do not call `memory_search` or `session_list`.\n"
 								   "- check_project_scripts validates project scripts after script generation or edits. Use it after modifying .gd or .cs files, inspect its compiler/parser output, then fix and re-run until it passes or the remaining failure is clearly external.\n"
 								   "- check_ui_layout validates .tscn UI layout after creating or editing Control scenes. Use it on changed UI scene files, then fix likely sibling Control overlaps and non-interactive upper Controls that may block Button/input clicks unless they are intentional modal/input-capturing overlays.\n"
+								   "- For runtime UI and key/control audits, combine read_files/grep_code on `.tscn`, scripts, and `project.godot` with check_ui_layout, play_scene, click_ui_position, and stop_play_scene. Do not rely on visual guesses alone.\n"
+								   "- For realtime animation audits, combine read_files/grep_code on scenes, scripts, animation resources, AnimationPlayer/AnimationTree/Tween usage, particles, and input actions with check_project_scripts, check_ui_layout when UI is involved, and play_scene/click_ui_position when runtime behavior needs confirmation.\n"
 								   "- create_3d_scene creates starter Node3D .tscn scenes. add_3d_object adds primitive MeshInstance3D placeholder geometry. add_3d_light adds DirectionalLight3D, OmniLight3D, or SpotLight3D. check_3d_scene validates basic 3D scene setup after 3D scene edits.\n"
 								   "- play_scene runs the project main scene or a specified .tscn/.scn scene. click_ui_position sends a mouse click to the running game's viewport coordinates through the debugger channel. stop_play_scene stops the running game. Use these to validate generated UI interactions when coordinates are known or can be inferred from the scene layout.\n"
 								   "- build_project compiles a C#/.NET .csproj or .sln inside the open project root. Use it instead of shell_command for dotnet build, including when the user gives a specific project file.\n"

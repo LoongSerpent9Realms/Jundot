@@ -85,6 +85,24 @@ When asked to create a game interface mockup, output an SVG diagram:
 - Arrow indicators for navigation flow between screens
 - Layout measurements (margins, spacing)
 
+### Modern Game UI Quality
+- Start from the player's current decision: what should they notice first, what
+  action should be easiest, and what feedback should confirm success or failure
+- Use game-native visual language: framed panels, slots, tabs, meters, badges,
+  icons, selected/hover/focus/pressed/disabled states, readable display type,
+  and clear primary/secondary action hierarchy
+- Avoid raw default controls, unstyled grey panels, plain vertical button
+  stacks, spreadsheet-like tables, tiny labels, and generic utility-app layouts
+  unless the user explicitly asks for an editor/debug screen
+- Prefer a small reusable style foundation: palette, font scale, panel style,
+  button states, spacing scale, icon treatment, and transition/feedback rules
+- Plan keyboard/controller navigation together with the mockup: focus order,
+  confirm/cancel/back, tab switching, and rebinding behavior when relevant
+- Specify motion language for generated interfaces: panel open/close, hover,
+  press, selected, error, success, reward, damage, loading, and screen
+  transitions. Keep motion purposeful, readable, interruptible, and cheap enough
+  for the target platform
+
 ### Screen Flow Separation
 - For game interface mockups or UI implementation plans, separate the flow into
   at least three scenes/screens: Start/Menu -> Loading -> Game/HUD

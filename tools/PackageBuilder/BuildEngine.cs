@@ -1295,7 +1295,7 @@ Install one of these toolchains, then run this tool again:
 		}
 
 		await CopyPackageBuilderAsync();
-		// Launcher is intentionally not embedded for now.
+		await CopyLauncherAsync();
 		await CopyCrashDialogAsync();
 
 		// Write manifest

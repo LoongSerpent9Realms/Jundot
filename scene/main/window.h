@@ -141,6 +141,7 @@ private:
 	bool transient_to_focused = false;
 	bool exclusive = false;
 	bool wrap_controls = false;
+	mutable Size2i popup_content_max_size;
 	bool updating_child_controls = false;
 	bool updating_embedded_window = false;
 	bool clamp_to_embedder = false;

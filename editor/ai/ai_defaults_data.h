@@ -35,7 +35,7 @@
 /// defaults directory (editor/ai/defaults/) does not exist.
 namespace AIDefaultsData {
 
-/// Returns the 5 bundled default skills.
+/// Returns the 7 bundled default skills.
 /// The returned entries have no id/timestamps — the caller is responsible
 /// for assigning those via AIToolRegistry::make_skill().
 Vector<AISkillEntry> get_default_skills();

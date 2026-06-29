@@ -1330,6 +1330,9 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	const bool game_ui_request =
 			msg.contains("ui") || msg.contains("hud") || msg.contains("menu") || msg.contains("inventory") || msg.contains("shop") || msg.contains("dialog") || msg.contains("interface") ||
 			msg.contains("界面") || msg.contains("菜单") || msg.contains("背包") || msg.contains("商店") || msg.contains("对话框") || msg.contains("技能面板") || msg.contains("暂停界面") || msg.contains("设置界面") || msg.contains("游戏ui");
+	const bool animation_request =
+			msg.contains("animation") || msg.contains("animate") || msg.contains("animated") || msg.contains("motion") || msg.contains("transition") || msg.contains("tween") || msg.contains("animationplayer") || msg.contains("animationtree") || msg.contains("particle") || msg.contains("camera shake") ||
+			msg.contains("动画") || msg.contains("动效") || msg.contains("实时动画") || msg.contains("转场") || msg.contains("过渡") || msg.contains("补间") || msg.contains("粒子") || msg.contains("镜头震动") || msg.contains("受击反馈") || msg.contains("攻击反馈") || msg.contains("加载动画");
 	const bool consultation =
 			msg.contains("how should") || msg.contains("why") || msg.contains("explain") || msg.contains("recommend") ||
 			msg.contains("怎么设计") || msg.contains("为什么") || msg.contains("解释") || msg.contains("建议") || msg.contains("哪个好");
@@ -1353,8 +1356,14 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	if (vague_repair_request) {
 		return "Current request guidance: this is a potentially ambiguous repair request. Before editing, briefly restate the understood target feature, current behavior, expected behavior, and observable acceptance criteria. Inspect project evidence and the real code path before changing files. If the target feature, reproduction steps, expected result, or error evidence cannot be inferred from the project context, ask one concise clarifying question through NEXT_QUESTION and do not guess-edit." + boundary;
 	}
+	if (game_ui_request && animation_request) {
+		return "Current request guidance: this is a player-facing animated UI request. Follow the Game UI Visual Quality Protocol, Runtime UI/Input Audit Protocol, and Runtime Animation Audit Protocol together: infer or inspect the game's existing style, define compact visual/motion/interaction acceptance criteria, implement purposeful contemporary game-interface motion with the simplest appropriate Godot mechanism, inspect scripts/project.godot input actions when controls or keybindings matter, validate layout safety with check_ui_layout, and use play_scene/click_ui_position/stop_play_scene for important animated UI paths before and after motion when coordinates can be inferred." + boundary;
+	}
 	if (game_ui_request) {
-		return "Current request guidance: this is a player-facing game UI request. Follow the Game UI Visual Quality Protocol: infer or inspect the game's existing style, use any attached images as the primary visual reference, define compact visual acceptance criteria, build with contemporary game-interface aesthetics rather than plain utility controls, then validate layout safety with check_ui_layout for changed Control scenes." + boundary;
+		return "Current request guidance: this is a player-facing game UI request. Follow the Game UI Visual Quality Protocol and Runtime UI/Input Audit Protocol: infer or inspect the game's existing style, use any attached images as the primary visual reference, define compact visual and interaction acceptance criteria, build with contemporary game-interface aesthetics rather than plain utility controls, inspect scripts/project.godot input actions when controls or keybindings matter, validate layout safety with check_ui_layout for changed Control scenes, and use play_scene/click_ui_position/stop_play_scene for important or suspected runtime click paths." + boundary;
+	}
+	if (animation_request) {
+		return "Current request guidance: this is a realtime animation or motion-feedback request. Follow the Runtime Animation Audit Protocol: inspect existing scenes/scripts/AnimationPlayer/AnimationTree/Tween/particle/input paths, define the purpose and acceptance criteria for each motion, implement with the simplest appropriate Godot animation mechanism, make interruption and cleanup rules explicit, validate scripts and UI layout when relevant, and use play_scene plus click_ui_position for important animated UI paths before and after motion when coordinates can be inferred." + boundary;
 	}
 	if (concrete_change) {
 		return "Current request guidance: this is a concrete project implementation, adjustment, or bug-fix request. Inspect the relevant project files and implement it directly. Use a compact task breakdown only when useful; do not pause for separate Plan approval unless scope is destructive, highly ambiguous, or materially larger than requested." + boundary;
@@ -1562,6 +1571,14 @@ void AIChatPanel::_apply_programming_experience_layout() {
 	if (programming_mode_switch_button) {
 		programming_mode_switch_button->set_text(beginner_chat_mode ? TTR("Show Full UI") : TTR("Use Beginner Mode"));
 		programming_mode_switch_button->set_tooltip_text(beginner_chat_mode ? TTR("Show the full AI workspace with modes, files, and tools.") : TTR("Hide advanced controls and keep only chat and input."));
+	}
+	if (beginner_ai_guide_panel) {
+		beginner_ai_guide_panel->set_visible(asked);
+	}
+	if (beginner_ai_guide_label) {
+		beginner_ai_guide_label->set_text(beginner_chat_mode ?
+						TTR("How to use Jundot AI:\n1. Say what you want in everyday language, for example \"make a jumping game\" or \"fix this button\".\n2. If something looks wrong, describe what you see or paste the error text.\n3. Jundot AI will open hidden editor panels only when it needs them.\n4. You can keep chatting while it works; it will ask when it needs your choice.") :
+						TTR("How to use the full AI workspace:\n1. Chat is for requests and decisions; Configuration controls the AI connection and behavior.\n2. Memories store project facts and preferences the AI should remember.\n3. Tools show what the AI can use to inspect files, validate scripts, run builds, or test the project.\n4. Switch to beginner mode any time if you want a cleaner chat-only workspace."));
 	}
 	if (!asked) {
 		if (input) {
@@ -4632,6 +4649,23 @@ AIChatPanel::AIChatPanel() {
 	programming_mode_switch_button = memnew(Button);
 	programming_mode_switch_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_toggle_programming_experience_mode));
 	programming_mode_hint_row->add_child(programming_mode_switch_button);
+
+	beginner_ai_guide_panel = memnew(PanelContainer);
+	beginner_ai_guide_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	beginner_ai_guide_panel->set_visible(false);
+	chat_vbox->add_child(beginner_ai_guide_panel);
+
+	MarginContainer *beginner_ai_guide_margin = memnew(MarginContainer);
+	beginner_ai_guide_margin->add_theme_constant_override("margin_left", 16 * EDSCALE);
+	beginner_ai_guide_margin->add_theme_constant_override("margin_right", 16 * EDSCALE);
+	beginner_ai_guide_margin->add_theme_constant_override("margin_top", 6 * EDSCALE);
+	beginner_ai_guide_margin->add_theme_constant_override("margin_bottom", 8 * EDSCALE);
+	beginner_ai_guide_panel->add_child(beginner_ai_guide_margin);
+
+	beginner_ai_guide_label = memnew(Label);
+	beginner_ai_guide_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	beginner_ai_guide_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	beginner_ai_guide_margin->add_child(beginner_ai_guide_label);
 
 	MarginContainer *top_bar_margin = memnew(MarginContainer);
 	chat_top_bar_container = top_bar_margin;

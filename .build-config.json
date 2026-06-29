@@ -17,5 +17,5 @@
   "CleanBuild": false,
   "ExtraSConsArgs": "module_wwise_enabled=no",
   "AutoUpdateVersion": true,
-  "GenerateUpdateManifest": true
+  "GenerateUpdateManifest": false
 }

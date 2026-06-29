@@ -318,12 +318,25 @@ void EngineUpdateLabel::_trigger_launcher_update() {
 	if (!FileAccess::exists(launcher_path)) {
 		launcher_path = exe_dir.path_join("Tools/Launcher/JundotLauncher.exe");
 	}
+	if (!FileAccess::exists(launcher_path)) {
+		launcher_path = exe_dir.path_join("../Tools/Launcher/JundotLauncher.exe").simplify_path();
+	}
+	if (!FileAccess::exists(launcher_path)) {
+		launcher_path = exe_dir.path_join("../tools/Launcher/bin/Debug/net8.0/JundotLauncher.exe").simplify_path();
+	}
+	if (!FileAccess::exists(launcher_path)) {
+		launcher_path = exe_dir.path_join("../tools/Launcher/bin/Release/net8.0/JundotLauncher.exe").simplify_path();
+	}
+	if (!FileAccess::exists(launcher_path)) {
+		launcher_path = exe_dir.path_join("../tools/Launcher/bin/Release/net8.0/win-x64/JundotLauncher.exe").simplify_path();
+	}
 
 	if (FileAccess::exists(launcher_path)) {
 		// Launch the launcher in update mode
 		List<String> args;
 		args.push_back("update");
-		args.push_back(vformat("--engine-path=\"%s\"", exe_dir));
+		args.push_back("--engine-path");
+		args.push_back(exe_dir);
 
 		int exitcode = -1;
 		Error err = OS::get_singleton()->execute(launcher_path, args, nullptr, &exitcode);

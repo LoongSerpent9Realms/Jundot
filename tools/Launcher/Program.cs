@@ -59,6 +59,14 @@ public class Program
 			var state = new UpdateStateStore(_enginePath);
 			if (!string.IsNullOrEmpty(_channel))
 				state.UpdateChannel = _channel;
+			if (string.IsNullOrWhiteSpace(state.CurrentVersion) || state.CurrentVersion == "0.0.0")
+			{
+				var detectedVersion = TryReadEngineVersion(_enginePath);
+				if (!string.IsNullOrWhiteSpace(detectedVersion))
+				{
+					state.CurrentVersion = detectedVersion;
+				}
+			}
 
 			// ── Dispatch command ──────────────────────────────
 			switch (_command)
@@ -432,18 +440,31 @@ public class Program
 		return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 	}
 
-	/// <summary>从 .jundot-update-state.json 读取当前版本字符串（若存在）。</summary>
+	/// <summary>从 .jundot-update-state.json 或本地 update-manifest.json 读取当前版本字符串（若存在）。</summary>
 	private static string? TryReadEngineVersion(string engineDir)
 	{
 		try
 		{
 			var path = Path.Combine(engineDir, ".jundot-update-state.json");
-			if (!File.Exists(path)) return null;
-			var json = File.ReadAllText(path);
-			// 轻量解析：兼容旧 PascalCase 和当前 snake_case 状态字段。
-			var match = System.Text.RegularExpressions.Regex.Match(json,
-				@"""(?:[Cc]urrent[Vv]ersion|current_version)""\s*:\s*""([^""]+)""");
-			return match.Success ? match.Groups[1].Value : null;
+			if (File.Exists(path))
+			{
+				var json = File.ReadAllText(path);
+				// 轻量解析：兼容旧 PascalCase 和当前 snake_case 状态字段。
+				var match = System.Text.RegularExpressions.Regex.Match(json,
+					@"""(?:[Cc]urrent[Vv]ersion|current_version)""\s*:\s*""([^""]+)""");
+				if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value) && match.Groups[1].Value != "0.0.0")
+				{
+					return match.Groups[1].Value;
+				}
+			}
+
+			var manifestPath = Path.Combine(engineDir, "update-manifest.json");
+			if (!File.Exists(manifestPath)) return null;
+			var manifestJson = File.ReadAllText(manifestPath);
+			var manifestMatch = System.Text.RegularExpressions.Regex.Match(manifestJson,
+				@"""version""\s*:\s*\{.*?""full""\s*:\s*""([^""]+)""",
+				System.Text.RegularExpressions.RegexOptions.Singleline);
+			return manifestMatch.Success ? manifestMatch.Groups[1].Value : null;
 		}
 		catch
 		{
@@ -632,6 +653,11 @@ JundotLauncher — Jundot Engine 线上热更新启动器
 				_enginePath = args[++i];
 				continue;
 			}
+			if (arg.StartsWith("--engine-path=", StringComparison.OrdinalIgnoreCase))
+			{
+				_enginePath = arg.Substring("--engine-path=".Length).Trim('"');
+				continue;
+			}
 			else if (arg == "--yes" || arg == "-y")
 			{
 				AssumeYes = true;
@@ -644,11 +670,27 @@ JundotLauncher — Jundot Engine 线上热更新启动器
 				_channel = args[++i];
 				continue;
 			}
+			if (arg.StartsWith("--channel=", StringComparison.OrdinalIgnoreCase))
+			{
+				_channel = arg.Substring("--channel=".Length).Trim('"');
+				continue;
+			}
 
 			// Handle --manifest-url value
 			if (arg == "--manifest-url" && i + 1 < args.Length)
 			{
 				_manifestUrl = args[++i];
+				continue;
+			}
+			if (arg.StartsWith("--manifest-url=", StringComparison.OrdinalIgnoreCase))
+			{
+				_manifestUrl = arg.Substring("--manifest-url=".Length).Trim('"');
+				continue;
+			}
+
+			if (arg.StartsWith("--target=", StringComparison.OrdinalIgnoreCase))
+			{
+				// Accepted for forward compatibility with rollback callers that pass a target version.
 				continue;
 			}
 

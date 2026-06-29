@@ -84,6 +84,8 @@ class AIChatPanel : public MarginContainer {
 	PanelContainer *programming_mode_hint_panel = nullptr;
 	Label *programming_mode_hint_label = nullptr;
 	Button *programming_mode_switch_button = nullptr;
+	PanelContainer *beginner_ai_guide_panel = nullptr;
+	Label *beginner_ai_guide_label = nullptr;
 	bool beginner_chat_mode = false;
 	PanelContainer *ai_activity_panel = nullptr;
 	ProgressBar *ai_activity_progress = nullptr;

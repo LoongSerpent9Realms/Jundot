@@ -550,7 +550,7 @@ void ProjectManager::_on_update_download_requested(const String &p_version, cons
 	}
 
 	update_dialog->set_update_info(info);
-	update_dialog->popup_centered();
+	update_dialog->popup_centered_clamped(Size2(760, 640) * EDSCALE, 0.9);
 }
 
 void ProjectManager::_on_update_now_requested() {
