@@ -138,7 +138,7 @@ AIEditorPlugin::AIEditorPlugin() {
 
 	github_auth_service = memnew(GitHubAuthService);
 	gitee_auth_service = memnew(GiteeAuthService);
-	cline_integration = memnew(AIClineIntegration);
+	cline_integration.instantiate();
 
 	// Register the inspector context menu plugin for "Ask AI" feature.
 	inspector_context_menu_plugin.instantiate();
@@ -173,10 +173,7 @@ AIEditorPlugin::~AIEditorPlugin() {
 		gitee_auth_service = nullptr;
 	}
 
-	if (cline_integration) {
-		memdelete(cline_integration);
-		cline_integration = nullptr;
-	}
+	cline_integration.unref();
 
 	AIClineIntegration::cleanup();
 	AIMCPManager::cleanup();

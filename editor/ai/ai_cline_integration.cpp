@@ -259,7 +259,7 @@ String AIClineIntegration::get_session_id() const {
 }
 
 void AIClineIntegration::_on_http_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
-	String response = String::utf8(p_body.ptr(), p_body.size());
+	String response = String::utf8((const char *)p_body.ptr(), p_body.size());
 	
 	if (state == AIClineState::CONNECTING) {
 		if (p_result == HTTPRequest::RESULT_SUCCESS && p_response_code == 200) {

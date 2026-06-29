@@ -45,7 +45,7 @@ class AIEditorPlugin : public EditorPlugin {
 	Ref<AIInspectorContextMenu> inspector_context_menu_plugin;
 	GitHubAuthService *github_auth_service = nullptr;
 	GiteeAuthService *gitee_auth_service = nullptr;
-	AIClineIntegration *cline_integration = nullptr;
+	Ref<AIClineIntegration> cline_integration;
 
 	void _create_dock();
 	Control *_create_placeholder_panel(const String &p_title, const String &p_description);
