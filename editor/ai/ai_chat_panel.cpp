@@ -115,6 +115,26 @@ static String _ai_chat_image_mime_type(const String &p_path) {
 	return "image/png";
 }
 
+static String _ai_chat_normalize_project_path(String p_path) {
+	p_path = p_path.strip_edges().replace("\\", "/");
+	if (p_path.begins_with("res://")) {
+		p_path = p_path.substr(6);
+	}
+	while (p_path.begins_with("./")) {
+		p_path = p_path.substr(2);
+	}
+	return p_path.simplify_path();
+}
+
+static bool _ai_chat_is_html_prototype_write_path(const String &p_path) {
+	const String normalized = _ai_chat_normalize_project_path(p_path).to_lower();
+	if (!normalized.begins_with(".jundotai/prototypes/")) {
+		return false;
+	}
+	const String ext = normalized.get_extension();
+	return ext == "html" || ext == "css" || ext == "js";
+}
+
 static bool _ai_chat_is_tool_error_text(const String &p_text) {
 	const String lower = p_text.to_lower();
 	return lower.contains("<tool_call") ||
@@ -709,10 +729,102 @@ Array AIChatPanel::_get_structured_history() const {
 	}
 	for (int i = 0; i < conversations.size(); i++) {
 		if (conversations[i].id == active_conversation_id) {
-			return conversations[i].structured_messages.duplicate(true);
+			return _compress_messages_for_low_token_mode(conversations[i].structured_messages);
 		}
 	}
 	return Array();
+}
+
+static int _ai_chat_message_content_length(const Dictionary &p_message) {
+	const Variant content = p_message.get("content", Variant());
+	if (content.get_type() == Variant::ARRAY) {
+		int total = 0;
+		const Array parts = content;
+		for (int i = 0; i < parts.size(); i++) {
+			if (parts[i].get_type() == Variant::DICTIONARY) {
+				const Dictionary part = parts[i];
+				total += String(part.get("text", String())).length();
+			}
+		}
+		return total;
+	}
+	return String(content).length();
+}
+
+static String _ai_chat_truncate_context_text(const String &p_text, int p_limit, const String &p_reason) {
+	if (p_limit <= 0 || p_text.length() <= p_limit) {
+		return p_text;
+	}
+	const int head_len = MAX(1, p_limit * 2 / 3);
+	const int tail_len = MAX(1, p_limit - head_len);
+	return p_text.substr(0, head_len).strip_edges() +
+			vformat("\n\n[... %s compressed: omitted %d chars ...]\n\n", p_reason, p_text.length() - p_limit) +
+			p_text.substr(p_text.length() - tail_len, tail_len).strip_edges();
+}
+
+Array AIChatPanel::_compress_messages_for_low_token_mode(const Array &p_messages) const {
+	const AISettingsData settings = AISettings::load();
+	if (!settings.low_token_mode || p_messages.is_empty()) {
+		return p_messages.duplicate(true);
+	}
+
+	const int total_budget = MAX(1024, settings.history_char_budget > 0 ? settings.history_char_budget : AISettings::get_low_token_history_char_budget());
+	const int old_text_budget = 700;
+	const int recent_text_budget = 1800;
+	const int old_tool_budget = 900;
+	const int recent_tool_budget = 1800;
+	const int recent_window = 8;
+
+	Array compressed;
+	int running_chars = 0;
+	for (int i = p_messages.size() - 1; i >= 0; i--) {
+		if (p_messages[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+
+		Dictionary message = ((Dictionary)p_messages[i]).duplicate(true);
+		const String role = String(message.get("role", String()));
+		const bool recent = (p_messages.size() - i) <= recent_window;
+		int content_budget = recent ? recent_text_budget : old_text_budget;
+		String reason = recent ? "recent message" : "old message";
+		if (role == "tool") {
+			content_budget = recent ? recent_tool_budget : old_tool_budget;
+			reason = recent ? "recent tool result" : "old tool result";
+		}
+
+		if (role != "system" && message.has("content")) {
+			if (message["content"].get_type() == Variant::ARRAY) {
+				Array parts = message["content"];
+				for (int j = 0; j < parts.size(); j++) {
+					if (parts[j].get_type() != Variant::DICTIONARY) {
+						continue;
+					}
+					Dictionary part = parts[j];
+					if (part.has("text")) {
+						part["text"] = _ai_chat_truncate_context_text(String(part["text"]), content_budget, reason);
+					}
+					parts[j] = part;
+				}
+				message["content"] = parts;
+			} else {
+				message["content"] = _ai_chat_truncate_context_text(String(message["content"]), content_budget, reason);
+			}
+		}
+
+		const int message_chars = String(message.get("role", String())).length() + _ai_chat_message_content_length(message);
+		if (role != "system" && !recent && running_chars + message_chars > total_budget) {
+			if (role == "tool") {
+				message["content"] = "[Old tool result compressed by Low Token Mode. Ask the AI to rerun or inspect the relevant file/log if exact output is needed.]";
+			} else {
+				message["content"] = "[Old conversation message compressed by Low Token Mode. Continue from the latest visible context and durable summary.]";
+			}
+		}
+
+		running_chars += String(message.get("role", String())).length() + _ai_chat_message_content_length(message);
+		compressed.push_front(message);
+	}
+
+	return compressed;
 }
 
 void AIChatPanel::_store_structured_history(const Array &p_messages, const String &p_assistant_content) {
@@ -720,12 +832,13 @@ void AIChatPanel::_store_structured_history(const Array &p_messages, const Strin
 		return;
 	}
 
+	const Array messages_to_store = _compress_messages_for_low_token_mode(p_messages);
 	Array stored_messages;
-	for (int i = 0; i < p_messages.size(); i++) {
-		if (p_messages[i].get_type() != Variant::DICTIONARY) {
+	for (int i = 0; i < messages_to_store.size(); i++) {
+		if (messages_to_store[i].get_type() != Variant::DICTIONARY) {
 			continue;
 		}
-		Dictionary message = p_messages[i];
+		Dictionary message = messages_to_store[i];
 		if (String(message.get("role", String())) == "system") {
 			continue;
 		}
@@ -1304,6 +1417,89 @@ bool AIChatPanel::_is_project_memory_continue_request(const String &p_user_messa
 		   msg == "start making" || msg == "start building" || msg == "start development" || msg == "build it" || msg == "make it";
 }
 
+bool AIChatPanel::_is_html_prototype_gate_start_message(const String &p_user_message) const {
+	const String msg = p_user_message.to_lower().strip_edges();
+	if (msg.is_empty()) {
+		return false;
+	}
+
+	return msg.contains("i want to make") || msg.contains("i want to build") || msg.contains("game idea") || msg.contains("game concept") ||
+			msg.contains("我要做一个") || msg.contains("我想做一个") || msg.contains("我想开发一个") || msg.contains("做一款") ||
+			msg.contains("做个游戏") || msg.contains("做一个游戏") || msg.contains("小游戏") || msg.contains("游戏原型") ||
+			msg.contains("游戏想法") || msg.contains("项目想法") || msg.contains("prototype") || msg.contains("game jam");
+}
+
+bool AIChatPanel::_is_html_prototype_gate_approval_message(const String &p_user_message) const {
+	const String msg = p_user_message.to_lower().strip_edges();
+	if (msg.is_empty()) {
+		return false;
+	}
+
+	return msg.contains("试玩通过") || msg.contains("验证通过") || msg.contains("验证成功") || msg.contains("测试通过") ||
+			msg.contains("玩法可以") || msg.contains("玩法没问题") || msg.contains("原型通过") || msg.contains("网页通过") ||
+			msg == "可以继续" || msg == "可以继续了" || msg.contains("可以继续制作") || msg.contains("继续制作") || msg.contains("开始制作godot") || msg.contains("开始做godot") ||
+			msg.contains("开始生成godot") || msg.contains("approved") || msg.contains("tested and approved") ||
+			msg.contains("prototype approved") || msg.contains("looks good") || msg.contains("go ahead with godot");
+}
+
+bool AIChatPanel::_is_html_prototype_gate_skip_message(const String &p_user_message) const {
+	const String msg = p_user_message.to_lower().strip_edges();
+	if (msg.is_empty()) {
+		return false;
+	}
+
+	return msg.contains("跳过html") || msg.contains("跳过 html") || msg.contains("跳过网页") || msg.contains("不用html") ||
+			msg.contains("不用 html") || msg.contains("不要网页") || msg.contains("直接做godot") || msg.contains("直接生成c#") ||
+			msg.contains("skip html") || msg.contains("skip the html") || msg.contains("skip prototype") ||
+			msg.contains("directly implement") || msg.contains("go straight to godot");
+}
+
+String AIChatPanel::_html_prototype_gate_prompt() const {
+	return String("=== Active HTML Gameplay Prototype Gate ===\n"
+				  "This conversation is currently waiting for user validation of a runnable HTML gameplay prototype. Treat every follow-up as prototype feedback unless the user explicitly says the prototype has been tested and approved or explicitly asks to skip HTML.\n"
+				  "- Until that approval, do not create, edit, validate, build, or package real Godot project production files such as `.cs`, `.gd`, `.tscn`, `.tres`, `.gdextension`, `.csproj`, `.sln`, `project.godot`, or `project.jundot`.\n"
+				  "- Allowed writes are limited to `.JundotAI/prototypes/` HTML prototype files. Prefer one self-contained `.html` file with inline CSS/JavaScript.\n"
+				  "- If the user asks for changes, revise the HTML prototype only, present the updated path/link, and ask them to run/verify it again through NEXT_QUESTION.\n"
+				  "- Only after the user explicitly confirms the HTML prototype gameplay is approved may you continue into real Godot/C# project production.");
+}
+
+bool AIChatPanel::_html_prototype_gate_blocks_tool_call(const Dictionary &p_tool_call, String &r_reason) const {
+	if (!html_prototype_gate_pending || active_settings.context_mode != AIContextMode::PROJECT) {
+		return false;
+	}
+
+	const Dictionary fn_def = p_tool_call.get("function", Dictionary());
+	String name = String(fn_def.get("name", String())).strip_edges();
+	const String args_json = fn_def.get("arguments", "{}");
+	if (name == "read_file") {
+		name = AIToolNames::READ_FILES;
+	} else if (name == "glob" || name == "glob_search") {
+		name = AIToolNames::SEARCH_FILES;
+	}
+
+	Dictionary args;
+	Variant parsed = JSON::parse_string(args_json);
+	if (parsed.get_type() == Variant::DICTIONARY) {
+		args = parsed;
+	}
+
+	if (name == AIToolNames::READ_FILES || name == AIToolNames::SEARCH_FILES || name == AIToolNames::LIST_FILES || name == AIToolNames::GREP_CODE || name == AIToolNames::FETCH_URL) {
+		return false;
+	}
+
+	if (name == AIToolNames::WRITE_FILE || name == AIToolNames::EDIT_FILE) {
+		const String path = String(args.get("path", String()));
+		if (_ai_chat_is_html_prototype_write_path(path)) {
+			return false;
+		}
+		r_reason = vformat(TTR("HTML prototype gate blocked %s for '%s'. The user has not approved the playable HTML prototype yet. Until approval, write/edit only `.html`, `.css`, or `.js` files under `.JundotAI/prototypes/`; do not create C#, GDScript, scenes, project settings, builds, or packages."), name, path);
+		return true;
+	}
+
+	r_reason = vformat(TTR("HTML prototype gate blocked tool `%s`. The user has not approved the playable HTML prototype yet. Continue by creating or revising the runnable HTML prototype under `.JundotAI/prototypes/`, then ask the user to test it before Godot/C# production work."), name);
+	return true;
+}
+
 String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	const String msg = p_user_message.to_lower().strip_edges();
 	const AISettingsData settings = AISettings::load();
@@ -1344,8 +1540,11 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 			msg.contains("怎么设计") || msg.contains("为什么") || msg.contains("解释") || msg.contains("建议") || msg.contains("哪个好");
 
 	const String boundary = " Stay strictly inside the open game project. Never inspect or modify engine source in PROJECT mode; if an engine limitation is discovered, finish any safe project-side work, call setup_engine_workspace to create or bind this project's dedicated engine worktree, then call request_engine_change with the exact reason and required engine change.";
+	if (html_prototype_gate_pending) {
+		return "Current request guidance: the HTML gameplay prototype gate is still pending. Treat this user message as feedback for the playable HTML prototype unless they explicitly approved or skipped it. Do not create or edit Godot/C# production files. Create or revise only the runnable HTML prototype under .JundotAI/prototypes/, present its path/link, and ask the user to test it before continuing to Godot production." + boundary;
+	}
 	if (_is_project_memory_continue_request(p_user_message)) {
-		return "Current request guidance: the user asked to continue from this project's memory. Treat Project Memories as the primary source of the intended game concept, project name, style, mechanics, and pending direction. First inspect the open project enough to determine whether it is still empty/minimal or already has meaningful game content. If it is empty/minimal, continue from the remembered concept without asking the user to repeat it: produce a compact execution plan and begin building the first playable Jundot project structure using GDScript by default, or C# only if the memory/user explicitly asks for C#. If content already exists, continue from the newest project state and memory together. Do not use memories from other projects and do not ask the user to choose an engine." + boundary;
+		return "Current request guidance: the user asked to continue from this project's memory. Treat Project Memories as the primary source of the intended game concept, project name, style, mechanics, and pending direction. First inspect the open project enough to determine whether it is still empty/minimal or already has meaningful game content. If it is empty/minimal, continue from the remembered concept without asking the user to repeat it: produce a compact execution plan and begin building the first playable Jundot project structure using C# scripts by default, or GDScript only if the memory/user explicitly asks for GDScript. If content already exists, continue from the newest project state and memory together. Do not use memories from other projects and do not ask the user to choose an engine." + boundary;
 	}
 	if (task_intent == "feature_development") {
 		return "Current request guidance: the user selected feature development for this chat. Work from the latest requested outcome, inspect the real project files, and implement directly when the request is concrete. Use a compact TASK_PLAN only when scope or sequencing materially benefits from it. If the latest message is just the starter option, ask what feature goal they want to build." + boundary;
@@ -1357,6 +1556,9 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 		return "Current request guidance: the user selected design discussion for this chat. Analyze the project and propose a path, but do not modify files until the user explicitly approves implementation." + boundary;
 	}
 	if (broad_project_idea && !concrete_change) {
+		if (settings.html_min_project_prototype_enabled) {
+			return "Current request guidance: this is a new game concept and the HTML gameplay prototype gate is enabled. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Before touching Godot scenes, scripts, resources, or project settings, create one runnable standalone HTML prototype under .JundotAI/prototypes/ that demonstrates the core loop, basic controls, score/win/lose feedback when applicable, and main screen flow. Keep it self-contained with inline CSS/JavaScript and no external assets unless they already exist in the project. Present the HTML path/link and ask the user through NEXT_QUESTION to verify the gameplay; stop there until the user approves or requests changes. Only after user approval continue into the real Godot project implementation, then validate scripts/runtime/UI, package_project, poll check_package_status, run test_package, and hand off package paths and validation evidence. If the project already has meaningful content, preserve it and ask approval before any broad replacement, restructuring, or reinterpretation. If the user explicitly asks to skip HTML preview, use the normal project workflow. Do not ask the user to operate PackageBuilder manually." + boundary;
+		}
 		return "Current request guidance: this is a new game concept. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Produce a TASK_PLAN scaled to its size: concise for a small game or prototype, fuller for a larger project. Evaluate the core loop, moment-to-moment fun, mastery, rewards, replayability, boring/frustrating risks, and prototype tests. Use fetch_url to research relevant official Steam/Epic pages when available, identify concrete differentiation opportunities, and generate a .JundotAI/mockups/ SVG when a visual flow or interface will help the user judge the idea. If the user did not explicitly request direct implementation, expose NEXT_QUESTION choices for Plan review, a minimum playable prototype, or gameplay/reference discussion, and stop before modifying game content until they choose or approve. If the project is empty/minimal and the Plan is approved or the user's answers make the Plan complete, continue autonomously through implementation, compile/build validation, runtime/UI testing, package_project, repeated check_package_status polling, test_package, and final handoff with package paths and validation evidence. If the project already has meaningful content, insert NEXT_QUESTION dialogue checkpoints before any broad replacement, restructuring, or reinterpretation of existing content. Do not ask the user to operate PackageBuilder manually." + boundary;
 	}
 	if (vague_repair_request) {
@@ -1587,12 +1789,16 @@ void AIChatPanel::_apply_programming_experience_layout() {
 		programming_mode_switch_button->set_tooltip_text(beginner_chat_mode ? TTR("Show the full AI workspace with modes, files, and tools.") : TTR("Hide advanced controls and keep only chat and input."));
 	}
 	if (beginner_ai_guide_panel) {
-		beginner_ai_guide_panel->set_visible(asked);
+		beginner_ai_guide_panel->set_visible(asked && !beginner_ai_guide_hidden);
 	}
 	if (beginner_ai_guide_label) {
 		beginner_ai_guide_label->set_text(beginner_chat_mode ?
-						TTR("How to use Jundot AI:\n1. Say what you want in everyday language, for example \"make a jumping game\" or \"fix this button\".\n2. If something looks wrong, describe what you see or paste the error text.\n3. Jundot AI will open hidden editor panels only when it needs them.\n4. You can keep chatting while it works; it will ask when it needs your choice.") :
+						TTR("How to use Jundot AI:\n1. Say what you want in everyday language, for example \"make a jumping game\" or \"fix this button\".\n2. If something looks wrong, describe what you see, paste the error text, or use + / Ctrl+V to attach a screenshot.\n3. Jundot AI will open hidden editor panels only when it needs them.\n4. You can keep chatting while it works; it will ask when it needs your choice.") :
 						TTR("How to use the full AI workspace:\n1. Chat is for requests and decisions; Configuration controls the AI connection and behavior.\n2. Memories store project facts and preferences the AI should remember.\n3. Tools show what the AI can use to inspect files, validate scripts, run builds, or test the project.\n4. Switch to beginner mode any time if you want a cleaner chat-only workspace."));
+	}
+	if (beginner_ai_guide_hide_button) {
+		beginner_ai_guide_hide_button->set_text(TTR("Hide"));
+		beginner_ai_guide_hide_button->set_tooltip_text(TTR("Hide this quick guide"));
 	}
 	if (!asked) {
 		if (input) {
@@ -1630,7 +1836,15 @@ void AIChatPanel::_apply_programming_experience_layout() {
 		_update_mode_indicator();
 	}
 	if (add_file_menu) {
-		add_file_menu->set_visible(!beginner_chat_mode);
+		add_file_menu->set_visible(true);
+		add_file_menu->set_tooltip_text(beginner_chat_mode ? TTR("Attach a screenshot or image") : TTR("Attach or reference a file or image"));
+		PopupMenu *file_popup = add_file_menu->get_popup();
+		if (file_popup) {
+			file_popup->set_item_disabled(file_popup->get_item_index(FILE_MENU_REFERENCE_PROJECT), beginner_chat_mode);
+			file_popup->set_item_disabled(file_popup->get_item_index(FILE_MENU_UPLOAD_TEXT), beginner_chat_mode);
+			file_popup->set_item_disabled(file_popup->get_item_index(FILE_MENU_UPLOAD_IMAGE), false);
+			file_popup->set_item_disabled(file_popup->get_item_index(FILE_MENU_IMPORT), beginner_chat_mode);
+		}
 	}
 	if (clear_button) {
 		clear_button->set_visible(!beginner_chat_mode);
@@ -1651,6 +1865,13 @@ void AIChatPanel::_apply_programming_experience_layout() {
 	}
 	if (asked) {
 		callable_mp(this, &AIChatPanel::_apply_editor_beginner_workspace).bind(beginner_chat_mode).call_deferred();
+	}
+}
+
+void AIChatPanel::_hide_beginner_ai_guide() {
+	beginner_ai_guide_hidden = true;
+	if (beginner_ai_guide_panel) {
+		beginner_ai_guide_panel->hide();
 	}
 }
 
@@ -2449,6 +2670,73 @@ Array AIChatPanel::_build_multimodal_user_content(const String &p_text) const {
 	return content;
 }
 
+void AIChatPanel::_append_tool_result_image_messages(Array &r_messages) const {
+	for (int i = 0; i < r_messages.size(); i++) {
+		if (r_messages[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary msg = r_messages[i];
+		if (String(msg.get("role", String())) != "tool") {
+			continue;
+		}
+		const String image_path = String(msg.get("image_path", String())).strip_edges();
+		if ((bool)msg.get("image_injected", false) || image_path.is_empty() || !FileAccess::exists(image_path)) {
+			if (!image_path.is_empty()) {
+				msg.erase("image_path");
+				msg.erase("image_mime_type");
+				msg.erase("image_description");
+				msg.erase("image_injected");
+				r_messages[i] = msg;
+			}
+			continue;
+		}
+
+		const String mime_type = String(msg.get("image_mime_type", "image/png"));
+		Error err = OK;
+		Vector<uint8_t> bytes = FileAccess::get_file_as_bytes(image_path, &err);
+		if (err != OK || bytes.is_empty()) {
+			continue;
+		}
+		CoreBind::Marshalls *marshalls = CoreBind::Marshalls::get_singleton();
+		if (!marshalls) {
+			continue;
+		}
+
+		Dictionary text_part;
+		text_part["type"] = "text";
+		text_part["text"] = vformat(TTR("Runtime screenshot from tool result. Inspect this image together with the preceding tool output and runtime UI snapshot for UI position, visibility, clipping, overlap, scale, color, and composition issues.\nPath: %s"), image_path);
+
+		Dictionary image_url;
+		image_url["url"] = "data:" + mime_type + ";base64," + marshalls->raw_to_base64(bytes);
+
+		Dictionary image_part;
+		image_part["type"] = "image_url";
+		image_part["image_url"] = image_url;
+
+		Array content;
+		content.push_back(text_part);
+		content.push_back(image_part);
+
+		Dictionary image_msg;
+		image_msg["role"] = "user";
+		image_msg["content"] = content;
+		r_messages.push_back(image_msg);
+		msg["image_injected"] = true;
+		msg.erase("image_path");
+		msg.erase("image_mime_type");
+		msg.erase("image_description");
+		msg.erase("image_injected");
+		r_messages[i] = msg;
+	}
+}
+
+void AIChatPanel::_append_tool_final_summary_instruction(Array &r_messages) const {
+	Dictionary summary_request;
+	summary_request["role"] = "user";
+	summary_request["content"] = TTR("When you finish this tool sequence and provide the final user-facing answer, include a concise execution summary covering: what was done from start to finish, files read, files modified or created, tools or validations run and their results, and any remaining risks or next steps. If more tool calls are still needed, continue using tools first and apply this instruction only to the final answer.");
+	r_messages.push_back(summary_request);
+}
+
 void AIChatPanel::_set_chat_display_scale(float p_scale) {
 	chat_display_scale = CLAMP(p_scale, 0.78f, 1.05f);
 	if (input) {
@@ -2594,6 +2882,14 @@ void AIChatPanel::_send_message() {
 	}
 	_record_issue_closed_from_user(visible_user_text);
 
+	if (settings.context_mode == AIContextMode::PROJECT && settings.html_min_project_prototype_enabled) {
+		if (html_prototype_gate_pending && (_is_html_prototype_gate_approval_message(visible_user_text) || _is_html_prototype_gate_skip_message(visible_user_text))) {
+			html_prototype_gate_pending = false;
+		} else if (!html_prototype_gate_pending && _is_html_prototype_gate_start_message(visible_user_text) && !_is_html_prototype_gate_skip_message(visible_user_text)) {
+			html_prototype_gate_pending = true;
+		}
+	}
+
 	// Persist the conversation after the user message has been added so that
 	// a crash or request failure does not lose the message.
 	request_conversation_id = active_conversation_id;
@@ -2639,6 +2935,9 @@ void AIChatPanel::_send_message() {
 	settings.system_prompt += "\n\n" + _ai_chat_next_question_protocol();
 	if (settings.context_mode == AIContextMode::PROJECT) {
 		settings.system_prompt += "\n\n" + _ai_project_memory_protocol();
+	}
+	if (html_prototype_gate_pending) {
+		settings.system_prompt += "\n\n" + _html_prototype_gate_prompt();
 	}
 	const String conversation_brief = _build_conversation_brief_prompt();
 	if (!conversation_brief.is_empty()) {
@@ -3618,7 +3917,7 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 						Array final_messages = pending_tool_round.original_messages.duplicate(true);
 						Dictionary final_request;
 						final_request["role"] = "user";
-						final_request["content"] = TTR("The tool-call iteration limit has been reached. Stop requesting tools now. Based only on the tool results already in this conversation, provide a clear final response: summarize what you found, what was changed or should be changed, and any remaining next steps. Do not request or describe more tool calls.");
+						final_request["content"] = TTR("The tool-call iteration limit has been reached. Stop requesting tools now. Based only on the tool results already in this conversation, provide a clear final response with an execution summary: what was done from start to finish, what was found, files read, files modified or created, tools or validations run and their results, what was changed or should be changed, and any remaining risks or next steps. Do not request or describe more tool calls.");
 						final_messages.push_back(final_request);
 
 						tool_call_label->set_visible(true);
@@ -3945,6 +4244,7 @@ void AIChatPanel::_append_forced_build_status_check() {
 
 	Dictionary result = AIToolExecutor::execute(tool_call);
 	pending_tool_round.original_messages.push_back(result);
+	pending_tool_round.original_messages = _compress_messages_for_low_token_mode(pending_tool_round.original_messages);
 	_store_structured_history(pending_tool_round.original_messages);
 	_save_all_conversations();
 
@@ -3986,7 +4286,10 @@ void AIChatPanel::_continue_after_build_poll() {
 	chat_service->configure(settings);
 	_set_ai_activity(TTR("Build finished. Asking AI to continue with the results..."), true);
 	_set_requesting(true);
-	Error err = chat_service->send_messages(pending_tool_round.original_messages, tools);
+	Array send_messages = _compress_messages_for_low_token_mode(pending_tool_round.original_messages);
+	_append_tool_result_image_messages(send_messages);
+	_append_tool_final_summary_instruction(send_messages);
+	Error err = chat_service->send_messages(send_messages, tools);
 	if (err != OK) {
 		status_label->set_text(TTR("Build-status continuation failed."));
 		in_tool_loop = false;
@@ -4075,8 +4378,20 @@ void AIChatPanel::_tool_execution_thread_func(void *p_userdata) {
 	Array messages = panel->tool_execution_messages;
 	bool build_poll_needed = false;
 	for (int i = 0; i < tool_calls.size(); i++) {
+		if (panel->tool_execution_cancelled) {
+			break;
+		}
 		Dictionary tc = tool_calls[i];
-		Dictionary result = AIToolExecutor::execute(tc);
+		String blocked_reason;
+		Dictionary result;
+		if (panel->_html_prototype_gate_blocks_tool_call(tc, blocked_reason)) {
+			result["content"] = blocked_reason;
+			result["is_error"] = true;
+			result["role"] = "tool";
+			result["tool_call_id"] = tc.get("id", String());
+		} else {
+			result = AIToolExecutor::execute(tc);
+		}
 		messages.push_back(result);
 		String result_content = result.get("content", String());
 		if (panel->_tool_result_needs_build_poll(result_content)) {
@@ -4106,7 +4421,7 @@ void AIChatPanel::_finish_tool_execution_thread() {
 		return;
 	}
 
-	Array messages = tool_execution_messages;
+	Array messages = _compress_messages_for_low_token_mode(tool_execution_messages);
 	Array tools = tool_execution_tools;
 	const bool build_poll_needed = tool_execution_build_poll_needed;
 
@@ -4146,7 +4461,10 @@ void AIChatPanel::_finish_tool_execution_thread() {
 	chat_service->configure(active_settings);
 	_set_ai_activity(TTR("Tools finished. Asking AI to analyze the results..."), true);
 	_set_requesting(true);
-	Error err = chat_service->send_messages(messages, tools);
+	Array send_messages = _compress_messages_for_low_token_mode(messages);
+	_append_tool_result_image_messages(send_messages);
+	_append_tool_final_summary_instruction(send_messages);
+	Error err = chat_service->send_messages(send_messages, tools);
 	if (err != OK) {
 		status_label->set_text(TTR("Tool call continuation failed."));
 		in_tool_loop = false;
@@ -4786,10 +5104,19 @@ AIChatPanel::AIChatPanel() {
 	beginner_ai_guide_margin->add_theme_constant_override("margin_bottom", 8 * EDSCALE);
 	beginner_ai_guide_panel->add_child(beginner_ai_guide_margin);
 
+	HBoxContainer *beginner_ai_guide_row = memnew(HBoxContainer);
+	beginner_ai_guide_row->add_theme_constant_override("separation", 8 * EDSCALE);
+	beginner_ai_guide_margin->add_child(beginner_ai_guide_row);
+
 	beginner_ai_guide_label = memnew(Label);
 	beginner_ai_guide_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	beginner_ai_guide_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
-	beginner_ai_guide_margin->add_child(beginner_ai_guide_label);
+	beginner_ai_guide_row->add_child(beginner_ai_guide_label);
+
+	beginner_ai_guide_hide_button = memnew(Button);
+	beginner_ai_guide_hide_button->set_flat(true);
+	beginner_ai_guide_hide_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_hide_beginner_ai_guide));
+	beginner_ai_guide_row->add_child(beginner_ai_guide_hide_button);
 
 	MarginContainer *top_bar_margin = memnew(MarginContainer);
 	chat_top_bar_container = top_bar_margin;

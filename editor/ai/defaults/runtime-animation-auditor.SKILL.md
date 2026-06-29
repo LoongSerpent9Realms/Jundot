@@ -62,9 +62,13 @@ verifiable at runtime instead of only existing as static scene data.
    - Run `check_project_scripts` after editing animation scripts.
    - Run `check_ui_layout` after editing UI scenes whose animated panels or
      effects may overlap interactive controls.
-   - Use `play_scene` for important animated scenes. For UI animation, use
-     `click_ui_position` on representative controls before and after the motion,
-     then use `stop_play_scene` when finished.
+   - Use `play_scene` for important animated scenes. For UI animation, prefer
+     `capture_runtime_ui_snapshot` and `capture_game_screenshot` before/after
+     the motion when visual state matters. Prefer `click_ui_node` when a
+     Control node path is known, otherwise use `click_ui_position` on
+     representative controls before and after the motion. Call
+     `assert_no_runtime_errors` after interactions, then use
+     `stop_play_scene` when finished.
 
 3. Audit result:
    - Report which animations were checked, what starts them, what stops them,

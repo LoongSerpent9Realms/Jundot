@@ -114,6 +114,9 @@ private:
 	static Error _msg_rq_screenshot(const Array &p_args);
 	static Error _msg_report_window_focused(const Array &p_args);
 	static Error _msg_ai_click_ui_position(const Array &p_args);
+	static Error _msg_ai_click_ui_node(const Array &p_args);
+	static Error _msg_ai_assert_node_visible(const Array &p_args);
+	static Error _msg_ai_capture_runtime_ui_snapshot(const Array &p_args);
 
 	static Error _msg_runtime_node_select_reset_camera_2d(const Array &p_args);
 	static Error _msg_transform_camera_2d(const Array &p_args);

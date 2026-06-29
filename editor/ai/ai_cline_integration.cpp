@@ -97,8 +97,8 @@ bool AIClineIntegration::is_connected() const {
 	return state == AIClineState::CONNECTED || state == AIClineState::AUTHENTICATED;
 }
 
-AIClineState AIClineIntegration::get_state() const {
-	return state;
+int AIClineIntegration::get_state() const {
+	return static_cast<int>(state);
 }
 
 Error AIClineIntegration::login(const String &p_token) {
@@ -115,13 +115,11 @@ Error AIClineIntegration::login(const String &p_token) {
 	poll_timer->start();
 	
 	if (callback.is_valid()) {
-		Dictionary data;
-		data["session_id"] = session_id;
-		data["auth_token"] = auth_token;
-		AIClineCallbackData cb_data;
-		cb_data.type = AIClineCallbackType::LOGIN_SUCCESS;
-		cb_data.data = data;
-		callback.call(cb_data);
+		Dictionary cb_dict;
+		cb_dict["type"] = "login_success";
+		cb_dict["session_id"] = session_id;
+		cb_dict["auth_token"] = auth_token;
+		callback.call(cb_dict);
 	}
 	
 	return OK;
@@ -133,9 +131,9 @@ void AIClineIntegration::logout() {
 	_update_state(AIClineState::CONNECTED);
 	
 	if (callback.is_valid()) {
-		AIClineCallbackData cb_data;
-		cb_data.type = AIClineCallbackType::SESSION_ENDED;
-		callback.call(cb_data);
+		Dictionary cb_dict;
+		cb_dict["type"] = "session_ended";
+		callback.call(cb_dict);
 	}
 }
 
@@ -283,10 +281,10 @@ void AIClineIntegration::_on_http_request_completed(int p_result, int p_response
 		if (json.parse(response) == OK) {
 			Dictionary result = json.get_data();
 			if (callback.is_valid()) {
-				AIClineCallbackData cb_data;
-				cb_data.type = AIClineCallbackType::MESSAGE_RECEIVED;
-				cb_data.data = result;
-				callback.call(cb_data);
+				Dictionary cb_dict;
+				cb_dict["type"] = "message_received";
+				cb_dict["data"] = result;
+				callback.call(cb_dict);
 			}
 		}
 	}
@@ -313,20 +311,19 @@ void AIClineIntegration::_update_state(AIClineState p_new_state) {
 	state = p_new_state;
 	
 	if (callback.is_valid() && old_state != p_new_state) {
-		AIClineCallbackData cb_data;
+		Dictionary cb_dict;
 		switch (p_new_state) {
 			case AIClineState::CONNECTED:
-				cb_data.type = AIClineCallbackType::LOGIN_SUCCESS;
+				cb_dict["type"] = "login_success";
 				break;
 			case AIClineState::ERROR:
-				cb_data.type = AIClineCallbackType::LOGIN_FAILED;
+				cb_dict["type"] = "login_failed";
 				break;
 			default:
-				cb_data.type = AIClineCallbackType::NONE;
 				break;
 		}
-		if (cb_data.type != AIClineCallbackType::NONE) {
-			callback.call(cb_data);
+		if (cb_dict.has("type")) {
+			callback.call(cb_dict);
 		}
 	}
 }

@@ -84,8 +84,14 @@ Root (Node2D/Node3D/Control)
   changed scene and fix likely overlaps or click blockers unless they are
   intentional overlay elements such as badges, icons, modal dimmers, or effects
 - For important menus, dialogs, HUD buttons, or suspected input-blocking bugs,
-  run the scene with `play_scene`, click the intended viewport coordinates with
-  `click_ui_position`, then stop it with `stop_play_scene` after validation
+  run the scene with `play_scene`, call `capture_runtime_ui_snapshot` for
+  current-frame hierarchy, positions, z-index, mouse filters, visibility, and
+  basic color evidence, and call `capture_game_screenshot` when visual
+  composition needs inspection. Prefer `click_ui_node` when a Control node path
+  is known, otherwise click the intended viewport coordinates with
+  `click_ui_position`, then call `assert_no_runtime_errors` so callback errors
+  fail the test. Use `assert_node_visible` after expected UI transitions when a
+  node path is known, then stop it with `stop_play_scene` after validation
 - For runtime UI audits, also inspect the related scripts and `project.jundot` (or `project.godot`)
   input actions. Confirm that keyboard/controller users have a clear focus path,
   confirm/cancel/back behavior, and explicit focus neighbors when automatic

@@ -64,6 +64,11 @@ private:
 	static Dictionary _test_package(const Dictionary &p_args);
 	static Dictionary _play_scene(const Dictionary &p_args);
 	static Dictionary _click_ui_position(const Dictionary &p_args);
+	static Dictionary _click_ui_node(const Dictionary &p_args);
+	static Dictionary _assert_node_visible(const Dictionary &p_args);
+	static Dictionary _assert_no_runtime_errors(const Dictionary &p_args);
+	static Dictionary _capture_game_screenshot(const Dictionary &p_args);
+	static Dictionary _capture_runtime_ui_snapshot(const Dictionary &p_args);
 	static Dictionary _stop_play_scene(const Dictionary &p_args);
 	static Dictionary _run_build(const Dictionary &p_args);
 	static Dictionary _check_build_status(const Dictionary &p_args);

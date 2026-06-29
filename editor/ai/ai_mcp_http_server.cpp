@@ -257,7 +257,7 @@ Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 	update_props["output_language"] = _external_mcp_str_property("Output language, such as auto, English, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, or German.");
 	update_props["tools_enabled"] = _external_mcp_bool_property("Enable built-in function calling tools.");
 	update_props["mcp_tools_enabled"] = _external_mcp_bool_property("Enable configured external MCP server tools.");
-	update_props["html_min_project_prototype_enabled"] = _external_mcp_bool_property("Allow project-concept requests to create a disposable standalone HTML prototype under .JundotAI/prototypes, then wait for user approval before real project implementation.");
+	update_props["html_min_project_prototype_enabled"] = _external_mcp_bool_property("Require new game/project concept requests to create a runnable standalone HTML prototype under .JundotAI/prototypes, then wait for user verification before real project implementation.");
 	update_props["context_char_budget"] = _external_mcp_int_property("Compressed context character budget.");
 	update_props["history_char_budget"] = _external_mcp_int_property("Conversation history character budget.");
 	update_props["max_tool_iterations"] = _external_mcp_int_property("Maximum tool-call loop iterations.");

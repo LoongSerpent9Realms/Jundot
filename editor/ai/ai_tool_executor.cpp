@@ -58,6 +58,7 @@
 #include "editor/ai/ai_tool_defs.h"
 #include "editor/ai/ai_tool_registry.h"
 #include "editor/editor_node.h"
+#include "editor/debugger/script_editor_debugger.h"
 #include "editor/editor_undo_redo_manager.h"
 #include "editor/run/editor_run_bar.h"
 #include "editor/run/game_view_plugin.h"
@@ -690,6 +691,16 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _play_scene(args);
 	} else if (name == AIToolNames::CLICK_UI_POSITION) {
 		result = _click_ui_position(args);
+	} else if (name == AIToolNames::CLICK_UI_NODE) {
+		result = _click_ui_node(args);
+	} else if (name == AIToolNames::ASSERT_NODE_VISIBLE) {
+		result = _assert_node_visible(args);
+	} else if (name == AIToolNames::ASSERT_NO_RUNTIME_ERRORS) {
+		result = _assert_no_runtime_errors(args);
+	} else if (name == AIToolNames::CAPTURE_GAME_SCREENSHOT) {
+		result = _capture_game_screenshot(args);
+	} else if (name == AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT) {
+		result = _capture_runtime_ui_snapshot(args);
 	} else if (name == AIToolNames::STOP_PLAY_SCENE) {
 		result = _stop_play_scene(args);
 	} else if (name == AIToolNames::RUN_BUILD) {
@@ -2983,6 +2994,57 @@ static MouseButton _parse_ai_mouse_button(const String &p_button) {
 	return MouseButton::LEFT;
 }
 
+static String _ai_mouse_button_name(MouseButton p_button) {
+	return p_button == MouseButton::RIGHT ? "right" : (p_button == MouseButton::MIDDLE ? "middle" : "left");
+}
+
+static String _format_ai_runtime_action_result(const String &p_tool_name, const Dictionary &p_result) {
+	StringBuilder output;
+	output += "Tool: " + p_tool_name + "\n";
+	output += String((bool)p_result.get("ok", false) ? "Result: passed\n" : "Result: failed\n");
+	output += "Message: " + String(p_result.get("message", "")) + "\n";
+	Dictionary details = p_result.get("details", Dictionary());
+	if (!details.is_empty()) {
+		output += "Details: " + JSON::stringify(details) + "\n";
+	}
+	return output.as_string().strip_edges();
+}
+
+static bool _wait_for_ai_runtime_action(GameViewDebugger *p_debugger, int64_t p_request_id, int p_wait_ms, Dictionary &r_result) {
+	const uint64_t deadline = OS::get_singleton()->get_ticks_msec() + (uint64_t)MAX(p_wait_ms, 0);
+	while (OS::get_singleton()->get_ticks_msec() <= deadline) {
+		if (p_debugger->pop_ai_action_result(p_request_id, r_result)) {
+			return true;
+		}
+		OS::get_singleton()->delay_usec(50 * 1000);
+	}
+	return p_debugger->pop_ai_action_result(p_request_id, r_result);
+}
+
+static bool _wait_for_ai_screenshot(GameViewDebugger *p_debugger, int64_t p_request_id, int p_wait_ms, Dictionary &r_result) {
+	const uint64_t deadline = OS::get_singleton()->get_ticks_msec() + (uint64_t)MAX(p_wait_ms, 0);
+	while (OS::get_singleton()->get_ticks_msec() <= deadline) {
+		if (p_debugger->pop_ai_screenshot_result(p_request_id, r_result)) {
+			return true;
+		}
+		OS::get_singleton()->delay_usec(50 * 1000);
+	}
+	return p_debugger->pop_ai_screenshot_result(p_request_id, r_result);
+}
+
+static String _safe_ai_screenshot_file_name(const String &p_name) {
+	String file_name = p_name.strip_edges().get_file();
+	if (file_name.is_empty()) {
+		String datetime = Time::get_singleton()->get_datetime_string_from_system().remove_chars("-T:");
+		file_name = "game-screenshot-" + datetime + "-" + itos(Time::get_singleton()->get_ticks_usec()) + ".png";
+	}
+	if (!file_name.to_lower().ends_with(".png")) {
+		file_name += ".png";
+	}
+	file_name = file_name.replace("\\", "_").replace("/", "_").replace(":", "_");
+	return file_name;
+}
+
 Dictionary AIToolExecutor::_play_scene(const Dictionary &p_args) {
 	const AISettingsData settings = AISettings::load();
 	if (settings.context_mode != AIContextMode::PROJECT) {
@@ -3058,10 +3120,249 @@ Dictionary AIToolExecutor::_click_ui_position(const Dictionary &p_args) {
 	}
 
 	return _make_result(vformat("Sent %s mouse click to running game at viewport position (%.1f, %.1f). Active debugger session(s): %d.",
-			button == MouseButton::RIGHT ? "right" : (button == MouseButton::MIDDLE ? "middle" : "left"),
+			_ai_mouse_button_name(button),
 			x,
 			y,
 			sent_count));
+}
+
+Dictionary AIToolExecutor::_click_ui_node(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("click_ui_node is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("click_ui_node failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("click_ui_node failed: Game View debugger is not available.", true);
+	}
+
+	const String node_path_text = String(p_args.get("node_path", "")).strip_edges();
+	if (node_path_text.is_empty()) {
+		return _make_result("click_ui_node requires node_path.", true);
+	}
+
+	const MouseButton button = _parse_ai_mouse_button(String(p_args.get("button", "left")));
+	const int64_t request_id = debugger->begin_ai_action();
+	const int sent_count = debugger->click_ui_node(NodePath(node_path_text), button, request_id);
+	if (sent_count <= 0) {
+		return _make_result("click_ui_node failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 500.0), 0, 5000);
+	Dictionary action_result;
+	if (_wait_for_ai_runtime_action(debugger, request_id, wait_ms, action_result)) {
+		const bool ok = action_result.get("ok", false);
+		return _make_result(_format_ai_runtime_action_result(AIToolNames::CLICK_UI_NODE, action_result), !ok);
+	}
+
+	return _make_result(vformat("Sent %s click request for runtime Control node '%s'. Active debugger session(s): %d.\nNo runtime acknowledgement was received within %d ms; call assert_no_runtime_errors and, if needed, retry after the debugger has processed messages.",
+			_ai_mouse_button_name(button),
+			node_path_text,
+			sent_count,
+			wait_ms));
+}
+
+Dictionary AIToolExecutor::_assert_node_visible(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("assert_node_visible is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("assert_node_visible failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("assert_node_visible failed: Game View debugger is not available.", true);
+	}
+
+	const String node_path_text = String(p_args.get("node_path", "")).strip_edges();
+	if (node_path_text.is_empty()) {
+		return _make_result("assert_node_visible requires node_path.", true);
+	}
+
+	const int64_t request_id = debugger->begin_ai_action();
+	const int sent_count = debugger->assert_node_visible(NodePath(node_path_text), request_id);
+	if (sent_count <= 0) {
+		return _make_result("assert_node_visible failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 500.0), 0, 5000);
+	Dictionary action_result;
+	if (_wait_for_ai_runtime_action(debugger, request_id, wait_ms, action_result)) {
+		const bool ok = action_result.get("ok", false);
+		return _make_result(_format_ai_runtime_action_result(AIToolNames::ASSERT_NODE_VISIBLE, action_result), !ok);
+	}
+
+	return _make_result(vformat("Sent visibility assertion request for runtime node '%s'. Active debugger session(s): %d.\nNo runtime acknowledgement was received within %d ms; retry after the debugger has processed messages.",
+			node_path_text,
+			sent_count,
+			wait_ms));
+}
+
+Dictionary AIToolExecutor::_assert_no_runtime_errors(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("assert_no_runtime_errors is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("assert_no_runtime_errors failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	EditorDebuggerNode *debugger_node = EditorDebuggerNode::get_singleton();
+	if (!debugger_node) {
+		return _make_result("assert_no_runtime_errors failed: editor debugger node is not available.", true);
+	}
+
+	int session_count = 0;
+	int active_session_count = 0;
+	int error_count = 0;
+	int warning_count = 0;
+	for (int i = 0;; i++) {
+		ScriptEditorDebugger *debugger = debugger_node->get_debugger(i);
+		if (!debugger) {
+			break;
+		}
+		session_count++;
+		if (debugger->is_session_active()) {
+			active_session_count++;
+			error_count += debugger->get_error_count();
+			warning_count += debugger->get_warning_count();
+		}
+	}
+
+	if (active_session_count <= 0) {
+		return _make_result("assert_no_runtime_errors failed: no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const bool allow_warnings = p_args.get("allow_warnings", true);
+	const bool failed = error_count > 0 || (!allow_warnings && warning_count > 0);
+	StringBuilder result;
+	result += "Tool: assert_no_runtime_errors\n";
+	result += failed ? "Result: failed\n" : "Result: passed\n";
+	result += vformat("Debugger sessions: %d total, %d active\n", session_count, active_session_count);
+	result += vformat("Runtime errors: %d\nRuntime warnings: %d\n", error_count, warning_count);
+	if (failed) {
+		result += "Runtime problems are present after the scene interaction. Inspect the Debugger Errors panel or reproduce the click, fix the reported script/runtime issue, then run the runtime assertion again.";
+	} else {
+		result += allow_warnings ? "No runtime errors are currently reported by the active debugger session(s)." : "No runtime errors or warnings are currently reported by the active debugger session(s).";
+	}
+
+	return _make_result(result.as_string(), failed);
+}
+
+Dictionary AIToolExecutor::_capture_game_screenshot(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("capture_game_screenshot is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("capture_game_screenshot failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("capture_game_screenshot failed: Game View debugger is not available.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("capture_game_screenshot failed: no open project root is available.", true);
+	}
+
+	const int64_t request_id = debugger->request_ai_screenshot();
+	if (request_id < 0) {
+		return _make_result("capture_game_screenshot failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 1000.0), 0, 10000);
+	Dictionary screenshot_result;
+	if (!_wait_for_ai_screenshot(debugger, request_id, wait_ms, screenshot_result)) {
+		return _make_result(vformat("capture_game_screenshot timed out after %d ms waiting for the running game to return a screenshot. Wait a moment after play_scene, then try again.", wait_ms), true);
+	}
+
+	const String temp_path = String(screenshot_result.get("path", String()));
+	if (temp_path.is_empty() || !FileAccess::exists(temp_path)) {
+		return _make_result("capture_game_screenshot failed: the running game returned no readable PNG path.", true);
+	}
+
+	const String out_dir = project_root.path_join(".JundotAI/runtime_screenshots");
+	Error mkdir_err = DirAccess::make_dir_recursive_absolute(out_dir);
+	if (mkdir_err != OK) {
+		return _make_result(vformat("capture_game_screenshot failed: could not create screenshot directory (err=%d): %s", (int)mkdir_err, out_dir), true);
+	}
+
+	const String file_name = _safe_ai_screenshot_file_name(String(p_args.get("file_name", "")));
+	String saved_path = out_dir.path_join(file_name);
+	if (FileAccess::exists(saved_path)) {
+		const String base = saved_path.get_basename();
+		int suffix = 1;
+		while (FileAccess::exists(saved_path)) {
+			saved_path = base + "-" + itos(suffix++) + ".png";
+		}
+	}
+
+	Error copy_err = DirAccess::copy_absolute(temp_path, saved_path);
+	if (copy_err != OK) {
+		return _make_result(vformat("capture_game_screenshot failed: could not copy screenshot to project directory (err=%d).\nTemp path: %s\nTarget path: %s", (int)copy_err, temp_path, saved_path), true);
+	}
+
+	const String rel_path = saved_path.replace(project_root.replace("\\", "/") + "/", "").replace("\\", "/");
+	StringBuilder result;
+	result += "Tool: capture_game_screenshot\n";
+	result += "Result: captured\n";
+	result += "Saved PNG: " + saved_path + "\n";
+	result += "Project path: " + rel_path + "\n";
+	result += vformat("Size: %d x %d\n", (int)screenshot_result.get("width", 0), (int)screenshot_result.get("height", 0));
+	result += "This screenshot will be attached as an image_url in the next AI tool-continuation request when the active backend supports multimodal message content.";
+	Dictionary tool_result = _make_result(result.as_string());
+	tool_result["image_path"] = saved_path;
+	tool_result["image_mime_type"] = "image/png";
+	tool_result["image_description"] = "Runtime game viewport screenshot captured by capture_game_screenshot.";
+	return tool_result;
+}
+
+Dictionary AIToolExecutor::_capture_runtime_ui_snapshot(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("capture_runtime_ui_snapshot is only available in PROJECT mode.", true);
+	}
+	if (!EditorRunBar::get_singleton() || !EditorRunBar::get_singleton()->is_playing()) {
+		return _make_result("capture_runtime_ui_snapshot failed: no game scene is currently playing. Call play_scene first.", true);
+	}
+
+	GameViewDebugger *debugger = GameViewDebugger::get_singleton();
+	if (!debugger) {
+		return _make_result("capture_runtime_ui_snapshot failed: Game View debugger is not available.", true);
+	}
+
+	const int max_nodes = CLAMP((int)(double)p_args.get("max_nodes", 200.0), 1, 1000);
+	const bool include_invisible = p_args.get("include_invisible", false);
+	const int64_t request_id = debugger->begin_ai_action();
+	const int sent_count = debugger->capture_runtime_ui_snapshot(max_nodes, include_invisible, request_id);
+	if (sent_count <= 0) {
+		return _make_result("capture_runtime_ui_snapshot failed: the game is playing, but no active debugger session is connected yet. Wait a moment after play_scene, then try again.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 1000.0), 0, 10000);
+	Dictionary action_result;
+	if (_wait_for_ai_runtime_action(debugger, request_id, wait_ms, action_result)) {
+		const bool ok = action_result.get("ok", false);
+		String formatted = _format_ai_runtime_action_result(AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT, action_result);
+		if (formatted.length() > 60000) {
+			formatted = formatted.substr(0, 60000) + "\n... [runtime UI snapshot truncated in tool output; reduce max_nodes or inspect a smaller UI section]";
+		}
+		return _make_result(formatted, !ok);
+	}
+
+	return _make_result(vformat("Sent runtime UI snapshot request. Active debugger session(s): %d.\nNo runtime acknowledgement was received within %d ms; retry after the debugger has processed messages.",
+			sent_count,
+			wait_ms),
+			true);
 }
 
 Dictionary AIToolExecutor::_stop_play_scene(const Dictionary &p_args) {

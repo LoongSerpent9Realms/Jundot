@@ -350,7 +350,7 @@ void AIJundotPluginBackend::cancel_request() {
 	}
 	requesting = false;
 	if (http_request) {
-		http_request->cancel_request();
+		http_request->call_deferred(SNAME("cancel_request"));
 	}
 }
 

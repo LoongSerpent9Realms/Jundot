@@ -55,6 +55,7 @@ static constexpr const char *EDITOR_AI_TEMPERATURE_KEY = "ai_settings/provider/t
 static constexpr const char *EDITOR_AI_MAX_TOKENS_KEY = "ai_settings/provider/max_tokens";
 static constexpr const char *EDITOR_AI_OUTPUT_LANGUAGE_KEY = "ai_settings/general/output_language";
 static constexpr const char *EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY = "ai_settings/project/enable_html_min_project_prototype";
+static constexpr const char *EDITOR_AI_LOW_TOKEN_MODE_KEY = "ai_settings/context/low_token_mode";
 static constexpr const char *EDITOR_AI_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_function_calling";
 static constexpr const char *EDITOR_AI_MCP_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_mcp_tools";
 static constexpr const char *EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY = "ai_settings/context/context_char_budget";
@@ -206,6 +207,9 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	if (_should_read_editor_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY, p_only_changed)) {
 		r_settings.html_min_project_prototype_enabled = editor_settings->get_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY);
 	}
+	if (_should_read_editor_setting(EDITOR_AI_LOW_TOKEN_MODE_KEY, p_only_changed)) {
+		r_settings.low_token_mode = editor_settings->get_setting(EDITOR_AI_LOW_TOKEN_MODE_KEY);
+	}
 	if (_should_read_editor_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_only_changed)) {
 		r_settings.tools_enabled = editor_settings->get_setting(EDITOR_AI_TOOLS_ENABLED_KEY);
 	}
@@ -255,6 +259,7 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	editor_settings->set_setting(EDITOR_AI_MAX_TOKENS_KEY, p_settings.max_tokens);
 	editor_settings->set_setting(EDITOR_AI_OUTPUT_LANGUAGE_KEY, p_settings.output_language);
 	editor_settings->set_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY, p_settings.html_min_project_prototype_enabled);
+	editor_settings->set_setting(EDITOR_AI_LOW_TOKEN_MODE_KEY, p_settings.low_token_mode);
 	editor_settings->set_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_settings.tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_settings.mcp_tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY, p_settings.context_char_budget);
@@ -276,7 +281,7 @@ String AISettings::get_default_model() {
 }
 
 String AISettings::get_default_system_prompt() {
-	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (batch_tools, list_files, read_files, write_file, edit_file, search_files, grep_code, check_project_scripts, check_ui_layout, build_project, package_project, check_package_status, test_package, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, validating project work, packaging completed project plans, smoke-testing packages, building the engine, and executing commands.\n\n"
+	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (batch_tools, list_files, read_files, write_file, edit_file, search_files, grep_code, check_project_scripts, check_ui_layout, build_project, package_project, check_package_status, test_package, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, stop_play_scene, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, validating project work, packaging completed project plans, smoke-testing packages, playing scenes, testing UI clicks, capturing screenshots, capturing runtime UI hierarchy/style snapshots, building the engine, and executing commands.\n\n"
 			   "When you use a tool, you will receive the result and can continue reasoning. After executing tools, analyze the results and either call more tools if needed or provide a comprehensive summary to the user with the next steps. Do NOT end the conversation with a single sentence — always follow up with a thorough analysis, reasoning, or actionable proposal.\n\n"
 			   "If MCP tools are configured, they are available as tools with names prefixed by the server name (e.g. 'servername.toolname').\n\n"
 			   "=== Task Breakdown Protocol ===\n"
@@ -291,8 +296,11 @@ String AISettings::get_default_system_prompt() {
 			   "- Only call tools that are explicitly provided in the current Function Calling tool list. Do not call Codex/MiMo-style tools such as `memory_search`, `session_list`, `read_file`, or `glob` unless they appear in the actual tool list. For project memory, use the Project Memories already included in context or read `.JundotAI/memory.json` with `read_files`.\n"
 			   "- Prefer batch_tools when you can combine independent local actions into one tool call, such as list_files + grep_code + read_files, reading several files, or writing several related files.\n"
 			   "- BEFORE writing or suggesting code changes, ALWAYS read the relevant source files first.\n"
+			   "- In PROJECT mode, when creating new gameplay/UI scripts, use C# `.cs` scripts by default. Keep using GDScript only when the user explicitly asks for it or when preserving an existing GDScript-heavy project pattern is clearly safer.\n"
+			   "- In PROJECT mode, after editing important menus, HUD buttons, dialogs, or suspected click/input paths, run the scene with play_scene, call capture_runtime_ui_snapshot for current-frame hierarchy/position/color evidence, use capture_game_screenshot when visual layout should be inspected, prefer click_ui_node when a Control node path is known, otherwise use click_ui_position. After runtime clicks, call assert_no_runtime_errors so callback/script errors fail the test instead of being mistaken for a successful click. Use assert_node_visible after expected UI transitions when a node path is known, then stop_play_scene when finished.\n"
 			   "- In PROJECT mode, the full autonomous delivery pipeline applies only to empty/minimal projects created from no existing project foundation. If the project already has meaningful content, insert NEXT_QUESTION dialogue checkpoints before broad replacement, restructuring, or reinterpretation.\n"
 			   "- For an empty/minimal project with an approved plan, continue through compile/build validation, project/runtime tests, package_project, check_package_status until success/failure, test_package, and then hand the package paths plus validation evidence to the user.\n"
+			   "- Final answers after a tool sequence must include an execution summary: what was done from start to finish, files read, files modified or created, tools or validations run and their results, and remaining risks or next steps. Do not omit the file list when files were handled.\n"
 			   "- run_build runs in the background. After calling it, call check_build_status to get the result. If still running, call it again in subsequent rounds.\n"
 			   "- When you encounter a build error, read the build log, analyze the error, apply fixes, then rebuild to verify.\n\n"
 			   "=== Evidence Freshness Protocol ===\n"
@@ -303,7 +311,7 @@ String AISettings::get_default_system_prompt() {
 			   "=== Agent Loop (CRITICAL) ===\n"
 			   "- After you finish calling tools and receive the final text response from the model, do NOT stop.\n"
 			   "- Analyze what you learned from the tool results.\n"
-			   "- Provide a thorough summary of what was done, what was found, or what the user should know.\n"
+			   "- Provide a thorough execution summary of what was done, what was found, files read, files modified or created, validation results, and what the user should know.\n"
 			   "- Suggest concrete next steps or ask clarifying questions if needed.\n"
 			   "- Keep the conversation going — a single terse response is never sufficient.");
 }
@@ -318,6 +326,35 @@ int AISettings::get_default_history_char_budget() {
 
 int AISettings::get_default_max_tool_iterations() {
 	return 10;
+}
+
+int AISettings::get_low_token_max_tokens() {
+	return 1024;
+}
+
+int AISettings::get_low_token_context_char_budget() {
+	return 4096;
+}
+
+int AISettings::get_low_token_history_char_budget() {
+	return 4096;
+}
+
+int AISettings::get_low_token_max_tool_iterations() {
+	return 3;
+}
+
+void AISettings::apply_low_token_mode(AISettingsData &r_settings) {
+	if (!r_settings.low_token_mode) {
+		return;
+	}
+
+	r_settings.max_tokens = MIN(r_settings.max_tokens, get_low_token_max_tokens());
+	r_settings.context_char_budget = MIN(r_settings.context_char_budget, get_low_token_context_char_budget());
+	r_settings.history_char_budget = MIN(r_settings.history_char_budget, get_low_token_history_char_budget());
+	r_settings.max_tool_iterations = MIN(r_settings.max_tool_iterations, get_low_token_max_tool_iterations());
+	r_settings.include_tool_context = false;
+	r_settings.mcp_tools_enabled = false;
 }
 
 double AISettings::get_default_feature_universality_threshold() {
@@ -388,6 +425,7 @@ AISettingsData AISettings::load() {
 		}
 		settings.system_prompt = get_default_system_prompt();
 		_apply_editor_settings(settings, false);
+		apply_low_token_mode(settings);
 		return settings;
 	}
 
@@ -422,6 +460,7 @@ AISettingsData AISettings::load() {
 	settings.system_prompt = get_default_system_prompt();
 	settings.include_project_memories = root.get("include_project_memories", true);
 	settings.include_tool_context = root.get("include_tool_context", true);
+	settings.low_token_mode = root.get("low_token_mode", false);
 	settings.tools_enabled = root.get("tools_enabled", true);
 	settings.develop_mode = root.get("develop_mode", false);
 	settings.mcp_tools_enabled = root.get("mcp_tools_enabled", false);
@@ -429,7 +468,7 @@ AISettingsData AISettings::load() {
 	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
 	settings.max_tool_iterations = root.get("max_tool_iterations", get_default_max_tool_iterations());
 	settings.auto_suggest_entries = root.get("auto_suggest_entries", true);
-	settings.html_min_project_prototype_enabled = root.get("html_min_project_prototype_enabled", false);
+	settings.html_min_project_prototype_enabled = root.get("html_min_project_prototype_enabled", true);
 	settings.user_extra_instructions = root.get("user_extra_instructions", String());
 	settings.output_language = root.get("output_language", "auto");
 	settings.usage_agreement_accepted = root.get("usage_agreement_accepted", false);
@@ -497,6 +536,7 @@ AISettingsData AISettings::load() {
 	}
 
 	_apply_editor_settings(settings, true);
+	apply_low_token_mode(settings);
 	return settings;
 }
 
@@ -519,6 +559,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["system_prompt"] = get_default_system_prompt();
 	root["include_project_memories"] = p_settings.include_project_memories;
 	root["include_tool_context"] = p_settings.include_tool_context;
+	root["low_token_mode"] = p_settings.low_token_mode;
 	root["tools_enabled"] = p_settings.tools_enabled;
 	root["develop_mode"] = p_settings.develop_mode;
 	root["mcp_tools_enabled"] = p_settings.mcp_tools_enabled;
@@ -651,12 +692,14 @@ String AISettings::get_effective_system_prompt(const AISettingsData &p_settings)
 				prompt = get_default_system_prompt();
 			}
 			if (p_settings.html_min_project_prototype_enabled) {
-				prompt += "\n\n=== Optional HTML Minimum Project Prototype Gate ===\n"
-						  "When the user describes a new project or game idea and the feature is enabled, you may directly create a tiny standalone HTML prototype before touching Godot project files. Use this only when a fast playable or visual example would help the user judge direction, controls, screen flow, or core feel.\n"
-						  "- Keep the prototype minimal and disposable: one self-contained .html file under `.JundotAI/prototypes/`, with inline CSS/JavaScript and no external assets unless already present in the project.\n"
+				prompt += "\n\n=== HTML Gameplay Prototype Gate ===\n"
+						  "When the user describes a new project or game idea and this feature is enabled, create a runnable standalone HTML gameplay prototype before touching Godot project files. This is the default first production step for validating gameplay.\n"
+						  "- Keep the prototype minimal, playable, and disposable: one self-contained .html file under `.JundotAI/prototypes/`, with inline CSS/JavaScript and no external assets unless already present in the project.\n"
+						  "- The HTML must exercise the core loop, basic controls, win/lose or score feedback when applicable, and the main screen flow well enough for the user to judge whether the gameplay direction is worth producing in Godot.\n"
 						  "- During this preview step, do not create or modify Godot scenes, scripts, resources, or project settings. Only write the HTML prototype and any required `.JundotAI/prototypes/` support file.\n"
-						  "- After presenting the HTML prototype, ask the user for approval through the NEXT_QUESTION protocol before continuing into real Godot project work. Treat the HTML as a review aid, not production source.\n"
-						  "- If the user explicitly asks to skip the HTML preview, or gives a clear direct implementation request, continue with the normal project workflow.\n";
+						  "- After presenting the HTML prototype, ask the user to run/verify it through the NEXT_QUESTION protocol before continuing into real Godot project work. Treat user approval as the gate into production.\n"
+						  "- In later turns, ordinary follow-ups such as continue, keep going, revise it, or change that still belong to the HTML prototype gate. They are not approval to start Godot/C# production. Only explicit tested/approved wording or an explicit skip request releases the gate.\n"
+						  "- If the user explicitly asks to skip the HTML preview, continue with the normal project workflow.\n";
 			}
 			break;
 	}

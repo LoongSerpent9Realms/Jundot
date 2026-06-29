@@ -88,7 +88,9 @@ class AIChatPanel : public MarginContainer {
 	Button *programming_mode_switch_button = nullptr;
 	PanelContainer *beginner_ai_guide_panel = nullptr;
 	Label *beginner_ai_guide_label = nullptr;
+	Button *beginner_ai_guide_hide_button = nullptr;
 	bool beginner_chat_mode = false;
+	bool beginner_ai_guide_hidden = false;
 	AISourceManager *beginner_source_manager = nullptr;
 	bool beginner_source_auto_config_requested = false;
 	PanelContainer *ai_activity_panel = nullptr;
@@ -180,6 +182,7 @@ class AIChatPanel : public MarginContainer {
 
 	PendingToolRound pending_tool_round;
 	bool in_tool_loop = false;
+	bool html_prototype_gate_pending = false;
 	String request_conversation_id;
 	uint64_t response_started_usec = 0;
 	String accumulated_think_content;
@@ -303,6 +306,7 @@ class AIChatPanel : public MarginContainer {
 	Array _get_structured_history() const;
 	void _store_structured_history(const Array &p_messages, const String &p_assistant_content = String());
 	void _clear_structured_history();
+	Array _compress_messages_for_low_token_mode(const Array &p_messages) const;
 	void _enqueue_current_message();
 	void _refresh_queued_messages_ui();
 	void _guide_queued_message(int p_index);
@@ -349,6 +353,8 @@ class AIChatPanel : public MarginContainer {
 	void _refresh_attachment_chips();
 	String _build_attachment_context() const;
 	Array _build_multimodal_user_content(const String &p_text) const;
+	void _append_tool_result_image_messages(Array &r_messages) const;
+	void _append_tool_final_summary_instruction(Array &r_messages) const;
 	void _set_chat_display_scale(float p_scale);
 	void _update_auto_chat_display_scale();
 	Array _build_message_history() const;
@@ -360,11 +366,17 @@ class AIChatPanel : public MarginContainer {
 	void _try_auto_title(const String &p_user_first_message, const Array &p_history);
 	void _title_completed(int p_result, int p_response_code, const String &p_title_content);
 	bool _is_project_memory_continue_request(const String &p_user_message) const;
+	bool _is_html_prototype_gate_start_message(const String &p_user_message) const;
+	bool _is_html_prototype_gate_approval_message(const String &p_user_message) const;
+	bool _is_html_prototype_gate_skip_message(const String &p_user_message) const;
+	String _html_prototype_gate_prompt() const;
+	bool _html_prototype_gate_blocks_tool_call(const Dictionary &p_tool_call, String &r_reason) const;
 	String _detect_mode_prompt(const String &p_user_message) const;
 	void _update_translations();
 	void _apply_programming_experience_layout();
 	void _apply_editor_beginner_workspace(bool p_enabled);
 	void _ensure_beginner_engine_source_configured();
+	void _hide_beginner_ai_guide();
 	void _set_programming_experience(bool p_has_programming_experience);
 	void _toggle_programming_experience_mode();
 	void _set_ai_activity(const String &p_text, bool p_visible);

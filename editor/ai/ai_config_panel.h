@@ -64,6 +64,7 @@ class AIConfigPanel : public MarginContainer {
 	OptionButton *output_language_option = nullptr;
 	CheckBox *include_project_memories_check = nullptr;
 	CheckBox *include_tool_context_check = nullptr;
+	CheckBox *low_token_mode_check = nullptr;
 	CheckBox *tools_enabled_check = nullptr;
 	CheckBox *develop_mode_check = nullptr;
 	CheckBox *mcp_tools_enabled_check = nullptr;
@@ -169,6 +170,7 @@ class AIConfigPanel : public MarginContainer {
 	void _import_config_confirmed(const String &p_path);
 	void _test_connection_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _update_translations();
+	void _on_low_token_mode_toggled(bool p_pressed);
 	void _update_external_mcp_config();
 	void _update_backend_controls();
 	void _update_mimocode_button();

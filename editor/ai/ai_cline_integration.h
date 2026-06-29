@@ -23,20 +23,9 @@ enum class AIClineState {
 	ERROR             // Error state
 };
 
-// Cline callback types
-enum class AIClineCallbackType {
-	NONE,
-	LOGIN_SUCCESS,
-	LOGIN_FAILED,
-	MESSAGE_RECEIVED,
-	TOOL_CALL_REQUESTED,
-	SESSION_ENDED
-};
-
-struct AIClineCallbackData {
-	AIClineCallbackType type = AIClineCallbackType::NONE;
-	Dictionary data;
-};
+// Cline callback data is passed as Dictionary with "type" key
+// containing one of: "login_success", "login_failed",
+// "message_received", "tool_call_requested", "session_ended"
 
 class AIClineIntegration : public RefCounted {
 	GDCLASS(AIClineIntegration, RefCounted);
@@ -73,7 +62,7 @@ public:
 	Error connect_to_cline(const String &p_server_url = String());
 	void disconnect_from_cline();
 	bool is_connected() const;
-	AIClineState get_state() const;
+	int get_state() const;
 	
 	// Authentication
 	Error login(const String &p_token = String());

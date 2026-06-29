@@ -357,6 +357,66 @@ int GameViewDebugger::click_ui_position(const Vector2 &p_position, MouseButton p
 	return sent_count;
 }
 
+int64_t GameViewDebugger::begin_ai_action() {
+	return ++ai_action_rq_id;
+}
+
+bool GameViewDebugger::pop_ai_action_result(int64_t p_request_id, Dictionary &r_result) {
+	if (!ai_action_results.has(p_request_id)) {
+		return false;
+	}
+	r_result = ai_action_results[p_request_id];
+	ai_action_results.erase(p_request_id);
+	return true;
+}
+
+int GameViewDebugger::click_ui_node(const NodePath &p_node_path, MouseButton p_button, int64_t p_request_id) {
+	Array message;
+	message.push_back(p_request_id);
+	message.push_back(p_node_path);
+	message.push_back((int)p_button);
+
+	int sent_count = 0;
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			I->send_message("scene:ai_click_ui_node", message);
+			sent_count++;
+		}
+	}
+	return sent_count;
+}
+
+int GameViewDebugger::assert_node_visible(const NodePath &p_node_path, int64_t p_request_id) {
+	Array message;
+	message.push_back(p_request_id);
+	message.push_back(p_node_path);
+
+	int sent_count = 0;
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			I->send_message("scene:ai_assert_node_visible", message);
+			sent_count++;
+		}
+	}
+	return sent_count;
+}
+
+int GameViewDebugger::capture_runtime_ui_snapshot(int p_max_nodes, bool p_include_invisible, int64_t p_request_id) {
+	Array message;
+	message.push_back(p_request_id);
+	message.push_back(p_max_nodes);
+	message.push_back(p_include_invisible);
+
+	int sent_count = 0;
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			I->send_message("scene:ai_capture_runtime_ui_snapshot", message);
+			sent_count++;
+		}
+	}
+	return sent_count;
+}
+
 void GameViewDebugger::setup_session(int p_session_id) {
 	Ref<EditorDebuggerSession> session = get_session(p_session_id);
 	ERR_FAIL_COND(session.is_null());
@@ -399,6 +459,29 @@ bool GameViewDebugger::add_screenshot_callback(const Callable &p_callaback, cons
 	return found;
 }
 
+int64_t GameViewDebugger::request_ai_screenshot() {
+	const int64_t request_id = scr_rq_id++;
+	bool found = false;
+	for (Ref<EditorDebuggerSession> &I : sessions) {
+		if (I->is_active()) {
+			Array arr;
+			arr.append(request_id);
+			I->send_message("scene:rq_screenshot", arr);
+			found = true;
+		}
+	}
+	return found ? request_id : -1;
+}
+
+bool GameViewDebugger::pop_ai_screenshot_result(int64_t p_request_id, Dictionary &r_result) {
+	if (!ai_screenshot_results.has(p_request_id)) {
+		return false;
+	}
+	r_result = ai_screenshot_results[p_request_id];
+	ai_screenshot_results.erase(p_request_id);
+	return true;
+}
+
 bool GameViewDebugger::_msg_get_screenshot(const Array &p_args) {
 	ERR_FAIL_COND_V_MSG(p_args.size() != 4, false, "get_screenshot: invalid number of arguments");
 
@@ -412,7 +495,29 @@ bool GameViewDebugger::_msg_get_screenshot(const Array &p_args) {
 			screenshot_callbacks[id].cb.call(w, h, path, screenshot_callbacks[id].rect);
 		}
 		screenshot_callbacks.erase(id);
+	} else {
+		Dictionary result;
+		result["width"] = w;
+		result["height"] = h;
+		result["path"] = path;
+		ai_screenshot_results[id] = result;
 	}
+	return true;
+}
+
+bool GameViewDebugger::_msg_ai_action_result(const Array &p_args) {
+	ERR_FAIL_COND_V_MSG(p_args.size() < 4, false, "ai_action_result: invalid number of arguments");
+
+	const int64_t id = p_args[0];
+	Dictionary result;
+	result["ok"] = p_args[1];
+	result["message"] = p_args[2];
+	if (p_args[3].get_type() == Variant::DICTIONARY) {
+		result["details"] = p_args[3];
+	} else {
+		result["details"] = Dictionary();
+	}
+	ai_action_results[id] = result;
 	return true;
 }
 
@@ -422,6 +527,8 @@ bool GameViewDebugger::capture(const String &p_message, const Array &p_data, int
 
 	if (p_message == "game_view:get_screenshot") {
 		return _msg_get_screenshot(p_data);
+	} else if (p_message == "game_view:ai_action_result") {
+		return _msg_ai_action_result(p_data);
 	} else if (p_message == "game_view:setup_complete") {
 		emit_signal(SNAME("setup_complete"));
 		return true;

@@ -55,8 +55,13 @@ still feels like a plain tool form.
    - After editing a Control scene, call `check_ui_layout` on each changed UI
      `.tscn` and fix reported overlap, mouse blocking, z-order, and modal issues.
    - For important screens or suspected input bugs, call `play_scene`, wait for
-     the game to start, use `click_ui_position` on representative controls, then
-     call `stop_play_scene`.
+     the game to start, call `capture_runtime_ui_snapshot` for hierarchy,
+     position, z-index, mouse filter, visibility, and basic color evidence, and
+     call `capture_game_screenshot` when visual composition needs inspection.
+     Prefer `click_ui_node` when a Control node path is known, otherwise use
+     `click_ui_position` on representative controls. After clicks, call
+     `assert_no_runtime_errors`, and use `assert_node_visible` for expected
+     visible results when a node path is known. Then call `stop_play_scene`.
    - If coordinates are uncertain, infer them from scene layout and state that
      the runtime click coverage was approximate.
 

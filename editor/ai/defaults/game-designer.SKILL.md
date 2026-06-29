@@ -180,7 +180,7 @@ res://
 │   ├── levels/
 │   ├── entities/
 │   └── ui/
-├── scripts/         # .gd script files
+├── scripts/         # .cs script files by default
 │   ├── managers/
 │   ├── entities/
 │   └── ui/

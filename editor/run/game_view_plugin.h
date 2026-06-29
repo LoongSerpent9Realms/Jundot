@@ -31,6 +31,8 @@
 #pragma once
 
 #include "core/input/input_enums.h"
+#include "core/string/node_path.h"
+#include "core/variant/dictionary.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/debugger/editor_debugger_plugin.h"
 #include "editor/editor_main_screen.h"
@@ -72,8 +74,12 @@ private:
 
 	int64_t scr_rq_id = 0;
 	HashMap<uint64_t, ScreenshotCB> screenshot_callbacks;
+	HashMap<uint64_t, Dictionary> ai_screenshot_results;
+	int64_t ai_action_rq_id = 0;
+	HashMap<int64_t, Dictionary> ai_action_results;
 
 	bool _msg_get_screenshot(const Array &p_args);
+	bool _msg_ai_action_result(const Array &p_args);
 
 protected:
 	static void _bind_methods();
@@ -85,6 +91,8 @@ public:
 	virtual bool has_capture(const String &p_capture) const override;
 
 	bool add_screenshot_callback(const Callable &p_callaback, const Rect2i &p_rect);
+	int64_t request_ai_screenshot();
+	bool pop_ai_screenshot_result(int64_t p_request_id, Dictionary &r_result);
 
 	void window_request_size();
 	void hdr_output_request_state();
@@ -115,6 +123,11 @@ public:
 	void reset_camera_2d_position();
 	void reset_camera_3d_position();
 	int click_ui_position(const Vector2 &p_position, MouseButton p_button = MouseButton::LEFT);
+	int64_t begin_ai_action();
+	bool pop_ai_action_result(int64_t p_request_id, Dictionary &r_result);
+	int click_ui_node(const NodePath &p_node_path, MouseButton p_button, int64_t p_request_id);
+	int assert_node_visible(const NodePath &p_node_path, int64_t p_request_id);
+	int capture_runtime_ui_snapshot(int p_max_nodes, bool p_include_invisible, int64_t p_request_id);
 
 	virtual void setup_session(int p_session_id) override;
 

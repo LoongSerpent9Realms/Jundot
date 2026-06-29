@@ -48,6 +48,10 @@
 #include "core/variant/array.h"
 #include "scene/2d/camera_2d.h"
 #include "scene/debugger/scene_debugger_object.h"
+#include "scene/gui/color_rect.h"
+#include "scene/gui/control.h"
+#include "scene/gui/label.h"
+#include "scene/main/canvas_item.h"
 #include "scene/main/node.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
@@ -579,6 +583,48 @@ Error SceneDebugger::_msg_report_window_focused(const Array &p_args) {
 	return OK;
 }
 
+static void _send_ai_action_result(int64_t p_request_id, bool p_ok, const String &p_message, const Dictionary &p_details = Dictionary()) {
+	Array response;
+	response.push_back(p_request_id);
+	response.push_back(p_ok);
+	response.push_back(p_message);
+	response.push_back(p_details);
+	EngineDebugger::get_singleton()->send_message("game_view:ai_action_result", response);
+}
+
+static void _send_ai_mouse_click(const Vector2 &p_position, MouseButton p_button) {
+	MouseButtonMask button_mask = MouseButtonMask::LEFT;
+	if (p_button == MouseButton::RIGHT) {
+		button_mask = MouseButtonMask::RIGHT;
+	} else if (p_button == MouseButton::MIDDLE) {
+		button_mask = MouseButtonMask::MIDDLE;
+	}
+
+	Ref<InputEventMouseMotion> motion;
+	motion.instantiate();
+	motion->set_position(p_position);
+	motion->set_global_position(p_position);
+	Input::get_singleton()->parse_input_event(motion);
+
+	Ref<InputEventMouseButton> press;
+	press.instantiate();
+	press->set_position(p_position);
+	press->set_global_position(p_position);
+	press->set_button_index(p_button);
+	press->set_button_mask(button_mask);
+	press->set_pressed(true);
+	Input::get_singleton()->parse_input_event(press);
+
+	Ref<InputEventMouseButton> release;
+	release.instantiate();
+	release->set_position(p_position);
+	release->set_global_position(p_position);
+	release->set_button_index(p_button);
+	release->set_button_mask(MouseButtonMask::NONE);
+	release->set_pressed(false);
+	Input::get_singleton()->parse_input_event(release);
+}
+
 Error SceneDebugger::_msg_ai_click_ui_position(const Array &p_args) {
 	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
 
@@ -588,37 +634,193 @@ Error SceneDebugger::_msg_ai_click_ui_position(const Array &p_args) {
 		button = (MouseButton)(int)p_args[2];
 	}
 
-	MouseButtonMask button_mask = MouseButtonMask::LEFT;
-	if (button == MouseButton::RIGHT) {
-		button_mask = MouseButtonMask::RIGHT;
-	} else if (button == MouseButton::MIDDLE) {
-		button_mask = MouseButtonMask::MIDDLE;
+	_send_ai_mouse_click(position, button);
+
+	if (p_args.size() >= 4) {
+		Dictionary details;
+		details["x"] = position.x;
+		details["y"] = position.y;
+		details["button"] = (int)button;
+		_send_ai_action_result((int64_t)p_args[3], true, "Clicked viewport position.", details);
 	}
 
-	Ref<InputEventMouseMotion> motion;
-	motion.instantiate();
-	motion->set_position(position);
-	motion->set_global_position(position);
-	Input::get_singleton()->parse_input_event(motion);
+	return OK;
+}
 
-	Ref<InputEventMouseButton> press;
-	press.instantiate();
-	press->set_position(position);
-	press->set_global_position(position);
-	press->set_button_index(button);
-	press->set_button_mask(button_mask);
-	press->set_pressed(true);
-	Input::get_singleton()->parse_input_event(press);
+Error SceneDebugger::_msg_ai_click_ui_node(const Array &p_args) {
+	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
 
-	Ref<InputEventMouseButton> release;
-	release.instantiate();
-	release->set_position(position);
-	release->set_global_position(position);
-	release->set_button_index(button);
-	release->set_button_mask(MouseButtonMask::NONE);
-	release->set_pressed(false);
-	Input::get_singleton()->parse_input_event(release);
+	const int64_t request_id = p_args[0];
+	const NodePath node_path = p_args[1];
+	MouseButton button = MouseButton::LEFT;
+	if (p_args.size() >= 3) {
+		button = (MouseButton)(int)p_args[2];
+	}
 
+	Dictionary details;
+	details["node_path"] = String(node_path);
+
+	SceneTree *tree = SceneTree::get_singleton();
+	Node *root = tree ? tree->get_root() : nullptr;
+	if (!root) {
+		_send_ai_action_result(request_id, false, "No running scene tree root is available.", details);
+		return ERR_UNCONFIGURED;
+	}
+
+	Node *node = root->get_node_or_null(node_path);
+	if (!node) {
+		_send_ai_action_result(request_id, false, "Node was not found in the running scene tree.", details);
+		return ERR_DOES_NOT_EXIST;
+	}
+
+	Control *control = Object::cast_to<Control>(node);
+	if (!control) {
+		details["class"] = node->get_class();
+		_send_ai_action_result(request_id, false, "Node exists, but it is not a Control and cannot be clicked as UI.", details);
+		return ERR_INVALID_PARAMETER;
+	}
+
+	const Rect2 rect = control->get_global_rect();
+	const Vector2 center = rect.get_center();
+	details["visible_in_tree"] = control->is_visible_in_tree();
+	details["x"] = center.x;
+	details["y"] = center.y;
+	details["width"] = rect.size.x;
+	details["height"] = rect.size.y;
+
+	if (!control->is_visible_in_tree()) {
+		_send_ai_action_result(request_id, false, "Control exists, but it is not visible in the running scene tree.", details);
+		return ERR_CANT_ACQUIRE_RESOURCE;
+	}
+	if (rect.size.x <= 0.0 || rect.size.y <= 0.0) {
+		_send_ai_action_result(request_id, false, "Control exists, but its runtime global rectangle has no clickable area.", details);
+		return ERR_INVALID_DATA;
+	}
+
+	_send_ai_mouse_click(center, button);
+	_send_ai_action_result(request_id, true, "Clicked Control center in the running scene.", details);
+	return OK;
+}
+
+Error SceneDebugger::_msg_ai_assert_node_visible(const Array &p_args) {
+	ERR_FAIL_COND_V(p_args.size() < 2, ERR_INVALID_DATA);
+
+	const int64_t request_id = p_args[0];
+	const NodePath node_path = p_args[1];
+
+	Dictionary details;
+	details["node_path"] = String(node_path);
+
+	SceneTree *tree = SceneTree::get_singleton();
+	Node *root = tree ? tree->get_root() : nullptr;
+	if (!root) {
+		_send_ai_action_result(request_id, false, "No running scene tree root is available.", details);
+		return ERR_UNCONFIGURED;
+	}
+
+	Node *node = root->get_node_or_null(node_path);
+	if (!node) {
+		_send_ai_action_result(request_id, false, "Node was not found in the running scene tree.", details);
+		return ERR_DOES_NOT_EXIST;
+	}
+
+	CanvasItem *canvas_item = Object::cast_to<CanvasItem>(node);
+	if (!canvas_item) {
+		details["class"] = node->get_class();
+		_send_ai_action_result(request_id, false, "Node exists, but it is not a CanvasItem with runtime visibility.", details);
+		return ERR_INVALID_PARAMETER;
+	}
+
+	details["visible_in_tree"] = canvas_item->is_visible_in_tree();
+	_send_ai_action_result(request_id, canvas_item->is_visible_in_tree(), canvas_item->is_visible_in_tree() ? "Node is visible in the running scene tree." : "Node exists, but it is not visible in the running scene tree.", details);
+	return OK;
+}
+
+static String _ai_color_to_html(const Color &p_color) {
+	return p_color.to_html(true);
+}
+
+static void _capture_runtime_ui_node(Node *p_node, Array &r_nodes, int p_max_nodes, bool p_include_invisible) {
+	if (!p_node || r_nodes.size() >= p_max_nodes) {
+		return;
+	}
+
+	CanvasItem *canvas_item = Object::cast_to<CanvasItem>(p_node);
+	Control *control = Object::cast_to<Control>(p_node);
+	if (canvas_item) {
+		const bool visible = canvas_item->is_visible_in_tree();
+		if (visible || p_include_invisible) {
+			Dictionary info;
+			info["path"] = String(p_node->get_path());
+			info["name"] = p_node->get_name();
+			info["class"] = p_node->get_class();
+			info["visible_in_tree"] = visible;
+			info["z_index"] = canvas_item->get_z_index();
+			info["modulate"] = _ai_color_to_html(canvas_item->get_modulate());
+			info["self_modulate"] = _ai_color_to_html(canvas_item->get_self_modulate());
+
+			if (control) {
+				const Rect2 rect = control->get_global_rect();
+				Dictionary rect_info;
+				rect_info["x"] = rect.position.x;
+				rect_info["y"] = rect.position.y;
+				rect_info["width"] = rect.size.x;
+				rect_info["height"] = rect.size.y;
+				info["global_rect"] = rect_info;
+				info["mouse_filter"] = (int)control->get_mouse_filter();
+				info["clip_contents"] = control->is_clipping_contents();
+			}
+
+			ColorRect *color_rect = Object::cast_to<ColorRect>(p_node);
+			if (color_rect) {
+				info["color"] = _ai_color_to_html(color_rect->get_color());
+			}
+			Label *label = Object::cast_to<Label>(p_node);
+			if (label) {
+				info["text"] = label->get_text().substr(0, 160);
+				info["font_color"] = _ai_color_to_html(label->get_theme_color(SceneStringName(font_color)));
+			}
+
+			r_nodes.push_back(info);
+		}
+	}
+
+	for (int i = 0; i < p_node->get_child_count() && r_nodes.size() < p_max_nodes; i++) {
+		_capture_runtime_ui_node(p_node->get_child(i), r_nodes, p_max_nodes, p_include_invisible);
+	}
+}
+
+Error SceneDebugger::_msg_ai_capture_runtime_ui_snapshot(const Array &p_args) {
+	ERR_FAIL_COND_V(p_args.is_empty(), ERR_INVALID_DATA);
+
+	const int64_t request_id = p_args[0];
+	int max_nodes = 200;
+	if (p_args.size() >= 2) {
+		max_nodes = CLAMP((int)p_args[1], 1, 1000);
+	}
+	bool include_invisible = false;
+	if (p_args.size() >= 3) {
+		include_invisible = p_args[2];
+	}
+
+	Dictionary details;
+	details["max_nodes"] = max_nodes;
+	details["include_invisible"] = include_invisible;
+
+	SceneTree *tree = SceneTree::get_singleton();
+	Node *root = tree ? tree->get_root() : nullptr;
+	if (!root) {
+		_send_ai_action_result(request_id, false, "No running scene tree root is available.", details);
+		return ERR_UNCONFIGURED;
+	}
+
+	Array nodes;
+	_capture_runtime_ui_node(root, nodes, max_nodes, include_invisible);
+	details["nodes"] = nodes;
+	details["node_count"] = nodes.size();
+	details["truncated"] = nodes.size() >= max_nodes;
+
+	_send_ai_action_result(request_id, true, "Captured runtime UI hierarchy snapshot.", details);
 	return OK;
 }
 
@@ -704,6 +906,9 @@ void SceneDebugger::_init_message_handlers() {
 	message_handlers["rq_screenshot"] = _msg_rq_screenshot;
 	message_handlers["report_window_focused"] = _msg_report_window_focused;
 	message_handlers["ai_click_ui_position"] = _msg_ai_click_ui_position;
+	message_handlers["ai_click_ui_node"] = _msg_ai_click_ui_node;
+	message_handlers["ai_assert_node_visible"] = _msg_ai_assert_node_visible;
+	message_handlers["ai_capture_runtime_ui_snapshot"] = _msg_ai_capture_runtime_ui_snapshot;
 }
 
 void SceneDebugger::_save_node(ObjectID id, const String &p_path) {

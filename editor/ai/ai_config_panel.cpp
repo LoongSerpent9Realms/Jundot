@@ -673,13 +673,15 @@ void AIConfigPanel::_update_translations() {
 	user_extra_instructions_label->set_text(TTR("Extra Instructions (appended to system prompt)"));
 	include_project_memories_check->set_text(TTR("Include project memories"));
 	include_tool_context_check->set_text(TTR("Include skill and MCP context"));
+	low_token_mode_check->set_text(TTR("Low Token Mode"));
+	low_token_mode_check->set_tooltip_text(TTR("Reduces output and context budgets, limits tool-call loops, disables MCP tools, and omits extra skill/MCP context from requests."));
 	tools_enabled_check->set_text(TTR("Enable Function Calling tools (read/write files, build, etc.)"));
 	develop_mode_check->set_text(TTR("Develop Mode (run local workflow, never commit or push)"));
 	develop_mode_check->set_tooltip_text(TTR("Demonstrates modify, build, restart, user verification, AI verification, and upload validation. Git commit and push are always skipped."));
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
-	html_min_project_prototype_check->set_text(TTR("Allow HTML minimum prototype preview before project implementation"));
-	html_min_project_prototype_check->set_tooltip_text(TTR("When enabled, project-concept requests can create a disposable standalone HTML prototype under .JundotAI/prototypes, then wait for user approval before editing Godot project files."));
+	html_min_project_prototype_check->set_text(TTR("Require HTML gameplay prototype before project implementation"));
+	html_min_project_prototype_check->set_tooltip_text(TTR("When enabled, new game/project concept requests first create a runnable standalone HTML prototype under .JundotAI/prototypes, then wait for user verification before editing Godot project files."));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
 	external_api_enabled_check->set_text(TTR("Enable External API Server (for remote MCP tool calls)"));
 	external_mcp_config_label->set_text(TTR("External AI MCP Config"));
@@ -721,6 +723,20 @@ void AIConfigPanel::_update_translations() {
 	if (engine_source_status_label) {
 		_update_engine_source_status();
 	}
+}
+
+void AIConfigPanel::_on_low_token_mode_toggled(bool p_pressed) {
+	if (!p_pressed) {
+		return;
+	}
+
+	max_tokens_spin->set_value(AISettings::get_low_token_max_tokens());
+	context_char_budget_spin->set_value(AISettings::get_low_token_context_char_budget());
+	history_budget_spin->set_value(AISettings::get_low_token_history_char_budget());
+	max_tool_iterations_spin->set_value(AISettings::get_low_token_max_tool_iterations());
+	include_tool_context_check->set_pressed(false);
+	mcp_tools_enabled_check->set_pressed(false);
+	status_label->set_text(TTR("Low Token Mode preset applied."));
 }
 
 void AIConfigPanel::_update_external_mcp_config() {
@@ -793,13 +809,13 @@ void AIConfigPanel::_update_mimocode_button() {
 	const String executable_path = _find_mimocode_executable();
 	if (!executable_path.is_empty()) {
 		mimocode_download_button->set_text(TTR("Start MiMoCode"));
-		mimocode_download_button->set_tooltip_text(TTR("Start the installed MiMoCode local plugin and save the connection settings."));
+		mimocode_download_button->set_tooltip_text(TTR("Start the installed MiMoCode local plugin, open its web interface, and save the connection settings."));
 		mimocode_download_button->set_disabled(false);
 		return;
 	}
 
 	mimocode_download_button->set_text(TTR("Download / Start MiMoCode"));
-	mimocode_download_button->set_tooltip_text(TTR("Download MiMoCode v0.4 if needed, then start it and save the local plugin connection settings."));
+	mimocode_download_button->set_tooltip_text(TTR("Download MiMoCode v0.4 if needed, then start it, open its web interface, and save the local plugin connection settings."));
 }
 
 void AIConfigPanel::_on_backend_type_selected(int p_index) {
@@ -908,6 +924,12 @@ void AIConfigPanel::_on_mimocode_download_completed(int p_result, int p_response
 
 Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
 	List<String> args;
+	args.push_back("web");
+	args.push_back("--hostname");
+	args.push_back("127.0.0.1");
+	args.push_back("--port");
+	args.push_back("4096");
+
 	ProcessID pid = 0;
 	const Error err = OS::get_singleton()->create_process(p_executable_path, args, &pid, false);
 	if (err != OK) {
@@ -926,7 +948,7 @@ Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
 	}
 	_update_backend_controls();
 	_save_settings();
-	status_label->set_text(TTR("MiMoCode has started. MiMoCode backend settings were saved; JunDot will connect to http://127.0.0.1:4096."));
+	status_label->set_text(TTR("MiMoCode has started and should open its web interface. MiMoCode backend settings were saved; JunDot will connect to http://127.0.0.1:4096."));
 	_update_mimocode_button();
 	return OK;
 }
@@ -1307,6 +1329,7 @@ void AIConfigPanel::_load_settings() {
 	output_language_option->select(output_language_option->get_item_index(_output_language_to_id(settings.output_language)));
 	include_project_memories_check->set_pressed(settings.include_project_memories);
 	include_tool_context_check->set_pressed(settings.include_tool_context);
+	low_token_mode_check->set_pressed(settings.low_token_mode);
 	tools_enabled_check->set_pressed(settings.tools_enabled);
 	develop_mode_check->set_pressed(settings.develop_mode);
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
@@ -1356,6 +1379,7 @@ void AIConfigPanel::_save_settings() {
 	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
@@ -1370,6 +1394,7 @@ void AIConfigPanel::_save_settings() {
 	settings.github_oauth_client_secret = github_client_secret_edit ? github_client_secret_edit->get_text().strip_edges() : String();
 	settings.gitee_oauth_client_id = gitee_client_id_edit ? gitee_client_id_edit->get_text().strip_edges() : String();
 	settings.gitee_oauth_client_secret = gitee_client_secret_edit ? gitee_client_secret_edit->get_text().strip_edges() : String();
+	AISettings::apply_low_token_mode(settings);
 	const Error err = AISettings::save(settings);
 	if (err != OK) {
 		status_label->set_text(TTR("AI settings could not be saved."));
@@ -1411,6 +1436,7 @@ void AIConfigPanel::_test_connection() {
 	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
@@ -1418,6 +1444,7 @@ void AIConfigPanel::_test_connection() {
 	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
+	AISettings::apply_low_token_mode(settings);
 
 	if (settings.backend_type == AIBackendType::JUNDOT_PLUGIN && (settings.jundot_ai_plugin_id.is_empty() || settings.jundot_ai_plugin_url.is_empty())) {
 		status_label->set_text(TTR("MiMoCode plugin ID and URL are required before testing the connection."));
@@ -1490,6 +1517,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.output_language = _output_language_from_id(output_language_option->get_selected_id());
 	settings.include_project_memories = include_project_memories_check->is_pressed();
 	settings.include_tool_context = include_tool_context_check->is_pressed();
+	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
@@ -1497,6 +1525,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
+	AISettings::apply_low_token_mode(settings);
 
 	Dictionary root;
 	root["backend_type"] = settings.backend_type == AIBackendType::CODEX ? "codex" : (settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin");
@@ -1511,6 +1540,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["system_prompt"] = AISettings::get_default_system_prompt();
 	root["include_project_memories"] = settings.include_project_memories;
 	root["include_tool_context"] = settings.include_tool_context;
+	root["low_token_mode"] = settings.low_token_mode;
 	root["tools_enabled"] = settings.tools_enabled;
 	root["develop_mode"] = settings.develop_mode;
 	root["mcp_tools_enabled"] = settings.mcp_tools_enabled;
@@ -1678,6 +1708,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	if (root.has("include_tool_context")) {
 		include_tool_context_check->set_pressed(root["include_tool_context"]);
+	}
+	if (root.has("low_token_mode")) {
+		low_token_mode_check->set_pressed(root["low_token_mode"]);
 	}
 	if (root.has("tools_enabled")) {
 		tools_enabled_check->set_pressed(root["tools_enabled"]);
@@ -2066,6 +2099,10 @@ AIConfigPanel::AIConfigPanel() {
 
 	include_tool_context_check = memnew(CheckBox);
 	root->add_child(include_tool_context_check);
+
+	low_token_mode_check = memnew(CheckBox);
+	low_token_mode_check->connect(SceneStringName(toggled), callable_mp(this, &AIConfigPanel::_on_low_token_mode_toggled));
+	root->add_child(low_token_mode_check);
 
 	tools_enabled_check = memnew(CheckBox);
 	root->add_child(tools_enabled_check);

@@ -426,6 +426,77 @@ Array AIToolDefs::get_builtin_tools() {
 	// 18. stop_play_scene
 	{
 		Dictionary props;
+		props["node_path"] = _str_property("Runtime scene-tree path to the Control node to click, for example '/root/Main/Menu/StartButton'. The node must exist in the running scene and be visible.");
+		props["button"] = _str_property("Mouse button to click: left, right, or middle. Defaults to left.");
+		props["wait_ms"] = _number_property("Optional time to wait for the running game to report the click result, in milliseconds. Defaults to 500.");
+		Array required;
+		required.push_back("node_path");
+		Dictionary fn = _make_fn(
+				AIToolNames::CLICK_UI_NODE,
+				"PROJECT mode only. Click a visible runtime Control by node path. This asks the running game to resolve the node, compute its global rectangle center, and send a synthetic mouse click there. Use this instead of coordinate clicks when a button path is known.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CLICK_UI_NODE, "", fn));
+	}
+
+	// 19. assert_node_visible
+	{
+		Dictionary props;
+		props["node_path"] = _str_property("Runtime scene-tree path to the CanvasItem node to check, for example '/root/Main/Menu/StartButton'.");
+		props["wait_ms"] = _number_property("Optional time to wait for the running game to report the assertion result, in milliseconds. Defaults to 500.");
+		Array required;
+		required.push_back("node_path");
+		Dictionary fn = _make_fn(
+				AIToolNames::ASSERT_NODE_VISIBLE,
+				"PROJECT mode only. Assert that a runtime CanvasItem node exists and is visible in the running scene tree. Use after clicks or scene transitions to verify visible UI state.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ASSERT_NODE_VISIBLE, "", fn));
+	}
+
+	// 20. assert_no_runtime_errors
+	{
+		Dictionary props;
+		Dictionary allow_warnings;
+		allow_warnings["type"] = "boolean";
+		allow_warnings["description"] = "If true, warnings do not fail the assertion. Runtime errors always fail. Defaults to true.";
+		props["allow_warnings"] = allow_warnings;
+		Dictionary fn = _make_fn(
+				AIToolNames::ASSERT_NO_RUNTIME_ERRORS,
+				"PROJECT mode only. Check the active debugger sessions for runtime errors and warnings after playing or clicking a scene. Use after click_ui_position or click_ui_node so AI does not treat a sent click as a passed test when the button callback throws.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::ASSERT_NO_RUNTIME_ERRORS, "", fn));
+	}
+
+	// 21. stop_play_scene
+	{
+		Dictionary props;
+		props["wait_ms"] = _number_property("Optional time to wait for the game viewport screenshot to arrive, in milliseconds. Defaults to 1000.");
+		props["file_name"] = _str_property("Optional PNG file name to save under .JundotAI/runtime_screenshots/. If omitted, a timestamped file name is generated.");
+		Dictionary fn = _make_fn(
+				AIToolNames::CAPTURE_GAME_SCREENSHOT,
+				"PROJECT mode only. Capture the currently running game viewport as a PNG and save it under .JundotAI/runtime_screenshots/. Use after play_scene and UI interactions to inspect visual layout, visible state, and screen composition. The tool returns the saved image path and dimensions.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CAPTURE_GAME_SCREENSHOT, "", fn));
+	}
+
+	// 22. stop_play_scene
+	{
+		Dictionary props;
+		props["max_nodes"] = _number_property("Maximum runtime CanvasItem/Control nodes to include. Defaults to 200, capped at 1000.");
+		Dictionary include_invisible;
+		include_invisible["type"] = "boolean";
+		include_invisible["description"] = "If true, include invisible CanvasItem nodes too. Defaults to false.";
+		props["include_invisible"] = include_invisible;
+		props["wait_ms"] = _number_property("Optional time to wait for the running game to return the snapshot, in milliseconds. Defaults to 1000.");
+		Dictionary fn = _make_fn(
+				AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT,
+				"PROJECT mode only. Capture structured runtime UI evidence from the currently running game: CanvasItem/Control hierarchy, node paths, classes, visibility, global rectangles, z_index, mouse_filter, clipping, modulate/self_modulate, and basic ColorRect/Label colors. Use with capture_game_screenshot to diagnose whether UI position, layering, and displayed state are correct.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT, "", fn));
+	}
+
+	// 23. stop_play_scene
+	{
+		Dictionary props;
 		Dictionary fn = _make_fn(
 				AIToolNames::STOP_PLAY_SCENE,
 				"PROJECT mode only. Stop the currently running game scene if one is playing.",
@@ -433,7 +504,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::STOP_PLAY_SCENE, "", fn));
 	}
 
-	// 19. run_build
+	// 24. run_build
 	{
 		Dictionary props;
 		props["extra_args"] = _str_property("Optional extra scons arguments, e.g. 'module_mono_enabled=yes'.");
@@ -444,7 +515,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RUN_BUILD, "", fn));
 	}
 
-	// 20. read_build_log
+	// 25. read_build_log
 	{
 		Dictionary props;
 		Dictionary fn = _make_fn(
@@ -454,7 +525,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::READ_BUILD_LOG, "", fn));
 	}
 
-	// 21. fetch_url
+	// 26. fetch_url
 	{
 		Dictionary props;
 		props["url"] = _str_property("The full URL to download from.");
@@ -584,7 +655,7 @@ Array AIToolDefs::get_builtin_tools() {
 	// 26. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, play_scene, click_ui_position, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -724,6 +795,11 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	project_only.insert(StringName(AIToolNames::TEST_PACKAGE));
 	project_only.insert(StringName(AIToolNames::PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::CLICK_UI_POSITION));
+	project_only.insert(StringName(AIToolNames::CLICK_UI_NODE));
+	project_only.insert(StringName(AIToolNames::ASSERT_NODE_VISIBLE));
+	project_only.insert(StringName(AIToolNames::ASSERT_NO_RUNTIME_ERRORS));
+	project_only.insert(StringName(AIToolNames::CAPTURE_GAME_SCREENSHOT));
+	project_only.insert(StringName(AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT));
 	project_only.insert(StringName(AIToolNames::STOP_PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::SETUP_ENGINE_WORKSPACE));
 	project_only.insert(StringName(AIToolNames::REQUEST_ENGINE_CHANGE));

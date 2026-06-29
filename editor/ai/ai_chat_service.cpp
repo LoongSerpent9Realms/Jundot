@@ -793,7 +793,7 @@ void AIChatService::cancel_request() {
 		return;
 	}
 	if (http_request) {
-		http_request->cancel_request();
+		http_request->call_deferred(SNAME("cancel_request"));
 	}
 }
 
