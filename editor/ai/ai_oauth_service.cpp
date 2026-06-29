@@ -218,7 +218,7 @@ void AIOAuthService::_handle_callback_client(Ref<StreamPeerTCP> p_client) {
 	print_line("AIOAuthService: Path: " + path + ", expected: " + _get_callback_path());
 
 	if (path == _get_callback_path()) {
-		String pending_html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Logging in...</title><style>body{font-family:Segoe UI,Microsoft YaHei,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#202124;color:#f1f3f4;text-align:center}.spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,0.25);border-top-color:#8ab4f8;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}@keyframes spin{to{transform:rotate(360deg)}}h1{font-size:1.4em}</style></head><body><div><div class=\"spinner\"></div><h1>GitHub login received</h1><p>You can return to Jundot. The editor is exchanging the authorization code now.</p><p style=\"opacity:0.8;font-size:0.9em\">This window will close automatically.</p><script>setTimeout(function(){window.close()},5000)</script></div></body></html>";
+		String pending_html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Logging in...</title><style>body{font-family:Segoe UI,Microsoft YaHei,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#202124;color:#f1f3f4;text-align:center}.spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,0.25);border-top-color:#8ab4f8;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}@keyframes spin{to{transform:rotate(360deg)}}h1{font-size:1.4em}</style></head><body><div><div class=\"spinner\"></div><h1>OAuth login received</h1><p>You can return to Jundot. The editor is exchanging the authorization code now.</p><p style=\"opacity:0.8;font-size:0.9em\">This window will close automatically.</p><script>setTimeout(function(){window.close()},5000)</script></div></body></html>";
 		_send_http_response(p_client, 200, "text/html; charset=utf-8", pending_html);
 		print_line("AIOAuthService: Callback response sent, now processing token exchange...");
 		p_client->disconnect_from_host();
@@ -255,12 +255,16 @@ void AIOAuthService::_handle_callback_request(const String &p_path, const Dictio
 			return;
 		}
 
-		if (state != auth_state_value) {
+		const bool allow_missing_state = state.is_empty() && _allow_missing_callback_state() && auth_state == AUTH_STATE_AUTHORIZING && !code.is_empty();
+		if (state != auth_state_value && !allow_missing_state) {
 			auth_state = AUTH_STATE_FAILED;
 			error_message = "State mismatch - possible CSRF attack.";
 			print_error("AIOAuthService: " + error_message);
 			auth_completed.set();
 			return;
+		}
+		if (allow_missing_state) {
+			WARN_PRINT("AIOAuthService: OAuth callback did not include state; accepting because this provider does not reliably echo state.");
 		}
 
 		if (code.is_empty()) {
@@ -558,6 +562,19 @@ Error AIOAuthService::_fetch_user_info(const AIOAuthToken &p_token, AIOAuthUserI
 	return OK;
 }
 
+String AIOAuthService::_build_authorization_url(const String &p_client_id, const String &p_redirect_uri) const {
+	String scope = _get_scope();
+
+	String auth_url = _get_authorize_url();
+	auth_url += "?";
+	auth_url += "client_id=" + p_client_id.uri_encode();
+	auth_url += "&redirect_uri=" + p_redirect_uri.uri_encode();
+	auth_url += "&response_type=code";
+	auth_url += "&scope=" + scope.uri_encode();
+	auth_url += "&state=" + auth_state_value.uri_encode();
+	return auth_url;
+}
+
 Error AIOAuthService::start_login() {
 	MutexLock lock(state_mutex);
 
@@ -584,16 +601,7 @@ Error AIOAuthService::start_login() {
 	}
 
 	String redirect_uri = vformat("http://127.0.0.1:%d%s", callback_port, _get_callback_path());
-	String scope = _get_scope();
-
-	// Build the authorization URL
-	String auth_url = _get_authorize_url();
-	auth_url += "?";
-	auth_url += "client_id=" + client_id.uri_encode();
-	auth_url += "&redirect_uri=" + redirect_uri.uri_encode();
-	auth_url += "&scope=" + scope.uri_encode();
-	auth_url += "&state=" + auth_state_value.uri_encode();
-	auth_url += "&response_type=code";
+	String auth_url = _build_authorization_url(client_id, redirect_uri);
 
 	print_line("AIOAuthService: Opening auth URL: " + auth_url);
 

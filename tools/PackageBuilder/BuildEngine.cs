@@ -1051,14 +1051,14 @@ Install one of these toolchains, then run this tool again:
 			buildArgs.AddRange(_cfg.ExtraSConsArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries));
 		}
 
-		// ── 默认启用加速选项（用户可通过 ExtraSConsArgs 覆盖�?─────────
-		AddIfMissing(buildArgs, "scu_build", "yes");           // 单编译单元：合并源文件减少编译次�?        AddIfMissing(buildArgs, "fast_unsafe", "yes");         // 隐式缓存 + 最大漂移：加速增量构�?        buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
+		// Enable PackageBuilder defaults that keep rebuilds fast while still
+		// allowing explicit Extra SCons Args to override them.
+		AddIfMissing(buildArgs, "scu_build", "yes");
 		AddIfMissing(buildArgs, "fast_unsafe", "yes");
+		AddIfMissing(buildArgs, "cache_path", Path.Combine(_repoRoot, ".scons_cache"));
 		buildArgs.RemoveAll(a => a.StartsWith("ninja=", StringComparison.OrdinalIgnoreCase));
 		buildArgs.Add("ninja=no");
-
-		// 构建缓存目录（用户的项目 gitignore 中应已忽�?.scons_cache�?        var defaultCache = Path.Combine(_repoRoot, ".scons_cache");
-		buildArgs.RemoveAll(a => a.StartsWith("cache_path=", StringComparison.OrdinalIgnoreCase));
+		Report("Build acceleration enabled: scu_build=yes fast_unsafe=yes SCons cache=.scons_cache.", "info");
 
 		// MinGW
 		if (_cfg.PlatformName == "windows" && _cfg.UseMinGW)

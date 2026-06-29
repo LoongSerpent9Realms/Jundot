@@ -56,6 +56,8 @@ private:
 	virtual String _get_client_secret() const = 0;
 	virtual String _get_callback_path() const = 0;
 	virtual String _get_scope() const = 0;
+	virtual bool _allow_missing_callback_state() const { return false; }
+	virtual String _build_authorization_url(const String &p_client_id, const String &p_redirect_uri) const;
 	virtual AIOAuthToken _parse_token_response(const Dictionary &p_response) const = 0;
 	virtual AIOAuthUserInfo _parse_user_response(const Dictionary &p_response) const = 0;
 	virtual void _save_token_and_user(const AIOAuthToken &p_token, const AIOAuthUserInfo &p_user) = 0;

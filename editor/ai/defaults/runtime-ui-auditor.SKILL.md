@@ -20,7 +20,7 @@ still feels like a plain tool form.
    - Read the `.tscn` file and relevant `.gd`/`.cs` scripts.
    - Identify Control nodes, CanvasLayer usage, containers, anchors, offsets,
      size, `mouse_filter`, `z_index`, focus mode, signal wiring, and navigation.
-   - Inspect `project.godot` or input setup for actions used by the screen.
+   - Inspect `project.jundot` (or `project.godot`) or input setup for actions used by the screen.
 
 2. Define acceptance criteria before editing.
    - Mouse/touch: which buttons, sliders, tabs, fields, or drag handles must work.

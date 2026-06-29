@@ -142,6 +142,7 @@ static String _find_ai_engine_source_root_in_cache(const String &p_cache_path) {
 void ProjectManager::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_ENTER_TREE: {
+			print_line(vformat("[STARTUP_TIMING] NOTIFICATION_ENTER_TREE: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 			Engine::get_singleton()->set_editor_hint(false);
 
 			Window *main_window = get_window();
@@ -155,6 +156,7 @@ void ProjectManager::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_READY: {
+			print_line(vformat("[STARTUP_TIMING] NOTIFICATION_READY start: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 			DisplayServer::get_singleton()->screen_set_keep_on(EDITOR_GET("interface/editor/display/keep_screen_on"));
 			const int default_sorting = (int)EDITOR_GET("project_manager/sorting_order");
 			filter_option->select(default_sorting);
@@ -164,6 +166,7 @@ void ProjectManager::_notification(int p_what) {
 			_update_list_placeholder();
 			_titlebar_resized();
 			callable_mp(this, &ProjectManager::_maybe_prompt_ai_source_cache).call_deferred();
+			print_line(vformat("[STARTUP_TIMING] NOTIFICATION_READY end: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 		} break;
 
 		case NOTIFICATION_TRANSLATION_CHANGED: {
@@ -417,6 +420,10 @@ void ProjectManager::_select_main_view(int p_id) {
 	ERR_FAIL_COND(!main_view_map.has(view_id));
 	ERR_FAIL_COND(!main_view_toggle_map.has(view_id));
 
+	if (view_id == MAIN_VIEW_ASSETLIB) {
+		_ensure_asset_library();
+	}
+
 	if (current_main_view != view_id) {
 		main_view_toggle_map[current_main_view]->set_pressed_no_signal(false);
 		main_view_map[current_main_view]->set_visible(false);
@@ -438,8 +445,47 @@ void ProjectManager::_select_main_view(int p_id) {
 #endif
 }
 
+void ProjectManager::_ensure_about_dialog() {
+	if (about_dialog) {
+		return;
+	}
+
+	about_dialog = memnew(EditorAbout);
+	add_child(about_dialog);
+}
+
 void ProjectManager::_show_about() {
+	_ensure_about_dialog();
 	about_dialog->popup_centered(Size2(780, 500) * EDSCALE);
+}
+
+void ProjectManager::_ensure_asset_library() {
+	if (asset_library || !AssetLibraryEditorPlugin::is_available()) {
+		return;
+	}
+
+	Control *old_view = main_view_map.has(MAIN_VIEW_ASSETLIB) ? main_view_map[MAIN_VIEW_ASSETLIB] : nullptr;
+	asset_library = memnew(EditorAssetLibrary(true));
+	asset_library->set_name("AssetLibraryTab");
+	asset_library->set_visible(false);
+	asset_library->connect("install_asset", callable_mp(this, &ProjectManager::_install_project));
+
+	if (EDITOR_GET("interface/theme/style") == "Classic") {
+		// Removes extra border margins.
+		asset_library->add_theme_style_override(SceneStringName(panel), memnew(StyleBoxEmpty));
+	}
+
+	if (old_view) {
+		const int old_index = old_view->get_index();
+		main_view_container->remove_child(old_view);
+		old_view->queue_free();
+		main_view_container->add_child(asset_library);
+		main_view_container->move_child(asset_library, old_index);
+	} else {
+		main_view_container->add_child(asset_library);
+	}
+
+	main_view_map[MAIN_VIEW_ASSETLIB] = asset_library;
 }
 
 void ProjectManager::_open_asset_library_confirmed() {
@@ -536,7 +582,7 @@ void ProjectManager::_restart_confirmed() {
 // Hot-update system handlers.
 
 void ProjectManager::_on_update_download_requested(const String &p_version, const String &p_url) {
-	if (!update_dialog || !update_manager) {
+	if (!update_dialog) {
 		return;
 	}
 
@@ -553,10 +599,19 @@ void ProjectManager::_on_update_download_requested(const String &p_version, cons
 	update_dialog->popup_centered_clamped(Size2(760, 640) * EDSCALE, 0.9);
 }
 
-void ProjectManager::_on_update_now_requested() {
-	if (!update_manager) {
+void ProjectManager::_ensure_update_manager() {
+	if (update_manager) {
 		return;
 	}
+
+	update_manager = memnew(UpdateManager);
+	add_child(update_manager);
+	update_manager->connect("update_launcher_started", callable_mp(this, &ProjectManager::_on_update_launcher_started));
+	update_manager->connect("update_launcher_finished", callable_mp(this, &ProjectManager::_on_update_launcher_finished));
+}
+
+void ProjectManager::_on_update_now_requested() {
+	_ensure_update_manager();
 
 	const int pid = update_manager->trigger_launcher_update();
 	if (pid < 0) {
@@ -587,38 +642,53 @@ void ProjectManager::_on_skip_version_requested() {
 }
 
 void ProjectManager::_maybe_prompt_ai_source_cache() {
+	print_line(vformat("[STARTUP_TIMING] _maybe_prompt_ai_source_cache start: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 	if (ai_source_prompt_shown) {
 		return;
 	}
 	ai_source_prompt_shown = true;
 
 	AISettingsData settings = AISettings::load();
+	print_line(vformat("[STARTUP_TIMING] AISettings loaded: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 	String cache_path = settings.engine_source_cache_root.strip_edges();
 	if (cache_path.is_empty()) {
 		cache_path = _get_default_ai_source_cache_root();
 	}
 
 	const String cached_source_root = _find_ai_engine_source_root_in_cache(cache_path);
+	print_line(vformat("[STARTUP_TIMING] Engine source cache scan done (found=%s, path=%s): t=%d ms", cached_source_root.is_empty() ? "false" : "true", cache_path, OS::get_singleton()->get_ticks_msec()));
 	if (!cached_source_root.is_empty()) {
 		settings.engine_source_root = cached_source_root;
 		settings.engine_source_cache_root = cache_path;
 		settings.engine_source_repository_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
 		settings.encrypt_engine_source_cache = true;
 		AISettings::save(settings);
+		print_line(vformat("[STARTUP_TIMING] AISettings saved: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 		return;
 	}
 
-	ai_source_prompt_dialog->popup_centered(Size2(520, 150) * EDSCALE);
+	_ensure_ai_source_manager_dialog();
+	ai_source_manager_dialog->popup_centered_on_parent(get_window());
+	ai_source_manager_dialog->begin_auto_configure();
+	print_line(vformat("[STARTUP_TIMING] _maybe_prompt_ai_source_cache end: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 }
 
 void ProjectManager::_open_ai_source_manager_from_prompt() {
 	_show_ai_source_manager();
 }
 
-void ProjectManager::_show_ai_source_manager() {
+void ProjectManager::_ensure_ai_source_manager_dialog() {
 	if (ai_source_manager_dialog) {
-		ai_source_manager_dialog->popup_centered_on_parent(get_window());
+		return;
 	}
+
+	ai_source_manager_dialog = memnew(AISourceManager);
+	add_child(ai_source_manager_dialog);
+}
+
+void ProjectManager::_show_ai_source_manager() {
+	_ensure_ai_source_manager_dialog();
+	ai_source_manager_dialog->popup_centered_on_parent(get_window());
 }
 
 // Project list.
@@ -629,7 +699,7 @@ void ProjectManager::_update_list_placeholder() {
 		return;
 	}
 
-	empty_list_open_assetlib->set_visible(asset_library);
+	empty_list_open_assetlib->set_visible(AssetLibraryEditorPlugin::is_available());
 
 	const int network_mode = EDITOR_GET("network/connection/network_mode");
 	if (network_mode == EditorSettings::NETWORK_OFFLINE) {
@@ -885,15 +955,17 @@ void ProjectManager::_open_selected_projects_with_migration() {
 }
 
 void ProjectManager::_install_project(const String &p_zip_path, const String &p_title) {
-	project_dialog->set_mode(ProjectDialog::MODE_INSTALL);
-	project_dialog->set_zip_path(p_zip_path);
-	project_dialog->set_zip_title(p_title);
-	project_dialog->show_dialog();
+	ProjectDialog *dialog = _ensure_project_dialog();
+	dialog->set_mode(ProjectDialog::MODE_INSTALL);
+	dialog->set_zip_path(p_zip_path);
+	dialog->set_zip_title(p_title);
+	dialog->show_dialog();
 }
 
 void ProjectManager::_import_project() {
-	project_dialog->set_mode(ProjectDialog::MODE_IMPORT);
-	project_dialog->ask_for_path_and_show();
+	ProjectDialog *dialog = _ensure_project_dialog();
+	dialog->set_mode(ProjectDialog::MODE_IMPORT);
+	dialog->ask_for_path_and_show();
 }
 
 String ProjectManager::_ai_project_sanitize_english_name(const String &p_name) const {
@@ -1193,9 +1265,10 @@ void ProjectManager::_ai_project_create_from_summary() {
 	ai_project_pending_memory_name = ai_project_suggested_name;
 	ai_project_pending_memory_brief = ai_project_suggested_brief;
 
-	project_dialog->set_mode(ProjectDialog::MODE_NEW);
-	project_dialog->show_dialog();
-	project_dialog->set_project_name(ai_project_suggested_name);
+	ProjectDialog *dialog = _ensure_project_dialog();
+	dialog->set_mode(ProjectDialog::MODE_NEW);
+	dialog->show_dialog();
+	dialog->set_project_name(ai_project_suggested_name);
 }
 
 void ProjectManager::_ai_project_save_memory(const String &p_project_path) {
@@ -1429,12 +1502,39 @@ void ProjectManager::_ai_project_clear_chat() {
 
 void ProjectManager::_show_ai_config_dialog() {
 	ERR_FAIL_NULL(ai_config_dialog);
+	_ensure_ai_config_panel();
 	ai_config_dialog->popup_centered_clamped(Size2(760, 620) * EDSCALE, 0.9);
 }
 
+void ProjectManager::_ensure_ai_config_panel() {
+	if (ai_config_panel) {
+		return;
+	}
+
+	ai_config_panel = memnew(AIConfigPanel);
+	ai_config_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	ai_config_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	ai_config_dialog->add_child(ai_config_panel);
+}
+
+ProjectDialog *ProjectManager::_ensure_project_dialog() {
+	if (project_dialog) {
+		return project_dialog;
+	}
+
+	project_dialog = memnew(ProjectDialog);
+	project_dialog->connect("projects_updated", callable_mp(this, &ProjectManager::_on_projects_updated));
+	project_dialog->connect("project_created", callable_mp(this, &ProjectManager::_on_project_created));
+	project_dialog->connect("project_duplicated", callable_mp(this, &ProjectManager::_on_project_duplicated));
+	add_child(project_dialog);
+
+	return project_dialog;
+}
+
 void ProjectManager::_new_project() {
-	project_dialog->set_mode(ProjectDialog::MODE_NEW);
-	project_dialog->show_dialog();
+	ProjectDialog *dialog = _ensure_project_dialog();
+	dialog->set_mode(ProjectDialog::MODE_NEW);
+	dialog->show_dialog();
 }
 
 void ProjectManager::_rename_project() {
@@ -1445,10 +1545,11 @@ void ProjectManager::_rename_project() {
 	}
 
 	for (const ProjectList::Item &E : selected_list) {
-		project_dialog->set_project_name(E.project_name);
-		project_dialog->set_project_path(E.path);
-		project_dialog->set_mode(ProjectDialog::MODE_RENAME);
-		project_dialog->show_dialog();
+		ProjectDialog *dialog = _ensure_project_dialog();
+		dialog->set_project_name(E.project_name);
+		dialog->set_project_path(E.path);
+		dialog->set_mode(ProjectDialog::MODE_RENAME);
+		dialog->show_dialog();
 	}
 }
 
@@ -1466,11 +1567,12 @@ void ProjectManager::_duplicate_project_with_action(PostDuplicateAction p_post_a
 
 	const ProjectList::Item &project = selected_projects[0];
 
-	project_dialog->set_mode(ProjectDialog::MODE_DUPLICATE);
-	project_dialog->set_project_name(vformat("%s (%s)", project.project_name, p_post_action == POST_DUPLICATE_ACTION_NONE ? "Copy" : project.project_version));
-	project_dialog->set_original_project_path(project.path);
-	project_dialog->set_duplicate_can_edit(p_post_action == POST_DUPLICATE_ACTION_NONE);
-	project_dialog->show_dialog(false);
+	ProjectDialog *dialog = _ensure_project_dialog();
+	dialog->set_mode(ProjectDialog::MODE_DUPLICATE);
+	dialog->set_project_name(vformat("%s (%s)", project.project_name, p_post_action == POST_DUPLICATE_ACTION_NONE ? "Copy" : project.project_version));
+	dialog->set_original_project_path(project.path);
+	dialog->set_duplicate_can_edit(p_post_action == POST_DUPLICATE_ACTION_NONE);
+	dialog->show_dialog(false);
 }
 
 void ProjectManager::_show_project_in_file_manager() {
@@ -2032,6 +2134,7 @@ void ProjectManager::_open_donate_page() {
 // Object methods.
 
 ProjectManager::ProjectManager() {
+	print_line(vformat("[STARTUP_TIMING] Constructor start: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 	singleton = this;
 
 	// Turn off some servers we aren't going to be using in the Project Manager.
@@ -2097,6 +2200,7 @@ ProjectManager::ProjectManager() {
 
 		OS::get_singleton()->set_low_processor_usage_mode(true);
 	}
+	print_line(vformat("[STARTUP_TIMING] After EditorSettings: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 
 #if defined(MODULE_GDSCRIPT_ENABLED) || defined(MODULE_MONO_ENABLED)
 	EditorHelpHighlighter::create_singleton();
@@ -2112,6 +2216,7 @@ ProjectManager::ProjectManager() {
 
 		EditorThemeManager::initialize();
 		theme = EditorThemeManager::generate_theme();
+		print_line(vformat("[STARTUP_TIMING] After theme generation: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 		DisplayServer::set_early_window_clear_color_override(true, theme->get_color(SNAME("background"), EditorStringName(Editor)));
 
 		set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
@@ -2565,17 +2670,14 @@ ProjectManager::ProjectManager() {
 	}
 
 	// Asset store view.
-	if (AssetLibraryEditorPlugin::is_available()) {
-		asset_library = memnew(EditorAssetLibrary(true));
-		asset_library->set_name("AssetLibraryTab");
-		_add_main_view(MAIN_VIEW_ASSETLIB, TTRC("Asset Store"), Ref<Texture2D>(), asset_library);
-		asset_library->connect("install_asset", callable_mp(this, &ProjectManager::_install_project));
-	} else {
+	{
 		VBoxContainer *asset_library_filler = memnew(VBoxContainer);
 		asset_library_filler->set_name("AssetLibraryTab");
 		Button *asset_library_toggle = _add_main_view(MAIN_VIEW_ASSETLIB, TTRC("Asset Store"), Ref<Texture2D>(), asset_library_filler);
-		asset_library_toggle->set_disabled(true);
-		asset_library_toggle->set_tooltip_text(TTRC("Asset Store not available (due to using Web editor, or because SSL support disabled)."));
+		if (!AssetLibraryEditorPlugin::is_available()) {
+			asset_library_toggle->set_disabled(true);
+			asset_library_toggle->set_tooltip_text(TTRC("Asset Store not available (due to using Web editor, or because SSL support disabled)."));
+		}
 	}
 
 	// Footer bar.
@@ -2610,11 +2712,6 @@ ProjectManager::ProjectManager() {
 		add_child(update_dialog);
 		update_dialog->connect("update_now_requested", callable_mp(this, &ProjectManager::_on_update_now_requested));
 		update_dialog->connect("skip_version_requested", callable_mp(this, &ProjectManager::_on_skip_version_requested));
-
-		update_manager = memnew(UpdateManager);
-		add_child(update_manager);
-		update_manager->connect("update_launcher_started", callable_mp(this, &ProjectManager::_on_update_launcher_started));
-		update_manager->connect("update_launcher_finished", callable_mp(this, &ProjectManager::_on_update_launcher_finished));
 
 		scan_dir = memnew(EditorFileDialog);
 		scan_dir->set_access(EditorFileDialog::ACCESS_FILESYSTEM);
@@ -2695,21 +2792,10 @@ ProjectManager::ProjectManager() {
 		ask_full_convert_dialog->connect(SceneStringName(confirmed), callable_mp(this, &ProjectManager::_perform_full_project_conversion));
 		add_child(ask_full_convert_dialog);
 
-		project_dialog = memnew(ProjectDialog);
-		project_dialog->connect("projects_updated", callable_mp(this, &ProjectManager::_on_projects_updated));
-		project_dialog->connect("project_created", callable_mp(this, &ProjectManager::_on_project_created));
-		project_dialog->connect("project_duplicated", callable_mp(this, &ProjectManager::_on_project_duplicated));
-		add_child(project_dialog);
-
 		ai_config_dialog = memnew(AcceptDialog);
 		ai_config_dialog->set_title(TTRC("AI Settings"));
 		ai_config_dialog->set_min_size(Size2(640, 420) * EDSCALE);
 		add_child(ai_config_dialog);
-
-		ai_config_panel = memnew(AIConfigPanel);
-		ai_config_panel->set_v_size_flags(Control::SIZE_EXPAND_FILL);
-		ai_config_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
-		ai_config_dialog->add_child(ai_config_panel);
 
 		ai_usage_agreement_dialog = memnew(AIUsageAgreementDialog);
 		ai_usage_agreement_dialog->connect(SNAME("agreement_accepted"), callable_mp(this, &ProjectManager::_ai_usage_agreement_accepted));
@@ -2736,12 +2822,6 @@ ProjectManager::ProjectManager() {
 		ai_source_prompt_vb->add_child(ai_source_prompt_label);
 
 		ai_source_prompt_dialog->connect(SceneStringName(confirmed), callable_mp(this, &ProjectManager::_open_ai_source_manager_from_prompt));
-
-		ai_source_manager_dialog = memnew(AISourceManager);
-		add_child(ai_source_manager_dialog);
-
-		about_dialog = memnew(EditorAbout);
-		add_child(about_dialog);
 	}
 
 	// Tag management.
@@ -2819,6 +2899,7 @@ ProjectManager::ProjectManager() {
 		_set_new_tag_name("");
 	}
 
+	print_line(vformat("[STARTUP_TIMING] Before project list init: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 	// Initialize project list.
 	{
 		project_list->load_project_list();
@@ -2847,6 +2928,7 @@ ProjectManager::ProjectManager() {
 		project_list->update_project_list();
 		initialized = true;
 	}
+	print_line(vformat("[STARTUP_TIMING] After project list init: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 
 	// Extend menu bar to window title.
 	if (can_expand) {
@@ -2857,6 +2939,7 @@ ProjectManager::ProjectManager() {
 	}
 
 	_update_size_limits();
+	print_line(vformat("[STARTUP_TIMING] Constructor end: t=%d ms", OS::get_singleton()->get_ticks_msec()));
 }
 
 ProjectManager::~ProjectManager() {

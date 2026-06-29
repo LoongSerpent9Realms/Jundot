@@ -240,24 +240,37 @@ Error AISourceUpdateService::update_source(AISourceUpdateStatus &r_status) {
 		}
 	}
 	if (merge_err != OK) {
+		String merge_error = output.strip_edges();
 		_run_source_git(root, { "merge", "--abort" }, output, exit_code);
 		if (dirty) {
-			_run_source_git(root, { "stash", "apply", "--index", stash_ref }, output, exit_code);
+			Error apply_err = _run_source_git(root, { "stash", "apply", "--index", "--whitespace=nowarn", stash_ref }, output, exit_code);
+			if (apply_err != OK) {
+				String conflicts;
+				_run_source_git(root, { "diff", "--name-only", "--diff-filter=U" }, conflicts, exit_code);
+				if (conflicts.strip_edges().is_empty()) {
+					apply_err = OK;
+				}
+			}
+			if (apply_err == OK) {
+				_run_source_git(root, { "stash", "drop", stash_ref }, output, exit_code);
+			}
 		}
 		r_status.state = AISourceUpdateStatus::ERROR;
-		r_status.message = "Automatic source update failed; the edit was cancelled. " + output.strip_edges();
+		r_status.message = "Automatic source update failed; the edit was cancelled. " + merge_error;
 		cached_source_status = r_status;
 		return FAILED;
 	}
 
 	if (dirty) {
-		Error apply_err = _run_source_git(root, { "stash", "apply", "--index", stash_ref }, output, exit_code);
+		Error apply_err = _run_source_git(root, { "stash", "apply", "--index", "--whitespace=nowarn", stash_ref }, output, exit_code);
 		if (apply_err != OK) {
 			String conflicts;
 			_run_source_git(root, { "diff", "--name-only", "--diff-filter=U" }, conflicts, exit_code);
 			if (!conflicts.strip_edges().is_empty()) {
 				_run_source_git(root, { "checkout", "--theirs", "--", "." }, output, exit_code);
 				_run_source_git(root, { "add", "-A" }, output, exit_code);
+				apply_err = OK;
+			} else {
 				apply_err = OK;
 			}
 		}

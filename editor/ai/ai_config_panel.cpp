@@ -39,6 +39,7 @@
 #include "editor/ai/ai_mcp_manager.h"
 #include "editor/ai/ai_settings.h"
 #include "editor/ai/ai_usage_agreement_dialog.h"
+#include "editor/file_system/editor_paths.h"
 #include "editor/ai/github_auth_service.h"
 #include "editor/ai/gitee_auth_service.h"
 #include "editor/gui/editor_file_dialog.h"
@@ -52,6 +53,7 @@
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/option_button.h"
+#include "scene/gui/progress_bar.h"
 #include "scene/gui/spin_box.h"
 #include "scene/gui/text_edit.h"
 #include "scene/main/http_request.h"
@@ -79,6 +81,9 @@ static constexpr const char *MIMOCODE_RELEASE_TAG = "v0.4";
 static constexpr const char *MIMOCODE_RELEASE_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/tag/v0.4";
 static constexpr const char *MIMOCODE_DOWNLOAD_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/download/v0.4/mimocode-windows-x64.zip";
 static constexpr const char *MIMOCODE_EXE_NAME = "mimo.exe";
+static constexpr const char *JUNDOT_ENGINE_SOURCE_ZIP_URL = "https://github.com/LoongSerpent9Realms/Jundot/archive/refs/heads/master.zip";
+static constexpr const char *JUNDOT_GITHUB_MIRROR_PREFIX = "https://github.akams.cn/";
+static ProcessID mimocode_process_id = 0;
 
 struct ExternalMCPAppTarget {
 	String name;
@@ -120,6 +125,81 @@ static String _find_engine_source_root_in_cache(const String &p_cache_path) {
 	}
 	dir->list_dir_end();
 	return String();
+}
+
+static String _get_github_mirror_url(const String &p_url) {
+	const String url = p_url.strip_edges();
+	if (url.is_empty() || url.begins_with(JUNDOT_GITHUB_MIRROR_PREFIX)) {
+		return url;
+	}
+	if (url.begins_with("https://github.com/")) {
+		return String(JUNDOT_GITHUB_MIRROR_PREFIX) + url;
+	}
+	return String();
+}
+
+static Error _remove_directory_recursive_absolute(const String &p_path, String *r_failed_path = nullptr) {
+	if (p_path.is_empty()) {
+		return ERR_INVALID_PARAMETER;
+	}
+	if (r_failed_path) {
+		r_failed_path->clear();
+	}
+
+	Error open_error = OK;
+	Ref<DirAccess> dir = DirAccess::open(p_path, &open_error);
+	if (dir.is_null()) {
+		FileAccess::set_read_only_attribute(p_path, false);
+		const Error err = DirAccess::remove_absolute(p_path);
+		if (err != OK && r_failed_path) {
+			*r_failed_path = p_path;
+		}
+		return err;
+	}
+
+	List<String> dirs;
+	List<String> files;
+
+	dir->list_dir_begin();
+	String name = dir->get_next();
+	while (!name.is_empty()) {
+		if (name != "." && name != "..") {
+			if (dir->current_is_dir() && !dir->is_link(name)) {
+				dirs.push_back(name);
+			} else {
+				files.push_back(name);
+			}
+		}
+		name = dir->get_next();
+	}
+	dir->list_dir_end();
+
+	for (const String &E : dirs) {
+		const String child_path = p_path.path_join(E);
+		Error err = _remove_directory_recursive_absolute(child_path, r_failed_path);
+		if (err != OK) {
+			return err;
+		}
+	}
+
+	for (const String &E : files) {
+		const String child_path = p_path.path_join(E);
+		FileAccess::set_read_only_attribute(child_path, false);
+		Error err = DirAccess::remove_absolute(child_path);
+		if (err != OK) {
+			if (r_failed_path) {
+				*r_failed_path = child_path;
+			}
+			return err;
+		}
+	}
+
+	FileAccess::set_read_only_attribute(p_path, false);
+	const Error err = DirAccess::remove_absolute(p_path);
+	if (err != OK && r_failed_path) {
+		*r_failed_path = p_path;
+	}
+	return err;
 }
 
 static Error _collect_engine_source_cache_entries(const String &p_path, List<String> &r_dirs, List<String> &r_files) {
@@ -202,7 +282,7 @@ static Error _encrypt_engine_source_cache(const String &p_cache_path, String &r_
 
 	return OK;
 #else
-	r_error = "Automatic encrypted source cache is only implemented on Windows.";
+	r_error = TTR("Automatic encrypted source cache is only implemented on Windows.");
 	return ERR_UNAVAILABLE;
 #endif
 }
@@ -339,11 +419,36 @@ static Error _write_external_ai_mcp_config(const String &p_path, const String &p
 }
 
 static String _get_mimocode_install_dir() {
-	return OS::get_singleton()->get_user_data_dir().path_join("mimocode").path_join(MIMOCODE_RELEASE_TAG);
+	return EditorPaths::get_singleton()->get_data_dir().path_join("mimocode").path_join(MIMOCODE_RELEASE_TAG);
 }
 
 static String _get_mimocode_download_dir() {
-	return OS::get_singleton()->get_user_data_dir().path_join("mimocode").path_join("downloads");
+	return EditorPaths::get_singleton()->get_data_dir().path_join("mimocode").path_join("downloads");
+}
+
+static String _get_legacy_mimocode_install_dir() {
+	return OS::get_singleton()->get_user_data_dir().path_join("mimocode").path_join(MIMOCODE_RELEASE_TAG);
+}
+
+static bool _is_managed_mimocode_running() {
+	if (mimocode_process_id == 0) {
+		return false;
+	}
+	if (!OS::get_singleton()->is_process_running(mimocode_process_id)) {
+		mimocode_process_id = 0;
+		return false;
+	}
+	return true;
+}
+
+static Error _stop_managed_mimocode() {
+	if (!_is_managed_mimocode_running()) {
+		return OK;
+	}
+
+	const ProcessID pid = mimocode_process_id;
+	mimocode_process_id = 0;
+	return OS::get_singleton()->kill(pid);
 }
 
 static String _find_mimocode_executable_in_dir(const String &p_dir) {
@@ -376,6 +481,23 @@ static String _find_mimocode_executable_in_dir(const String &p_dir) {
 	return String();
 }
 
+static String _find_mimocode_executable() {
+	String executable_path = _find_mimocode_executable_in_dir(_get_mimocode_install_dir());
+	if (!executable_path.is_empty()) {
+		return executable_path;
+	}
+
+	const String legacy_install_dir = _get_legacy_mimocode_install_dir();
+	if (legacy_install_dir != _get_mimocode_install_dir()) {
+		executable_path = _find_mimocode_executable_in_dir(legacy_install_dir);
+		if (!executable_path.is_empty()) {
+			return executable_path;
+		}
+	}
+
+	return String();
+}
+
 static Error _extract_mimocode_zip(const String &p_zip_path, const String &p_install_dir, String &r_executable_path) {
 	Ref<ZIPReader> zip;
 	zip.instantiate();
@@ -399,7 +521,7 @@ static Error _extract_mimocode_zip(const String &p_zip_path, const String &p_ins
 			continue;
 		}
 
-		const PackedByteArray data = zip->read_file(files[i], true);
+		const PackedByteArray file_data = zip->read_file(files[i], true);
 		const String output_path = p_install_dir.path_join(file_path);
 		err = DirAccess::make_dir_recursive_absolute(output_path.get_base_dir());
 		if (err != OK) {
@@ -412,8 +534,8 @@ static Error _extract_mimocode_zip(const String &p_zip_path, const String &p_ins
 			zip->close();
 			return err != OK ? err : ERR_CANT_OPEN;
 		}
-		if (!data.is_empty()) {
-			output->store_buffer(data.ptr(), data.size());
+		if (!file_data.is_empty()) {
+			output->store_buffer(file_data.ptr(), file_data.size());
 		}
 	}
 
@@ -570,8 +692,7 @@ void AIConfigPanel::_update_translations() {
 	export_button->set_text(TTR("Export Config"));
 	import_button->set_text(TTR("Import Config"));
 	auto_configure_mcp_button->set_text(TTR("Auto Configure External MCP Apps"));
-	mimocode_download_button->set_text(TTR("Download / Start MiMoCode"));
-	mimocode_download_button->set_tooltip_text(TTR("Download MiMoCode v0.4 if needed, then start it and save the local plugin connection settings."));
+	_update_mimocode_button();
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	jundot_plugin_id_edit->set_placeholder(JUNDOT_MIMOCODE_PLUGIN_ID);
 	jundot_plugin_url_edit->set_placeholder("http://127.0.0.1:4096");
@@ -590,6 +711,16 @@ void AIConfigPanel::_update_translations() {
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_GERMAN), TTR("German"));
 	_update_external_mcp_config();
 	_update_backend_controls();
+	_update_mimocode_button();
+	if (engine_source_browse_button) {
+		engine_source_browse_button->set_text(TTR("Browse"));
+	}
+	if (engine_source_delete_button) {
+		engine_source_delete_button->set_text(TTR("Delete Cache"));
+	}
+	if (engine_source_status_label) {
+		_update_engine_source_status();
+	}
 }
 
 void AIConfigPanel::_update_external_mcp_config() {
@@ -644,6 +775,31 @@ void AIConfigPanel::_update_backend_controls() {
 	if (api_key_edit) {
 		api_key_edit->set_visible(!use_mimocode);
 	}
+	_update_mimocode_button();
+}
+
+void AIConfigPanel::_update_mimocode_button() {
+	if (!mimocode_download_button) {
+		return;
+	}
+
+	if (_is_managed_mimocode_running()) {
+		mimocode_download_button->set_text(TTR("Stop MiMoCode"));
+		mimocode_download_button->set_tooltip_text(TTR("Stop the MiMoCode process started by JunDot."));
+		mimocode_download_button->set_disabled(false);
+		return;
+	}
+
+	const String executable_path = _find_mimocode_executable();
+	if (!executable_path.is_empty()) {
+		mimocode_download_button->set_text(TTR("Start MiMoCode"));
+		mimocode_download_button->set_tooltip_text(TTR("Start the installed MiMoCode local plugin and save the connection settings."));
+		mimocode_download_button->set_disabled(false);
+		return;
+	}
+
+	mimocode_download_button->set_text(TTR("Download / Start MiMoCode"));
+	mimocode_download_button->set_tooltip_text(TTR("Download MiMoCode v0.4 if needed, then start it and save the local plugin connection settings."));
 }
 
 void AIConfigPanel::_on_backend_type_selected(int p_index) {
@@ -652,13 +808,25 @@ void AIConfigPanel::_on_backend_type_selected(int p_index) {
 }
 
 void AIConfigPanel::_on_mimocode_download_button_pressed() {
+	if (_is_managed_mimocode_running()) {
+		const Error stop_err = _stop_managed_mimocode();
+		_update_mimocode_button();
+		if (stop_err != OK) {
+			status_label->set_text(vformat(TTR("Could not stop MiMoCode. Error: %d"), (int)stop_err));
+			return;
+		}
+		status_label->set_text(TTR("MiMoCode stopped."));
+		return;
+	}
+
 	const String install_dir = _get_mimocode_install_dir();
-	const String executable_path = _find_mimocode_executable_in_dir(install_dir);
+	const String executable_path = _find_mimocode_executable();
 	if (!executable_path.is_empty()) {
 		const Error launch_err = _start_mimocode(executable_path);
 		if (launch_err != OK) {
 			status_label->set_text(vformat(TTR("MiMoCode is installed, but could not be started. Error: %d"), (int)launch_err));
 		}
+		_update_mimocode_button();
 		return;
 	}
 
@@ -698,6 +866,12 @@ void AIConfigPanel::_on_mimocode_download_button_pressed() {
 	if (mimocode_download_button) {
 		mimocode_download_button->set_disabled(true);
 	}
+	if (mimocode_download_progress) {
+		mimocode_download_progress->set_min(0);
+		mimocode_download_progress->set_max(1);
+		mimocode_download_progress->set_value(0);
+		mimocode_download_progress->set_visible(true);
+	}
 	status_label->set_text(TTR("Downloading MiMoCode v0.4..."));
 }
 
@@ -707,6 +881,10 @@ void AIConfigPanel::_on_mimocode_download_completed(int p_result, int p_response
 
 	if (mimocode_download_button) {
 		mimocode_download_button->set_disabled(false);
+	}
+	if (mimocode_download_progress) {
+		mimocode_download_progress->set_visible(false);
+		mimocode_download_progress->set_tooltip_text("");
 	}
 
 	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code < 200 || p_response_code >= 300) {
@@ -725,6 +903,7 @@ void AIConfigPanel::_on_mimocode_download_completed(int p_result, int p_response
 	if (launch_err != OK) {
 		status_label->set_text(vformat(TTR("MiMoCode was installed, but could not be started. Error: %d"), (int)launch_err));
 	}
+	_update_mimocode_button();
 }
 
 Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
@@ -734,6 +913,7 @@ Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
 	if (err != OK) {
 		return err;
 	}
+	mimocode_process_id = pid;
 
 	if (backend_type_option) {
 		backend_type_option->select(backend_type_option->get_item_index(BACKEND_TYPE_JUNDOT_PLUGIN));
@@ -746,8 +926,13 @@ Error AIConfigPanel::_start_mimocode(const String &p_executable_path) {
 	}
 	_update_backend_controls();
 	_save_settings();
-	status_label->set_text(TTR("MiMoCode started. MiMoCode backend settings were saved; Jundot will connect to http://127.0.0.1:4096."));
+	status_label->set_text(TTR("MiMoCode has started. MiMoCode backend settings were saved; JunDot will connect to http://127.0.0.1:4096."));
+	_update_mimocode_button();
 	return OK;
+}
+
+void AIConfigPanel::stop_managed_mimocode() {
+	_stop_managed_mimocode();
 }
 
 void AIConfigPanel::_update_engine_source_status() {
@@ -757,9 +942,14 @@ void AIConfigPanel::_update_engine_source_status() {
 		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
 	}
 
-	String source_root = AISourceUpdateService::resolve_source_root();
+	// Prioritize the cache directory to avoid stale settings pointing elsewhere.
+	String source_root = _find_engine_source_root_in_cache(cache_path);
 	if (source_root.is_empty()) {
-		source_root = _find_engine_source_root_in_cache(cache_path);
+		source_root = AISourceUpdateService::resolve_source_root();
+		// If the resolved root is not inside the cache directory, ignore it.
+		if (!source_root.is_empty() && !source_root.begins_with(cache_path)) {
+			source_root = String();
+		}
 	}
 
 	if (!source_root.is_empty()) {
@@ -775,23 +965,29 @@ void AIConfigPanel::_update_engine_source_status() {
 		if (encryption_err == OK) {
 			const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
 			const String update_text = update_status.source_root == source_root && !update_status.message.is_empty() ? update_status.message : TTR("Update: Not checked");
-			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Enabled\n%s"), source_root, update_text));
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource root: %s\nEncryption: Enabled\n%s"), source_root, update_text));
 		} else {
 			const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
 			const String update_text = update_status.source_root == source_root && !update_status.message.is_empty() ? update_status.message : TTR("Update: Not checked");
-			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource Root: %s\nEncryption: Failed (%s)\n%s"), source_root, encryption_error, update_text));
+			engine_source_status_label->set_text(vformat(TTR("Status: Downloaded\nSource root: %s\nEncryption: Failed (%s)\n%s"), source_root, encryption_error, update_text));
 		}
-		engine_source_download_button->set_text(TTR("Re-download"));
+		engine_source_download_button->set_text(TTR("Redownload"));
 		engine_source_delete_button->set_disabled(false);
 		engine_source_update_button->set_disabled(false);
 		const AISourceUpdateStatus update_status = AISourceUpdateService::get_cached_status();
-		engine_source_update_button->set_text(update_status.source_root == source_root && update_status.state == AISourceUpdateStatus::UPDATE_AVAILABLE ? TTR("Update Now") : TTR("Check Updates"));
+		engine_source_update_button->set_text(update_status.source_root == source_root && update_status.state == AISourceUpdateStatus::UPDATE_AVAILABLE ? TTR("Update Now") : TTR("Check for Updates"));
 	} else {
-		engine_source_status_label->set_text(TTR("Status: Not Downloaded"));
+		// Clear stale paths so resolve_source_root() won't misreport elsewhere.
+		if (!settings.engine_source_root.is_empty() || !settings.engine_source_cache_root.is_empty()) {
+			settings.engine_source_root = "";
+			settings.engine_source_cache_root = "";
+			AISettings::save(settings);
+		}
+		engine_source_status_label->set_text(TTR("Status: Not downloaded"));
 		engine_source_download_button->set_text(TTR("Download"));
 		engine_source_delete_button->set_disabled(true);
 		engine_source_update_button->set_disabled(true);
-		engine_source_update_button->set_text(TTR("Check Updates"));
+		engine_source_update_button->set_text(TTR("Check for Updates"));
 	}
 
 	engine_source_cache_path_edit->set_text(cache_path);
@@ -802,11 +998,11 @@ void AIConfigPanel::_on_engine_source_update_button_pressed() {
 	const String source_root = AISourceUpdateService::resolve_source_root();
 	const AISourceUpdateStatus cached_status = AISourceUpdateService::get_cached_status();
 	if (cached_status.source_root == source_root && cached_status.state == AISourceUpdateStatus::UPDATE_AVAILABLE) {
-		engine_source_status_label->set_text(TTR("Updating engine source and preserving local changes..."));
+		engine_source_status_label->set_text(TTR("Updating engine source while preserving local changes..."));
 		AISourceUpdateStatus update_status = cached_status;
 		AISourceUpdateService::update_source(update_status);
 	} else {
-		engine_source_status_label->set_text(TTR("Checking the engine source repository for updates..."));
+		engine_source_status_label->set_text(TTR("Checking engine source repository updates..."));
 		AISourceUpdateService::check_for_updates(true);
 	}
 	_update_engine_source_status();
@@ -852,8 +1048,44 @@ void AIConfigPanel::_on_engine_source_download_button_pressed() {
 	settings.engine_source_cache_root = cache_path;
 	AISettings::save(settings);
 
-	// Launch external browser to download or show instructions.
-	status_label->set_text(vformat(TTR("Please download engine source from:\nhttps://github.com/LoongSerpent9Realms/Jundot\n\nCache path set to: %s"), cache_path));
+	String source_root = _find_engine_source_root_in_cache(cache_path);
+	if (!source_root.is_empty()) {
+		status_label->set_text(TTR("Engine source already exists. Use Redownload to replace it."));
+		return;
+	}
+
+	if (!engine_source_download_request) {
+		status_label->set_text(TTR("Engine source downloader is not available."));
+		return;
+	}
+
+	engine_source_download_zip_path = cache_path.path_join("jundot_engine_source.zip");
+	if (FileAccess::exists(engine_source_download_zip_path)) {
+		DirAccess::remove_file_or_error(engine_source_download_zip_path);
+	}
+
+	engine_source_download_request->set_download_file(engine_source_download_zip_path);
+	PackedStringArray headers;
+	headers.push_back("User-Agent: Jundot-Engine-Source-Downloader/1.0");
+	engine_source_download_url = JUNDOT_ENGINE_SOURCE_ZIP_URL;
+	const String mirror_url = _get_github_mirror_url(engine_source_download_url);
+	engine_source_download_mirror_retry_available = !mirror_url.is_empty() && mirror_url != engine_source_download_url;
+	err = engine_source_download_request->request(engine_source_download_url, headers);
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Could not start engine source download: %s"), engine_source_download_url));
+		return;
+	}
+
+	if (engine_source_download_button) {
+		engine_source_download_button->set_disabled(true);
+	}
+	if (engine_source_download_progress) {
+		engine_source_download_progress->set_min(0);
+		engine_source_download_progress->set_max(1);
+		engine_source_download_progress->set_value(0);
+		engine_source_download_progress->set_visible(true);
+	}
+	status_label->set_text(TTR("Downloading engine source..."));
 }
 
 void AIConfigPanel::_on_engine_source_delete_button_pressed() {
@@ -870,9 +1102,14 @@ void AIConfigPanel::_on_engine_source_delete_button_pressed() {
 		return;
 	}
 
-	Error err = DirAccess::remove_absolute(source_root);
+	String failed_path;
+	Error err = _remove_directory_recursive_absolute(source_root, &failed_path);
 	if (err != OK) {
-		status_label->set_text(vformat(TTR("Failed to delete cache: error %d"), err));
+		if (failed_path.is_empty()) {
+			status_label->set_text(vformat(TTR("Failed to delete cache: error %d"), err));
+		} else {
+			status_label->set_text(vformat(TTR("Failed to delete cache: error %d\nPath: %s"), err, failed_path));
+		}
 		return;
 	}
 
@@ -889,6 +1126,167 @@ void AIConfigPanel::_on_engine_source_cache_path_selected(const String &p_path) 
 	settings.engine_source_cache_root = p_path;
 	AISettings::save(settings);
 	_update_engine_source_status();
+}
+
+void AIConfigPanel::_on_engine_source_download_progress(int p_amount_downloaded, int p_amount_total) {
+	if (!engine_source_download_progress) {
+		return;
+	}
+
+	if (p_amount_total > 0) {
+		engine_source_download_progress->set_max(p_amount_total);
+		engine_source_download_progress->set_value(p_amount_downloaded);
+
+		const double percent = (double)p_amount_downloaded / (double)p_amount_total * 100.0;
+		String downloaded_str;
+		String total_str;
+		if (p_amount_total >= 1048576) {
+			downloaded_str = vformat("%.1f MB", (double)p_amount_downloaded / 1048576.0);
+			total_str = vformat("%.1f MB", (double)p_amount_total / 1048576.0);
+		} else if (p_amount_total >= 1024) {
+			downloaded_str = vformat("%.1f KB", (double)p_amount_downloaded / 1024.0);
+			total_str = vformat("%.1f KB", (double)p_amount_total / 1024.0);
+		} else {
+			downloaded_str = itos(p_amount_downloaded) + " B";
+			total_str = itos(p_amount_total) + " B";
+		}
+		engine_source_download_progress->set_tooltip_text(vformat("%s / %s", downloaded_str, total_str));
+		status_label->set_text(vformat(TTR("Downloading engine source... %.0f%% (%s / %s)"), percent, downloaded_str, total_str));
+	} else {
+		// Unknown total size — show indeterminate progress.
+		engine_source_download_progress->set_max(0);
+		const double downloaded_mb = (double)p_amount_downloaded / 1048576.0;
+		status_label->set_text(vformat(TTR("Downloading engine source... %.1f MB"), downloaded_mb));
+	}
+}
+
+void AIConfigPanel::_on_engine_source_download_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
+	(void)p_headers;
+	(void)p_body;
+
+	if (engine_source_download_button) {
+		engine_source_download_button->set_disabled(false);
+	}
+	if (engine_source_download_progress) {
+		engine_source_download_progress->set_visible(false);
+		engine_source_download_progress->set_tooltip_text("");
+	}
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code < 200 || p_response_code >= 300) {
+		if (engine_source_download_mirror_retry_available && engine_source_download_request) {
+			engine_source_download_mirror_retry_available = false;
+			const String mirror_url = _get_github_mirror_url(engine_source_download_url);
+			if (!mirror_url.is_empty()) {
+				if (FileAccess::exists(engine_source_download_zip_path)) {
+					DirAccess::remove_file_or_error(engine_source_download_zip_path);
+				}
+				engine_source_download_request->set_download_file(engine_source_download_zip_path);
+				PackedStringArray headers;
+				headers.push_back("User-Agent: Jundot-Engine-Source-Downloader/1.0");
+				engine_source_download_url = mirror_url;
+				const Error retry_err = engine_source_download_request->request(engine_source_download_url, headers);
+				if (retry_err == OK) {
+					if (engine_source_download_button) {
+						engine_source_download_button->set_disabled(true);
+					}
+					if (engine_source_download_progress) {
+						engine_source_download_progress->set_min(0);
+						engine_source_download_progress->set_max(1);
+						engine_source_download_progress->set_value(0);
+						engine_source_download_progress->set_visible(true);
+					}
+					status_label->set_text(TTR("Engine source download failed. Retrying through the GitHub mirror..."));
+					return;
+				}
+			}
+		}
+		status_label->set_text(vformat(TTR("Engine source download failed. HTTP %d, result %d."), p_response_code, p_result));
+		return;
+	}
+
+	String cache_path = engine_source_cache_path_edit->get_text().strip_edges();
+	if (cache_path.is_empty()) {
+		cache_path = OS::get_singleton()->get_user_data_dir().path_join("engine_source");
+	}
+
+	status_label->set_text(TTR("Extracting engine source..."));
+
+	Ref<ZIPReader> zip;
+	zip.instantiate();
+	Error err = zip->open(engine_source_download_zip_path);
+	if (err != OK) {
+		status_label->set_text(vformat(TTR("Could not open source archive. Error: %d"), (int)err));
+		return;
+	}
+
+	const PackedStringArray files = zip->get_files();
+	for (int i = 0; i < files.size(); i++) {
+		String file_path = files[i].simplify_path();
+		if (file_path.is_empty() || file_path.begins_with("../") || file_path.contains("/../") || file_path.is_absolute_path()) {
+			continue;
+		}
+		if (file_path.ends_with("/")) {
+			DirAccess::make_dir_recursive_absolute(cache_path.path_join(file_path));
+			continue;
+		}
+
+		const PackedByteArray file_data = zip->read_file(files[i], true);
+		const String output_path = cache_path.path_join(file_path);
+		err = DirAccess::make_dir_recursive_absolute(output_path.get_base_dir());
+		if (err != OK) {
+			zip->close();
+			status_label->set_text(vformat(TTR("Could not extract engine source. Error: %d"), (int)err));
+			return;
+		}
+
+		Ref<FileAccess> output = FileAccess::open(output_path, FileAccess::WRITE, &err);
+		if (err != OK || output.is_null()) {
+			zip->close();
+			status_label->set_text(vformat(TTR("Could not extract engine source. Error: %d"), err != OK ? (int)err : (int)ERR_CANT_OPEN));
+			return;
+		}
+		if (!file_data.is_empty()) {
+			output->store_buffer(file_data.ptr(), file_data.size());
+		}
+	}
+
+	zip->close();
+
+	DirAccess::remove_file_or_error(engine_source_download_zip_path);
+
+	status_label->set_text(TTR("Engine source downloaded and extracted."));
+	_update_engine_source_status();
+}
+
+void AIConfigPanel::_on_mimocode_download_progress(int p_amount_downloaded, int p_amount_total) {
+	if (!mimocode_download_progress) {
+		return;
+	}
+
+	if (p_amount_total > 0) {
+		mimocode_download_progress->set_max(p_amount_total);
+		mimocode_download_progress->set_value(p_amount_downloaded);
+
+		const double percent = (double)p_amount_downloaded / (double)p_amount_total * 100.0;
+		String downloaded_str;
+		String total_str;
+		if (p_amount_total >= 1048576) {
+			downloaded_str = vformat("%.1f MB", (double)p_amount_downloaded / 1048576.0);
+			total_str = vformat("%.1f MB", (double)p_amount_total / 1048576.0);
+		} else if (p_amount_total >= 1024) {
+			downloaded_str = vformat("%.1f KB", (double)p_amount_downloaded / 1024.0);
+			total_str = vformat("%.1f KB", (double)p_amount_total / 1024.0);
+		} else {
+			downloaded_str = itos(p_amount_downloaded) + " B";
+			total_str = itos(p_amount_total) + " B";
+		}
+		mimocode_download_progress->set_tooltip_text(vformat("%s / %s", downloaded_str, total_str));
+		status_label->set_text(vformat(TTR("Downloading MiMoCode v0.4... %.0f%% (%s / %s)"), percent, downloaded_str, total_str));
+	} else {
+		mimocode_download_progress->set_max(0);
+		const double downloaded_mb = (double)p_amount_downloaded / 1048576.0;
+		status_label->set_text(vformat(TTR("Downloading MiMoCode v0.4... %.1f MB"), downloaded_mb));
+	}
 }
 
 void AIConfigPanel::_load_settings() {
@@ -1658,6 +2056,11 @@ AIConfigPanel::AIConfigPanel() {
 	feature_necessity_threshold_spin = _add_spin_box_row(grid, &feature_necessity_threshold_label, TTR("Feature Necessity Threshold"), 0, 1, 0.05);
 	output_language_option = _add_output_language_row(grid, &output_language_label, TTR("AI Output Language"));
 
+	mimocode_download_progress = memnew(ProgressBar);
+	mimocode_download_progress->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	mimocode_download_progress->set_visible(false);
+	root->add_child(mimocode_download_progress);
+
 	include_project_memories_check = memnew(CheckBox);
 	root->add_child(include_project_memories_check);
 
@@ -1743,7 +2146,7 @@ AIConfigPanel::AIConfigPanel() {
 		engine_source_actions->add_child(engine_source_download_button);
 
 		engine_source_update_button = memnew(Button);
-		engine_source_update_button->set_text(TTR("Check Updates"));
+		engine_source_update_button->set_text(TTR("Check for Updates"));
 		engine_source_update_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_update_button_pressed));
 		engine_source_actions->add_child(engine_source_update_button);
 
@@ -1751,6 +2154,11 @@ AIConfigPanel::AIConfigPanel() {
 		engine_source_delete_button->set_text(TTR("Delete Cache"));
 		engine_source_delete_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_engine_source_delete_button_pressed));
 		engine_source_actions->add_child(engine_source_delete_button);
+
+		engine_source_download_progress = memnew(ProgressBar);
+		engine_source_download_progress->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		engine_source_download_progress->set_visible(false);
+		root->add_child(engine_source_download_progress);
 
 		Label *engine_source_spacer = memnew(Label);
 		engine_source_spacer->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
@@ -1933,6 +2341,11 @@ AIConfigPanel::AIConfigPanel() {
 	mimocode_download_request->set_timeout(120.0);
 	mimocode_download_request->connect(SNAME("request_completed"), callable_mp(this, &AIConfigPanel::_on_mimocode_download_completed));
 	add_child(mimocode_download_request, false, INTERNAL_MODE_BACK);
+
+	engine_source_download_request = memnew(HTTPRequest);
+	engine_source_download_request->set_timeout(300.0);
+	engine_source_download_request->connect(SNAME("request_completed"), callable_mp(this, &AIConfigPanel::_on_engine_source_download_request_completed));
+	add_child(engine_source_download_request, false, INTERNAL_MODE_BACK);
 
 	usage_agreement_dialog = memnew(AIUsageAgreementDialog);
 	add_child(usage_agreement_dialog);

@@ -35,7 +35,9 @@
 
 class AIChatMessage;
 class AIChatService;
+class AIFirstRunGuideDialog;
 class AIRepairCard;
+class AISourceManager;
 class AIToolConfirmationDialog;
 class AIUsageAgreementDialog;
 class AISuggestionCard;
@@ -87,6 +89,8 @@ class AIChatPanel : public MarginContainer {
 	PanelContainer *beginner_ai_guide_panel = nullptr;
 	Label *beginner_ai_guide_label = nullptr;
 	bool beginner_chat_mode = false;
+	AISourceManager *beginner_source_manager = nullptr;
+	bool beginner_source_auto_config_requested = false;
 	PanelContainer *ai_activity_panel = nullptr;
 	ProgressBar *ai_activity_progress = nullptr;
 	Label *ai_activity_label = nullptr;
@@ -107,6 +111,7 @@ class AIChatPanel : public MarginContainer {
 	EditorFileDialog *upload_image_dialog = nullptr;
 	EditorFileDialog *import_file_dialog = nullptr;
 	AIUsageAgreementDialog *usage_agreement_dialog = nullptr;
+	AIFirstRunGuideDialog *first_run_guide_dialog = nullptr;
 
 	// Mode switching (PROJECT / ENGINE).
 	HBoxContainer *mode_bar = nullptr;
@@ -117,6 +122,7 @@ class AIChatPanel : public MarginContainer {
 	Button *engine_mode_btn = nullptr;
 	Button *project_mode_btn = nullptr;
 	Label *mode_indicator = nullptr;
+	bool beginner_privilege_escalated = false;
 
 	// Conversation selector.
 	HBoxContainer *conversation_bar = nullptr;
@@ -358,6 +364,7 @@ class AIChatPanel : public MarginContainer {
 	void _update_translations();
 	void _apply_programming_experience_layout();
 	void _apply_editor_beginner_workspace(bool p_enabled);
+	void _ensure_beginner_engine_source_configured();
 	void _set_programming_experience(bool p_has_programming_experience);
 	void _toggle_programming_experience_mode();
 	void _set_ai_activity(const String &p_text, bool p_visible);
@@ -366,6 +373,8 @@ class AIChatPanel : public MarginContainer {
 	bool _ensure_usage_agreement();
 	void _usage_agreement_accepted();
 	void _usage_agreement_rejected();
+	void _show_first_run_guide_if_needed(bool p_force = false);
+	void _open_ai_config_from_first_run_guide();
 	void _show_tool_limit_options(bool p_due_to_limit);
 	void _hide_tool_limit_options();
 	void _set_tool_limit_options_collapsed(bool p_collapsed);
@@ -415,6 +424,11 @@ class AIChatPanel : public MarginContainer {
 	void _on_build_status_poll_timeout();
 	void _append_forced_build_status_check();
 	void _continue_after_build_poll();
+
+	// --- Send / Stop button dynamic text ---
+	bool is_currently_requesting = false;
+	void _on_input_text_changed();
+	void _update_send_button_text();
 
 protected:
 	void _notification(int p_what);

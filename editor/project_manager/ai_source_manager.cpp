@@ -76,6 +76,18 @@ static void _add_git_auth_headers(List<String> &r_args) {
 #endif
 
 const char *JUNDOT_ENGINE_SOURCE_ZIP_URL = "https://github.com/LoongSerpent9Realms/Jundot/archive/refs/heads/master.zip";
+const char *JUNDOT_GITHUB_MIRROR_PREFIX = "https://github.akams.cn/";
+
+static String _get_github_mirror_url(const String &p_url) {
+	const String url = p_url.strip_edges();
+	if (url.is_empty() || url.begins_with(JUNDOT_GITHUB_MIRROR_PREFIX)) {
+		return url;
+	}
+	if (url.begins_with("https://github.com/")) {
+		return String(JUNDOT_GITHUB_MIRROR_PREFIX) + url;
+	}
+	return String();
+}
 
 void AISourceManager::_bind_methods() {
 }
@@ -531,7 +543,7 @@ Error AISourceManager::_run_git_command(const String &p_working_dir, const List<
 	return exit_code == 0 ? OK : FAILED;
 }
 
-Error AISourceManager::_update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_error) {
+Error AISourceManager::_update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_effective_repository_url, String &r_error) {
 	_defer_processing_progress(0, TTR("Checking Git availability..."));
 	if (!_is_git_available()) {
 		r_error = TTR("Git is not available.");
@@ -549,6 +561,7 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, const Strin
 	if (repo_url.is_empty()) {
 		repo_url = JUNDOT_ENGINE_SOURCE_REPOSITORY_URL;
 	}
+	r_effective_repository_url = repo_url;
 
 	String repo_path = p_cache_path;
 	if (!FileAccess::exists(repo_path.path_join(".git")) && _dir_has_entries(repo_path)) {
@@ -603,17 +616,49 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, const Strin
 		clone_args.push_back("master");
 		clone_args.push_back("--no-tags");
 		clone_args.push_back("--filter=blob:none");
-		clone_args.push_back(repo_url);
+		String clone_url = repo_url;
+		clone_args.push_back(clone_url);
 		clone_args.push_back(repo_path);
 
 		int exit_code = 0;
-		err = _run_git_process(clone_args, "git -c protocol.version=2 -c core.compression=1 clone --depth=1 --single-branch --branch master --no-tags --filter=blob:none " + repo_url + " " + repo_path, output, &exit_code);
+		err = _run_git_process(clone_args, "git -c protocol.version=2 -c core.compression=1 clone --depth=1 --single-branch --branch master --no-tags --filter=blob:none " + clone_url + " " + repo_path, output, &exit_code);
 		if (err != OK || exit_code != 0) {
-			r_error = output.strip_edges();
-			if (r_error.is_empty()) {
-				r_error = TTR("Git clone failed.");
+			const String mirror_url = _get_github_mirror_url(repo_url);
+			if (!mirror_url.is_empty() && mirror_url != repo_url) {
+				_defer_processing_indeterminate(TTR("Git clone failed. Retrying through the GitHub mirror..."));
+				String failed_path;
+				_remove_directory_recursive_absolute(repo_path, &failed_path);
+				DirAccess::make_dir_recursive_absolute(repo_path);
+
+				clone_args.clear();
+				clone_args.push_back("-c");
+				clone_args.push_back("protocol.version=2");
+				clone_args.push_back("-c");
+				clone_args.push_back("core.compression=1");
+				clone_args.push_back("clone");
+				clone_args.push_back("--depth=1");
+				clone_args.push_back("--single-branch");
+				clone_args.push_back("--branch");
+				clone_args.push_back("master");
+				clone_args.push_back("--no-tags");
+				clone_args.push_back("--filter=blob:none");
+				clone_args.push_back(mirror_url);
+				clone_args.push_back(repo_path);
+
+				output.clear();
+				exit_code = 0;
+				err = _run_git_process(clone_args, "git -c protocol.version=2 -c core.compression=1 clone --depth=1 --single-branch --branch master --no-tags --filter=blob:none " + mirror_url + " " + repo_path, output, &exit_code);
+				if (err == OK && exit_code == 0) {
+					r_effective_repository_url = mirror_url;
+				}
 			}
-			return err != OK ? err : FAILED;
+			if (err != OK || exit_code != 0) {
+				r_error = output.strip_edges();
+				if (r_error.is_empty()) {
+					r_error = TTR("Git clone failed.");
+				}
+				return err != OK ? err : FAILED;
+			}
 		}
 	} else {
 		// Ensure the local origin remote matches the configured repository URL.
@@ -649,11 +694,30 @@ Error AISourceManager::_update_git_cache(const String &p_cache_path, const Strin
 		fetch_args.push_back("master");
 		err = _run_git_command(repo_path, fetch_args, output);
 		if (err != OK) {
-			r_error = output.strip_edges();
-			if (r_error.is_empty()) {
-				r_error = TTR("Git fetch failed.");
+			const String mirror_url = _get_github_mirror_url(repo_url);
+			if (!mirror_url.is_empty() && mirror_url != repo_url) {
+				_defer_processing_indeterminate(TTR("Git fetch failed. Retrying through the GitHub mirror..."));
+				List<String> mirror_url_args;
+				mirror_url_args.push_back("remote");
+				mirror_url_args.push_back("set-url");
+				mirror_url_args.push_back("origin");
+				mirror_url_args.push_back(mirror_url);
+				int set_url_exit = 0;
+				_run_git_command(repo_path, mirror_url_args, output, &set_url_exit);
+
+				output.clear();
+				err = _run_git_command(repo_path, fetch_args, output);
+				if (err == OK) {
+					r_effective_repository_url = mirror_url;
+				}
 			}
-			return err;
+			if (err != OK) {
+				r_error = output.strip_edges();
+				if (r_error.is_empty()) {
+					r_error = TTR("Git fetch failed.");
+				}
+				return err;
+			}
 		}
 
 		_defer_processing_indeterminate(TTR("Resetting Git source cache to the latest revision..."));
@@ -981,6 +1045,9 @@ void AISourceManager::_start_zip_fallback(const String &p_cache_path, const Stri
 		}
 		zip_url = base + "/archive/refs/heads/master.zip";
 	}
+	current_zip_url = zip_url;
+	const String mirror_zip_url = _get_github_mirror_url(zip_url);
+	current_zip_mirror_retry_available = !mirror_zip_url.is_empty() && mirror_zip_url != zip_url;
 
 	const Error err = downloader->start(zip_url, download_zip_path, 16);
 	if (err != OK) {
@@ -1093,6 +1160,30 @@ void AISourceManager::_on_download_finished(const String &p_output_path) {
 void AISourceManager::_on_download_failed(const String &p_reason) {
 	is_downloading = false;
 	set_process(false);
+	if (current_zip_mirror_retry_available) {
+		current_zip_mirror_retry_available = false;
+		const String mirror_zip_url = _get_github_mirror_url(current_zip_url);
+		if (!mirror_zip_url.is_empty() && downloader) {
+			if (FileAccess::exists(download_zip_path)) {
+				DirAccess::remove_file_or_error(download_zip_path);
+			}
+			download_progress->set_indeterminate(false);
+			download_progress->set_min(0);
+			download_progress->set_max(1);
+			download_progress->set_value(0);
+			download_progress->set_visible(true);
+			download_status_label->set_text(TTR("ZIP download failed. Retrying through the GitHub mirror..."));
+			download_status_label->set_visible(true);
+			current_zip_url = mirror_zip_url;
+			const Error retry_err = downloader->start(mirror_zip_url, download_zip_path, 16);
+			if (retry_err == OK) {
+				is_downloading = true;
+				set_process(true);
+				_update_ui();
+				return;
+			}
+		}
+	}
 	current_error = p_reason;
 	download_progress->set_visible(false);
 	download_status_label->set_visible(false);
@@ -1270,12 +1361,16 @@ void AISourceManager::_worker_thread_func() {
 
 	if (worker_git_mode) {
 		String git_error;
-		err = _update_git_cache(worker_cache_path, worker_repository_url, source_root, git_error);
+		String effective_repository_url;
+		err = _update_git_cache(worker_cache_path, worker_repository_url, source_root, effective_repository_url, git_error);
 		if (err != OK || source_root.is_empty()) {
 			worker_error = err != OK ? err : FAILED;
 			worker_error_msg = git_error.is_empty() ? TTR("Git update failed.") : git_error;
 			_defer_processing_completed();
 			return;
+		}
+		if (!effective_repository_url.is_empty()) {
+			worker_repository_url = effective_repository_url;
 		}
 	} else {
 		err = _extract_zip(download_zip_path, worker_cache_path, source_root);
@@ -1474,6 +1569,14 @@ void AISourceManager::popup_centered_on_parent(const Window *p_parent) {
 	_update_ui();
 	_fit_to_contents();
 	popup_centered_clamped(get_size(), 0.9);
+}
+
+void AISourceManager::begin_auto_configure() {
+	_update_ui();
+	if (is_downloading || is_processing || !_get_source_root().is_empty()) {
+		return;
+	}
+	callable_mp(this, &AISourceManager::_on_download_button_pressed).call_deferred();
 }
 
 AISourceManager::AISourceManager() {

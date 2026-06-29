@@ -116,7 +116,7 @@ Error AIMemoryStore::load(Vector<AIMemoryEntry> &r_entries, const String &p_path
 	String path = p_path.is_empty() ? _get_default_path() : p_path;
 	ERR_FAIL_COND_V_MSG(path.is_empty(), ERR_UNCONFIGURED, "AI memory store path is empty.");
 	if (!FileAccess::exists(path)) {
-		// Read the previous .godot/ai_memory.json location when present. The next
+		// Read the previous .godot/ai_memory.json or .jundot/ai_memory.json legacy location when present. The next
 		// automatic or manual save writes the merged data to .JundotAI/memory.json.
 		const String legacy_path = p_path.is_empty() ? _legacy_project_memory_path() : String();
 		if (legacy_path.is_empty() || legacy_path == path || !FileAccess::exists(legacy_path)) {

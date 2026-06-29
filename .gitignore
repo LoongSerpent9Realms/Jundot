@@ -53,6 +53,9 @@ logs/
 tests/data/*.translation
 tests/data/crypto/out*
 
+#cline
+.cline
+
 ############################
 ### General build output ###
 ############################

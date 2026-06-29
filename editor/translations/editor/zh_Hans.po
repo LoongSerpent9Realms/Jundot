@@ -21460,6 +21460,157 @@ msgstr "正在加密引擎源码缓存... %d / %d"
 msgid "Could not encrypt path: %s (Windows error %d)"
 msgstr "无法加密路径：%s（Windows 错误 %d）"
 
+msgid "Engine source cache path is empty."
+msgstr "引擎源码缓存路径为空。"
+
+msgid "Automatic encrypted source cache is only implemented on Windows."
+msgstr "自动加密源码缓存仅在 Windows 上实现。"
+
+msgid "Download / Start MiMoCode"
+msgstr "下载 / 启动 MiMoCode"
+
+msgid "Download MiMoCode v0.4 if needed, then start it and save the local plugin connection settings."
+msgstr "如有需要则下载 MiMoCode v0.4，然后启动并保存本地插件连接设置。"
+
+msgid "Stop MiMoCode"
+msgstr "停止 MiMoCode"
+
+msgid "Stop the MiMoCode process started by JunDot."
+msgstr "停止由 JunDot 启动的 MiMoCode 进程。"
+
+msgid "Start MiMoCode"
+msgstr "启动 MiMoCode"
+
+msgid "Start the installed MiMoCode local plugin and save the connection settings."
+msgstr "启动已安装的 MiMoCode 本地插件并保存连接设置。"
+
+msgid "Could not stop MiMoCode. Error: %d"
+msgstr "无法停止 MiMoCode。错误：%d"
+
+msgid "MiMoCode stopped."
+msgstr "MiMoCode 已停止。"
+
+msgid "Delete Cache"
+msgstr "删除缓存"
+
+msgid "MiMoCode is installed, but could not be started. Error: %d"
+msgstr "MiMoCode 已安装，但无法启动。错误：%d"
+
+msgid "Could not create MiMoCode download folder."
+msgstr "无法创建 MiMoCode 下载文件夹。"
+
+msgid "MiMoCode was extracted, but could not be started. Error: %d"
+msgstr "MiMoCode 已解压，但无法启动。错误：%d"
+
+msgid "MiMoCode downloader is not available."
+msgstr "MiMoCode 下载器不可用。"
+
+msgid "Could not start MiMoCode download: %s"
+msgstr "无法开始 MiMoCode 下载：%s"
+
+msgid "Downloading MiMoCode v0.4..."
+msgstr "正在下载 MiMoCode v0.4..."
+
+msgid "MiMoCode download failed. HTTP %d, result %d."
+msgstr "MiMoCode 下载失败。HTTP %d，结果 %d。"
+
+msgid "MiMoCode download completed, but extraction failed. Error: %d"
+msgstr "MiMoCode 下载完成，但解压失败。错误：%d"
+
+msgid "MiMoCode was installed, but could not be started. Error: %d"
+msgstr "MiMoCode 已安装，但无法启动。错误：%d"
+
+msgid "MiMoCode has started. MiMoCode backend settings were saved; JunDot will connect to http://127.0.0.1:4096."
+msgstr "MiMoCode 已启动。MiMoCode 后端设置已保存；JunDot 将连接到 http://127.0.0.1:4096。"
+
+msgid "Update: Not checked"
+msgstr "更新：未检查"
+
+msgid ""
+"Status: Downloaded\n"
+"Source root: %s\n"
+"Encryption: Enabled\n"
+"%s"
+msgstr ""
+"状态：已下载\n"
+"源代码根目录：%s\n"
+"加密：已启用\n"
+"%s"
+
+msgid ""
+"Status: Downloaded\n"
+"Source root: %s\n"
+"Encryption: Failed (%s)\n"
+"%s"
+msgstr ""
+"状态：已下载\n"
+"源代码根目录：%s\n"
+"加密：失败（%s）\n"
+"%s"
+
+msgid "Redownload"
+msgstr "重新下载"
+
+msgid "Update Now"
+msgstr "立即更新"
+
+msgid "Status: Not downloaded"
+msgstr "状态：未下载"
+
+msgid "Updating engine source while preserving local changes..."
+msgstr "正在更新引擎源码并保留本地更改..."
+
+msgid "Checking engine source repository updates..."
+msgstr "正在检查引擎源码仓库更新..."
+
+msgid "Could not create cache directory: error %d"
+msgstr "无法创建缓存目录：错误 %d"
+
+msgid "Could not open cache directory: %s"
+msgstr "无法打开缓存目录：%s"
+
+msgid "Could not create cache directory."
+msgstr "无法创建缓存目录。"
+
+msgid "Engine source already exists. Use Redownload to replace it."
+msgstr "引擎源码已存在。请使用「重新下载」替换。"
+
+msgid "Engine source downloader is not available."
+msgstr "引擎源码下载器不可用。"
+
+msgid "Could not start engine source download: %s"
+msgstr "无法开始引擎源码下载：%s"
+
+msgid "Downloading engine source..."
+msgstr "正在下载引擎源码..."
+
+msgid "No source cache to delete."
+msgstr "没有可删除的源码缓存。"
+
+msgid "Failed to delete cache: error %d"
+msgstr "删除缓存失败：错误 %d"
+
+msgid "Engine source cache deleted."
+msgstr "引擎源码缓存已删除。"
+
+msgid "Downloading engine source... %.0f%% (%s / %s)"
+msgstr "正在下载引擎源码... %.0f%% (%s / %s)"
+
+msgid "Downloading engine source... %.1f MB"
+msgstr "正在下载引擎源码... %.1f MB"
+
+msgid "Engine source download failed. HTTP %d, result %d."
+msgstr "引擎源码下载失败。HTTP %d，结果 %d。"
+
+msgid "Could not open source archive. Error: %d"
+msgstr "无法打开源码压缩包。错误：%d"
+
+msgid "Could not extract engine source. Error: %d"
+msgstr "解压源码失败。错误：%d"
+
+msgid "Engine source downloaded and extracted."
+msgstr "引擎源码下载并解压完成。"
+
 msgid "AI Usage Agreement"
 msgstr "AI 使用协议"
 
@@ -21684,3 +21835,46 @@ msgstr "已跳过"
 
 msgid "Answer"
 msgstr "回答"
+
+msgid "Beginner mode: engine source is missing. Jundot AI is configuring it automatically."
+msgstr "新手模式：缺少引擎源代码。Jundot AI 正在自动配置。"
+
+msgid "Git clone failed. Retrying through the GitHub mirror..."
+msgstr "Git 克隆失败。正在通过 GitHub 镜像重试..."
+
+msgid "Git fetch failed. Retrying through the GitHub mirror..."
+msgstr "Git 拉取失败。正在通过 GitHub 镜像重试..."
+
+msgid "ZIP download failed. Retrying through the GitHub mirror..."
+msgstr "ZIP 下载失败。正在通过 GitHub 镜像重试..."
+
+msgid "Engine source download failed. Retrying through the GitHub mirror..."
+msgstr "引擎源代码下载失败。正在通过 GitHub 镜像重试..."
+
+msgid "Set up Jundot AI"
+msgstr "设置 Jundot AI"
+
+msgid "Start Using AI"
+msgstr "开始使用 AI"
+
+msgid "Open AI Config"
+msgstr "打开 AI 配置"
+
+msgid "Welcome to Jundot AI"
+msgstr "欢迎使用 Jundot AI"
+
+msgid ""
+"Let's finish the first-time AI setup:\n"
+"\n"
+"1. Choose or confirm your AI provider in Configuration.\n"
+"2. Add the API key or local endpoint you want Jundot AI to use.\n"
+"3. Send your first request in Chat. Beginner mode can stay chat-only while Jundot AI opens other editor panels only when needed."
+msgstr ""
+"让我们完成首次 AI 初始化设置：\n"
+"\n"
+"1. 在“配置”中选择或确认你的 AI 提供商。\n"
+"2. 填入希望 Jundot AI 使用的 API Key 或本地端点。\n"
+"3. 回到“聊天”发送第一个请求。新手模式会保持纯聊天界面，Jundot AI 只会在需要时打开其他编辑器面板。"
+
+msgid "AI usage agreement accepted. Finish the first-time setup guide to continue."
+msgstr "AI 使用协议已接受。请完成首次设置引导后继续。"

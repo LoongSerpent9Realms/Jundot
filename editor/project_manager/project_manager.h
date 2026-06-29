@@ -119,12 +119,14 @@ class ProjectManager : public Control {
 	Button *_add_main_view(MainViewTab p_id, const String &p_name, const Ref<Texture2D> &p_icon, Control *p_view_control);
 	void _set_main_view_icon(MainViewTab p_id, const Ref<Texture2D> &p_icon);
 	void _select_main_view(int p_id);
+	void _ensure_asset_library();
 
 	VBoxContainer *local_projects_vb = nullptr;
 	EditorAssetLibrary *asset_library = nullptr;
 
 	EditorAbout *about_dialog = nullptr;
 
+	void _ensure_about_dialog();
 	void _show_about();
 	void _open_asset_library_confirmed();
 	void _project_list_menu_option(int p_option);
@@ -152,6 +154,7 @@ class ProjectManager : public Control {
 	void _on_skip_version_requested();
 	void _on_update_launcher_started();
 	void _on_update_launcher_finished(int p_exit_code);
+	void _ensure_update_manager();
 
 	// AI engine source cache bootstrap.
 
@@ -161,6 +164,7 @@ class ProjectManager : public Control {
 
 	void _maybe_prompt_ai_source_cache();
 	void _open_ai_source_manager_from_prompt();
+	void _ensure_ai_source_manager_dialog();
 	void _show_ai_source_manager();
 
 	// Project list.
@@ -250,6 +254,7 @@ class ProjectManager : public Control {
 	void _ai_project_question_submit();
 	void _ai_project_update_question_nav();
 	void _ai_project_clear_chat();
+	void _ensure_ai_config_panel();
 	void _show_ai_config_dialog();
 	bool _ensure_ai_usage_agreement_for_project(const String &p_project_path, bool p_popup = true);
 	void _ai_usage_agreement_accepted();
@@ -271,6 +276,7 @@ class ProjectManager : public Control {
 
 	ProjectDialog *project_dialog = nullptr;
 
+	ProjectDialog *_ensure_project_dialog();
 	void _scan_projects();
 	void _run_project();
 	void _run_project_confirm();

@@ -41,6 +41,7 @@ class ScrollContainer;
 class VBoxContainer;
 
 extern const char *JUNDOT_ENGINE_SOURCE_ZIP_URL;
+extern const char *JUNDOT_GITHUB_MIRROR_PREFIX;
 
 class AISourceManager : public AcceptDialog {
 	GDCLASS(AISourceManager, AcceptDialog);
@@ -74,6 +75,8 @@ private:
 	String download_zip_path;
 	String pending_zip_cache_path;
 	String pending_zip_url;
+	String current_zip_url;
+	bool current_zip_mirror_retry_available = false;
 	bool is_downloading = false;
 	bool is_processing = false;
 	String current_error;
@@ -129,7 +132,7 @@ private:
 	void _clear_update_check_cache();
 	Error _run_git_process(const List<String> &p_args, const String &p_command, String &r_output, int *r_exit_code = nullptr);
 	Error _run_git_command(const String &p_working_dir, const List<String> &p_args, String &r_output, int *r_exit_code = nullptr);
-	Error _update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_error);
+	Error _update_git_cache(const String &p_cache_path, const String &p_repository_url, String &r_source_root, String &r_effective_repository_url, String &r_error);
 	String _get_default_cache_root() const;
 	SourceStatus _get_current_status() const;
 	String _get_source_root() const;
@@ -141,6 +144,7 @@ protected:
 
 public:
 	void popup_centered_on_parent(const Window *p_parent);
+	void begin_auto_configure();
 
 	AISourceManager();
 };

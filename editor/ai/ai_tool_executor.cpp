@@ -296,6 +296,7 @@ static void _restore_prebuild_stash_after_failed_update(const String &p_stash_re
 	apply_args.push_back("stash");
 	apply_args.push_back("apply");
 	apply_args.push_back("--index");
+	apply_args.push_back("--whitespace=nowarn");
 	apply_args.push_back(p_stash_ref);
 	Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
 	if (apply_err != OK) {
@@ -318,6 +319,8 @@ static void _restore_prebuild_stash_after_failed_update(const String &p_stash_re
 				add_args.push_back("-A");
 				apply_err = _run_prebuild_git_command(add_args, output, exit_code);
 			}
+		} else {
+			apply_err = OK;
 		}
 	}
 
@@ -471,6 +474,7 @@ static Error _auto_update_source_before_build(String &r_log) {
 		apply_args.push_back("stash");
 		apply_args.push_back("apply");
 		apply_args.push_back("--index");
+		apply_args.push_back("--whitespace=nowarn");
 		apply_args.push_back(stash_ref);
 		Error apply_err = _run_prebuild_git_command(apply_args, output, exit_code);
 		if (apply_err != OK) {
@@ -482,26 +486,27 @@ static Error _auto_update_source_before_build(String &r_log) {
 			int conflict_exit = -1;
 			_run_prebuild_git_command(conflicts_args, conflict_output, conflict_exit);
 			if (conflict_output.strip_edges().is_empty()) {
-				r_log += "[Source Update] Updated source, but failed to restore local changes:\n" + output + "\n";
-				return FAILED;
+				apply_err = OK;
+			} else {
+				List<String> theirs_args;
+				theirs_args.push_back("checkout");
+				theirs_args.push_back("--theirs");
+				theirs_args.push_back("--");
+				theirs_args.push_back(".");
+				if (_run_prebuild_git_command(theirs_args, output, exit_code) != OK) {
+					r_log += "[Source Update] Failed to restore local working changes during conflict resolution:\n" + output + "\n";
+					return FAILED;
+				}
+				List<String> add_args;
+				add_args.push_back("add");
+				add_args.push_back("-A");
+				if (_run_prebuild_git_command(add_args, output, exit_code) != OK) {
+					r_log += "[Source Update] Failed to stage restored local working changes:\n" + output + "\n";
+					return FAILED;
+				}
+				apply_err = OK;
+				r_log += "[Source Update] Resolved restore conflicts by preserving the pre-build local working versions.\n";
 			}
-			List<String> theirs_args;
-			theirs_args.push_back("checkout");
-			theirs_args.push_back("--theirs");
-			theirs_args.push_back("--");
-			theirs_args.push_back(".");
-			if (_run_prebuild_git_command(theirs_args, output, exit_code) != OK) {
-				r_log += "[Source Update] Failed to restore local working changes during conflict resolution:\n" + output + "\n";
-				return FAILED;
-			}
-			List<String> add_args;
-			add_args.push_back("add");
-			add_args.push_back("-A");
-			if (_run_prebuild_git_command(add_args, output, exit_code) != OK) {
-				r_log += "[Source Update] Failed to stage restored local working changes:\n" + output + "\n";
-				return FAILED;
-			}
-			r_log += "[Source Update] Resolved restore conflicts by preserving the pre-build local working versions.\n";
 		}
 
 		List<String> drop_args;
@@ -750,7 +755,7 @@ String AIToolExecutor::_get_project_root() {
 
 	if (ProjectSettings::get_singleton()) {
 		String project_root = ProjectSettings::get_singleton()->get_resource_path();
-		if (!project_root.is_empty() && FileAccess::exists(project_root.path_join("project.godot"))) {
+		if (!project_root.is_empty() && (FileAccess::exists(project_root.path_join("project.jundot")) || FileAccess::exists(project_root.path_join("project.godot")))) {
 			return project_root;
 		}
 	}
@@ -759,7 +764,7 @@ String AIToolExecutor::_get_project_root() {
 	// back to the process cwd can accidentally expose an engine checkout when
 	// the editor was launched from its source directory.
 	String exe_path = OS::get_singleton()->get_executable_path();
-	if (!exe_path.is_empty() && FileAccess::exists(exe_path.get_base_dir().path_join("project.godot"))) {
+	if (!exe_path.is_empty() && (FileAccess::exists(exe_path.get_base_dir().path_join("project.jundot")) || FileAccess::exists(exe_path.get_base_dir().path_join("project.godot")))) {
 		return exe_path.get_base_dir();
 	}
 
@@ -884,7 +889,7 @@ Dictionary AIToolExecutor::_setup_engine_workspace(const Dictionary &p_args) {
 
 	const String project_root = _get_project_root();
 	if (project_root.is_empty()) {
-		return _make_result("Project root not detected. Open a project with project.godot before creating an engine workspace.", true);
+		return _make_result("Project root not detected. Open a project with project.jundot before creating an engine workspace.", true);
 	}
 
 	const String base_engine_root = _get_engine_build_root();
@@ -1068,7 +1073,7 @@ static void _collect_gdscript_files(const String &p_root, const String &p_rel_di
 
 		const String rel = p_rel_dir.is_empty() ? name : p_rel_dir.path_join(name);
 		if (da->current_is_dir()) {
-			if (!name.begins_with(".") && name != "bin" && name != "obj" && name != ".godot" && name != ".import" && name != "__pycache__") {
+			if (!name.begins_with(".") && name != "bin" && name != "obj" && name != ".godot" && name != ".jundot" && name != ".import" && name != "__pycache__") {
 				_collect_gdscript_files(p_root, rel, r_paths, p_limit);
 			}
 		} else if (name.to_lower().ends_with(".gd")) {
@@ -2514,7 +2519,7 @@ Dictionary AIToolExecutor::_build_project(const Dictionary &p_args) {
 
 	const String project_root = _get_project_root();
 	if (project_root.is_empty()) {
-		return _make_result("No open project root was detected. Open a project with project.godot before building project code.", true);
+		return _make_result("No open project root was detected. Open a project with project.jundot before building project code.", true);
 	}
 
 	String project_path = String(p_args.get("project_path", String())).strip_edges().replace("\\", "/");
@@ -2622,7 +2627,7 @@ Dictionary AIToolExecutor::_reload_cpp_hot_module(const Dictionary &p_args) {
 
 	const String project_root = _get_project_root();
 	if (project_root.is_empty()) {
-		return _make_result("No open project root was detected. Open a project with project.godot before reloading a C++ hot module.", true);
+		return _make_result("No open project root was detected. Open a project with project.jundot before reloading a C++ hot module.", true);
 	}
 
 	String full_path;
@@ -2723,7 +2728,7 @@ Dictionary AIToolExecutor::_build_cpp_hot_module(const Dictionary &p_args) {
 
 	const String project_root = _get_project_root();
 	if (project_root.is_empty()) {
-		return _make_result("No open project root was detected. Open a project with project.godot before building a C++ hot module.", true);
+		return _make_result("No open project root was detected. Open a project with project.jundot before building a C++ hot module.", true);
 	}
 
 	String workdir_arg = String(p_args.get("workdir", ".")).strip_edges();
@@ -3425,7 +3430,7 @@ Dictionary AIToolExecutor::_check_project_scripts(const Dictionary &p_args) {
 
 	const String project_root = _get_project_root();
 	if (project_root.is_empty()) {
-		return _make_result("No open Godot project root was detected. Open a project with project.godot before validating project scripts.", true);
+		return _make_result("No open project root was detected. Open a project with project.jundot before validating project scripts.", true);
 	}
 
 	Vector<String> script_paths;

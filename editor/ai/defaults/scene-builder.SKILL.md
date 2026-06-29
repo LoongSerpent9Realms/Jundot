@@ -86,7 +86,7 @@ Root (Node2D/Node3D/Control)
 - For important menus, dialogs, HUD buttons, or suspected input-blocking bugs,
   run the scene with `play_scene`, click the intended viewport coordinates with
   `click_ui_position`, then stop it with `stop_play_scene` after validation
-- For runtime UI audits, also inspect the related scripts and `project.godot`
+- For runtime UI audits, also inspect the related scripts and `project.jundot` (or `project.godot`)
   input actions. Confirm that keyboard/controller users have a clear focus path,
   confirm/cancel/back behavior, and explicit focus neighbors when automatic
   navigation would be ambiguous

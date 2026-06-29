@@ -30,6 +30,19 @@
 #include "core/io/json.h"
 #include "core/variant/dictionary.h"
 
+static bool _try_parse_json(const String &p_block, JSON &r_json) {
+	String trimmed = p_block.strip_edges();
+	if (trimmed.is_empty()) {
+		return false;
+	}
+	// JSON 必须以 '{' 或 '[' 开头（也可能以 true/false/null 开头，但极少使用）
+	if (!(trimmed.begins_with("{") || trimmed.begins_with("["))) {
+		return false;
+	}
+	Error err = r_json.parse(trimmed);
+	return err == OK;
+}
+
 Vector<String> AIChatParser::_extract_comment_blocks(const String &p_text, const String &p_tag) {
 	Vector<String> blocks;
 	const String open_tag = "<!-- " + p_tag + " -->";
@@ -55,7 +68,6 @@ Vector<String> AIChatParser::_extract_comment_blocks(const String &p_text, const
 Vector<String> AIChatParser::_extract_json_blocks(const String &p_text) {
 	Vector<String> blocks;
 	const String json_fence = "```json";
-
 	int from = 0;
 	while (from < p_text.length()) {
 		const int start = p_text.find(json_fence, from);
@@ -504,7 +516,7 @@ void AIChatParser::parse_next_questions(const String &p_response, Vector<String>
 	const Vector<String> json_blocks = _extract_json_blocks(p_response);
 	for (int i = 0; i < json_blocks.size() && r_questions.size() < 4; i++) {
 		JSON json;
-		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+		if (!_try_parse_json(json_blocks[i], json)) {
 			continue;
 		}
 		const Variant data = json.get_data();
@@ -546,7 +558,7 @@ void AIChatParser::parse_task_plans(const String &p_response, Vector<AITaskPlan>
 	const Vector<String> json_blocks = _extract_json_blocks(p_response);
 	for (int i = 0; i < json_blocks.size() && r_task_plans.size() < MAX_SUGGESTIONS_PER_RESPONSE; i++) {
 		JSON json;
-		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+		if (!_try_parse_json(json_blocks[i], json)) {
 			continue;
 		}
 		const Variant data = json.get_data();
@@ -649,7 +661,7 @@ void AIChatParser::parse_repair_tasks(const String &p_response, Vector<AIRepairS
 	const Vector<String> json_blocks = _extract_json_blocks(p_response);
 	for (int i = 0; i < json_blocks.size() && r_repairs.size() < MAX_SUGGESTIONS_PER_RESPONSE; i++) {
 		JSON json;
-		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+		if (!_try_parse_json(json_blocks[i], json)) {
 			continue;
 		}
 		const Variant data = json.get_data();
@@ -672,7 +684,7 @@ void AIChatParser::parse_feature_gates(const String &p_response, Vector<AIFeatur
 	const Vector<String> json_blocks = _extract_json_blocks(p_response);
 	for (int i = 0; i < json_blocks.size() && r_features.size() < MAX_SUGGESTIONS_PER_RESPONSE; i++) {
 		JSON json;
-		if (json.parse(json_blocks[i]) != OK || json.get_data().get_type() != Variant::DICTIONARY) {
+		if (!_try_parse_json(json_blocks[i], json)) {
 			continue;
 		}
 		const Variant data = json.get_data();

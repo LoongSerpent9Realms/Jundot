@@ -163,6 +163,11 @@ def run_msbuild(tools: ToolsLocation, sln: str, chdir_to: str, msbuild_args: lis
 
     args += [sln]
 
+    # Enable parallel builds to utilize all CPU cores.
+    # Without /m, MSBuild builds projects sequentially, which is extremely slow
+    # for solutions with many source files (e.g. JundotSharp with 1000+ generated .cs files).
+    args += ["/m"]
+
     if msbuild_args:
         args += msbuild_args
 
@@ -188,7 +193,7 @@ def run_msbuild(tools: ToolsLocation, sln: str, chdir_to: str, msbuild_args: lis
     return subprocess.call(args, env=msbuild_env, cwd=chdir_to)
 
 
-def build_jundot_api(msbuild_tool, module_dir, output_dir, push_nupkgs_local, precision, no_deprecated, werror):
+def build_jundot_api(msbuild_tool, module_dir, output_dir, push_nupkgs_local, precision, no_deprecated, werror, skip_debug=False):
     target_filenames = [
         "JundotSharp.dll",
         "JundotSharp.pdb",
@@ -201,7 +206,8 @@ def build_jundot_api(msbuild_tool, module_dir, output_dir, push_nupkgs_local, pr
         "JundotPlugins.runtimeconfig.json",
     ]
 
-    for build_config in ["Debug", "Release"]:
+    build_configs = ["Release"] if skip_debug else ["Debug", "Release"]
+    for build_config in build_configs:
         editor_api_dir = os.path.join(output_dir, "JundotSharp", "Api", build_config)
 
         targets = [os.path.join(editor_api_dir, filename) for filename in target_filenames]
@@ -358,14 +364,14 @@ def generate_sdk_package_versions():
 
 
 def build_all(
-    msbuild_tool, module_dir, output_dir, jundot_platform, dev_debug, push_nupkgs_local, precision, no_deprecated, werror
+    msbuild_tool, module_dir, output_dir, jundot_platform, dev_debug, push_nupkgs_local, precision, no_deprecated, werror, skip_debug=False
 ):
     # Generate SdkPackageVersions.props and VersionDocsUrl constant
     generate_sdk_package_versions()
 
     # Jundot API
     exit_code = build_jundot_api(
-        msbuild_tool, module_dir, output_dir, push_nupkgs_local, precision, no_deprecated, werror
+        msbuild_tool, module_dir, output_dir, push_nupkgs_local, precision, no_deprecated, werror, skip_debug
     )
     if exit_code != 0:
         return exit_code
@@ -424,6 +430,12 @@ def main():
         help="Build JundotSharp without using deprecated features. This is required, if the engine was built with 'deprecated=no'.",
     )
     parser.add_argument("--werror", action="store_true", default=False, help="Treat compiler warnings as errors.")
+    parser.add_argument(
+        "--skip-debug",
+        action="store_true",
+        default=False,
+        help="Skip building the Debug configuration of JundotSharp (only build Release). Speeds up the bindingsGen step significantly.",
+    )
 
     args = parser.parse_args()
 
@@ -450,6 +462,7 @@ def main():
         args.precision,
         args.no_deprecated,
         args.werror,
+        args.skip_debug,
     )
     sys.exit(exit_code)
 

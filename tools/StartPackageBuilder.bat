@@ -1,4 +1,4 @@
 @echo off
-cd /d "PackageBuilder\bin\CodexCheck3\" || exit /b
+cd /d "%~dp0PackageBuilder\bin\CodexFast\" || exit /b
 start "" "JundotPackageBuilder.exe" --ai-package-builder
 exit

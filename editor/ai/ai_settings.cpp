@@ -679,7 +679,7 @@ String AISettings::get_engine_source_root(const AISettingsData &p_settings) {
 	}
 
 	// Fall back to a nearby source checkout when running from a developer tree.
-	// Packaged editor builds do not include source code, so project.godot is not
+	// Packaged editor builds do not include source code, so project.jundot/project.godot is not
 	// a valid engine source root here.
 	String exe_path = OS::get_singleton()->get_executable_path();
 	if (!exe_path.is_empty()) {

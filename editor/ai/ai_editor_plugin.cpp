@@ -33,6 +33,7 @@
 #include "ai_tools_panel.h"
 #include "ai_mcp_manager.h"
 #include "ai_inspector_context_menu.h"
+#include "ai_cline_integration.h"
 #include "github_auth_service.h"
 #include "gitee_auth_service.h"
 
@@ -137,6 +138,7 @@ AIEditorPlugin::AIEditorPlugin() {
 
 	github_auth_service = memnew(GitHubAuthService);
 	gitee_auth_service = memnew(GiteeAuthService);
+	cline_integration = memnew(AIClineIntegration);
 
 	// Register the inspector context menu plugin for "Ask AI" feature.
 	inspector_context_menu_plugin.instantiate();
@@ -146,6 +148,8 @@ AIEditorPlugin::AIEditorPlugin() {
 }
 
 AIEditorPlugin::~AIEditorPlugin() {
+	AIConfigPanel::stop_managed_mimocode();
+
 	if (main_screen_panel) {
 		main_screen_panel->queue_free();
 		main_screen_panel = nullptr;
@@ -169,5 +173,11 @@ AIEditorPlugin::~AIEditorPlugin() {
 		gitee_auth_service = nullptr;
 	}
 
+	if (cline_integration) {
+		memdelete(cline_integration);
+		cline_integration = nullptr;
+	}
+
+	AIClineIntegration::cleanup();
 	AIMCPManager::cleanup();
 }

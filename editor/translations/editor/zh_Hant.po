@@ -19470,3 +19470,46 @@ msgstr "完整 AI 工作區已啟用。"
 
 msgid "Beginner chat mode enabled."
 msgstr "新手聊天模式已啟用。"
+
+msgid "Beginner mode: engine source is missing. Jundot AI is configuring it automatically."
+msgstr "新手模式：缺少引擎原始碼。Jundot AI 正在自動配置。"
+
+msgid "Git clone failed. Retrying through the GitHub mirror..."
+msgstr "Git 複製失敗。正在透過 GitHub 鏡像重試..."
+
+msgid "Git fetch failed. Retrying through the GitHub mirror..."
+msgstr "Git 擷取失敗。正在透過 GitHub 鏡像重試..."
+
+msgid "ZIP download failed. Retrying through the GitHub mirror..."
+msgstr "ZIP 下載失敗。正在透過 GitHub 鏡像重試..."
+
+msgid "Engine source download failed. Retrying through the GitHub mirror..."
+msgstr "引擎原始碼下載失敗。正在透過 GitHub 鏡像重試..."
+
+msgid "Set up Jundot AI"
+msgstr "設定 Jundot AI"
+
+msgid "Start Using AI"
+msgstr "開始使用 AI"
+
+msgid "Open AI Config"
+msgstr "開啟 AI 配置"
+
+msgid "Welcome to Jundot AI"
+msgstr "歡迎使用 Jundot AI"
+
+msgid ""
+"Let's finish the first-time AI setup:\n"
+"\n"
+"1. Choose or confirm your AI provider in Configuration.\n"
+"2. Add the API key or local endpoint you want Jundot AI to use.\n"
+"3. Send your first request in Chat. Beginner mode can stay chat-only while Jundot AI opens other editor panels only when needed."
+msgstr ""
+"讓我們完成首次 AI 初始化設定：\n"
+"\n"
+"1. 在「配置」中選擇或確認你的 AI 提供商。\n"
+"2. 填入希望 Jundot AI 使用的 API Key 或本機端點。\n"
+"3. 回到「聊天」送出第一個請求。新手模式會保持純聊天介面，Jundot AI 只會在需要時開啟其他編輯器面板。"
+
+msgid "AI usage agreement accepted. Finish the first-time setup guide to continue."
+msgstr "AI 使用協議已接受。請完成首次設定引導後繼續。"

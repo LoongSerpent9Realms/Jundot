@@ -14,6 +14,7 @@ protected:
 	virtual String _get_client_secret() const override;
 	virtual String _get_callback_path() const override;
 	virtual String _get_scope() const override;
+	virtual bool _allow_missing_callback_state() const override { return true; }
 	virtual AIOAuthToken _parse_token_response(const Dictionary &p_response) const override;
 	virtual AIOAuthUserInfo _parse_user_response(const Dictionary &p_response) const override;
 	virtual void _save_token_and_user(const AIOAuthToken &p_token, const AIOAuthUserInfo &p_user) override;

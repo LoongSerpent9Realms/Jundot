@@ -58,8 +58,8 @@ static constexpr const char *GITHUB_OAUTH_CALLBACK_PATH = "/callback/github";
 static constexpr const char *GITEE_OAUTH_AUTHORIZE_URL = "https://gitee.com/oauth/authorize";
 static constexpr const char *GITEE_OAUTH_TOKEN_URL = "https://gitee.com/oauth/token";
 static constexpr const char *GITEE_API_USER_URL = "https://gitee.com/api/v5/user";
-static constexpr const char *GITEE_OAUTH_CLIENT_ID = "";
-static constexpr const char *GITEE_OAUTH_CLIENT_SECRET = "";
+static constexpr const char *GITEE_OAUTH_CLIENT_ID = "a6a64bb41f167d14056035be7f0e32027b1539bfa547c38a6bd39e41723a55f4";
+static constexpr const char *GITEE_OAUTH_CLIENT_SECRET = "5d5ed81095af8bd14562ab869d4565e94fd35d22d420c6ed216839a7249504f0";
 static constexpr const char *GITEE_OAUTH_CALLBACK_PATH = "/callback/gitee";
 
 struct AIOAuthUserInfo {
@@ -159,7 +159,7 @@ struct AISettingsData {
 								   "- If an overlap or mouse-blocking layer is intentional, such as an icon over a panel, a badge over a button, a modal dimmer, or a deliberate input-capturing overlay, state that explicitly in the final summary.\n\n"
 								   "=== Runtime UI and Input Audit Protocol ===\n"
 								   "When creating, modifying, or reviewing player-facing UI, audit the runtime interaction path in addition to the static scene layout.\n"
-								   "- Inspect the UI scene, connected scripts, and `project.godot` input actions before changing controls, shortcuts, focus handling, or rebinding UI.\n"
+								   "- Inspect the UI scene, connected scripts, and `project.jundot` (or `project.godot`) input actions before changing controls, shortcuts, focus handling, or rebinding UI.\n"
 								   "- Define acceptance criteria for mouse/touch, keyboard/controller focus, confirm/cancel/back actions, modal blocking, visual states, and any drag handles before writing files.\n"
 								   "- Use named InputMap actions instead of hard-coded keycodes for gameplay UI. Rebind screens must show the current binding, capture replacement input without trapping the user, detect duplicate conflicts, and preserve a cancel/back path.\n"
 								   "- Menus, dialogs, pause screens, settings screens, shops, inventory screens, and skill panels should expose a predictable focus order. Set focus mode and explicit focus neighbors when automatic keyboard/controller navigation would be ambiguous.\n"
@@ -198,7 +198,7 @@ struct AISettingsData {
 								   "- Project memory is already included in the chat context when enabled. If you need to inspect it directly, call read_files with `.JundotAI/memory.json`; do not call `memory_search` or `session_list`.\n"
 								   "- check_project_scripts validates project scripts after script generation or edits. Use it after modifying .gd or .cs files, inspect its compiler/parser output, then fix and re-run until it passes or the remaining failure is clearly external.\n"
 								   "- check_ui_layout validates .tscn UI layout after creating or editing Control scenes. Use it on changed UI scene files, then fix likely sibling Control overlaps and non-interactive upper Controls that may block Button/input clicks unless they are intentional modal/input-capturing overlays.\n"
-								   "- For runtime UI and key/control audits, combine read_files/grep_code on `.tscn`, scripts, and `project.godot` with check_ui_layout, play_scene, click_ui_position, and stop_play_scene. Do not rely on visual guesses alone.\n"
+								   "- For runtime UI and key/control audits, combine read_files/grep_code on `.tscn`, scripts, and `project.jundot` (or `project.godot`) with check_ui_layout, play_scene, click_ui_position, and stop_play_scene. Do not rely on visual guesses alone.\n"
 								   "- For realtime animation audits, combine read_files/grep_code on scenes, scripts, animation resources, AnimationPlayer/AnimationTree/Tween usage, particles, and input actions with check_project_scripts, check_ui_layout when UI is involved, and play_scene/click_ui_position when runtime behavior needs confirmation.\n"
 								   "- create_3d_scene creates starter Node3D .tscn scenes. add_3d_object adds primitive MeshInstance3D placeholder geometry. add_3d_light adds DirectionalLight3D, OmniLight3D, or SpotLight3D. check_3d_scene validates basic 3D scene setup after 3D scene edits.\n"
 								   "- play_scene runs the project main scene or a specified .tscn/.scn scene. click_ui_position sends a mouse click to the running game's viewport coordinates through the debugger channel. stop_play_scene stops the running game. Use these to validate generated UI interactions when coordinates are known or can be inferred from the scene layout.\n"

@@ -44,6 +44,7 @@
 #include "editor/ai/ai_chat_service.h"
 #include "editor/ai/ai_code_fetcher.h"
 #include "editor/ai/ai_develop_flow.h"
+#include "editor/ai/ai_first_run_guide_dialog.h"
 #include "editor/ai/ai_context_builder.h"
 #include "editor/ai/ai_feature_gate.h"
 #include "editor/ai/ai_importer.h"
@@ -67,6 +68,7 @@
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
+#include "editor/project_manager/ai_source_manager.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/item_list.h"
@@ -92,6 +94,7 @@ static constexpr int AI_CHAT_IMAGE_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024;
 static const char *AI_CHAT_METADATA_SECTION = "jundot_ai_chat";
 static const char *AI_CHAT_METADATA_PROGRAMMING_EXPERIENCE_ASKED = "programming_experience_asked";
 static const char *AI_CHAT_METADATA_HAS_PROGRAMMING_EXPERIENCE = "has_programming_experience";
+static const char *AI_CHAT_METADATA_FIRST_RUN_GUIDE_SHOWN = "first_run_guide_shown";
 
 static bool _ai_chat_is_image_extension(const String &p_path) {
 	const String ext = p_path.get_extension().to_lower();
@@ -1188,6 +1191,9 @@ void AIChatPanel::_notification(int p_what) {
 		if (root_window && !root_window->is_connected(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped))) {
 			root_window->connect(SNAME("files_dropped"), callable_mp(this, &AIChatPanel::_window_files_dropped));
 		}
+		if (input && !input->is_connected(SceneStringName(text_changed), callable_mp(this, &AIChatPanel::_on_input_text_changed))) {
+			input->connect(SceneStringName(text_changed), callable_mp(this, &AIChatPanel::_on_input_text_changed));
+		}
 	}
 	if (p_what == NOTIFICATION_TRANSLATION_CHANGED) {
 		_update_translations();
@@ -1357,10 +1363,10 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 		return "Current request guidance: this is a potentially ambiguous repair request. Before editing, briefly restate the understood target feature, current behavior, expected behavior, and observable acceptance criteria. Inspect project evidence and the real code path before changing files. If the target feature, reproduction steps, expected result, or error evidence cannot be inferred from the project context, ask one concise clarifying question through NEXT_QUESTION and do not guess-edit." + boundary;
 	}
 	if (game_ui_request && animation_request) {
-		return "Current request guidance: this is a player-facing animated UI request. Follow the Game UI Visual Quality Protocol, Runtime UI/Input Audit Protocol, and Runtime Animation Audit Protocol together: infer or inspect the game's existing style, define compact visual/motion/interaction acceptance criteria, implement purposeful contemporary game-interface motion with the simplest appropriate Godot mechanism, inspect scripts/project.godot input actions when controls or keybindings matter, validate layout safety with check_ui_layout, and use play_scene/click_ui_position/stop_play_scene for important animated UI paths before and after motion when coordinates can be inferred." + boundary;
+		return "Current request guidance: this is a player-facing animated UI request. Follow the Game UI Visual Quality Protocol, Runtime UI/Input Audit Protocol, and Runtime Animation Audit Protocol together: infer or inspect the game's existing style, define compact visual/motion/interaction acceptance criteria, implement purposeful contemporary game-interface motion with the simplest appropriate Godot mechanism, inspect scripts/project.jundot (or project.godot) input actions when controls or keybindings matter, validate layout safety with check_ui_layout, and use play_scene/click_ui_position/stop_play_scene for important animated UI paths before and after motion when coordinates can be inferred." + boundary;
 	}
 	if (game_ui_request) {
-		return "Current request guidance: this is a player-facing game UI request. Follow the Game UI Visual Quality Protocol and Runtime UI/Input Audit Protocol: infer or inspect the game's existing style, use any attached images as the primary visual reference, define compact visual and interaction acceptance criteria, build with contemporary game-interface aesthetics rather than plain utility controls, inspect scripts/project.godot input actions when controls or keybindings matter, validate layout safety with check_ui_layout for changed Control scenes, and use play_scene/click_ui_position/stop_play_scene for important or suspected runtime click paths." + boundary;
+		return "Current request guidance: this is a player-facing game UI request. Follow the Game UI Visual Quality Protocol and Runtime UI/Input Audit Protocol: infer or inspect the game's existing style, use any attached images as the primary visual reference, define compact visual and interaction acceptance criteria, build with contemporary game-interface aesthetics rather than plain utility controls, inspect scripts/project.jundot (or project.godot) input actions when controls or keybindings matter, validate layout safety with check_ui_layout for changed Control scenes, and use play_scene/click_ui_position/stop_play_scene for important or suspected runtime click paths." + boundary;
 	}
 	if (animation_request) {
 		return "Current request guidance: this is a realtime animation or motion-feedback request. Follow the Runtime Animation Audit Protocol: inspect existing scenes/scripts/AnimationPlayer/AnimationTree/Tween/particle/input paths, define the purpose and acceptance criteria for each motion, implement with the simplest appropriate Godot animation mechanism, make interruption and cleanup rules explicit, validate scripts and UI layout when relevant, and use play_scene plus click_ui_position for important animated UI paths before and after motion when coordinates can be inferred." + boundary;
@@ -1374,6 +1380,10 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	return "Current request guidance: choose adaptively between discussion, planning, and implementation based on scope, ambiguity, risk, and the user's requested outcome. Do not mechanically force a Plan, and do not avoid tools when concrete project work is requested." + boundary;
 }
 void AIChatPanel::_switch_to_engine() {
+	if (beginner_chat_mode && !beginner_privilege_escalated) {
+    status_label->set_text(TTR("Beginner mode: switching to Engine mode is only allowed when AI requests it."));
+    return;
+}
 	AISettingsData s = AISettings::load();
 	s.context_mode = AIContextMode::ENGINE;
 	AISettings::save(s);
@@ -1392,6 +1402,10 @@ void AIChatPanel::_switch_to_engine() {
 }
 
 void AIChatPanel::_switch_to_project() {
+	if (beginner_chat_mode && !beginner_privilege_escalated) {
+    status_label->set_text(TTR("Beginner mode: switching to Projets mode is only allowed when AI requests it."));
+    return;
+}
 	AISettingsData s = AISettings::load();
 	s.context_mode = AIContextMode::PROJECT;
 	AISettings::save(s);
@@ -1649,6 +1663,7 @@ void AIChatPanel::_apply_editor_beginner_workspace(bool p_enabled) {
 	if (p_enabled) {
 		editor_node->get_editor_main_screen()->select_by_name("AI Assistant");
 		editor_node->set_distraction_free_mode(true);
+		callable_mp(this, &AIChatPanel::_ensure_beginner_engine_source_configured).call_deferred();
 	} else {
 		if (editor_node->get_editor_main_screen()->get_selected_plugin() &&
 				editor_node->get_editor_main_screen()->get_selected_plugin()->get_plugin_name() == "AI Assistant") {
@@ -1656,6 +1671,30 @@ void AIChatPanel::_apply_editor_beginner_workspace(bool p_enabled) {
 		}
 		editor_node->set_distraction_free_mode(false);
 	}
+}
+
+void AIChatPanel::_ensure_beginner_engine_source_configured() {
+	if (!beginner_chat_mode || beginner_source_auto_config_requested) {
+		return;
+	}
+
+	const AISettingsData settings = AISettings::load();
+	const String source_root = AISettings::get_engine_source_root(settings);
+	if (!source_root.is_empty() && FileAccess::exists(source_root.path_join("SConstruct"))) {
+		return;
+	}
+
+	beginner_source_auto_config_requested = true;
+	if (status_label) {
+		status_label->set_text(TTR("Beginner mode: engine source is missing. Jundot AI is configuring it automatically."));
+	}
+
+	if (!beginner_source_manager) {
+		beginner_source_manager = memnew(AISourceManager);
+		add_child(beginner_source_manager);
+	}
+	beginner_source_manager->popup_centered_on_parent(get_window());
+	beginner_source_manager->begin_auto_configure();
 }
 
 void AIChatPanel::_set_programming_experience(bool p_has_programming_experience) {
@@ -1716,10 +1755,10 @@ void AIChatPanel::_refresh_ai_activity() {
 }
 
 void AIChatPanel::_set_requesting(bool p_requesting) {
+	is_currently_requesting = p_requesting;
 	if (send_button) {
 		send_button->set_disabled(false);
-		send_button->set_text(p_requesting ? TTR("Queue") : TTR("Send"));
-		send_button->set_tooltip_text(p_requesting ? TTR("Queue this message while the AI is responding") : String());
+		_update_send_button_text();
 	}
 	cancel_button->set_disabled(!p_requesting);
 	if (conversation_list) {
@@ -1752,11 +1791,45 @@ bool AIChatPanel::_ensure_usage_agreement() {
 }
 
 void AIChatPanel::_usage_agreement_accepted() {
-	status_label->set_text(TTR("AI usage agreement accepted. Send your message again to continue."));
+	status_label->set_text(TTR("AI usage agreement accepted. Finish the first-time setup guide to continue."));
+	_show_first_run_guide_if_needed(true);
 }
 
 void AIChatPanel::_usage_agreement_rejected() {
 	status_label->set_text(TTR("AI message was not sent because the usage agreement was not accepted."));
+}
+
+void AIChatPanel::_show_first_run_guide_if_needed(bool p_force) {
+	if (!first_run_guide_dialog) {
+		return;
+	}
+
+	EditorSettings *editor_settings = EditorSettings::get_singleton();
+	const bool already_shown = editor_settings ? bool(editor_settings->get_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_FIRST_RUN_GUIDE_SHOWN, false)) : true;
+	if (!p_force && already_shown) {
+		return;
+	}
+
+	if (editor_settings) {
+		editor_settings->set_project_metadata(AI_CHAT_METADATA_SECTION, AI_CHAT_METADATA_FIRST_RUN_GUIDE_SHOWN, true);
+		editor_settings->save_project_metadata();
+	}
+
+	first_run_guide_dialog->popup_centered_clamped(Size2(560, 380) * EDSCALE, 0.85);
+}
+
+void AIChatPanel::_open_ai_config_from_first_run_guide() {
+	TabContainer *parent_tabs = Object::cast_to<TabContainer>(get_parent());
+	if (parent_tabs) {
+		parent_tabs->set_current_tab(CLAMP(get_index() + 1, 0, parent_tabs->get_tab_count() - 1));
+
+		EditorDock *dock = Object::cast_to<EditorDock>(parent_tabs->get_parent());
+		if (dock) {
+			dock->make_visible();
+		} else {
+			parent_tabs->show();
+		}
+	}
 }
 
 void AIChatPanel::_show_tool_limit_options(bool p_due_to_limit) {
@@ -2441,8 +2514,30 @@ void AIChatPanel::_update_auto_chat_display_scale() {
 }
 
 void AIChatPanel::_send_message() {
+	if (beginner_chat_mode && !beginner_privilege_escalated) {
+    AISettingsData s = AISettings::load();
+    if (s.context_mode != AIContextMode::PROJECT) {
+        s.context_mode = AIContextMode::PROJECT;
+        AISettings::save(s);
+        // 同时更新当前对话的模式
+        for (auto &conv : conversations) {
+            if (conv.id == active_conversation_id) {
+                conv.context_mode = AIContextMode::PROJECT;
+                break;
+            }
+        }
+        _update_mode_indicator();
+        _refresh_conversation_list_ui();
+    }
+}
+
 	const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
 	if (busy) {
+		bool has_input = !input->get_text().strip_edges().is_empty() || !attachments.is_empty();
+		if (!has_input) {
+			_cancel_request();
+			return;
+		}
 		_enqueue_current_message();
 		return;
 	}
@@ -2873,6 +2968,32 @@ void AIChatPanel::_title_completed(int p_result, int p_response_code, const Stri
 		}
 	}
 	title_request_conversation_id = String();
+}
+
+void AIChatPanel::_on_input_text_changed() {
+	_update_send_button_text();
+}
+
+void AIChatPanel::_update_send_button_text() {
+	if (!send_button) {
+		return;
+	}
+	bool has_input = !input->get_text().strip_edges().is_empty() || !attachments.is_empty();
+	if (is_currently_requesting) {
+		if (has_input) {
+			send_button->set_text(TTR("Queue"));
+			send_button->set_tooltip_text(TTR("Queue this message while the AI is responding"));
+		} else {
+			send_button->set_text(TTR("Stop"));
+			send_button->set_tooltip_text(TTR("Stop the current AI response"));
+		}
+	} else {
+		send_button->set_text(TTR("Send"));
+		send_button->set_tooltip_text(String());
+	}
+	if (cancel_button) {
+		cancel_button->set_visible(is_currently_requesting && has_input && !beginner_chat_mode);
+	}
 }
 
 void AIChatPanel::_cancel_request() {
@@ -3353,7 +3474,7 @@ void AIChatPanel::_save_project_memory_update(const AIProjectMemoryUpdate &p_upd
 		return;
 	}
 	const String project_root = ProjectSettings::get_singleton()->get_resource_path();
-	if (project_root.is_empty() || !FileAccess::exists(project_root.path_join("project.godot"))) {
+	if (project_root.is_empty() || (!FileAccess::exists(project_root.path_join("project.jundot")) && !FileAccess::exists(project_root.path_join("project.godot")))) {
 		return;
 	}
 
@@ -3969,6 +4090,7 @@ void AIChatPanel::_tool_execution_thread_func(void *p_userdata) {
 }
 
 void AIChatPanel::_finish_tool_execution_thread() {
+
 	if (tool_execution_thread.is_started()) {
 		tool_execution_thread.wait_to_finish();
 	}
@@ -3999,6 +4121,7 @@ void AIChatPanel::_finish_tool_execution_thread() {
 
 	const String engine_request = _find_mode_transition_result(messages, "ENGINE_MODE_REQUEST_ACCEPTED");
 	if (!engine_request.is_empty() && active_settings.context_mode == AIContextMode::PROJECT) {
+		 if (beginner_chat_mode) beginner_privilege_escalated = true; 
 		_switch_to_engine();
 		active_settings = AISettings::load();
 		status_label->set_text(TTR("Continuing in ENGINE mode for the requested engine change..."));
@@ -4008,6 +4131,7 @@ void AIChatPanel::_finish_tool_execution_thread() {
 
 	const String project_return = _find_mode_transition_result(messages, "PROJECT_MODE_RETURN_ACCEPTED");
 	if (!project_return.is_empty() && active_settings.context_mode == AIContextMode::ENGINE) {
+		  if (beginner_chat_mode) beginner_privilege_escalated = false;  
 		_switch_to_project();
 		active_settings = AISettings::load();
 		status_label->set_text(TTR("Returned to PROJECT mode after engine work."));
@@ -5010,6 +5134,10 @@ AIChatPanel::AIChatPanel() {
 	usage_agreement_dialog->connect(SNAME("agreement_rejected"), callable_mp(this, &AIChatPanel::_usage_agreement_rejected));
 	add_child(usage_agreement_dialog);
 
+	first_run_guide_dialog = memnew(AIFirstRunGuideDialog);
+	first_run_guide_dialog->connect(SNAME("open_ai_config_requested"), callable_mp(this, &AIChatPanel::_open_ai_config_from_first_run_guide));
+	add_child(first_run_guide_dialog);
+
 	// Create tool call confirmation dialog.
 	tool_confirmation_dialog = memnew(AIToolConfirmationDialog);
 	tool_confirmation_dialog->set_callbacks(
@@ -5032,4 +5160,7 @@ AIChatPanel::AIChatPanel() {
 	_update_auto_chat_display_scale();
 	status_label->set_text(TTR("AI assistant ready."));
 	_apply_programming_experience_layout();
+	if (AISettings::is_usage_agreement_current(AISettings::load())) {
+		callable_mp(this, &AIChatPanel::_show_first_run_guide_if_needed).call_deferred(false);
+	}
 }

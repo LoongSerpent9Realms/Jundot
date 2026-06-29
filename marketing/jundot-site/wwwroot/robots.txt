@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /Admin/
+Disallow: /api/
+Disallow: /Error
+Disallow: /Logout
+Disallow: /User/
+
+Sitemap: https://jundot.loongst.com/sitemap.xml

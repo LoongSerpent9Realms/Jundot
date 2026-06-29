@@ -35,6 +35,7 @@ class FileDialog;
 class GridContainer;
 class HFlowContainer;
 class HTTPRequest;
+class ProgressBar;
 class ScrollContainer;
 class AIChatService;
 class AIUsageAgreementDialog;
@@ -110,6 +111,7 @@ class AIConfigPanel : public MarginContainer {
 	Button *auto_configure_mcp_button = nullptr;
 	Button *mimocode_download_button = nullptr;
 	HTTPRequest *mimocode_download_request = nullptr;
+	ProgressBar *mimocode_download_progress = nullptr;
 	String mimocode_download_zip_path;
 	Button *engine_source_download_button = nullptr;
 	Button *engine_source_delete_button = nullptr;
@@ -117,6 +119,11 @@ class AIConfigPanel : public MarginContainer {
 	Button *engine_source_update_button = nullptr;
 	Label *engine_source_status_label = nullptr;
 	LineEdit *engine_source_cache_path_edit = nullptr;
+	ProgressBar *engine_source_download_progress = nullptr;
+	HTTPRequest *engine_source_download_request = nullptr;
+	String engine_source_download_zip_path;
+	String engine_source_download_url;
+	bool engine_source_download_mirror_retry_available = false;
 
 	Label *github_account_label = nullptr;
 	Label *github_status_label = nullptr;
@@ -164,12 +171,16 @@ class AIConfigPanel : public MarginContainer {
 	void _update_translations();
 	void _update_external_mcp_config();
 	void _update_backend_controls();
+	void _update_mimocode_button();
 	void _on_backend_type_selected(int p_index);
 	void _on_mimocode_download_button_pressed();
+	void _on_mimocode_download_progress(int p_amount_downloaded, int p_amount_total);
 	void _on_mimocode_download_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	Error _start_mimocode(const String &p_executable_path);
 	void _update_engine_source_status();
 	void _on_engine_source_download_button_pressed();
+	void _on_engine_source_download_progress(int p_amount_downloaded, int p_amount_total);
+	void _on_engine_source_download_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	void _on_engine_source_delete_button_pressed();
 	void _on_engine_source_browse_button_pressed();
 	void _on_engine_source_update_button_pressed();
@@ -196,5 +207,7 @@ protected:
 	static void _bind_methods();
 
 public:
+	static void stop_managed_mimocode();
+
 	AIConfigPanel();
 };
