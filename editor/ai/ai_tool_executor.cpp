@@ -650,6 +650,18 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		args["paths"] = paths;
 	}
 
+	if (name.find_char('.') < 0) {
+		const Vector<String> disabled_tools = AISettings::load().disabled_builtin_tools;
+		for (const String &disabled_tool : disabled_tools) {
+			if (disabled_tool == name) {
+				Dictionary disabled_result = _make_result(vformat("Tool `%s` is disabled in AI tool settings. Re-enable it in AI Configuration > Built-in Tools before using it.", name), true);
+				disabled_result["role"] = "tool";
+				disabled_result["tool_call_id"] = tool_call_id;
+				return disabled_result;
+			}
+		}
+	}
+
 	Dictionary result;
 	if (name == AIToolNames::READ_FILES) {
 		result = _read_files(args);
@@ -689,6 +701,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _check_package_status(args);
 	} else if (name == AIToolNames::TEST_PACKAGE) {
 		result = _test_package(args);
+	} else if (name == AIToolNames::CAPTURE_PACKAGE_SCREENSHOT) {
+		result = _capture_package_screenshot(args);
 	} else if (name == AIToolNames::PLAY_SCENE) {
 		result = _play_scene(args);
 	} else if (name == AIToolNames::CLICK_UI_POSITION) {
@@ -858,6 +872,7 @@ static bool _project_shell_command_stays_in_root(const String &p_command) {
 }
 
 static Error _run_command_in_root(const String &p_root, const String &p_program, const List<String> &p_args, String &r_output, int &r_exit_code);
+static String _safe_ai_screenshot_file_name(const String &p_name);
 
 static String _ai_safe_git_segment(const String &p_value, const String &p_fallback) {
 	String value = p_value.strip_edges().to_lower().replace("\\", "-").replace("/", "-");
@@ -3299,6 +3314,7 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 						name == AIToolNames::PACKAGE_PROJECT ||
 						name == AIToolNames::CHECK_PACKAGE_STATUS ||
 						name == AIToolNames::TEST_PACKAGE ||
+						name == AIToolNames::CAPTURE_PACKAGE_SCREENSHOT ||
 						name == AIToolNames::REQUEST_ENGINE_CHANGE ||
 						name == AIToolNames::ADD_PHYSICS ||
 						name == AIToolNames::ADD_ANIMATION ||
@@ -4662,6 +4678,215 @@ Dictionary AIToolExecutor::_test_package(const Dictionary &p_args) {
 		result += "\nBuild log: " + build_log_path;
 	}
 	return _make_result(result.as_string(), err != OK || exit_code != 0);
+}
+
+Dictionary AIToolExecutor::_capture_package_screenshot(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("capture_package_screenshot is only available in PROJECT mode.", true);
+	}
+
+	String version;
+	String package_dir;
+	String exe_path;
+	String zip_path;
+	String build_log_path;
+	if (!AIBuildBridge::get_latest_package_launch_info(version, package_dir, exe_path, zip_path, build_log_path)) {
+		return _make_result("capture_package_screenshot could not find a packaged executable in the latest PackageBuilder records. Run package_project and wait for check_package_status success first.", true);
+	}
+	if (!FileAccess::exists(exe_path)) {
+		return _make_result("capture_package_screenshot packaged executable was not found: " + exe_path, true);
+	}
+
+	const String exe_name = exe_path.get_file().to_lower();
+	if (exe_name.contains("template_")) {
+		return _make_result("capture_package_screenshot cannot directly capture template runtime packages; they require exported project data. Build/package a runnable executable first.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("capture_package_screenshot failed: no open project root is available.", true);
+	}
+
+	const String out_dir = project_root.path_join(".JundotAI/package_screenshots");
+	Error mkdir_err = DirAccess::make_dir_recursive_absolute(out_dir);
+	if (mkdir_err != OK) {
+		return _make_result(vformat("capture_package_screenshot failed: could not create screenshot directory (err=%d): %s", (int)mkdir_err, out_dir), true);
+	}
+
+	const String file_name = _safe_ai_screenshot_file_name(String(p_args.get("file_name", "")));
+	String saved_path = out_dir.path_join(file_name);
+	if (FileAccess::exists(saved_path)) {
+		const String base = saved_path.get_basename();
+		int suffix = 1;
+		while (FileAccess::exists(saved_path)) {
+			saved_path = base + "-" + itos(suffix++) + ".png";
+		}
+	}
+
+	String arg_text = String(p_args.get("args", String())).strip_edges();
+	if (arg_text.find("&&") >= 0 || arg_text.find("||") >= 0 || arg_text.find(";") >= 0 || arg_text.find("|") >= 0) {
+		return _make_result("capture_package_screenshot args must be simple executable arguments, not shell operators.", true);
+	}
+
+	const int wait_ms = CLAMP((int)(double)p_args.get("wait_ms", 3000.0), 0, 60000);
+	const bool close_after = bool(p_args.get("close_after", true));
+	const String workdir = package_dir.is_empty() ? exe_path.get_base_dir() : package_dir;
+
+#ifdef WINDOWS_ENABLED
+	const String ps_path = out_dir.path_join("capture_package_screenshot.ps1");
+	String ps_script = R"PS(
+$ErrorActionPreference = 'Stop'
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32Capture {
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+}
+"@
+Add-Type -AssemblyName System.Drawing
+
+$ExePath = $args[0]
+$Workdir = $args[1]
+$OutPath = $args[2]
+$WaitMs = [int]$args[3]
+$CloseAfter = [bool]::Parse($args[4])
+$ArgText = if ($args.Count -ge 6) { $args[5] } else { "" }
+
+$startInfo = @{
+  FilePath = $ExePath
+  WorkingDirectory = $Workdir
+  PassThru = $true
+}
+if ($ArgText.Trim().Length -gt 0) {
+  $startInfo.ArgumentList = $ArgText
+}
+$proc = Start-Process @startInfo
+$deadline = [DateTime]::UtcNow.AddMilliseconds([Math]::Max($WaitMs, 1000))
+while ([DateTime]::UtcNow -lt $deadline) {
+  Start-Sleep -Milliseconds 100
+  $proc.Refresh()
+  if ($proc.HasExited) { break }
+  if ($proc.MainWindowHandle -ne [IntPtr]::Zero) { break }
+}
+if ($WaitMs -gt 0) {
+  Start-Sleep -Milliseconds ([Math]::Min($WaitMs, 2000))
+  $proc.Refresh()
+}
+if ($proc.HasExited) {
+  throw "Packaged executable exited before a window screenshot could be captured. ExitCode=$($proc.ExitCode)"
+}
+if ($proc.MainWindowHandle -eq [IntPtr]::Zero) {
+  throw "No main window handle was available for the packaged executable."
+}
+[Win32Capture]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
+Start-Sleep -Milliseconds 250
+$rect = New-Object Win32Capture+RECT
+if (-not [Win32Capture]::GetWindowRect($proc.MainWindowHandle, [ref]$rect)) {
+  throw "GetWindowRect failed."
+}
+$width = $rect.Right - $rect.Left
+$height = $rect.Bottom - $rect.Top
+if ($width -le 0 -or $height -le 0) {
+  throw "Invalid window rectangle ${width}x${height}."
+}
+$bitmap = New-Object System.Drawing.Bitmap($width, $height)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+try {
+  $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
+  $bitmap.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
+} finally {
+  $graphics.Dispose()
+  $bitmap.Dispose()
+}
+if ($CloseAfter -and -not $proc.HasExited) {
+  $proc.CloseMainWindow() | Out-Null
+  if (-not $proc.WaitForExit(1500)) {
+    $proc.Kill()
+  }
+}
+[pscustomobject]@{
+  status = "captured"
+  executable = $ExePath
+  output = $OutPath
+  width = $width
+  height = $height
+  pid = $proc.Id
+  closed = $CloseAfter
+} | ConvertTo-Json -Depth 4
+)PS";
+
+	Ref<FileAccess> ps_file = FileAccess::open(ps_path, FileAccess::WRITE);
+	if (ps_file.is_null()) {
+		return _make_result("capture_package_screenshot failed to write PowerShell capture script: " + ps_path, true);
+	}
+	ps_file->store_string(ps_script);
+	ps_file.unref();
+
+	List<String> ps_args;
+	ps_args.push_back("-NoProfile");
+	ps_args.push_back("-ExecutionPolicy");
+	ps_args.push_back("Bypass");
+	ps_args.push_back("-File");
+	ps_args.push_back(ps_path);
+	ps_args.push_back(exe_path);
+	ps_args.push_back(workdir);
+	ps_args.push_back(saved_path);
+	ps_args.push_back(itos(wait_ms));
+	ps_args.push_back(close_after ? "true" : "false");
+	ps_args.push_back(arg_text);
+
+	String output;
+	int exit_code = -1;
+	const Error err = OS::get_singleton()->execute("powershell", ps_args, &output, &exit_code, true);
+	if (err != OK || exit_code != 0 || !FileAccess::exists(saved_path)) {
+		StringBuilder failed;
+		failed += "Tool: capture_package_screenshot\n";
+		failed += "Result: failed\n";
+		failed += "Version: " + version + "\n";
+		failed += "Executable: " + exe_path + "\n";
+		failed += "Workdir: " + workdir + "\n";
+		failed += vformat("Wait ms: %d\n", wait_ms);
+		failed += vformat("PowerShell err: %d\nPowerShell exit code: %d\n", (int)err, exit_code);
+		if (!output.strip_edges().is_empty()) {
+			failed += "\n--- capture output ---\n";
+			failed += _truncate_tool_output(output, 12000).strip_edges();
+			failed += "\n";
+		}
+		return _make_result(failed.as_string(), true);
+	}
+
+	const String rel_path = saved_path.replace(project_root.replace("\\", "/") + "/", "").replace("\\", "/");
+	StringBuilder result;
+	result += "Tool: capture_package_screenshot\n";
+	result += "Result: captured\n";
+	result += "Version: " + version + "\n";
+	result += "Executable: " + exe_path + "\n";
+	if (!zip_path.is_empty()) {
+		result += "Package zip: " + zip_path + "\n";
+	}
+	result += "Workdir: " + workdir + "\n";
+	result += "Saved PNG: " + saved_path + "\n";
+	result += "Project path: " + rel_path + "\n";
+	result += vformat("Wait ms: %d\n", wait_ms);
+	result += close_after ? "Closed launched process: true\n" : "Closed launched process: false\n";
+	if (!output.strip_edges().is_empty()) {
+		result += "\n--- capture output ---\n";
+		result += _truncate_tool_output(output, 6000).strip_edges();
+		result += "\n";
+	}
+	result += "This packaged-build screenshot will be attached as an image_url in the next AI tool-continuation request when the active backend supports multimodal message content. Inspect it for visual semantic errors such as entities rendered in the wrong gameplay region.";
+	Dictionary tool_result = _make_result(result.as_string());
+	tool_result["image_path"] = saved_path;
+	tool_result["image_mime_type"] = "image/png";
+	tool_result["image_description"] = "Packaged executable window screenshot captured by capture_package_screenshot.";
+	return tool_result;
+#else
+	return _make_result("capture_package_screenshot is currently implemented for Windows packaged executables only.", true);
+#endif
 }
 
 static MouseButton _parse_ai_mouse_button(const String &p_button) {

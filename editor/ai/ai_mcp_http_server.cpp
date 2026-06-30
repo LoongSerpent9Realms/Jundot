@@ -256,6 +256,11 @@ Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 	update_props["max_tokens"] = _external_mcp_int_property("Maximum response token budget.");
 	update_props["output_language"] = _external_mcp_str_property("Output language, such as auto, English, Simplified Chinese, Traditional Chinese, Japanese, Korean, Spanish, French, or German.");
 	update_props["tools_enabled"] = _external_mcp_bool_property("Enable built-in function calling tools.");
+	Dictionary disabled_tools_prop;
+	disabled_tools_prop["type"] = "array";
+	disabled_tools_prop["items"] = _external_mcp_str_property("Built-in tool name to disable.");
+	disabled_tools_prop["description"] = "Built-in Function Calling tool names to hide and reject, such as shell_command or package_project.";
+	update_props["disabled_builtin_tools"] = disabled_tools_prop;
 	update_props["mcp_tools_enabled"] = _external_mcp_bool_property("Enable configured external MCP server tools.");
 	update_props["html_min_project_prototype_enabled"] = _external_mcp_bool_property("Require new game/project concept requests to create a runnable standalone HTML prototype under .JundotAI/prototypes, then wait for user verification before real project implementation.");
 	update_props["context_char_budget"] = _external_mcp_int_property("Compressed context character budget.");
@@ -314,6 +319,13 @@ Dictionary AIMCPHTTPServer::_get_ai_settings_snapshot() const {
 	d["max_tokens"] = settings.max_tokens;
 	d["output_language"] = settings.output_language;
 	d["tools_enabled"] = settings.tools_enabled;
+	Array disabled_builtin_tools;
+	for (const String &tool_name : settings.disabled_builtin_tools) {
+		if (!tool_name.is_empty() && !disabled_builtin_tools.has(tool_name)) {
+			disabled_builtin_tools.push_back(tool_name);
+		}
+	}
+	d["disabled_builtin_tools"] = disabled_builtin_tools;
 	d["mcp_tools_enabled"] = settings.mcp_tools_enabled;
 	d["html_min_project_prototype_enabled"] = settings.html_min_project_prototype_enabled;
 	d["context_char_budget"] = settings.context_char_budget;
@@ -445,6 +457,18 @@ String AIMCPHTTPServer::_execute_ai_settings_tool(const String &p_tool_name, con
 	}
 	if (args.has("tools_enabled")) {
 		settings.tools_enabled = bool(args["tools_enabled"]);
+	}
+	if (args.has("disabled_builtin_tools")) {
+		settings.disabled_builtin_tools.clear();
+		if (args["disabled_builtin_tools"].get_type() == Variant::ARRAY) {
+			Array disabled_tools = args["disabled_builtin_tools"];
+			for (int i = 0; i < disabled_tools.size(); i++) {
+				const String tool_name = String(disabled_tools[i]).strip_edges();
+				if (!tool_name.is_empty() && !settings.disabled_builtin_tools.has(tool_name)) {
+					settings.disabled_builtin_tools.push_back(tool_name);
+				}
+			}
+		}
 	}
 	if (args.has("mcp_tools_enabled")) {
 		settings.mcp_tools_enabled = bool(args["mcp_tools_enabled"]);

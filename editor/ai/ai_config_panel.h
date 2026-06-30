@@ -31,6 +31,7 @@
 
 class Button;
 class CheckBox;
+class AcceptDialog;
 class FileDialog;
 class GridContainer;
 class HFlowContainer;
@@ -44,6 +45,8 @@ class LineEdit;
 class OptionButton;
 class SpinBox;
 class TextEdit;
+class VBoxContainer;
+struct AISettingsData;
 
 class AIConfigPanel : public MarginContainer {
 	GDCLASS(AIConfigPanel, MarginContainer)
@@ -68,6 +71,13 @@ class AIConfigPanel : public MarginContainer {
 	CheckBox *include_tool_context_check = nullptr;
 	CheckBox *low_token_mode_check = nullptr;
 	CheckBox *tools_enabled_check = nullptr;
+	Button *builtin_tools_button = nullptr;
+	AcceptDialog *builtin_tools_dialog = nullptr;
+	Label *builtin_tools_label = nullptr;
+	VBoxContainer *builtin_tools_box = nullptr;
+	Button *builtin_tools_enable_all_button = nullptr;
+	Button *builtin_tools_disable_all_button = nullptr;
+	Vector<CheckBox *> builtin_tool_checkboxes;
 	CheckBox *develop_mode_check = nullptr;
 	CheckBox *mcp_tools_enabled_check = nullptr;
 	CheckBox *auto_suggest_entries_check = nullptr;
@@ -176,6 +186,11 @@ class AIConfigPanel : public MarginContainer {
 	void _on_low_token_mode_toggled(bool p_pressed);
 	void _update_external_mcp_config();
 	void _update_backend_controls();
+	void _rebuild_builtin_tool_checks(const AISettingsData &p_settings);
+	Vector<String> _collect_disabled_builtin_tools() const;
+	void _show_builtin_tools_dialog();
+	void _enable_all_builtin_tools();
+	void _disable_all_builtin_tools();
 	void _update_mimocode_button();
 	void _on_backend_type_selected(int p_index);
 	void _on_model_refresh_pressed();

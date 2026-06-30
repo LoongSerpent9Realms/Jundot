@@ -411,7 +411,21 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::TEST_PACKAGE, "", fn));
 	}
 
-	// 16. play_scene
+	// 16. capture_package_screenshot
+	{
+		Dictionary props;
+		props["args"] = _str_property("Optional command-line arguments for the packaged executable. Defaults to empty so the game/editor window can render normally.");
+		props["wait_ms"] = _number_property("Optional time to wait after launching the packaged executable before capturing the main window, in milliseconds. Defaults to 3000.");
+		props["file_name"] = _str_property("Optional PNG file name to save under .JundotAI/package_screenshots/. If omitted, a timestamped file name is generated.");
+		props["close_after"] = _bool_property("If true or omitted, close the launched packaged executable after capturing the screenshot.");
+		Dictionary fn = _make_fn(
+				AIToolNames::CAPTURE_PACKAGE_SCREENSHOT,
+				"PROJECT mode only. Launch the latest packaged executable from PackageBuilder records, wait for its main window, capture a PNG screenshot under .JundotAI/package_screenshots/, and return the image path for multimodal inspection. Use after check_package_status succeeds to catch visual semantic errors in packaged builds, not only startup/console failures.",
+				props, Array());
+		tools.push_back(_tool(AIToolNames::CAPTURE_PACKAGE_SCREENSHOT, "", fn));
+	}
+
+	// 17. play_scene
 	{
 		Dictionary props;
 		props["scene_path"] = _str_property("Scene file path relative to the project root, e.g. 'scenes/main_menu.tscn' or 'res://scenes/main_menu.tscn'. If omitted, the project's main scene is played.");
@@ -888,7 +902,7 @@ Array AIToolDefs::get_builtin_tools() {
 	// 36. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_html_prototype, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, add_physics, add_animation, add_particles, add_vfx, add_character_controller, remove_node, modify_node_properties, connect_signal, duplicate_node, reparent_node, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_html_prototype, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, add_physics, add_animation, add_particles, add_vfx, add_character_controller, remove_node, modify_node_properties, connect_signal, duplicate_node, reparent_node, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, capture_package_screenshot, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -1027,6 +1041,7 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	project_only.insert(StringName(AIToolNames::PACKAGE_PROJECT));
 	project_only.insert(StringName(AIToolNames::CHECK_PACKAGE_STATUS));
 	project_only.insert(StringName(AIToolNames::TEST_PACKAGE));
+	project_only.insert(StringName(AIToolNames::CAPTURE_PACKAGE_SCREENSHOT));
 	project_only.insert(StringName(AIToolNames::PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::CLICK_UI_POSITION));
 	project_only.insert(StringName(AIToolNames::CLICK_UI_NODE));
@@ -1061,7 +1076,7 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 		filtered.push_back(tool);
 	}
 
-	return filtered;
+	return filter_disabled_tools(filtered, AISettings::load().disabled_builtin_tools);
 }
 
 Array AIToolDefs::get_readonly_tools() {
@@ -1078,6 +1093,110 @@ Array AIToolDefs::get_readonly_tools() {
 		Dictionary fn = tool["function"];
 		String name = fn["name"];
 		if (readonly_names.has(StringName(name))) {
+			filtered.push_back(tool);
+		}
+	}
+	return filter_disabled_tools(filtered, AISettings::load().disabled_builtin_tools);
+}
+
+Dictionary AIToolDefs::get_builtin_tool_categories() {
+	Dictionary categories;
+
+	Array files;
+	files.push_back(AIToolNames::READ_FILES);
+	files.push_back(AIToolNames::WRITE_FILE);
+	files.push_back(AIToolNames::EDIT_FILE);
+	files.push_back(AIToolNames::SEARCH_FILES);
+	files.push_back(AIToolNames::LIST_FILES);
+	files.push_back(AIToolNames::GREP_CODE);
+	categories["Files and Search"] = files;
+
+	Array validation;
+	validation.push_back(AIToolNames::CHECK_PROJECT_SCRIPTS);
+	validation.push_back(AIToolNames::CHECK_HTML_PROTOTYPE);
+	validation.push_back(AIToolNames::CHECK_UI_LAYOUT);
+	validation.push_back(AIToolNames::CHECK_3D_SCENE);
+	validation.push_back(AIToolNames::BUILD_PROJECT);
+	validation.push_back(AIToolNames::BUILD_CPP_HOT_MODULE);
+	validation.push_back(AIToolNames::RELOAD_CPP_HOT_MODULE);
+	categories["Validation and Build"] = validation;
+
+	Array runtime;
+	runtime.push_back(AIToolNames::PLAY_SCENE);
+	runtime.push_back(AIToolNames::CLICK_UI_POSITION);
+	runtime.push_back(AIToolNames::CLICK_UI_NODE);
+	runtime.push_back(AIToolNames::ASSERT_NODE_VISIBLE);
+	runtime.push_back(AIToolNames::ASSERT_NO_RUNTIME_ERRORS);
+	runtime.push_back(AIToolNames::CAPTURE_GAME_SCREENSHOT);
+	runtime.push_back(AIToolNames::CAPTURE_RUNTIME_UI_SNAPSHOT);
+	runtime.push_back(AIToolNames::STOP_PLAY_SCENE);
+	categories["Runtime Testing"] = runtime;
+
+	Array scene_generation;
+	scene_generation.push_back(AIToolNames::CREATE_3D_SCENE);
+	scene_generation.push_back(AIToolNames::ADD_3D_OBJECT);
+	scene_generation.push_back(AIToolNames::ADD_3D_LIGHT);
+	scene_generation.push_back(AIToolNames::ADD_PHYSICS);
+	scene_generation.push_back(AIToolNames::ADD_ANIMATION);
+	scene_generation.push_back(AIToolNames::ADD_PARTICLES);
+	scene_generation.push_back(AIToolNames::ADD_VFX);
+	scene_generation.push_back(AIToolNames::ADD_CHARACTER_CONTROLLER);
+	scene_generation.push_back(AIToolNames::REMOVE_NODE);
+	scene_generation.push_back(AIToolNames::MODIFY_NODE_PROPERTIES);
+	scene_generation.push_back(AIToolNames::CONNECT_SIGNAL);
+	scene_generation.push_back(AIToolNames::DUPLICATE_NODE);
+	scene_generation.push_back(AIToolNames::REPARENT_NODE);
+	categories["Scene Generation and Editing"] = scene_generation;
+
+	Array packaging;
+	packaging.push_back(AIToolNames::PACKAGE_PROJECT);
+	packaging.push_back(AIToolNames::CHECK_PACKAGE_STATUS);
+	packaging.push_back(AIToolNames::TEST_PACKAGE);
+	packaging.push_back(AIToolNames::CAPTURE_PACKAGE_SCREENSHOT);
+	categories["Packaging"] = packaging;
+
+	Array engine;
+	engine.push_back(AIToolNames::RUN_BUILD);
+	engine.push_back(AIToolNames::CHECK_BUILD_STATUS);
+	engine.push_back(AIToolNames::READ_BUILD_LOG);
+	engine.push_back(AIToolNames::RESTART_ENGINE);
+	engine.push_back(AIToolNames::UPLOAD_CODE);
+	engine.push_back(AIToolNames::DEVELOP_AI_VERIFY);
+	engine.push_back(AIToolNames::SETUP_ENGINE_WORKSPACE);
+	engine.push_back(AIToolNames::REQUEST_ENGINE_CHANGE);
+	engine.push_back(AIToolNames::RETURN_TO_PROJECT_MODE);
+	categories["Engine Workflow"] = engine;
+
+	Array external;
+	external.push_back(AIToolNames::FETCH_URL);
+	external.push_back(AIToolNames::SHELL_COMMAND);
+	external.push_back(AIToolNames::BATCH_TOOLS);
+	categories["External and Advanced"] = external;
+
+	return categories;
+}
+
+Array AIToolDefs::filter_disabled_tools(const Array &p_tools, const Vector<String> &p_disabled_tool_names) {
+	if (p_disabled_tool_names.is_empty()) {
+		return p_tools.duplicate(true);
+	}
+
+	HashSet<StringName> disabled;
+	for (const String &tool_name : p_disabled_tool_names) {
+		if (!tool_name.strip_edges().is_empty()) {
+			disabled.insert(StringName(tool_name.strip_edges()));
+		}
+	}
+
+	Array filtered;
+	for (int i = 0; i < p_tools.size(); i++) {
+		if (p_tools[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary tool = p_tools[i];
+		Dictionary fn = tool.get("function", Dictionary());
+		const String name = String(fn.get("name", String()));
+		if (!disabled.has(StringName(name))) {
 			filtered.push_back(tool);
 		}
 	}

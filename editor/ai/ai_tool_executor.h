@@ -63,6 +63,7 @@ private:
 	static Dictionary _package_project(const Dictionary &p_args);
 	static Dictionary _check_package_status(const Dictionary &p_args);
 	static Dictionary _test_package(const Dictionary &p_args);
+	static Dictionary _capture_package_screenshot(const Dictionary &p_args);
 	static Dictionary _play_scene(const Dictionary &p_args);
 	static Dictionary _click_ui_position(const Dictionary &p_args);
 	static Dictionary _click_ui_node(const Dictionary &p_args);

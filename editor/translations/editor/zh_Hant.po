@@ -19513,3 +19513,42 @@ msgstr ""
 
 msgid "AI usage agreement accepted. Finish the first-time setup guide to continue."
 msgstr "AI 使用協議已接受。請完成首次設定引導後繼續。"
+
+msgid "Manage Built-in Tools..."
+msgstr "管理內建工具..."
+
+msgid "Open the categorized built-in tool manager."
+msgstr "開啟按分類顯示的內建工具管理器。"
+
+msgid "Built-in Tools"
+msgstr "內建工具"
+
+msgid "Choose which built-in Function Calling tools are available to AI. Disabled tools are hidden from the model and rejected if called from old context."
+msgstr "選擇哪些內建 Function Calling 工具可供 AI 使用。停用的工具會從模型可見清單中隱藏，且即使從舊上下文呼叫也會被拒絕。"
+
+msgid "Enable All"
+msgstr "全部啟用"
+
+msgid "Disable All"
+msgstr "全部停用"
+
+msgid "Files and Search"
+msgstr "檔案與搜尋"
+
+msgid "Validation and Build"
+msgstr "驗證與建置"
+
+msgid "Runtime Testing"
+msgstr "執行階段測試"
+
+msgid "Scene Generation and Editing"
+msgstr "場景生成與編輯"
+
+msgid "Packaging"
+msgstr "打包"
+
+msgid "Engine Workflow"
+msgstr "引擎工作流"
+
+msgid "External and Advanced"
+msgstr "外部與進階工具"

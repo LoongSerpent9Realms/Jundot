@@ -29,6 +29,7 @@
 
 #include "core/templates/vector.h"
 #include "core/variant/array.h"
+#include "core/variant/dictionary.h"
 #include "editor/ai/ai_settings.h"
 
 // Tool name constants.
@@ -52,6 +53,7 @@ constexpr const char *RELOAD_CPP_HOT_MODULE = "reload_cpp_hot_module";
 constexpr const char *PACKAGE_PROJECT = "package_project";
 constexpr const char *CHECK_PACKAGE_STATUS = "check_package_status";
 constexpr const char *TEST_PACKAGE = "test_package";
+constexpr const char *CAPTURE_PACKAGE_SCREENSHOT = "capture_package_screenshot";
 constexpr const char *PLAY_SCENE = "play_scene";
 constexpr const char *CLICK_UI_POSITION = "click_ui_position";
 constexpr const char *CLICK_UI_NODE = "click_ui_node";
@@ -103,6 +105,12 @@ public:
 	// discussion queries where the AI may need to look up project files but
 	// should not modify them. Saves ~3,000 tokens vs. the full mode set.
 	static Array get_readonly_tools();
+
+	// Returns grouped built-in tool names for settings UI.
+	static Dictionary get_builtin_tool_categories();
+
+	// Filters a tool definition array by disabled built-in tool names.
+	static Array filter_disabled_tools(const Array &p_tools, const Vector<String> &p_disabled_tool_names);
 
 	// Heuristic check: does the user message look like a consultation/design
 	// discussion rather than an implementation request?

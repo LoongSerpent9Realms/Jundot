@@ -57,6 +57,7 @@ static constexpr const char *EDITOR_AI_OUTPUT_LANGUAGE_KEY = "ai_settings/genera
 static constexpr const char *EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY = "ai_settings/project/enable_html_min_project_prototype";
 static constexpr const char *EDITOR_AI_LOW_TOKEN_MODE_KEY = "ai_settings/context/low_token_mode";
 static constexpr const char *EDITOR_AI_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_function_calling";
+static constexpr const char *EDITOR_AI_DISABLED_BUILTIN_TOOLS_KEY = "ai_settings/tools/disabled_builtin_tools";
 static constexpr const char *EDITOR_AI_MCP_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_mcp_tools";
 static constexpr const char *EDITOR_AI_AUTO_AUDIT_ENABLED_KEY = "ai_settings/audit/auto_audit_enabled";
 static constexpr const char *EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY = "ai_settings/context/context_char_budget";
@@ -219,6 +220,16 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	if (_should_read_editor_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_only_changed)) {
 		r_settings.tools_enabled = editor_settings->get_setting(EDITOR_AI_TOOLS_ENABLED_KEY);
 	}
+	if (_should_read_editor_setting(EDITOR_AI_DISABLED_BUILTIN_TOOLS_KEY, p_only_changed)) {
+		r_settings.disabled_builtin_tools.clear();
+		PackedStringArray disabled_tools = editor_settings->get_setting(EDITOR_AI_DISABLED_BUILTIN_TOOLS_KEY);
+		for (int i = 0; i < disabled_tools.size(); i++) {
+			const String tool_name = String(disabled_tools[i]).strip_edges();
+			if (!tool_name.is_empty() && !r_settings.disabled_builtin_tools.has(tool_name)) {
+				r_settings.disabled_builtin_tools.push_back(tool_name);
+			}
+		}
+	}
 	if (_should_read_editor_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_only_changed)) {
 		r_settings.mcp_tools_enabled = editor_settings->get_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY);
 	}
@@ -270,6 +281,13 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	editor_settings->set_setting(EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY, p_settings.html_min_project_prototype_enabled);
 	editor_settings->set_setting(EDITOR_AI_LOW_TOKEN_MODE_KEY, p_settings.low_token_mode);
 	editor_settings->set_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_settings.tools_enabled);
+	PackedStringArray disabled_tools;
+	for (const String &tool_name : p_settings.disabled_builtin_tools) {
+		if (!tool_name.is_empty() && !disabled_tools.has(tool_name)) {
+			disabled_tools.push_back(tool_name);
+		}
+	}
+	editor_settings->set_setting(EDITOR_AI_DISABLED_BUILTIN_TOOLS_KEY, disabled_tools);
 	editor_settings->set_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_settings.mcp_tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_AUTO_AUDIT_ENABLED_KEY, p_settings.auto_audit_enabled);
 	editor_settings->set_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY, p_settings.context_char_budget);
@@ -291,7 +309,7 @@ String AISettings::get_default_model() {
 }
 
 String AISettings::get_default_system_prompt() {
-	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (batch_tools, list_files, read_files, write_file, edit_file, search_files, grep_code, check_project_scripts, check_ui_layout, build_project, package_project, check_package_status, test_package, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, stop_play_scene, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, validating project work, packaging completed project plans, smoke-testing packages, playing scenes, testing UI clicks, capturing screenshots, capturing runtime UI hierarchy/style snapshots, building the engine, and executing commands.\n\n"
+	return TTR("You are an AI assistant inside the Jundot editor (a Godot Engine fork). You have access to built-in Function Calling tools (batch_tools, list_files, read_files, write_file, edit_file, search_files, grep_code, check_project_scripts, check_ui_layout, build_project, package_project, check_package_status, test_package, capture_package_screenshot, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, stop_play_scene, run_build, check_build_status, read_build_log, fetch_url, shell_command, restart_engine) for reading and modifying source code, searching the project, validating project work, packaging completed project plans, smoke-testing packages, capturing packaged-build screenshots, playing scenes, testing UI clicks, capturing screenshots, capturing runtime UI hierarchy/style snapshots, building the engine, and executing commands.\n\n"
 			   "When you use a tool, you will receive the result and can continue reasoning. After executing tools, analyze the results and either call more tools if needed or provide a comprehensive summary to the user with the next steps. Do NOT end the conversation with a single sentence — always follow up with a thorough analysis, reasoning, or actionable proposal.\n\n"
 			   "If MCP tools are configured, they are available as tools with names prefixed by the server name (e.g. 'servername.toolname').\n\n"
 			   "=== Task Breakdown Protocol ===\n"
@@ -309,7 +327,7 @@ String AISettings::get_default_system_prompt() {
 			   "- In PROJECT mode, when creating new gameplay/UI scripts, use C# `.cs` scripts by default. Keep using GDScript only when the user explicitly asks for it or when preserving an existing GDScript-heavy project pattern is clearly safer.\n"
 			   "- In PROJECT mode, after editing important menus, HUD buttons, dialogs, or suspected click/input paths, run the scene with play_scene, call capture_runtime_ui_snapshot for current-frame hierarchy/position/color evidence, use capture_game_screenshot when visual layout should be inspected, prefer click_ui_node when a Control node path is known, otherwise use click_ui_position. After runtime clicks, call assert_no_runtime_errors so callback/script errors fail the test instead of being mistaken for a successful click. Use assert_node_visible after expected UI transitions when a node path is known, then stop_play_scene when finished.\n"
 			   "- In PROJECT mode, the full autonomous delivery pipeline applies only to empty/minimal projects created from no existing project foundation. If the project already has meaningful content, insert NEXT_QUESTION dialogue checkpoints before broad replacement, restructuring, or reinterpretation.\n"
-			   "- For an empty/minimal project with an approved plan, continue through compile/build validation, project/runtime tests, package_project, check_package_status until success/failure, test_package, and then hand the package paths plus validation evidence to the user.\n"
+			   "- For an empty/minimal project with an approved plan, continue through compile/build validation, project/runtime tests, package_project, check_package_status until success/failure, test_package, capture_package_screenshot for visual semantic validation, and then hand the package paths plus validation evidence to the user.\n"
 			   "- Final answers after a tool sequence must include an execution summary: what was done from start to finish, files read, files modified or created, tools or validations run and their results, and remaining risks or next steps. Do not omit the file list when files were handled.\n"
 			   "- run_build runs in the background. After calling it, call check_build_status to get the result. If still running, call it again in subsequent rounds.\n"
 			   "- When you encounter a build error, read the build log, analyze the error, apply fixes, then rebuild to verify.\n\n"
@@ -488,6 +506,16 @@ AISettingsData AISettings::load() {
 	settings.include_tool_context = root.get("include_tool_context", true);
 	settings.low_token_mode = root.get("low_token_mode", false);
 	settings.tools_enabled = root.get("tools_enabled", true);
+	const Variant disabled_tools_value = root.get("disabled_builtin_tools", Array());
+	if (disabled_tools_value.get_type() == Variant::ARRAY) {
+		Array disabled_tools = disabled_tools_value;
+		for (int i = 0; i < disabled_tools.size(); i++) {
+			const String tool_name = String(disabled_tools[i]).strip_edges();
+			if (!tool_name.is_empty() && !settings.disabled_builtin_tools.has(tool_name)) {
+				settings.disabled_builtin_tools.push_back(tool_name);
+			}
+		}
+	}
 	settings.develop_mode = root.get("develop_mode", false);
 	settings.mcp_tools_enabled = root.get("mcp_tools_enabled", false);
 	settings.context_char_budget = root.get("context_char_budget", get_default_context_char_budget());
@@ -588,6 +616,13 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["include_tool_context"] = p_settings.include_tool_context;
 	root["low_token_mode"] = p_settings.low_token_mode;
 	root["tools_enabled"] = p_settings.tools_enabled;
+	Array disabled_builtin_tools;
+	for (const String &tool_name : p_settings.disabled_builtin_tools) {
+		if (!tool_name.is_empty() && !disabled_builtin_tools.has(tool_name)) {
+			disabled_builtin_tools.push_back(tool_name);
+		}
+	}
+	root["disabled_builtin_tools"] = disabled_builtin_tools;
 	root["develop_mode"] = p_settings.develop_mode;
 	root["mcp_tools_enabled"] = p_settings.mcp_tools_enabled;
 	root["context_char_budget"] = p_settings.context_char_budget;

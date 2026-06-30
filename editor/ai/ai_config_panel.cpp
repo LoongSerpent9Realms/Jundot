@@ -38,6 +38,7 @@
 #include "editor/ai/ai_develop_flow.h"
 #include "editor/ai/ai_mcp_manager.h"
 #include "editor/ai/ai_settings.h"
+#include "editor/ai/ai_tool_defs.h"
 #include "editor/ai/ai_usage_agreement_dialog.h"
 #include "editor/file_system/editor_paths.h"
 #include "editor/ai/github_auth_service.h"
@@ -47,6 +48,7 @@
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
 #include "scene/gui/check_box.h"
+#include "scene/gui/dialogs.h"
 #include "scene/gui/file_dialog.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/grid_container.h"
@@ -690,6 +692,12 @@ void AIConfigPanel::_update_translations() {
 	low_token_mode_check->set_text(TTR("Low Token Mode"));
 	low_token_mode_check->set_tooltip_text(TTR("Reduces output and context budgets, limits tool-call loops, disables MCP tools, and omits extra skill/MCP context from requests."));
 	tools_enabled_check->set_text(TTR("Enable Function Calling tools (read/write files, build, etc.)"));
+	builtin_tools_button->set_text(TTR("Manage Built-in Tools..."));
+	builtin_tools_button->set_tooltip_text(TTR("Open the categorized built-in tool manager."));
+	builtin_tools_dialog->set_title(TTR("Built-in Tools"));
+	builtin_tools_label->set_text(TTR("Choose which built-in Function Calling tools are available to AI. Disabled tools are hidden from the model and rejected if called from old context."));
+	builtin_tools_enable_all_button->set_text(TTR("Enable All"));
+	builtin_tools_disable_all_button->set_text(TTR("Disable All"));
 	develop_mode_check->set_text(TTR("Develop Mode (run local workflow, never commit or push)"));
 	develop_mode_check->set_tooltip_text(TTR("Demonstrates modify, build, restart, user verification, AI verification, and upload validation. Git commit and push are always skipped."));
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
@@ -753,6 +761,108 @@ void AIConfigPanel::_on_low_token_mode_toggled(bool p_pressed) {
 	include_tool_context_check->set_pressed(false);
 	mcp_tools_enabled_check->set_pressed(false);
 	status_label->set_text(TTR("Low Token Mode preset applied."));
+}
+
+void AIConfigPanel::_rebuild_builtin_tool_checks(const AISettingsData &p_settings) {
+	if (!builtin_tools_box) {
+		return;
+	}
+
+	for (int i = builtin_tools_box->get_child_count() - 1; i >= 0; i--) {
+		builtin_tools_box->get_child(i)->queue_free();
+	}
+	builtin_tool_checkboxes.clear();
+
+	Dictionary tool_descriptions;
+	Array all_tools = AIToolDefs::get_builtin_tools();
+	for (int i = 0; i < all_tools.size(); i++) {
+		if (all_tools[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary tool = all_tools[i];
+		Dictionary fn = tool.get("function", Dictionary());
+		const String name = String(fn.get("name", String()));
+		if (!name.is_empty()) {
+			tool_descriptions[name] = String(fn.get("description", String()));
+		}
+	}
+
+	Dictionary categories = AIToolDefs::get_builtin_tool_categories();
+	Array category_names = categories.keys();
+	for (int i = 0; i < category_names.size(); i++) {
+		const String category_name = String(category_names[i]);
+		Label *category_label = memnew(Label);
+		String translated_category = category_name;
+		if (category_name == "Files and Search") {
+			translated_category = TTR("Files and Search");
+		} else if (category_name == "Validation and Build") {
+			translated_category = TTR("Validation and Build");
+		} else if (category_name == "Runtime Testing") {
+			translated_category = TTR("Runtime Testing");
+		} else if (category_name == "Scene Generation and Editing") {
+			translated_category = TTR("Scene Generation and Editing");
+		} else if (category_name == "Packaging") {
+			translated_category = TTR("Packaging");
+		} else if (category_name == "Engine Workflow") {
+			translated_category = TTR("Engine Workflow");
+		} else if (category_name == "External and Advanced") {
+			translated_category = TTR("External and Advanced");
+		}
+		category_label->set_text(translated_category);
+		category_label->add_theme_font_size_override(SceneStringName(font_size), 13 * EDSCALE);
+		builtin_tools_box->add_child(category_label);
+
+		Array tool_names = categories[category_name];
+		for (int j = 0; j < tool_names.size(); j++) {
+			const String tool_name = String(tool_names[j]);
+			CheckBox *tool_check = memnew(CheckBox);
+			tool_check->set_text("  " + tool_name);
+			tool_check->set_meta("tool_name", tool_name);
+			tool_check->set_pressed(!p_settings.disabled_builtin_tools.has(tool_name));
+			if (tool_descriptions.has(tool_name)) {
+				tool_check->set_tooltip_text(tool_descriptions[tool_name]);
+			}
+			builtin_tools_box->add_child(tool_check);
+			builtin_tool_checkboxes.push_back(tool_check);
+		}
+	}
+}
+
+Vector<String> AIConfigPanel::_collect_disabled_builtin_tools() const {
+	Vector<String> disabled;
+	for (CheckBox *tool_check : builtin_tool_checkboxes) {
+		if (!tool_check) {
+			continue;
+		}
+		const String tool_name = String(tool_check->get_meta("tool_name", String())).strip_edges();
+		if (!tool_name.is_empty() && !tool_check->is_pressed() && !disabled.has(tool_name)) {
+			disabled.push_back(tool_name);
+		}
+	}
+	return disabled;
+}
+
+void AIConfigPanel::_show_builtin_tools_dialog() {
+	if (!builtin_tools_dialog) {
+		return;
+	}
+	builtin_tools_dialog->popup_centered_clamped(Size2(720, 620) * EDSCALE, 0.85);
+}
+
+void AIConfigPanel::_enable_all_builtin_tools() {
+	for (CheckBox *tool_check : builtin_tool_checkboxes) {
+		if (tool_check) {
+			tool_check->set_pressed(true);
+		}
+	}
+}
+
+void AIConfigPanel::_disable_all_builtin_tools() {
+	for (CheckBox *tool_check : builtin_tool_checkboxes) {
+		if (tool_check) {
+			tool_check->set_pressed(false);
+		}
+	}
 }
 
 void AIConfigPanel::_update_external_mcp_config() {
@@ -1490,6 +1600,7 @@ void AIConfigPanel::_load_settings() {
 	include_tool_context_check->set_pressed(settings.include_tool_context);
 	low_token_mode_check->set_pressed(settings.low_token_mode);
 	tools_enabled_check->set_pressed(settings.tools_enabled);
+	_rebuild_builtin_tool_checks(settings);
 	develop_mode_check->set_pressed(settings.develop_mode);
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
@@ -1546,6 +1657,7 @@ void AIConfigPanel::_save_settings() {
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.disabled_builtin_tools = _collect_disabled_builtin_tools();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
@@ -1604,6 +1716,7 @@ void AIConfigPanel::_test_connection() {
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.disabled_builtin_tools = _collect_disabled_builtin_tools();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
@@ -1686,6 +1799,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.include_tool_context = include_tool_context_check->is_pressed();
 	settings.low_token_mode = low_token_mode_check->is_pressed();
 	settings.tools_enabled = tools_enabled_check->is_pressed();
+	settings.disabled_builtin_tools = _collect_disabled_builtin_tools();
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
@@ -1710,6 +1824,13 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["include_tool_context"] = settings.include_tool_context;
 	root["low_token_mode"] = settings.low_token_mode;
 	root["tools_enabled"] = settings.tools_enabled;
+	Array disabled_builtin_tools;
+	for (const String &tool_name : settings.disabled_builtin_tools) {
+		if (!tool_name.is_empty() && !disabled_builtin_tools.has(tool_name)) {
+			disabled_builtin_tools.push_back(tool_name);
+		}
+	}
+	root["disabled_builtin_tools"] = disabled_builtin_tools;
 	root["develop_mode"] = settings.develop_mode;
 	root["mcp_tools_enabled"] = settings.mcp_tools_enabled;
 	root["context_char_budget"] = settings.context_char_budget;
@@ -1893,6 +2014,21 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	if (root.has("tools_enabled")) {
 		tools_enabled_check->set_pressed(root["tools_enabled"]);
+	}
+	if (root.has("disabled_builtin_tools")) {
+		AISettingsData imported_tool_settings = AISettings::load();
+		imported_tool_settings.disabled_builtin_tools.clear();
+		const Variant disabled_tools_value = root["disabled_builtin_tools"];
+		if (disabled_tools_value.get_type() == Variant::ARRAY) {
+			Array disabled_tools = disabled_tools_value;
+			for (int i = 0; i < disabled_tools.size(); i++) {
+				const String tool_name = String(disabled_tools[i]).strip_edges();
+				if (!tool_name.is_empty() && !imported_tool_settings.disabled_builtin_tools.has(tool_name)) {
+					imported_tool_settings.disabled_builtin_tools.push_back(tool_name);
+				}
+			}
+		}
+		_rebuild_builtin_tool_checks(imported_tool_settings);
 	}
 	if (root.has("develop_mode")) {
 		develop_mode_check->set_pressed(root["develop_mode"]);
@@ -2314,6 +2450,46 @@ AIConfigPanel::AIConfigPanel() {
 
 	tools_enabled_check = memnew(CheckBox);
 	root->add_child(tools_enabled_check);
+
+	builtin_tools_button = memnew(Button);
+	builtin_tools_button->set_h_size_flags(Control::SIZE_SHRINK_BEGIN);
+	builtin_tools_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_show_builtin_tools_dialog));
+	root->add_child(builtin_tools_button);
+
+	builtin_tools_dialog = memnew(AcceptDialog);
+	builtin_tools_dialog->set_title(TTR("Built-in Tools"));
+	builtin_tools_dialog->set_min_size(Size2(640, 520) * EDSCALE);
+	add_child(builtin_tools_dialog);
+
+	VBoxContainer *builtin_tools_dialog_root = memnew(VBoxContainer);
+	builtin_tools_dialog_root->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	builtin_tools_dialog_root->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	builtin_tools_dialog_root->add_theme_constant_override("separation", 8 * EDSCALE);
+	builtin_tools_dialog->add_child(builtin_tools_dialog_root);
+
+	builtin_tools_label = memnew(Label);
+	builtin_tools_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+	builtin_tools_dialog_root->add_child(builtin_tools_label);
+
+	HFlowContainer *builtin_tools_actions = memnew(HFlowContainer);
+	builtin_tools_enable_all_button = memnew(Button);
+	builtin_tools_enable_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_enable_all_builtin_tools));
+	builtin_tools_actions->add_child(builtin_tools_enable_all_button);
+	builtin_tools_disable_all_button = memnew(Button);
+	builtin_tools_disable_all_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_disable_all_builtin_tools));
+	builtin_tools_actions->add_child(builtin_tools_disable_all_button);
+	builtin_tools_dialog_root->add_child(builtin_tools_actions);
+
+	ScrollContainer *builtin_tools_scroll = memnew(ScrollContainer);
+	builtin_tools_scroll->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	builtin_tools_scroll->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+	builtin_tools_scroll->set_horizontal_scroll_mode(ScrollContainer::SCROLL_MODE_DISABLED);
+	builtin_tools_scroll->set_vertical_scroll_mode(ScrollContainer::SCROLL_MODE_AUTO);
+	builtin_tools_dialog_root->add_child(builtin_tools_scroll);
+
+	builtin_tools_box = memnew(VBoxContainer);
+	builtin_tools_box->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+	builtin_tools_scroll->add_child(builtin_tools_box);
 
 	develop_mode_check = memnew(CheckBox);
 	develop_mode_check->set_tooltip_text(TTR("Demonstrates the complete engine AI workflow without committing or pushing to GitHub."));
