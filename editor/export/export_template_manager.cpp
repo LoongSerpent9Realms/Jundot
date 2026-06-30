@@ -86,6 +86,11 @@ void ExportTemplateManager::_request_mirrors() {
 
 	if (mirrors_list->get_tooltip_text().is_empty()) {
 		const String mirrors_metadata_url = vformat("https://godotengine.org/mirrorlist/%s.json", JUNDOT_VERSION_FULL_CONFIG);
+		// Safety: ensure the HTTPRequest node is inside the scene tree before requesting.
+		if (!mirrors_requester->is_inside_tree()) {
+			callable_mp(this, &ExportTemplateManager::_request_mirrors).call_deferred();
+			return;
+		}
 		mirrors_requester->request(mirrors_metadata_url);
 	}
 }
@@ -1992,6 +1997,11 @@ void TemplateDownloader::_bind_methods() {
 Error TemplateDownloader::download_template(const String &p_file_name, const String &p_source) {
 	url = p_source;
 	filename = p_file_name;
+
+	// Safety: ensure this HTTPRequest node is inside the scene tree before requesting.
+	if (!is_inside_tree()) {
+		ERR_FAIL_V_MSG(ERR_UNCONFIGURED, "TemplateDownloader HTTPRequest is not inside the scene tree.");
+	}
 
 	current_step = Step::QUERYING;
 	return request(p_source, PackedStringArray(), HTTPClient::METHOD_HEAD);

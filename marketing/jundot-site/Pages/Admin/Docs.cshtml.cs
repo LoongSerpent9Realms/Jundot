@@ -4,24 +4,31 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using JundotSite.Data;
+using JundotSite.Models;
 using JundotSite.Services;
 
 namespace JundotSite.Pages.Admin;
 
+[Microsoft.AspNetCore.Mvc.RequestFormLimits(ValueLengthLimit = 50 * 1024 * 1024, MultipartBodyLengthLimit = 50 * 1024 * 1024)]
 public class DocsModel : AdminPageModel
 {
     private readonly IWebHostEnvironment _environment;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ApplicationDbContext _context;
 
-    public DocsModel(IWebHostEnvironment environment, IConfiguration configuration, IHttpClientFactory httpClientFactory)
+    public DocsModel(IWebHostEnvironment environment, IConfiguration configuration, IHttpClientFactory httpClientFactory, ApplicationDbContext context)
     {
         _environment = environment;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
+        _context = context;
     }
 
     public List<DocumentationPage> Documents { get; set; } = new();
+    public List<DocVideo> DocVideos { get; set; } = new();
     public List<DocLanguageOption> SupportedLanguages { get; set; } = GetSupportedLanguages();
     public string CurrentDocId { get; set; } = "index";
     public string CurrentDocTitle { get; set; } = "开始使用";
@@ -133,6 +140,45 @@ public class DocsModel : AdminPageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnPostUploadImageAsync()
+    {
+        var result = RequireLogin();
+        if (result is not PageResult) return result;
+
+        var files = Request.Form.Files;
+        if (files.Count == 0)
+        {
+            return new JsonResult(new { success = false, message = "没有选择文件。" });
+        }
+
+        var file = files[0];
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(ext))
+        {
+            return new JsonResult(new { success = false, message = "不支持的图片格式。支持：JPG, PNG, GIF, WebP, SVG" });
+        }
+
+        if (file.Length > 50L * 1024 * 1024)
+        {
+            return new JsonResult(new { success = false, message = "图片大小不能超过 50MB。" });
+        }
+
+        var imagesDir = Path.Combine(_environment.WebRootPath, "images", "docs");
+        Directory.CreateDirectory(imagesDir);
+
+        var fileName = $"{Guid.NewGuid()}{ext}";
+        var filePath = Path.Combine(imagesDir, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var relativeUrl = $"/images/docs/{fileName}";
+        return new JsonResult(new { success = true, url = relativeUrl });
+    }
+
     public async Task<IActionResult> OnPostCreateAsync()
     {
         var result = RequireLogin();
@@ -228,6 +274,10 @@ public class DocsModel : AdminPageModel
     {
         Documents = GetDocuments();
         SupportedLanguages = GetSupportedLanguages();
+        DocVideos = await _context.DocVideos
+            .Where(v => v.IsPublished)
+            .OrderBy(v => v.SortOrder)
+            .ToListAsync();
         var doc = FindDoc(docId) ?? FindDoc("index")!;
         CurrentDocId = doc.Id;
         CurrentDocTitle = doc.Title;

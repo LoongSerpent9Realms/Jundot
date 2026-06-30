@@ -248,7 +248,7 @@ Array AIMCPHTTPServer::_get_ai_settings_tools() const {
 			Dictionary()));
 
 	Dictionary update_props;
-	update_props["backend_type"] = _external_mcp_str_property("AI backend type: jundot_plugin, codex, or legacy_openai.");
+	update_props["backend_type"] = _external_mcp_str_property("AI backend type: jundot_plugin, codex, legacy_openai, or qwen.");
 	update_props["base_url"] = _external_mcp_str_property("OpenAI-compatible API base URL.");
 	update_props["model"] = _external_mcp_str_property("Model name used by the built-in AI assistant.");
 	update_props["api_key"] = _external_mcp_str_property("API key to store. Passing an empty string clears it.");
@@ -298,6 +298,9 @@ Dictionary AIMCPHTTPServer::_get_ai_settings_snapshot() const {
 			break;
 		case AIBackendType::LEGACY_OPENAI:
 			d["backend_type"] = "legacy_openai";
+			break;
+		case AIBackendType::QWEN:
+			d["backend_type"] = "qwen";
 			break;
 		case AIBackendType::JUNDOT_PLUGIN:
 		default:
@@ -412,11 +415,13 @@ String AIMCPHTTPServer::_execute_ai_settings_tool(const String &p_tool_name, con
 			settings.backend_type = AIBackendType::CODEX;
 		} else if (backend_type == "legacy_openai") {
 			settings.backend_type = AIBackendType::LEGACY_OPENAI;
+		} else if (backend_type == "qwen") {
+			settings.backend_type = AIBackendType::QWEN;
 		} else if (backend_type == "jundot_plugin") {
 			settings.backend_type = AIBackendType::JUNDOT_PLUGIN;
 		} else {
 			response["ok"] = false;
-			response["error"] = "backend_type must be one of: jundot_plugin, codex, legacy_openai.";
+			response["error"] = "backend_type must be one of: jundot_plugin, codex, legacy_openai, qwen.";
 			return JSON::stringify(response);
 		}
 	}

@@ -61,7 +61,7 @@ public:
 	// Connection management
 	Error connect_to_cline(const String &p_server_url = String());
 	void disconnect_from_cline();
-	bool is_connected() const;
+	bool is_cline_connected() const;
 	int get_state() const;
 	
 	// Authentication

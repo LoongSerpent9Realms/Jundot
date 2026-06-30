@@ -1,0 +1,544 @@
+@page
+@model JundotSite.Pages.Admin.VideosModel
+@{
+    Layout = "_AdminLayout";
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-error">@Model.ErrorMessage</div>
+}
+
+<div class="videos-admin-layout">
+    <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px;">
+            <div>
+                <h3 style="margin-bottom: 6px;">视频列表</h3>
+                <p style="margin: 0; color: #53615c; line-height: 1.6;">拖拽视频可调整排序。视频可关联到文档页面，在前台文档中显示播放器。</p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="showAddForm()">+ 添加视频</button>
+        </div>
+
+        @if (Model.Videos.Count == 0)
+        {
+            <div style="text-align: center; padding: 40px 20px; color: #53615c;">
+                <p style="font-size: 16px; margin-bottom: 8px;">还没有视频</p>
+                <p style="font-size: 14px;">点击"添加视频"开始管理文档视频</p>
+            </div>
+        }
+        else
+        {
+            <div class="videos-sort-list" id="videos-sort-list">
+                @foreach (var video in Model.Videos)
+                {
+                    <div class="videos-sort-item" data-id="@video.Id" draggable="true">
+                        <div class="videos-sort-handle" title="拖拽排序">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="8" cy="6" r="1"></circle><circle cx="16" cy="6" r="1"></circle>
+                                <circle cx="8" cy="12" r="1"></circle><circle cx="16" cy="12" r="1"></circle>
+                                <circle cx="8" cy="18" r="1"></circle><circle cx="16" cy="18" r="1"></circle>
+                            </svg>
+                        </div>
+                        <div class="videos-sort-info">
+                            <strong>@video.Title</strong>
+                            <span>
+                                @if (video.SourceType == 0) { <text>外部链接</text> } else { <text>本地上传</text> }
+                                @if (!string.IsNullOrEmpty(video.Category))
+                                {
+                                    <span class="docs-language-pill">@video.Category</span>
+                                }
+                                @if (!string.IsNullOrEmpty(video.DocId))
+                                {
+                                    var doc = Model.Documents.FirstOrDefault(d => d.Id == video.DocId);
+                                    <span class="docs-language-pill">@(doc?.Title ?? video.DocId)</span>
+                                }
+                                @if (!video.IsPublished)
+                                {
+                                    <span class="badge badge-draft">未发布</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="videos-sort-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick='editVideo(@Json.Serialize(video))'>编辑</button>
+                            <form method="post" asp-page-handler="Delete" style="display:inline;" onsubmit="return confirm('确定要删除这个视频吗？');">
+                                <input type="hidden" name="id" value="@video.Id" />
+                                <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="admin-card admin-form" id="video-form-card" style="display: none;">
+        <h3 id="video-form-title">添加视频</h3>
+        <form method="post" asp-page-handler="Save" id="video-form" onsubmit="return prepareVideoFormSubmit()">
+            <input type="hidden" asp-for="Input.Id" id="video-id" />
+
+            <div class="form-group">
+                <label asp-for="Input.Title">视频标题</label>
+                <input asp-for="Input.Title" id="video-title-input" placeholder="例如：快速入门演示" />
+                <span asp-validation-for="Input.Title" style="color: #c62828; font-size: 13px;"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.Description">视频描述</label>
+                <input asp-for="Input.Description" id="video-desc-input" placeholder="简短描述视频内容" />
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>视频来源</label>
+                    <select id="video-source-type" onchange="toggleSourceType()">
+                        <option value="0">外部链接</option>
+                        <option value="1">本地上传</option>
+                    </select>
+                    <input type="hidden" asp-for="Input.SourceType" id="video-source-type-hidden" value="0" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.Category">分类</label>
+                    <input asp-for="Input.Category" id="video-category-input" placeholder="例如：教程、演示" list="category-list" />
+                    <datalist id="category-list">
+                        @foreach (var cat in Model.Categories)
+                        {
+                            <option value="@cat"></option>
+                        }
+                    </datalist>
+                </div>
+            </div>
+
+            <div class="form-group" id="external-url-group">
+                <label asp-for="Input.VideoUrl">视频链接</label>
+                <input asp-for="Input.VideoUrl" id="video-url-input" placeholder="https://www.bilibili.com/video/BV... 或 YouTube 链接" />
+                <span asp-validation-for="Input.VideoUrl" style="color: #c62828; font-size: 13px;"></span>
+                <small style="color: #53615c; margin-top: 4px; display: block;">支持 Bilibili、YouTube 等平台的视频链接或嵌入地址</small>
+            </div>
+
+            <div class="form-group" id="upload-group" style="display: none;">
+                <label>上传视频文件</label>
+                <div class="video-upload-area" id="video-upload-area">
+                    <input type="file" id="video-file-input" accept="video/*" onchange="handleFileSelect(this)" style="display: none;" />
+                    <div id="upload-placeholder" onclick="document.getElementById('video-file-input').click()">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#53615c" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>点击选择视频文件</p>
+                        <small>支持 MP4, WebM, OGG, MOV, AVI, MKV 等（最大 1GB，浏览器自动压缩为 WebM）</small>
+                    </div>
+                    <div id="upload-progress" style="display: none;">
+                        <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill"></div></div>
+                        <p id="upload-status">上传中...</p>
+                    </div>
+                    <div id="upload-done" style="display: none;">
+                        <p style="color: #2e7d32; font-weight: 600;" id="uploaded-filename"></p>
+                        <input type="hidden" name="Input.VideoUrl" id="uploaded-url" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Input.ThumbnailUrl">封面图片链接（可选）</label>
+                <input asp-for="Input.ThumbnailUrl" id="video-thumb-input" placeholder="https://... 或留空" />
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label asp-for="Input.DocId">关联文档页面</label>
+                    <select asp-for="Input.DocId" id="video-doc-input">
+                        <option value="">-- 不关联 --</option>
+                        @foreach (var doc in Model.Documents)
+                        {
+                            <option value="@doc.Id">@doc.Title (@doc.Id)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.SortOrder">排序</label>
+                    <input asp-for="Input.SortOrder" id="video-sort-input" type="number" min="0" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="checkbox-inline">
+                    <input type="checkbox" asp-for="Input.IsPublished" id="video-published-input" checked />
+                    <span>发布（在前台显示）</span>
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="video-submit-btn">保存视频</button>
+                <button type="button" class="btn btn-secondary" onclick="hideForm()">取消</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function prepareVideoFormSubmit() {
+        var sourceType = parseInt(document.getElementById('video-source-type-hidden').value);
+        var externalInput = document.getElementById('video-url-input');
+        var uploadInput = document.getElementById('uploaded-url');
+
+        if (sourceType === 1) {
+            // Local upload mode: disable external URL input so it doesn't submit empty value
+            externalInput.disabled = true;
+            uploadInput.disabled = false;
+        } else {
+            // External link mode: disable upload URL input
+            externalInput.disabled = false;
+            uploadInput.disabled = true;
+        }
+
+        // Re-enable after a short delay to allow form submission
+        setTimeout(function() {
+            externalInput.disabled = false;
+            uploadInput.disabled = false;
+        }, 100);
+
+        return true;
+    }
+
+    function showAddForm() {
+        resetForm();
+        document.getElementById('video-form-card').style.display = 'block';
+        document.getElementById('video-form-title').textContent = '添加视频';
+        document.getElementById('video-form-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function editVideo(video) {
+        resetForm();
+        document.getElementById('video-form-card').style.display = 'block';
+        document.getElementById('video-form-title').textContent = '编辑视频';
+
+        document.getElementById('video-id').value = video.Id || '';
+        document.getElementById('video-title-input').value = video.Title || '';
+        document.getElementById('video-desc-input').value = video.Description || '';
+        document.getElementById('video-source-type').value = video.SourceType || 0;
+        document.getElementById('video-source-type-hidden').value = video.SourceType || 0;
+        document.getElementById('video-category-input').value = video.Category || '';
+        document.getElementById('video-thumb-input').value = video.ThumbnailUrl || '';
+        document.getElementById('video-doc-input').value = video.DocId || '';
+        document.getElementById('video-sort-input').value = video.SortOrder || 0;
+        document.getElementById('video-published-input').checked = video.IsPublished !== false;
+
+        if (video.SourceType === 1) {
+            document.getElementById('uploaded-url').value = video.VideoUrl || '';
+            document.getElementById('uploaded-filename').textContent = '已上传: ' + video.VideoUrl;
+            document.getElementById('upload-done').style.display = 'block';
+            document.getElementById('upload-placeholder').style.display = 'none';
+        } else {
+            document.getElementById('video-url-input').value = video.VideoUrl || '';
+        }
+
+        toggleSourceType();
+        document.getElementById('video-form-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideForm() {
+        document.getElementById('video-form-card').style.display = 'none';
+        resetForm();
+    }
+
+    function resetForm() {
+        document.getElementById('video-form').reset();
+        document.getElementById('video-id').value = '';
+        document.getElementById('video-source-type').value = 0;
+        document.getElementById('video-source-type-hidden').value = 0;
+        document.getElementById('upload-done').style.display = 'none';
+        document.getElementById('upload-progress').style.display = 'none';
+        document.getElementById('upload-placeholder').style.display = 'block';
+        document.getElementById('uploaded-url').value = '';
+        toggleSourceType();
+    }
+
+    function toggleSourceType() {
+        var type = parseInt(document.getElementById('video-source-type').value);
+        document.getElementById('video-source-type-hidden').value = type;
+        document.getElementById('external-url-group').style.display = type === 0 ? 'block' : 'none';
+        document.getElementById('upload-group').style.display = type === 1 ? 'block' : 'none';
+    }
+
+    // Client-side video compression using WebCodecs + MediaRecorder
+    async function compressVideoClientSide(file, onProgress) {
+        try {
+            // Create video element to load the file
+            const video = document.createElement('video');
+            video.muted = true;
+            video.playsInline = true;
+            
+            // Load video metadata
+            await new Promise((resolve, reject) => {
+                video.onloadedmetadata = resolve;
+                video.onerror = reject;
+                video.src = URL.createObjectURL(file);
+            });
+
+            const duration = video.duration;
+            if (!duration || duration < 0.1) {
+                console.error('Invalid video duration');
+                return null;
+            }
+
+            // Create canvas to capture frames
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.min(video.videoWidth, 1280); // Max 1280p
+            canvas.height = Math.round(canvas.width * (video.videoHeight / video.videoWidth));
+            const ctx = canvas.getContext('2d');
+
+            // Create MediaStream from canvas
+            const canvasStream = canvas.captureStream(30); // 30 FPS
+            
+            // Add audio track if available
+            if (video.captureStream) {
+                try {
+                    const videoStream = video.captureStream();
+                    const audioTracks = videoStream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        canvasStream.addTrack(audioTracks[0]);
+                    }
+                } catch (e) {
+                    console.warn('Could not capture audio:', e);
+                }
+            }
+
+            // Use MediaRecorder to encode
+            const chunks = [];
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') 
+                ? 'video/webm;codecs=vp9,opus'
+                : 'video/webm;codecs=vp8,opus';
+            
+            const recorder = new MediaRecorder(canvasStream, {
+                mimeType: mimeType,
+                videoBitsPerSecond: 1500000 // 1.5 Mbps
+            });
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+
+            const recordingPromise = new Promise((resolve) => {
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    resolve(blob);
+                };
+            });
+
+            // Start recording
+            recorder.start(1000); // Collect data every second
+            video.currentTime = 0;
+            await video.play();
+
+            // Draw frames and track progress
+            let lastUpdateTime = 0;
+            const drawFrame = () => {
+                if (video.ended || video.paused) {
+                    recorder.stop();
+                    canvasStream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Update progress
+                const progress = Math.min(100, Math.round((video.currentTime / duration) * 100));
+                if (onProgress && progress !== lastUpdateTime) {
+                    onProgress(progress);
+                    lastUpdateTime = progress;
+                }
+
+                requestAnimationFrame(drawFrame);
+            };
+
+            drawFrame();
+
+            // Wait for video to end
+            await new Promise((resolve) => {
+                video.onended = () => {
+                    setTimeout(() => {
+                        recorder.stop();
+                        canvasStream.getTracks().forEach(t => t.stop());
+                        resolve();
+                    }, 100);
+                };
+            });
+
+            // Wait for recording to complete
+            const blob = await recordingPromise;
+            URL.revokeObjectURL(video.src);
+            
+            return blob;
+        } catch (e) {
+            console.error('Client-side compression failed:', e);
+            return null;
+        }
+    }
+
+    async function handleFileSelect(input) {
+        if (!input.files || input.files.length === 0) return;
+        var file = input.files[0];
+
+        document.getElementById('upload-placeholder').style.display = 'none';
+        document.getElementById('upload-progress').style.display = 'block';
+        document.getElementById('upload-done').style.display = 'none';
+        document.getElementById('progress-fill').style.width = '0%';
+        document.getElementById('upload-status').textContent = '准备压缩...';
+
+        // Try client-side compression first
+        var compressedBlob = null;
+        var clientCompressionSucceeded = false;
+
+        try {
+            compressedBlob = await compressVideoClientSide(file, function(pct) {
+                document.getElementById('progress-fill').style.width = (pct / 2) + '%'; // 0-50% for compression
+                document.getElementById('upload-status').textContent = '本地压缩中... ' + pct + '%';
+            });
+            if (compressedBlob) {
+                clientCompressionSucceeded = true;
+            }
+        } catch (e) {
+            console.error('Client-side compression failed, will upload original:', e);
+        }
+
+        // Prepare file to upload (compressed or original)
+        var fileToUpload = clientCompressionSucceeded 
+            ? new File([compressedBlob], file.name.replace(/\.[^.]+$/, '.webm'), { type: 'video/webm' })
+            : file;
+
+        var sizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(1);
+        document.getElementById('upload-status').textContent = '压缩完成 (' + sizeMB + ' MB)，上传中...';
+
+        var formData = new FormData();
+        formData.append('file', fileToUpload);
+        formData.append('clientCompressed', clientCompressionSucceeded ? 'true' : 'false');
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/Admin/Videos?handler=Upload');
+        xhr.timeout = 10 * 60 * 1000; // 10 minutes for upload only
+
+        // Include anti-forgery token
+        var tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (tokenInput) {
+            xhr.setRequestHeader('RequestVerificationToken', tokenInput.value);
+        }
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round((e.loaded / e.total) * 100);
+                document.getElementById('progress-fill').style.width = (50 + pct / 2) + '%'; // 50-100% for upload
+                document.getElementById('upload-status').textContent = '上传中... ' + pct + '%';
+            }
+        };
+
+        xhr.onload = function() {
+            if (xhr.status === 0) {
+                alert('请求超时，请重试。');
+                document.getElementById('upload-progress').style.display = 'none';
+                document.getElementById('upload-placeholder').style.display = 'block';
+                return;
+            }
+            try {
+                var resp = JSON.parse(xhr.responseText);
+                if (resp.success) {
+                    document.getElementById('upload-progress').style.display = 'none';
+                    document.getElementById('upload-done').style.display = 'block';
+
+                    var finalSizeMB = (resp.fileSize / (1024 * 1024)).toFixed(1);
+                    var statusText = '已上传: ' + file.name + ' (' + finalSizeMB + ' MB)';
+                    if (clientCompressionSucceeded) {
+                        statusText += ' [本地压缩为 WebM]';
+                    } else if (resp.compressed) {
+                        statusText += ' [服务器压缩为 WebM]';
+                    }
+                    document.getElementById('uploaded-filename').textContent = statusText;
+                    document.getElementById('uploaded-url').value = resp.url;
+                } else {
+                    alert(resp.message || '上传失败');
+                    document.getElementById('upload-progress').style.display = 'none';
+                    document.getElementById('upload-placeholder').style.display = 'block';
+                }
+            } catch (e) {
+                alert('上传出错: 服务器返回异常');
+                document.getElementById('upload-progress').style.display = 'none';
+                document.getElementById('upload-placeholder').style.display = 'block';
+            }
+        };
+
+        xhr.onerror = function() {
+            alert('上传失败，请重试');
+            document.getElementById('upload-progress').style.display = 'none';
+            document.getElementById('upload-placeholder').style.display = 'block';
+        };
+
+        xhr.ontimeout = function() {
+            alert('请求超时，请重试');
+            document.getElementById('upload-progress').style.display = 'none';
+            document.getElementById('upload-placeholder').style.display = 'block';
+        };
+
+        xhr.send(formData);
+    }
+
+    // Drag and drop sorting
+    (function() {
+        var list = document.getElementById('videos-sort-list');
+        if (!list) return;
+        var dragItem = null;
+
+        list.querySelectorAll('.videos-sort-item').forEach(function(item) {
+            item.addEventListener('dragstart', function(e) {
+                dragItem = item;
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            item.addEventListener('dragend', function() {
+                item.classList.remove('dragging');
+                dragItem = null;
+                list.querySelectorAll('.videos-sort-item').forEach(function(i) {
+                    i.classList.remove('drag-over');
+                });
+                saveOrder();
+            });
+            item.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                if (dragItem && dragItem !== item) {
+                    item.classList.add('drag-over');
+                    var rect = item.getBoundingClientRect();
+                    var midY = rect.top + rect.height / 2;
+                    if (e.clientY < midY) {
+                        list.insertBefore(dragItem, item);
+                    } else {
+                        list.insertBefore(dragItem, item.nextSibling);
+                    }
+                }
+            });
+            item.addEventListener('dragleave', function() {
+                item.classList.remove('drag-over');
+            });
+        });
+
+        function saveOrder() {
+            var ids = [];
+            list.querySelectorAll('.videos-sort-item').forEach(function(item) {
+                ids.push(parseInt(item.dataset.id));
+            });
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            fetch('/Admin/Videos?handler=Reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': token ? token.value : '' },
+                body: JSON.stringify({ videoIds: ids })
+            });
+        }
+    })();
+</script>
+}

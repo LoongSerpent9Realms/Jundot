@@ -15,7 +15,6 @@
 }
 
 <div class="user-docs-layout">
-<<<<<<< HEAD
     <aside class="user-docs-sidebar">
         <div class="sidebar-header">
             <h2>文档列表</h2>
@@ -27,23 +26,11 @@
             {
                 <a href="/User/Docs?doc=@Model.CurrentDocId&lang=@language.Id" class="language-tab @(Model.CurrentLanguage == language.Id ? "active" : "")">@language.Label</a>
             }
-=======
-    <div class="user-card">
-        <div class="user-card-header">
-            <h2>文档编辑</h2>
-            <div class="language-tabs">
-                @foreach (var language in Model.SupportedLanguages)
-                {
-                    <a href="/User/Docs?doc=@Model.CurrentDocId&lang=@language.Id" class="language-tab @(Model.CurrentLanguage == language.Id ? "active" : "")">@language.Label</a>
-                }
-            </div>
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         </div>
 
         <div class="docs-list">
             @foreach (var doc in Model.Documents)
             {
-<<<<<<< HEAD
                 <div class="docs-item-wrapper">
                     <a href="/User/Docs?doc=@doc.Id&lang=@Model.CurrentLanguage" class="docs-item @(Model.CurrentDocId == doc.Id ? "active" : "")">
                         <strong>@doc.Title</strong>
@@ -147,37 +134,11 @@
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="toggleCreateModal()">取消</button>
                 <button type="submit" class="btn btn-primary">创建</button>
-=======
-                <a href="/User/Docs?doc=@doc.Id&lang=@Model.CurrentLanguage" class="docs-item @(Model.CurrentDocId == doc.Id ? "active" : "")">
-                    <strong>@doc.Title</strong>
-                    <span>@doc.Description</span>
-                </a>
-            }
-        </div>
-    </div>
-
-    <div class="user-card">
-        <div class="user-card-header">
-            <h3>编辑：@Model.CurrentDocTitle <span class="lang-pill">@Model.CurrentLanguageLabel</span></h3>
-            <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">预览</a>
-        </div>
-
-        <form method="post">
-            <input type="hidden" asp-for="Input.DocId" />
-            <input type="hidden" asp-for="Input.Language" />
-            <div class="form-group">
-                <textarea asp-for="Input.Html" class="docs-editor"></textarea>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">保存</button>
-                <a href="/docs/@Model.CurrentDocId?lang=@Model.CurrentLanguage" target="_blank" class="btn btn-secondary">打开前台预览</a>
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             </div>
         </form>
     </div>
 </div>
 
-<<<<<<< HEAD
 <form id="delete-form" method="post" asp-page-handler="Delete" style="display: none;">
     <input type="hidden" name="docId" id="delete-doc-id" />
 </form>
@@ -234,49 +195,11 @@
         .btn-sm {
             padding: 6px 12px;
             font-size: 13px;
-=======
-@section Styles {
-    <style>
-        .user-docs-layout {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .user-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            padding: 24px;
-            margin-bottom: 20px;
-        }
-
-        .user-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .user-card-header h2 {
-            margin: 0;
-            font-size: 20px;
-            color: #333;
-        }
-
-        .user-card-header h3 {
-            margin: 0;
-            font-size: 16px;
-            color: #333;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         }
 
         .language-tabs {
             display: flex;
             gap: 8px;
-<<<<<<< HEAD
             padding: 12px 20px;
             border-bottom: 1px solid #eee;
         }
@@ -287,16 +210,6 @@
             color: #666;
             text-decoration: none;
             font-size: 13px;
-=======
-        }
-
-        .language-tab {
-            padding: 6px 12px;
-            border-radius: 6px;
-            color: #666;
-            text-decoration: none;
-            font-size: 14px;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             transition: all 0.2s;
         }
 
@@ -310,7 +223,6 @@
         }
 
         .docs-list {
-<<<<<<< HEAD
             flex: 1;
             padding: 12px 0;
             overflow-y: auto;
@@ -331,18 +243,6 @@
             flex-direction: column;
             gap: 4px;
             padding: 12px 14px;
-=======
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .docs-item {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            padding: 12px 16px;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             border-radius: 8px;
             text-decoration: none;
             color: inherit;
@@ -368,7 +268,6 @@
             font-size: 12px;
         }
 
-<<<<<<< HEAD
         .btn-delete {
             background: #fee2e2;
             color: #dc2626;
@@ -502,39 +401,19 @@
             padding: 20px;
             border: none;
             border-radius: 0;
-=======
-        .docs-editor {
-            width: 100%;
-            min-height: 400px;
-            padding: 16px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             font-family: 'Consolas', 'Monaco', monospace;
             font-size: 14px;
             line-height: 1.6;
             resize: vertical;
-<<<<<<< HEAD
             box-sizing: border-box;
             color: #111827;
             background: #ffffff;
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-        }
-
-        .docs-editor:focus {
-            outline: none;
-<<<<<<< HEAD
-=======
-            border-color: #4A90D9;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         }
 
         .form-group {
             margin-bottom: 16px;
         }
 
-<<<<<<< HEAD
         .form-group label {
             display: block;
             margin-bottom: 6px;
@@ -570,11 +449,6 @@
             padding: 20px 24px;
             border-top: 1px solid #eee;
             flex-wrap: wrap;
-=======
-        .form-actions {
-            display: flex;
-            gap: 12px;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         }
 
         .btn {
@@ -585,13 +459,9 @@
             font-weight: 500;
             cursor: pointer;
             text-decoration: none;
-<<<<<<< HEAD
             display: inline-flex;
             align-items: center;
             justify-content: center;
-=======
-            display: inline-block;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             transition: all 0.2s;
         }
 
@@ -617,172 +487,24 @@
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 20px;
-<<<<<<< HEAD
             position: fixed;
             top: 86px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 100;
             max-width: min(680px, calc(100vw - 32px));
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-        }
-
-        .alert-error {
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-        }
-
-        .alert-success {
-            background: #f0fdf4;
-            color: #16a34a;
-            border: 1px solid #bbf7d0;
-        }
-
-<<<<<<< HEAD
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            width: 480px;
-            max-width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #333;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #888;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-        }
-
-        .modal-close:hover {
-            color: #333;
-        }
-
-        @@media (max-width: 900px) {
-            body > main {
-                padding: 124px 16px 20px;
-            }
-
-            .user-docs-layout {
-                grid-template-columns: 1fr;
-                min-height: auto;
-            }
-
-            .user-docs-sidebar {
-                max-height: 420px;
-            }
-
-            .docs-list {
-                max-height: 300px;
-            }
-
-            .user-docs-editor {
-                min-height: 680px;
-            }
-        }
-
-        @@media (min-width: 901px) {
-            .user-docs-editor form {
-                display: flex;
-                flex: 1;
-                min-height: 0;
-                flex-direction: column;
-            }
-
-            .user-docs-editor .form-group {
-                flex: 1;
-                min-height: 0;
-                margin-bottom: 0;
-            }
         }
     </style>
 }
 
 @section Scripts {
-    <script>
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-panel').forEach(function(panel) {
-                panel.classList.remove('active');
-            });
-            document.querySelectorAll('.editor-tab').forEach(function(btn) {
-                btn.classList.remove('active');
-            });
-            document.getElementById('tab-' + tab).classList.add('active');
-            event.target.classList.add('active');
+<script>
+    function confirmDelete(docId) {
+        if (confirm('确定要删除这个文档页面吗？此操作不可恢复。')) {
+            var form = document.getElementById('delete-form');
+            document.getElementById('delete-doc-id').value = docId;
+            form.submit();
         }
-
-        function confirmResetCss() {
-            if (confirm('确定要重置自定义CSS吗？此操作不可撤销。')) {
-                document.getElementById('reset-css-form').submit();
-            }
-        }
-
-        function toggleCreateModal() {
-            var modal = document.getElementById('create-modal');
-            if (modal.style.display === 'none') {
-                modal.style.display = 'flex';
-            } else {
-                modal.style.display = 'none';
-            }
-        }
-
-        function confirmDelete(docId, docTitle) {
-            if (confirm('确定要删除文档《' + docTitle + '》吗？此操作不可撤销。')) {
-                document.getElementById('delete-doc-id').value = docId;
-                document.getElementById('delete-form').submit();
-            }
-        }
-
-        document.getElementById('create-modal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                toggleCreateModal();
-            }
-        });
-    </script>
+    }
+</script>
 }
-=======
-        .lang-pill {
-            display: inline-block;
-            padding: 2px 8px;
-            background: #e8f0f8;
-            color: #4A90D9;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-left: 8px;
-        }
-    </style>
-}
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a

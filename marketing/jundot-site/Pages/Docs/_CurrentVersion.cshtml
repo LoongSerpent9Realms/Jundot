@@ -1,0 +1,106 @@
+<h1 id="current-version">Jundot Engine 0.3.32 alpha 现版本说明</h1>
+<p>Jundot Engine 0.3.32 alpha 是当前源码版本。它基于 Godot 的编辑器、运行时和导出体系，重点加入 AI 辅助项目制作、问题修复、运行时验证、图形化打包发布和热更新流程。</p>
+
+<div class="docs-callout">
+    <div class="docs-callout-title">引导视频位置</div>
+    <p>这里预留给现版本入门引导视频。视频发布后，可在后台“文档视频”中绑定到 <code>current-version</code> 页面，或把公开视频链接嵌入到本区域。</p>
+    <div class="docs-video-placeholder">
+        <div class="docs-video-placeholder-label">Guide Video Placeholder</div>
+        <div class="docs-video-placeholder-title">Jundot Engine 0.3.32 alpha 快速上手</div>
+        <p>建议视频内容：下载与启动、AI Assistant 首次配置、用 AI 创建项目、运行时截图验证、Package Builder 打包与更新。</p>
+    </div>
+</div>
+
+<h2 id="who-should-read">适合谁阅读</h2>
+<p>如果你是第一次打开 Jundot，建议先读本页，再进入安装、快速入门和 AI 助手页面。本页不是 Godot 基础教程，而是说明 Jundot 当前版本相比普通 Godot 多了哪些入口，以及这些入口应该如何串起来使用。</p>
+
+<h2 id="version-summary">版本概览</h2>
+<table>
+    <thead>
+        <tr>
+            <th>项目</th>
+            <th>当前值</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>产品名</td>
+            <td>Jundot Engine</td>
+        </tr>
+        <tr>
+            <td>源码版本</td>
+            <td>0.3.32 alpha</td>
+        </tr>
+        <tr>
+            <td>官网</td>
+            <td><a href="https://jundotengine.org">jundotengine.org</a></td>
+        </tr>
+        <tr>
+            <td>核心定位</td>
+            <td>基于 Godot 的 AI 辅助游戏迭代引擎</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="main-capabilities">当前核心能力</h2>
+
+<h3 id="ai-project-flow">1. AI 项目制作流程</h3>
+<p>Jundot 的主要入口是编辑器里的 AI Assistant。用户描述游戏想法后，AI 会先理解项目目标，再创建或修改项目文件、场景、脚本和 UI。当前版本默认鼓励先做可运行、可验证的小版本，再继续迭代。</p>
+<ul>
+    <li>支持项目模式和引擎模式的区分。</li>
+    <li>支持 <code>project.jundot</code> 与 <code>project.godot</code> 项目识别。</li>
+    <li>默认倾向用 C# 脚本制作项目，除非项目或用户明确要求 GDScript。</li>
+    <li>对于游戏创意类需求，优先通过可运行原型确认方向。</li>
+</ul>
+
+<h3 id="ai-repair-flow">2. AI 修复与验证闭环</h3>
+<p>遇到报错、性能问题、构建失败或功能无反应时，可以把问题交给 AI。AI 会读取真实现场、定位相关文件、做最小修改，并把检查结果反馈回对话中继续修。</p>
+<ul>
+    <li>运行时 UI 工具可辅助点击节点、检查节点可见性、断言无运行时错误。</li>
+    <li>AI 可以捕获游戏截图和运行时 UI 快照，作为下一轮判断依据。</li>
+    <li>工具执行后会生成摘要，方便用户知道 AI 实际改了什么、检查了什么。</li>
+    <li>修复引擎问题时，应先说明故障表现、预期结果、根因和验收标准。</li>
+</ul>
+
+<h3 id="engine-change-flow">3. 项目需要时再改引擎</h3>
+<p>Jundot 不是让 AI 随意改引擎。当前引擎能力足够时，AI 应只修改项目；只有项目层无法完成需求时，才进入引擎改动流程。进入引擎改动前，AI 需要说明原因、影响范围和验证方式。</p>
+
+<h3 id="package-builder">4. Package Builder 打包发布</h3>
+<p>当前版本包含图形化 Package Builder，用于构建引擎、管理版本、生成发布包和更新清单。它适合替代手写长命令的日常打包流程。</p>
+<ul>
+    <li>支持版本管理面板，构建成功后可自动更新补丁号。</li>
+    <li>支持构建历史、日志查看、打开输出目录和删除记录。</li>
+    <li>支持生成 <code>update-manifest.json</code>，供热更新系统使用。</li>
+    <li>发布配置中的 draft、prerelease 等状态应以显式配置为准。</li>
+</ul>
+
+<h3 id="hot-update">5. Launcher 与热更新</h3>
+<p>JundotLauncher 负责启动前版本检查、下载、SHA256 校验、安装和回滚。打包后的编辑器应包含 <code>Tools/Launcher/JundotLauncher.exe</code>，这样编辑器更新弹窗才能调用启动器执行更新。</p>
+
+<h2 id="recommended-first-run">推荐首次使用流程</h2>
+<ol>
+    <li>从下载页或 GitHub Releases 获取预览版。</li>
+    <li>启动 Jundot，打开或创建一个测试项目。</li>
+    <li>在 AI Config 中配置 OpenAI-compatible 后端或本地后端。</li>
+    <li>进入 AI Assistant，先用一句话描述要做的游戏。</li>
+    <li>让 AI 生成第一版可运行原型，并运行项目查看效果。</li>
+    <li>把报错、截图或想改的玩法继续交给 AI 迭代。</li>
+    <li>项目验证通过后，再考虑打包、提交或发布。</li>
+</ol>
+
+<h2 id="important-boundaries">重要边界</h2>
+<ul>
+    <li><strong>AI 不是自动合并者</strong>：AI 可以建议和修改，但关键结果需要用户验证。</li>
+    <li><strong>真实证据优先</strong>：报错日志、运行截图、构建输出比旧对话记忆更可靠。</li>
+    <li><strong>项目优先于引擎</strong>：能在项目层完成的需求，不应先改引擎。</li>
+    <li><strong>发布前检查包内容</strong>：更新、回滚、崩溃对话框等辅助工具需要进入最终包。</li>
+</ul>
+
+<h2 id="where-next">继续阅读</h2>
+<ul>
+    <li><a href="/docs/installation">安装指南</a>：下载、启动和 AI 后端配置。</li>
+    <li><a href="/docs/quickstart">快速入门</a>：用 AI 创建第一个项目。</li>
+    <li><a href="/docs/ai-assistant">AI 助手</a>：项目模式、引擎模式和修复流程。</li>
+    <li><a href="/docs/hot-update">更新与发布</a>：Package Builder、Launcher 和 GitHub 发布。</li>
+    <li><a href="/docs/troubleshooting">常见问题</a>：排查安装、AI、更新和运行问题。</li>
+</ul>

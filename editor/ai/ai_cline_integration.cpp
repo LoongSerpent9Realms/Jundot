@@ -11,6 +11,7 @@
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "editor/editor_node.h"
 #include "scene/main/http_request.h"
 #include "scene/main/timer.h"
 
@@ -30,7 +31,7 @@ void AIClineIntegration::cleanup() {
 void AIClineIntegration::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("connect_to_cline", "server_url"), &AIClineIntegration::connect_to_cline, DEFVAL(""));
 	ClassDB::bind_method(D_METHOD("disconnect_from_cline"), &AIClineIntegration::disconnect_from_cline);
-	ClassDB::bind_method(D_METHOD("is_connected"), &AIClineIntegration::is_connected);
+	ClassDB::bind_method(D_METHOD("is_cline_connected"), &AIClineIntegration::is_cline_connected);
 	ClassDB::bind_method(D_METHOD("get_state"), &AIClineIntegration::get_state);
 	ClassDB::bind_method(D_METHOD("login", "token"), &AIClineIntegration::login, DEFVAL(""));
 	ClassDB::bind_method(D_METHOD("logout"), &AIClineIntegration::logout);
@@ -49,21 +50,36 @@ void AIClineIntegration::_bind_methods() {
 
 AIClineIntegration::AIClineIntegration() {
 	singleton = this;
-	
+
 	http_request = memnew(HTTPRequest);
+	http_request->set_name("AIClineIntegrationHTTPRequest");
 	http_request->connect("request_completed", callable_mp(this, &AIClineIntegration::_on_http_request_completed));
-	
+
 	poll_timer = memnew(Timer);
+	poll_timer->set_name("AIClineIntegrationPollTimer");
 	poll_timer->set_wait_time(poll_interval / 1000.0);
 	poll_timer->connect("timeout", callable_mp(this, &AIClineIntegration::_on_poll_timeout));
+
+	// HTTPRequest and Timer must be in the scene tree to function.
+	// Since AIClineIntegration is RefCounted (not a Node), attach them to the editor gui base.
+	if (EditorNode::get_singleton() && EditorNode::get_singleton()->get_gui_base()) {
+		EditorNode::get_singleton()->get_gui_base()->add_child(http_request);
+		EditorNode::get_singleton()->get_gui_base()->add_child(poll_timer);
+	}
 }
 
 AIClineIntegration::~AIClineIntegration() {
 	disconnect_from_cline();
 	if (http_request) {
+		if (http_request->is_inside_tree()) {
+			http_request->get_parent()->remove_child(http_request);
+		}
 		memdelete(http_request);
 	}
 	if (poll_timer) {
+		if (poll_timer->is_inside_tree()) {
+			poll_timer->get_parent()->remove_child(poll_timer);
+		}
 		memdelete(poll_timer);
 	}
 }
@@ -93,7 +109,7 @@ void AIClineIntegration::disconnect_from_cline() {
 	auth_token = "";
 }
 
-bool AIClineIntegration::is_connected() const {
+bool AIClineIntegration::is_cline_connected() const {
 	return state == AIClineState::CONNECTED || state == AIClineState::AUTHENTICATED;
 }
 
@@ -142,7 +158,7 @@ bool AIClineIntegration::is_authenticated() const {
 }
 
 Error AIClineIntegration::send_message(const String &p_content, const Dictionary &p_context) {
-	if (!is_connected()) {
+	if (!is_cline_connected()) {
 		return ERR_UNAVAILABLE;
 	}
 	
@@ -163,7 +179,7 @@ Error AIClineIntegration::send_message(const String &p_content, const Dictionary
 }
 
 Error AIClineIntegration::send_tool_result(const String &p_tool_call_id, const String &p_result, bool p_is_error) {
-	if (!is_connected()) {
+	if (!is_cline_connected()) {
 		return ERR_UNAVAILABLE;
 	}
 	
@@ -185,7 +201,7 @@ Error AIClineIntegration::send_tool_result(const String &p_tool_call_id, const S
 }
 
 Error AIClineIntegration::register_tool(const String &p_name, const String &p_description, const Dictionary &p_parameters) {
-	if (!is_connected()) {
+	if (!is_cline_connected()) {
 		return ERR_UNAVAILABLE;
 	}
 	
@@ -207,7 +223,7 @@ Error AIClineIntegration::register_tool(const String &p_name, const String &p_de
 }
 
 Error AIClineIntegration::unregister_tool(const String &p_name) {
-	if (!is_connected()) {
+	if (!is_cline_connected()) {
 		return ERR_UNAVAILABLE;
 	}
 	
@@ -291,7 +307,7 @@ void AIClineIntegration::_on_http_request_completed(int p_result, int p_response
 }
 
 void AIClineIntegration::_on_poll_timeout() {
-	if (!is_connected()) {
+	if (!is_cline_connected()) {
 		poll_timer->stop();
 		return;
 	}

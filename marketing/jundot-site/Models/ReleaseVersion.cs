@@ -29,15 +29,12 @@ public class ReleaseVersion
 
     public string? SupportedPlatforms { get; set; }
 
-<<<<<<< HEAD
     public LicenseType LicenseType { get; set; } = LicenseType.MIT;
 
     public int? EngineBranchId { get; set; }
 
     public EngineBranch? EngineBranch { get; set; }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     public List<ReleaseFeature> Features { get; set; } = new();
 }
 

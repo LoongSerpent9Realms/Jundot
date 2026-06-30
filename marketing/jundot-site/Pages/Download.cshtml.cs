@@ -15,11 +15,7 @@ public class DownloadModel : PageModel
         _context = context;
     }
 
-<<<<<<< HEAD
     public async Task<IActionResult> OnGetAsync(string? version, string? platform, string? branch)
-=======
-    public async Task<IActionResult> OnGetAsync(string? version, string? platform)
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     {
         var latestRelease = await _context.ReleaseVersions
             .Where(r => r.IsPublished)
@@ -48,7 +44,6 @@ public class DownloadModel : PageModel
             latestRelease.DownloadCount++;
         }
 
-<<<<<<< HEAD
         if (!string.IsNullOrEmpty(branch))
         {
             var engineBranch = await _context.EngineBranches
@@ -59,8 +54,6 @@ public class DownloadModel : PageModel
             }
         }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         await _context.SaveChangesAsync();
 
         return Redirect(downloadUrl);

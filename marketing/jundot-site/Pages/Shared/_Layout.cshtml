@@ -33,33 +33,16 @@
                 <nav class="site-nav" aria-label="主导航">
                     <a href="/" class="@(currentPath == "/" ? "active" : "")">首页</a>
                     <a href="/#features">特性</a>
-<<<<<<< HEAD
                     <a href="/Branches" class="@(currentPath.StartsWith("/Branches", StringComparison.OrdinalIgnoreCase) || currentPath.StartsWith("/Branch", StringComparison.OrdinalIgnoreCase) ? "active" : "")">引擎分支</a>
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
                     <a href="/docs" class="@(currentPath.StartsWith("/docs", StringComparison.OrdinalIgnoreCase) ? "active" : "")">文档</a>
-                    <a href="/#download">下载</a>
                     <a href="/About" class="@(currentPath.StartsWith("/About", StringComparison.OrdinalIgnoreCase) ? "active" : "")">关于</a>
-                    <a href="/Contact" class="@(currentPath.StartsWith("/Contact", StringComparison.OrdinalIgnoreCase) ? "active" : "")">联系</a>
-                </nav>
-
-                <div class="nav-account">
+                    <a href="/Contact" class="@(currentPath.StartsWith("/Contact", StringComparison.OrdinalIgnoreCase) ? "active" : "")">反馈</a>
                     @if (isLoggedIn)
                     {
-<<<<<<< HEAD
-                        var isAdmin = Context.Session.GetString("IsAdmin") == "true";
-                        <span class="nav-user">@username</span>
-                        @if (isAdmin)
+                        if (!string.IsNullOrEmpty(username))
                         {
-                            <a href="/Admin/Docs">管理后台</a>
+                            <span class="nav-user">👤 @username</span>
                         }
-                        else
-                        {
-                            <a href="/User/Docs">文档管理</a>
-                        }
-=======
-                        <span class="nav-user">@username</span>
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
                         <a href="/Logout">退出</a>
                     }
                     else
@@ -79,15 +62,12 @@
     <footer>
         <div class="footer-inner">
             <span>@ViewData["FooterText"]</span>
-<<<<<<< HEAD
             <span>
                 <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">苏ICP备2021040231号-2</a>
             </span>
             <span>
                 <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener">苏公网安备32011202001011号</a>
             </span>
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             <span>@ViewData["FooterCopyright"]</span>
         </div>
     </footer>

@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "core/os/process_id.h"
 #include "core/os/thread.h"
 #include "core/templates/vector.h"
 #include "editor/ai/ai_chat_parser.h"
@@ -58,6 +59,8 @@ class Timer;
 class VBoxContainer;
 class PanelContainer;
 class ItemList;
+class EditorExportPlatform;
+class EditorExportPreset;
 
 class AIChatPanel : public MarginContainer {
 	GDCLASS(AIChatPanel, MarginContainer);
@@ -70,6 +73,8 @@ class AIChatPanel : public MarginContainer {
 	};
 
 	AIChatService *chat_service = nullptr;
+	AIChatService *audit_service = nullptr;
+	bool is_auditing = false;
 	AIChatMessage *streaming_message = nullptr;
 	VBoxContainer *message_list = nullptr;
 	ScrollContainer *message_scroll = nullptr;
@@ -108,6 +113,9 @@ class AIChatPanel : public MarginContainer {
 	VBoxContainer *next_question_options_box = nullptr;
 	bool tool_limit_options_due_to_limit = false;
 	Vector<String> next_question_options;
+	bool next_question_options_multi_select = false;
+	Vector<bool> next_question_selected;
+	Button *next_question_confirm_button = nullptr;
 	EditorFileDialog *reference_file_dialog = nullptr;
 	EditorFileDialog *upload_file_dialog = nullptr;
 	EditorFileDialog *upload_image_dialog = nullptr;
@@ -190,6 +198,28 @@ class AIChatPanel : public MarginContainer {
 	Timer *response_elapsed_timer = nullptr;
 	int build_status_poll_count = 0;
 
+	// ============ Export pipeline (no-bugs → package → verify) ============
+	enum ExportPipelineState {
+		EXPORT_PIPELINE_IDLE,
+		EXPORT_PIPELINE_AWAITING_PLATFORM,
+		EXPORT_PIPELINE_CHECKING_TEMPLATES,
+		EXPORT_PIPELINE_WAITING_TEMPLATE_DOWNLOAD,
+		EXPORT_PIPELINE_EXPORTING,
+		EXPORT_PIPELINE_LAUNCHING,
+		EXPORT_PIPELINE_VERIFYING,
+	};
+
+	ExportPipelineState export_pipeline_state = EXPORT_PIPELINE_IDLE;
+	String export_pipeline_platform;
+	String export_pipeline_output_path;
+	Timer *export_template_poll_timer = nullptr;
+	Timer *export_verify_timer = nullptr;
+	ProcessID export_verify_pid = 0;
+	int export_verify_wait_count = 0;
+	PanelContainer *export_pipeline_status_panel = nullptr;
+	Label *export_pipeline_status_label = nullptr;
+	ProgressBar *export_pipeline_progress = nullptr;
+
 	// Tool call confirmation dialog.
 	AIToolConfirmationDialog *tool_confirmation_dialog = nullptr;
 	Dictionary pending_tool_calls_json; // Stores the JSON for pending tool calls
@@ -252,6 +282,7 @@ class AIChatPanel : public MarginContainer {
 		bool tool_limit_options_collapsed = false;
 		bool tool_limit_options_due_to_limit = false;
 		Vector<String> next_question_options;
+		bool next_question_multi_select = false;
 		Vector<QueuedChatMessage> queued_messages;
 
 		static Dictionary to_dict(const Conversation &p_conv);
@@ -321,6 +352,8 @@ class AIChatPanel : public MarginContainer {
 	void _clear_messages();
 	void _chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _chat_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);
+	void _start_auto_audit(const String &p_user_message, const String &p_ai_response);
+	void _audit_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	Array _get_available_tools_for_active_settings() const;
 	bool _looks_like_tool_preamble(const String &p_content) const;
 	bool _extract_text_tool_calls(const String &p_content, Array &r_tool_calls) const;
@@ -392,9 +425,12 @@ class AIChatPanel : public MarginContainer {
 	void _set_tool_limit_options_collapsed(bool p_collapsed);
 	void _store_tool_limit_options_state(bool p_save = true);
 	void _apply_tool_limit_options_state(const Conversation &p_conv);
-	void _set_next_question_options(const Vector<String> &p_questions, bool p_save = true);
+	void _set_next_question_options(const Vector<String> &p_questions, bool p_save = true, bool p_multi_select = false);
 	void _render_next_question_options();
 	void _use_next_question_option(const String &p_question);
+	void _toggle_next_question_option(int p_index);
+	void _confirm_multi_select_options();
+	void _update_next_question_confirm_button();
 	void _send_hidden_followup(const String &p_instruction);
 	void _continue_after_tool_limit();
 	void _focus_custom_tool_limit_message();
@@ -436,6 +472,19 @@ class AIChatPanel : public MarginContainer {
 	void _on_build_status_poll_timeout();
 	void _append_forced_build_status_check();
 	void _continue_after_build_poll();
+
+	// Export pipeline (no-bugs → package → verify).
+	bool _is_no_bug_confirmation_message(const String &p_text) const;
+	void _start_export_pipeline();
+	void _export_pipeline_select_platform(const String &p_platform);
+	void _export_pipeline_check_templates();
+	void _export_pipeline_on_template_poll();
+	void _export_pipeline_do_export();
+	void _export_pipeline_launch_game();
+	void _export_pipeline_on_verify_tick();
+	void _export_pipeline_finish(bool p_success, const String &p_message);
+	void _export_pipeline_cancel();
+	void _update_export_pipeline_status_ui();
 
 	// --- Send / Stop button dynamic text ---
 	bool is_currently_requesting = false;

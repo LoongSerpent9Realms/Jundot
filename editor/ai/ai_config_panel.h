@@ -52,7 +52,9 @@ class AIConfigPanel : public MarginContainer {
 	OptionButton *backend_type_option = nullptr;
 	LineEdit *jundot_plugin_id_edit = nullptr;
 	LineEdit *jundot_plugin_url_edit = nullptr;
-	LineEdit *model_edit = nullptr;
+	OptionButton *model_option = nullptr;
+	Button *model_refresh_button = nullptr;
+	HTTPRequest *model_list_request = nullptr;
 	LineEdit *api_key_edit = nullptr;
 	SpinBox *temperature_spin = nullptr;
 	SpinBox *max_tokens_spin = nullptr;
@@ -69,6 +71,7 @@ class AIConfigPanel : public MarginContainer {
 	CheckBox *develop_mode_check = nullptr;
 	CheckBox *mcp_tools_enabled_check = nullptr;
 	CheckBox *auto_suggest_entries_check = nullptr;
+	CheckBox *auto_audit_enabled_check = nullptr;
 	CheckBox *html_min_project_prototype_check = nullptr;
 	CheckBox *feature_design_philosophy_check = nullptr;
 	TextEdit *system_prompt_edit = nullptr;
@@ -175,6 +178,9 @@ class AIConfigPanel : public MarginContainer {
 	void _update_backend_controls();
 	void _update_mimocode_button();
 	void _on_backend_type_selected(int p_index);
+	void _on_model_refresh_pressed();
+	void _on_model_list_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	void _fetch_available_models();
 	void _on_mimocode_download_button_pressed();
 	void _on_mimocode_download_progress(int p_amount_downloaded, int p_amount_total);
 	void _on_mimocode_download_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);

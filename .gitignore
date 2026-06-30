@@ -403,3 +403,14 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 *.generated.props
+
+#############################
+### Secrets and credentials ###
+#############################
+
+# Environment files may contain API keys (e.g. DASHSCOPE_API_KEY).
+.env
+.env.*
+
+# Exported AI config files may contain API keys.
+ai_config*.json

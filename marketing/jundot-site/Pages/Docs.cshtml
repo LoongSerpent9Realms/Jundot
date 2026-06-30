@@ -19,10 +19,7 @@
     <link rel="icon" type="image/png" href="~/images/jundot-icon.png" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/docs.css" asp-append-version="true" />
-<<<<<<< HEAD
     <link rel="stylesheet" href="~/css/custom-docs.css" asp-append-version="true" />
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 </head>
 <body class="docs-page">
     <header class="docs-topbar">
@@ -129,6 +126,39 @@
 
                 <article class="docs-article">
                     @Html.Raw(Model.CurrentDocHtml)
+
+                    @if (Model.DocVideos.Any())
+                    {
+                        <section class="docs-videos-section" aria-labelledby="docs-videos-heading">
+                            <h2 id="docs-videos-heading" class="docs-videos-heading">相关视频</h2>
+                            <div class="docs-videos-grid">
+                                @foreach (var video in Model.DocVideos)
+                                {
+                                    <article class="docs-video-card">
+                                        <div class="docs-video-player-wrapper">
+                                            @if (video.SourceType == 1)
+                                            {
+                                                <video class="docs-video-player" controls preload="metadata" poster="@video.ThumbnailUrl">
+                                                    <source src="@video.VideoUrl" />
+                                                </video>
+                                            }
+                                            else
+                                            {
+                                                @await Html.PartialAsync("Shared/_VideoEmbed", video.VideoUrl)
+                                            }
+                                        </div>
+                                        <div class="docs-video-info">
+                                            <h3 class="docs-video-title">@video.Title</h3>
+                                            @if (!string.IsNullOrWhiteSpace(video.Description))
+                                            {
+                                                <p class="docs-video-desc">@video.Description</p>
+                                            }
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                        </section>
+                    }
                 </article>
 
                 <div class="docs-footer-nav">

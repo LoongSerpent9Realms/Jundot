@@ -18,11 +18,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<DocSnapshot> DocSnapshots { get; set; }
     public DbSet<EmailVerificationCode> EmailVerificationCodes { get; set; }
-<<<<<<< HEAD
     public DbSet<EngineBranch> EngineBranches { get; set; }
     public DbSet<BranchFeature> BranchFeatures { get; set; }
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+    public DbSet<DocVideo> DocVideos { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,7 +38,6 @@ public class ApplicationDbContext : DbContext
             .HasIndex(r => r.VersionNumber)
             .IsUnique();
 
-<<<<<<< HEAD
         modelBuilder.Entity<ReleaseVersion>()
             .HasOne(r => r.EngineBranch)
             .WithMany(b => b.Releases)
@@ -57,8 +54,6 @@ public class ApplicationDbContext : DbContext
             .HasIndex(b => b.Slug)
             .IsUnique();
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
             .IsUnique();
@@ -72,5 +67,11 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<DocSnapshot>()
             .HasIndex(d => d.DocId);
+
+        modelBuilder.Entity<DocVideo>()
+            .HasIndex(v => v.DocId);
+
+        modelBuilder.Entity<DocVideo>()
+            .HasIndex(v => v.SortOrder);
     }
 }

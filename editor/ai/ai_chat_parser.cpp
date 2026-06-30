@@ -502,14 +502,29 @@ void AIChatParser::parse(const String &p_response, Vector<AISuggestion> &r_sugge
 	}
 }
 
-void AIChatParser::parse_next_questions(const String &p_response, Vector<String> &r_questions) {
+void AIChatParser::parse_next_questions(const String &p_response, Vector<String> &r_questions, bool *r_multi_select) {
 	r_questions.clear();
+	if (r_multi_select) {
+		*r_multi_select = false;
+	}
 
 	const Vector<String> question_blocks = _extract_comment_blocks(p_response, "NEXT_QUESTION");
 	for (int i = 0; i < question_blocks.size() && r_questions.size() < 4; i++) {
-		const String question = _extract_field(question_blocks[i], "QUESTION").strip_edges();
-		if (!question.is_empty()) {
-			r_questions.push_back(question);
+		// Check for MODE field (applies to the whole set of options).
+		if (r_multi_select) {
+			const String mode = _extract_field(question_blocks[i], "MODE").strip_edges().to_lower();
+			if (mode == "multi" || mode == "multiple" || mode == "multi_select") {
+				*r_multi_select = true;
+			}
+		}
+		// Extract all QUESTION lines from this block (multi mode may have
+		// multiple QUESTION entries in a single block).
+		const Vector<String> lines = _split_lines(question_blocks[i]);
+		for (int j = 0; j < lines.size() && r_questions.size() < 4; j++) {
+			const String question = _strip_field_prefix(lines[j], "QUESTION:");
+			if (!question.is_empty()) {
+				r_questions.push_back(question.strip_edges());
+			}
 		}
 	}
 

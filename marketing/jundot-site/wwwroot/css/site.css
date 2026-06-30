@@ -654,7 +654,6 @@ footer {
   }
 }
 
-<<<<<<< HEAD
 .branch-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -851,8 +850,54 @@ footer {
   }
 }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
+/* ===== GIF Showcase Styles ===== */
+.showcase {
+  padding: 0 clamp(18px, 5vw, 72px);
+  background: var(--dark);
+}
+
+.showcase-hero {
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.showcase-hero-gif {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #101719;
+}
+
+.showcase-hero-gif img {
+  width: 100%;
+  display: block;
+}
+
+.feature-gif {
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d9e3dd;
+  background: #f7faf7;
+}
+
+.feature-gif img {
+  width: 100%;
+  display: block;
+}
+
+.step-gif {
+  margin-bottom: 14px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.step-gif img {
+  width: 100%;
+  display: block;
+}
 @media (max-width: 520px) {
   .site-nav,
   .nav-account {
@@ -873,4 +918,24 @@ footer {
     padding-left: 16px;
     padding-right: 16px;
   }
+}
+
+/* ===== Docs Image Styles ===== */
+.docs-image {
+  margin: 24px 0;
+  text-align: center;
+}
+
+.docs-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.docs-image figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #53615c;
 }

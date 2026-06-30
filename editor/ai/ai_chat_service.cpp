@@ -28,6 +28,7 @@
 #include "ai_chat_service.h"
 
 #include "core/io/json.h"
+#include "core/math/math_funcs.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
@@ -36,6 +37,11 @@
 #include "editor/ai/ai_settings.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/main/http_request.h"
+#include "scene/main/timer.h"
+
+static constexpr int OPENAI_MAX_RETRIES = 2;
+static constexpr double OPENAI_RETRY_BASE_SECONDS = 5.0;
+static constexpr double OPENAI_RETRY_MAX_SECONDS = 60.0;
 
 static String _get_json_error(const String &p_text) {
 	// Try to extract a human-readable error from a non-JSON response.
@@ -294,6 +300,102 @@ bool AIChatService::_should_use_jundot_plugin_backend() const {
 	return settings.backend_type == AIBackendType::JUNDOT_PLUGIN;
 }
 
+void AIChatService::_ensure_retry_timer() {
+	if (retry_timer) {
+		return;
+	}
+
+	retry_timer = memnew(Timer);
+	retry_timer->set_name("AIChatRetryTimer");
+	retry_timer->set_one_shot(true);
+	retry_timer->connect("timeout", callable_mp(this, &AIChatService::_send_retry_request));
+	add_child(retry_timer, false, INTERNAL_MODE_BACK);
+}
+
+bool AIChatService::_is_retryable_error(int p_result, int p_response_code, const String &p_body) const {
+	// Timeout.
+	if (p_result == 8) {
+		return true;
+	}
+	// Connection failures are worth retrying.
+	if (p_result == HTTPRequest::RESULT_CANT_CONNECT ||
+			p_result == HTTPRequest::RESULT_CONNECTION_ERROR) {
+		return true;
+	}
+	// HTTP 429 Too Many Requests.
+	if (p_response_code == 429) {
+		return true;
+	}
+	// HTTP 5xx server errors.
+	if (p_response_code >= 500 && p_response_code <= 599) {
+		return true;
+	}
+	// Some APIs return rate-limit info in the body with a 200/400 status.
+	if (p_body.to_lower().contains("rate limit exceeded") ||
+			p_body.to_lower().contains("too many requests")) {
+		return true;
+	}
+	return false;
+}
+
+double AIChatService::_get_retry_wait_seconds(const PackedStringArray &p_headers) const {
+	// Respect Retry-After header when present.
+	for (int i = 0; i < p_headers.size(); i++) {
+		const String header = p_headers[i].strip_edges();
+		const int separator = header.find(":");
+		if (separator < 0 || header.substr(0, separator).strip_edges().to_lower() != "retry-after") {
+			continue;
+		}
+		const String value = header.substr(separator + 1).strip_edges();
+		if (value.is_valid_float()) {
+			return MAX(1.0, value.to_float());
+		}
+	}
+
+	// Exponential backoff: base * 2^retry_count, capped at max.
+	return MIN(OPENAI_RETRY_MAX_SECONDS,
+			OPENAI_RETRY_BASE_SECONDS * Math::pow(2.0, retry_count));
+}
+
+bool AIChatService::_schedule_retry(const PackedStringArray &p_headers) {
+	if (retry_count >= OPENAI_MAX_RETRIES) {
+		return false;
+	}
+	if (retry_messages.is_empty()) {
+		return false;
+	}
+
+	const double wait_seconds = _get_retry_wait_seconds(p_headers);
+	retry_count++;
+	retry_pending = true;
+
+	_ensure_retry_timer();
+	retry_timer->start(wait_seconds);
+
+	print_line(vformat("AIChatService: Retryable error detected. Scheduling retry %d/%d in %.1f seconds.",
+			retry_count, OPENAI_MAX_RETRIES, wait_seconds));
+	return true;
+}
+
+void AIChatService::_send_retry_request() {
+	if (!retry_pending) {
+		return;
+	}
+
+	Array messages = retry_messages.duplicate(true);
+	Array tools = retry_tools.duplicate(true);
+	retry_messages.clear();
+	retry_tools.clear();
+	retry_pending = false;
+
+	print_line(vformat("AIChatService: Executing retry %d/%d.", retry_count, OPENAI_MAX_RETRIES));
+
+	const Error err = send_messages(messages, tools);
+	if (err != OK) {
+		print_line("AIChatService: Retry request failed to start.");
+	}
+}
+
 String AIChatService::_extract_text_from_response(const Variant &p_data) const {
 	if (p_data.get_type() != Variant::DICTIONARY) {
 		return String();
@@ -332,6 +434,18 @@ void AIChatService::_extract_usage_from_response(const Variant &p_data, int &r_p
 		Dictionary usage = root["usage"];
 		r_prompt_tokens = usage.get("prompt_tokens", 0);
 		r_completion_tokens = usage.get("completion_tokens", 0);
+		// DashScope context cache: report cached/creation token counts when available.
+		if (usage.has("prompt_tokens_details") && usage["prompt_tokens_details"].get_type() == Variant::DICTIONARY) {
+			Dictionary details = usage["prompt_tokens_details"];
+			const int cached = details.get("cached_tokens", 0);
+			const int cache_creation = details.get("cache_creation_input_tokens", 0);
+			if (cached > 0) {
+				print_verbose(vformat("AIChatService: Context cache hit — %d tokens at 10%% cost", cached));
+			}
+			if (cache_creation > 0) {
+				print_verbose(vformat("AIChatService: Context cache created — %d tokens at 125%% cost", cache_creation));
+			}
+		}
 	}
 }
 
@@ -396,6 +510,14 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 	String body_text;
 	if (!p_body.is_empty()) {
 		body_text = ai_decode_http_response_text(p_body, p_headers);
+	}
+
+	// Check for retryable errors (429, 5xx, timeout, connection failure).
+	if (_is_retryable_error(p_result, p_response_code, body_text)) {
+		if (_schedule_retry(p_headers)) {
+			return; // Retry scheduled, don't propagate the error yet.
+		}
+		print_line("AIChatService: Max retries exhausted, propagating error.");
 	}
 
 	Variant parsed;
@@ -553,6 +675,11 @@ void AIChatService::_request_completed(int p_result, int p_response_code, const 
 		json = parsed;
 	}
 
+	// Success — clear retry state.
+	retry_count = 0;
+	retry_messages.clear();
+	retry_tools.clear();
+
 	if (streaming) {
 		emit_signal(SNAME("chat_stream_complete"), p_result, p_response_code, content, json, body_text, elapsed, think_content, prompt_tokens, completion_tokens);
 	}
@@ -626,6 +753,7 @@ void AIChatService::configure(const AISettingsData &p_settings) {
 }
 
 Error AIChatService::send_chat(const String &p_message) {
+	retry_count = 0;
 	Array messages;
 	String effective_prompt = AISettings::get_effective_system_prompt(settings);
 	if (!effective_prompt.is_empty()) {
@@ -644,6 +772,7 @@ Error AIChatService::send_chat(const String &p_message) {
 }
 
 Error AIChatService::send_messages(const Array &p_messages) {
+	retry_count = 0;
 	return send_messages(p_messages, Array());
 }
 
@@ -663,9 +792,16 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 
 	_ensure_http_request();
 
+	// Save request data for potential retry on transient failures.
+	retry_messages = p_messages.duplicate(true);
+	retry_tools = p_tools.duplicate(true);
+
 	request_start_usec = OS::get_singleton()->get_ticks_usec();
 
-	const bool request_stream = p_tools.is_empty();
+	// Always use streaming mode — the stream parser already accumulates
+	// tool_calls incrementally (see _process_stream_chunk) and the completion
+	// handler constructs synthetic responses when tool_calls are present.
+	const bool request_stream = true;
 	streaming = request_stream;
 	stream_buffer = String();
 	stream_prompt_tokens = 0;
@@ -690,6 +826,11 @@ Error AIChatService::send_messages(const Array &p_messages, const Array &p_tools
 	headers.push_back("Accept-Charset: utf-8");
 	if (request_stream) {
 		headers.push_back("Accept: text/event-stream");
+	}
+
+	// Safety: ensure the HTTPRequest node is inside the scene tree before requesting.
+	if (!http_request->is_inside_tree()) {
+		ERR_FAIL_V_MSG(ERR_UNCONFIGURED, "AIChatService HTTPRequest is not inside the scene tree.");
 	}
 
 	return http_request->request(_build_chat_url(), headers, HTTPClient::METHOD_POST, JSON::stringify(payload));
@@ -783,11 +924,30 @@ void AIChatService::_process_stream_chunk(const String &p_chunk) {
 		Dictionary usage = chunk_data["usage"];
 		stream_prompt_tokens = usage.get("prompt_tokens", stream_prompt_tokens);
 		stream_completion_tokens = usage.get("completion_tokens", stream_completion_tokens);
+		// DashScope context cache: report cached/creation token counts when available.
+		if (usage.has("prompt_tokens_details") && usage["prompt_tokens_details"].get_type() == Variant::DICTIONARY) {
+			Dictionary details = usage["prompt_tokens_details"];
+			const int cached = details.get("cached_tokens", 0);
+			const int cache_creation = details.get("cache_creation_input_tokens", 0);
+			if (cached > 0) {
+				print_verbose(vformat("AIChatService: Stream context cache hit — %d tokens at 10%% cost", cached));
+			}
+			if (cache_creation > 0) {
+				print_verbose(vformat("AIChatService: Stream context cache created — %d tokens at 125%% cost", cache_creation));
+			}
+		}
 	}
 }
 
 void AIChatService::cancel_request() {
 	streaming = false;
+	retry_pending = false;
+	retry_count = 0;
+	retry_messages.clear();
+	retry_tools.clear();
+	if (retry_timer) {
+		retry_timer->stop();
+	}
 	if (_should_use_jundot_plugin_backend() && jundot_plugin_backend) {
 		jundot_plugin_backend->cancel_request();
 		return;

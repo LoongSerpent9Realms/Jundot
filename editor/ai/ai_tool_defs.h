@@ -40,6 +40,7 @@ constexpr const char *SEARCH_FILES = "search_files";
 constexpr const char *LIST_FILES = "list_files";
 constexpr const char *GREP_CODE = "grep_code";
 constexpr const char *CHECK_PROJECT_SCRIPTS = "check_project_scripts";
+constexpr const char *CHECK_HTML_PROTOTYPE = "check_html_prototype";
 constexpr const char *CHECK_UI_LAYOUT = "check_ui_layout";
 constexpr const char *CREATE_3D_SCENE = "create_3d_scene";
 constexpr const char *ADD_3D_OBJECT = "add_3d_object";
@@ -71,6 +72,16 @@ constexpr const char *SETUP_ENGINE_WORKSPACE = "setup_engine_workspace";
 constexpr const char *REQUEST_ENGINE_CHANGE = "request_engine_change";
 constexpr const char *RETURN_TO_PROJECT_MODE = "return_to_project_mode";
 constexpr const char *BATCH_TOOLS = "batch_tools";
+constexpr const char *ADD_PHYSICS = "add_physics";
+constexpr const char *ADD_ANIMATION = "add_animation";
+constexpr const char *ADD_PARTICLES = "add_particles";
+constexpr const char *ADD_VFX = "add_vfx";
+constexpr const char *ADD_CHARACTER_CONTROLLER = "add_character_controller";
+constexpr const char *REMOVE_NODE = "remove_node";
+constexpr const char *MODIFY_NODE_PROPERTIES = "modify_node_properties";
+constexpr const char *CONNECT_SIGNAL = "connect_signal";
+constexpr const char *DUPLICATE_NODE = "duplicate_node";
+constexpr const char *REPARENT_NODE = "reparent_node";
 } // namespace AIToolNames
 
 // Returns the built-in tool definitions as an Array of Dictionary,
@@ -87,4 +98,13 @@ public:
 	// - PROJECT: project file tools + shell_command + setup_engine_workspace + request_engine_change (no build tools).
 	// - ENGINE: engine source tools + build tools + return_to_project_mode.
 	static Array get_tools_for_mode(AIContextMode p_mode);
+
+	// Returns a minimal read-only tool set suitable for consultation/design
+	// discussion queries where the AI may need to look up project files but
+	// should not modify them. Saves ~3,000 tokens vs. the full mode set.
+	static Array get_readonly_tools();
+
+	// Heuristic check: does the user message look like a consultation/design
+	// discussion rather than an implementation request?
+	static bool is_consultation_message(const String &p_message);
 };

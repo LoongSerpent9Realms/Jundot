@@ -49,7 +49,35 @@
             <input type="hidden" asp-for="Input.Language" />
             <div class="form-group">
                 <label asp-for="Input.Html">文档 HTML</label>
-                <textarea asp-for="Input.Html" class="docs-admin-editor"></textarea>
+                <div class="docs-editor-toolbar">
+                    <span style="font-size: 13px; color: #53615c; font-weight: 600;">插入视频：</span>
+                    @if (Model.DocVideos.Count > 0)
+                    {
+                        <select id="video-insert-select" style="padding: 6px 10px; border: 1px solid #d9e3dd; border-radius: 6px; font-size: 13px; min-width: 180px;">
+                            <option value="">-- 选择视频 --</option>
+                            @foreach (var video in Model.DocVideos)
+                            {
+                                var label = video.Title + (video.SourceType == 0 ? " (外部)" : " (本地)");
+                                <option value="@video.Id" data-source-type="@video.SourceType" data-url="@video.VideoUrl" data-title="@video.Title">@label</option>
+                            }
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="insertVideoAtCursor()" title="在光标位置插入视频 HTML">插入到光标处</button>
+                    }
+                    else
+                    {
+                        <span style="font-size: 13px; color: #8a9690;">暂无视频，先去 <a href="/Admin/Videos" style="color: #7be495;">视频管理</a> 添加</span>
+                    }
+                </div>
+                <div class="docs-editor-toolbar">
+                    <span style="font-size: 13px; color: #53615c; font-weight: 600;">插入图片：</span>
+                    <input type="file" id="image-upload-input" accept="image/*" style="display: none;" onchange="handleImageUpload(this)" />
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('image-upload-input').click()">上传图片</button>
+                    <span style="color: #8a9690; font-size: 12px;">或</span>
+                    <input type="text" id="image-url-input" placeholder="粘贴图片链接" style="padding: 6px 10px; border: 1px solid #d9e3dd; border-radius: 6px; font-size: 13px; width: 240px;" />
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="insertImageUrlAtCursor()">插入到光标处</button>
+                    <span id="image-upload-status" style="font-size: 12px; color: #2e7d32; display: none;"></span>
+                </div>
+                <textarea asp-for="Input.Html" class="docs-admin-editor" id="doc-html-editor"></textarea>
                 <span asp-validation-for="Input.Html" style="color: #c62828; font-size: 13px;"></span>
             </div>
             <div class="form-actions">
@@ -123,3 +151,149 @@
         </div>
     </form>
 </div>
+
+@section Scripts {
+<script>
+function insertVideoAtCursor() {
+    var select = document.getElementById('video-insert-select');
+    var option = select.options[select.selectedIndex];
+    if (!option || !option.value) {
+        alert('请先选择一个视频');
+        return;
+    }
+
+    var sourceType = option.getAttribute('data-source-type');
+    var url = option.getAttribute('data-url');
+    var title = option.getAttribute('data-title') || '视频';
+    var textarea = document.getElementById('doc-html-editor');
+    if (!textarea) return;
+
+    var html = '';
+    if (sourceType === '1') {
+        // Local video - HTML5 player
+        html = '\n<div class="docs-video-card">\n' +
+            '    <div class="docs-video-player-wrapper">\n' +
+            '        <video class="docs-video-player" controls preload="metadata">\n' +
+            '            <source src="' + url + '" type="video/mp4" />\n' +
+            '            你的浏览器不支持视频播放。\n' +
+            '        </video>\n' +
+            '    </div>\n' +
+            '    <div class="docs-video-info">\n' +
+            '        <h3 class="docs-video-title">' + title + '</h3>\n' +
+            '    </div>\n' +
+            '</div>\n';
+    } else {
+        // External video - iframe embed
+        var embedUrl = convertToEmbedUrl(url);
+        html = '\n<div class="docs-video-card">\n' +
+            '    <div class="docs-video-player-wrapper">\n' +
+            '        <div class="docs-video-embed">\n' +
+            '            <iframe src="' + embedUrl + '" frameborder="0" allowfullscreen loading="lazy"></iframe>\n' +
+            '        </div>\n' +
+            '    </div>\n' +
+            '    <div class="docs-video-info">\n' +
+            '        <h3 class="docs-video-title">' + title + '</h3>\n' +
+            '    </div>\n' +
+            '</div>\n';
+    }
+
+    // Insert at cursor position
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var text = textarea.value;
+    textarea.value = text.substring(0, start) + html + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + html.length;
+    textarea.focus();
+}
+
+function convertToEmbedUrl(url) {
+    // Bilibili
+    var bvMatch = url.match(/(BV[a-zA-Z0-9]+)/);
+    if (bvMatch && url.indexOf('bilibili.com') !== -1) {
+        return '//player.bilibili.com/player.html?bvid=' + bvMatch[1] + '&high_quality=1&danmaku=0';
+    }
+    // YouTube
+    var ytMatch = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch && (url.indexOf('youtube.com') !== -1 || url.indexOf('youtu.be') !== -1)) {
+        return 'https://www.youtube.com/embed/' + ytMatch[1];
+    }
+    // Already an embed URL or other
+    return url;
+}
+
+function insertImageUrlAtCursor() {
+    var urlInput = document.getElementById('image-url-input');
+    var url = urlInput.value.trim();
+    if (!url) {
+        alert('请先输入图片链接');
+        return;
+    }
+    insertImageHtml(url, '');
+    urlInput.value = '';
+}
+
+function handleImageUpload(input) {
+    if (!input.files || input.files.length === 0) return;
+    var file = input.files[0];
+
+    var statusEl = document.getElementById('image-upload-status');
+    statusEl.style.display = 'inline';
+    statusEl.style.color = '#53615c';
+    statusEl.textContent = '上传中...';
+
+    var formData = new FormData();
+    formData.append('file', file);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/Admin/Docs?handler=UploadImage');
+
+    var tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (tokenInput) {
+        xhr.setRequestHeader('RequestVerificationToken', tokenInput.value);
+    }
+
+    xhr.onload = function() {
+        try {
+            var resp = JSON.parse(xhr.responseText);
+            if (resp.success) {
+                statusEl.style.color = '#2e7d32';
+                statusEl.textContent = '已上传';
+                insertImageHtml(resp.url, file.name);
+            } else {
+                statusEl.style.color = '#c62828';
+                statusEl.textContent = resp.message || '上传失败';
+            }
+        } catch (e) {
+            statusEl.style.color = '#c62828';
+            statusEl.textContent = '上传出错';
+        }
+        input.value = '';
+        setTimeout(function() { statusEl.style.display = 'none'; }, 3000);
+    };
+
+    xhr.onerror = function() {
+        statusEl.style.color = '#c62828';
+        statusEl.textContent = '上传失败';
+        input.value = '';
+    };
+
+    xhr.send(formData);
+}
+
+function insertImageHtml(url, alt) {
+    var textarea = document.getElementById('doc-html-editor');
+    if (!textarea) return;
+
+    var html = '\n<figure class="docs-image">\n' +
+        '    <img src="' + url + '" alt="' + (alt || '') + '" loading="lazy" />\n' +
+        '</figure>\n';
+
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var text = textarea.value;
+    textarea.value = text.substring(0, start) + html + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + html.length;
+    textarea.focus();
+}
+</script>
+}

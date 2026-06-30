@@ -129,6 +129,12 @@ void EngineUpdateLabel::_check_update() {
 	checked_update = true;
 	_set_status(UpdateStatus::BUSY);
 
+	// Safety: ensure the HTTPRequest node is inside the scene tree before requesting.
+	if (!http->is_inside_tree()) {
+		call_deferred(SNAME("_check_update"));
+		return;
+	}
+
 	String manifest_url = EDITOR_GET("network/connection/update_manifest_url");
 	if (manifest_url.is_empty()) {
 		manifest_url = JUNDOT_AUTO_MANIFEST_URL;

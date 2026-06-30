@@ -199,7 +199,23 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_PROJECT_SCRIPTS, "", fn));
 	}
 
-	// 7. check_ui_layout
+	// 7. check_html_prototype
+	{
+		Dictionary props;
+		props["path"] = _str_property("HTML file path relative to the project root. Must be under .JundotAI/prototypes/ and end with .html.");
+		props["wait_ms"] = _number_property("Optional time to keep the page running after load and interactions, in milliseconds. Defaults to 1500.");
+		props["click_selectors"] = _array_str_property("Optional CSS selectors to click after the page loads, such as '#start' or 'button.play'.");
+		props["screenshot"] = _bool_property("If true or omitted, save a browser screenshot under .JundotAI/browser_checks/.");
+		Array required;
+		required.push_back("path");
+		Dictionary fn = _make_fn(
+				AIToolNames::CHECK_HTML_PROTOTYPE,
+				"PROJECT mode only. Open a generated standalone HTML gameplay prototype in a real browser via Playwright/Chromium when available, collect console.error, page errors, failed requests, HTTP error responses, optional click-selector results, and a screenshot path. Use immediately after writing or revising .JundotAI/prototypes/*.html so browser/runtime errors are fixed before asking the user to verify the prototype.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CHECK_HTML_PROTOTYPE, "", fn));
+	}
+
+	// 8. check_ui_layout
 	{
 		Dictionary props;
 		props["paths"] = _array_str_property("Scene file path(s) relative to the project root to inspect, e.g. 'scenes/main_menu.tscn' or 'res://scenes/hud.tscn'.");
@@ -212,7 +228,7 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::CHECK_UI_LAYOUT, "", fn));
 	}
 
-	// 8. build_project
+	// 9. build_project
 	{
 		Dictionary props;
 		props["path"] = _str_property("Scene file path to create relative to the project root, e.g. 'scenes/levels/test_arena.tscn' or 'res://scenes/levels/test_arena.tscn'.");
@@ -652,10 +668,227 @@ Array AIToolDefs::get_builtin_tools() {
 		tools.push_back(_tool(AIToolNames::RETURN_TO_PROJECT_MODE, "", fn));
 	}
 
-	// 26. batch_tools
+	// 26. add_physics
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new physics body node.");
+		props["body_type"] = _str_property("Physics body type: static_3d, rigid_3d, character_3d, area_3d, static_2d, rigid_2d, character_2d, or area_2d. Defaults to static_3d.");
+		props["shape_type"] = _str_property("Collision shape type: box, sphere, capsule, cylinder (3D only), rectangle (2D only), circle (2D only). Defaults to box for 3D, rectangle for 2D.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["position"] = _str_property("Optional position. For 3D: 'x,y,z'. For 2D: 'x,y'. Defaults to origin.");
+		props["shape_size"] = _str_property("Optional shape dimensions. For 3D box: 'x,y,z'. For sphere: 'radius'. For capsule: 'radius,height'. For 2D rectangle: 'width,height'. For 2D circle: 'radius'. Defaults to 1,1,1.");
+		props["mass"] = _number_property("Optional mass for rigid bodies. Defaults to 1.0.");
+		props["friction"] = _number_property("Optional friction (0.0 to 1.0). Defaults to 1.0.");
+		props["bounce"] = _number_property("Optional bounce (0.0 to 1.0). Defaults to 0.0.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_PHYSICS,
+				"PROJECT mode only. Add a 2D or 3D physics body with collision shape to an existing .tscn scene. Supports StaticBody, RigidBody, CharacterBody, and Area in both 2D and 3D. Creates the body node, a CollisionShape child, and configures physics material properties.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_PHYSICS, "", fn));
+	}
+
+	// 27. add_animation
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new AnimationPlayer node.");
+		props["animation_name"] = _str_property("Name of the animation to create, e.g. 'idle', 'walk', 'attack'. Defaults to 'default'.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["duration"] = _number_property("Animation duration in seconds. Defaults to 1.0.");
+		props["loop"] = _bool_property("If true, the animation loops. Defaults to false.");
+		props["tracks"] = _str_property("Optional JSON array string describing animation tracks. Each track: {\"node_path\":\"NodeName\", \"property\":\"prop_name\", \"type\":\"value\", \"keys\":[{\"time\":0.0,\"value\":\"...\"}]}. If omitted, a placeholder animation is created.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_ANIMATION,
+				"PROJECT mode only. Add an AnimationPlayer node with an animation to an existing .tscn scene. Creates the AnimationPlayer in the scene and writes the Animation resource as a .tres file. Supports property value tracks for animating node properties like position, rotation, scale, color, visibility, etc.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_ANIMATION, "", fn));
+	}
+
+	// 28. add_particles
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new particle node.");
+		props["dimension"] = _str_property("2d or 3d. Defaults to 3d.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["position"] = _str_property("Optional position. For 3D: 'x,y,z'. For 2D: 'x,y'. Defaults to origin.");
+		props["amount"] = _number_property("Number of particles. Defaults to 32.");
+		props["lifetime"] = _number_property("Particle lifetime in seconds. Defaults to 2.0.");
+		props["one_shot"] = _bool_property("If true, particles emit once then stop. Defaults to false.");
+		props["explosiveness"] = _number_property("Explosiveness (0.0 to 1.0). Higher values emit particles at the start of the lifetime. Defaults to 0.0.");
+		props["direction"] = _str_property("Emission direction. For 3D: 'x,y,z' vector. For 2D: 'x,y' vector. Defaults to 0,-1,0 (downward).");
+		props["spread"] = _number_property("Emission spread angle in degrees. Defaults to 45.");
+		props["gravity"] = _str_property("Gravity vector. For 3D: 'x,y,z'. For 2D: 'x,y'. Defaults to 0,-9.8,0.");
+		props["initial_velocity"] = _number_property("Initial particle velocity. Defaults to 2.0.");
+		props["angular_velocity"] = _number_property("Initial angular velocity (degrees/sec). Defaults to 0.0.");
+		props["scale_amount"] = _number_property("Initial particle scale. Defaults to 1.0.");
+		props["color"] = _str_property("Particle color as '#RRGGBB', 'r,g,b', or 'Color(r,g,b,a)'. Defaults to white.");
+		props["emission_shape"] = _str_property("Emission shape: point, sphere, or box. Defaults to point.");
+		props["emission_extents"] = _str_property("Emission shape extents. For sphere: 'radius'. For box: 'x,y,z'. Defaults to 1.0.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_PARTICLES,
+				"PROJECT mode only. Add GPU-based 2D or 3D particles to an existing .tscn scene. Creates a GPUParticles2D/3D node with a ParticleProcessMaterial, written as a .tres resource file. Supports configurable emission, velocity, gravity, color, scale, and emission shape.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_PARTICLES, "", fn));
+	}
+
+	// 29. add_vfx
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new WorldEnvironment node.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["glow_enabled"] = _bool_property("Enable glow/bloom effect. Defaults to false.");
+		props["glow_intensity"] = _number_property("Glow bloom blend factor (0.0 to 1.0). Defaults to 0.3.");
+		props["glow_strength"] = _str_property("Glow strength per level as comma-separated values, e.g. '0.2,0.1,0.0,0.0,0.0,0.0,0.0'.");
+		props["ao_enabled"] = _bool_property("Enable ambient occlusion. Defaults to false.");
+		props["ao_radius"] = _number_property("AO radius. Defaults to 2.0.");
+		props["ao_power"] = _number_property("AO power. Defaults to 1.5.");
+		props["fog_enabled"] = _bool_property("Enable depth fog. Defaults to false.");
+		props["fog_color"] = _str_property("Fog color as '#RRGGBB' or 'r,g,b'. Defaults to '0.7,0.7,0.7'.");
+		props["fog_depth_begin"] = _number_property("Fog depth begin distance. Defaults to 10.0.");
+		props["fog_depth_end"] = _number_property("Fog depth end distance. Defaults to 100.0.");
+		props["volumetric_fog_enabled"] = _bool_property("Enable volumetric fog. Defaults to false.");
+		props["volumetric_fog_density"] = _number_property("Volumetric fog density. Defaults to 0.05.");
+		props["ambient_light_color"] = _str_property("Ambient light color as '#RRGGBB' or 'r,g,b'. Defaults to '0.1,0.1,0.1'.");
+		props["ambient_light_energy"] = _number_property("Ambient light energy. Defaults to 0.5.");
+		props["tonemap_mode"] = _str_property("Tonemap mode: disabled, linear, reinhart, filmic, aces. Defaults to filmic.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_VFX,
+				"PROJECT mode only. Add a WorldEnvironment node with visual effects to an existing .tscn 3D scene. Supports glow/bloom, ambient occlusion, depth fog, volumetric fog, ambient light, and tonemap settings. Creates an Environment sub_resource inline in the scene.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_VFX, "", fn));
+	}
+
+	// 30. add_character_controller
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["name"] = _str_property("Name for the new CharacterBody node.");
+		props["dimension"] = _str_property("2d or 3d. Defaults to 3d.");
+		props["parent"] = _str_property("Optional parent node path inside the scene. Defaults to root '.'.");
+		props["position"] = _str_property("Optional position. For 3D: 'x,y,z'. For 2D: 'x,y'. Defaults to origin.");
+		props["shape_type"] = _str_property("Collision shape type: capsule, box, sphere (3D) or capsule, rectangle, circle (2D). Defaults to capsule.");
+		props["shape_size"] = _str_property("Optional shape dimensions. For capsule: 'radius,height'. For box: 'x,y,z' or 'w,h'. Defaults to 0.5,1.8 for capsule.");
+		props["speed"] = _number_property("Movement speed. Defaults to 5.0.");
+		props["jump_velocity"] = _number_property("Jump velocity. Defaults to 4.5.");
+		props["script_path"] = _str_property("Optional GDScript file path to create for movement logic. Defaults to auto-generated based on node name under scripts/.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("name");
+		Dictionary fn = _make_fn(
+				AIToolNames::ADD_CHARACTER_CONTROLLER,
+				"PROJECT mode only. Add a 2D or 3D CharacterBody with collision shape and a GDScript movement controller to an existing .tscn scene. Creates the CharacterBody node, CollisionShape child, and writes a movement script with input handling, gravity, jumping, and basic movement. The script uses Input.get_vector() for 2D or Input.get_axis() for 3D.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::ADD_CHARACTER_CONTROLLER, "", fn));
+	}
+
+	// 31. remove_node
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["node_path"] = _str_property("Scene-tree path of the node to remove, e.g. 'OldBox' or 'World/Enemies/SpawnPoint'. The root node is '.'.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("node_path");
+		Dictionary fn = _make_fn(
+				AIToolNames::REMOVE_NODE,
+				"PROJECT mode only. Remove a node and all its children from an existing .tscn scene file. Also cleans up unreferenced sub_resources. Use this to delete unwanted nodes from a scene.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::REMOVE_NODE, "", fn));
+	}
+
+	// 32. modify_node_properties
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["node_path"] = _str_property("Scene-tree path of the node to modify, e.g. 'Player' or 'World/Environment'.");
+		props["properties"] = _str_property("JSON object string of property names and values to set. Values use Godot .tscn format, e.g. {\"position\":\"Vector3(0, 2, 0)\", \"visible\":\"false\", \"light_energy\":\"2.5\"}.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("node_path");
+		required.push_back("properties");
+		Dictionary fn = _make_fn(
+				AIToolNames::MODIFY_NODE_PROPERTIES,
+				"PROJECT mode only. Modify one or more properties of an existing node in a .tscn scene. Updates existing property lines or appends new ones. Values must be in Godot .tscn format (Vector3(...), Color(...), true/false, numbers, quoted strings, etc.).",
+				props, required);
+		tools.push_back(_tool(AIToolNames::MODIFY_NODE_PROPERTIES, "", fn));
+	}
+
+	// 33. connect_signal
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["source_node"] = _str_property("Scene-tree path of the node emitting the signal, e.g. 'UIButton'.");
+		props["signal_name"] = _str_property("Signal name to connect, e.g. 'pressed', 'body_entered', 'toggled'.");
+		props["target_node"] = _str_property("Scene-tree path of the node receiving the signal, e.g. 'GameLogic'.");
+		props["method_name"] = _str_property("Method name to call on the target node, e.g. '_on_start_pressed'.");
+		props["flags"] = _number_property("Optional connection flags: 0 = deferred (default), 1 = defer, 2 = one-shot, 3 = defer + one-shot.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("source_node");
+		required.push_back("signal_name");
+		required.push_back("target_node");
+		required.push_back("method_name");
+		Dictionary fn = _make_fn(
+				AIToolNames::CONNECT_SIGNAL,
+				"PROJECT mode only. Add a signal connection to a .tscn scene file. Creates a [connection] entry linking a source node's signal to a target node's method. The target method must exist in a script attached to the target node.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::CONNECT_SIGNAL, "", fn));
+	}
+
+	// 34. duplicate_node
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["node_path"] = _str_property("Scene-tree path of the node to duplicate, e.g. 'Enemy' or 'World/Props/Pickup'.");
+		props["new_name"] = _str_property("Optional name for the duplicate. Defaults to '<original_name>Copy'.");
+		props["new_parent"] = _str_property("Optional new parent path. Defaults to the same parent as the original.");
+		props["position_offset"] = _str_property("Optional Vector3 offset to apply to the duplicate's position, e.g. '2,0,0'. Defaults to 0,0,0.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("node_path");
+		Dictionary fn = _make_fn(
+				AIToolNames::DUPLICATE_NODE,
+				"PROJECT mode only. Duplicate a node and all its children within a .tscn scene. The duplicate is placed as a sibling of the original (or under a specified new parent) with a new name and optional position offset. Sub-resources are duplicated with new IDs.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::DUPLICATE_NODE, "", fn));
+	}
+
+	// 35. reparent_node
+	{
+		Dictionary props;
+		props["scene_path"] = _str_property("Existing .tscn scene file relative to the project root.");
+		props["node_path"] = _str_property("Scene-tree path of the node to move, e.g. 'World/OldParent/MyNode'.");
+		props["new_parent"] = _str_property("Scene-tree path of the new parent node, e.g. 'World/NewParent' or '.' for root.");
+		Array required;
+		required.push_back("scene_path");
+		required.push_back("node_path");
+		required.push_back("new_parent");
+		Dictionary fn = _make_fn(
+				AIToolNames::REPARENT_NODE,
+				"PROJECT mode only. Move a node and all its children to a different parent in a .tscn scene. Updates the parent path of the node and all descendants. Use this to reorganize the scene hierarchy.",
+				props, required);
+		tools.push_back(_tool(AIToolNames::REPARENT_NODE, "", fn));
+	}
+
+	// 36. batch_tools
 	{
 		Dictionary op_props;
-		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, shell_command.");
+		op_props["name"] = _str_property("Tool name to execute, e.g. list_files, grep_code, read_files, write_file, check_project_scripts, check_html_prototype, check_ui_layout, create_3d_scene, add_3d_object, add_3d_light, check_3d_scene, add_physics, add_animation, add_particles, add_vfx, add_character_controller, remove_node, modify_node_properties, connect_signal, duplicate_node, reparent_node, play_scene, click_ui_position, click_ui_node, assert_node_visible, assert_no_runtime_errors, capture_game_screenshot, capture_runtime_ui_snapshot, shell_command.");
 		op_props["arguments"] = _str_property("JSON object string for the named tool's arguments, e.g. {\"paths\":[\"editor/ai/ai_chat_panel.cpp\"]}.");
 
 		Array op_required;
@@ -782,6 +1015,7 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 
 	HashSet<StringName> project_only;
 	project_only.insert(StringName(AIToolNames::CHECK_PROJECT_SCRIPTS));
+	project_only.insert(StringName(AIToolNames::CHECK_HTML_PROTOTYPE));
 	project_only.insert(StringName(AIToolNames::CHECK_UI_LAYOUT));
 	project_only.insert(StringName(AIToolNames::CREATE_3D_SCENE));
 	project_only.insert(StringName(AIToolNames::ADD_3D_OBJECT));
@@ -803,6 +1037,16 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	project_only.insert(StringName(AIToolNames::STOP_PLAY_SCENE));
 	project_only.insert(StringName(AIToolNames::SETUP_ENGINE_WORKSPACE));
 	project_only.insert(StringName(AIToolNames::REQUEST_ENGINE_CHANGE));
+	project_only.insert(StringName(AIToolNames::ADD_PHYSICS));
+	project_only.insert(StringName(AIToolNames::ADD_ANIMATION));
+	project_only.insert(StringName(AIToolNames::ADD_PARTICLES));
+	project_only.insert(StringName(AIToolNames::ADD_VFX));
+	project_only.insert(StringName(AIToolNames::ADD_CHARACTER_CONTROLLER));
+	project_only.insert(StringName(AIToolNames::REMOVE_NODE));
+	project_only.insert(StringName(AIToolNames::MODIFY_NODE_PROPERTIES));
+	project_only.insert(StringName(AIToolNames::CONNECT_SIGNAL));
+	project_only.insert(StringName(AIToolNames::DUPLICATE_NODE));
+	project_only.insert(StringName(AIToolNames::REPARENT_NODE));
 
 	for (int i = 0; i < all_tools.size(); i++) {
 		Dictionary tool = all_tools[i];
@@ -818,4 +1062,47 @@ Array AIToolDefs::get_tools_for_mode(AIContextMode p_mode) {
 	}
 
 	return filtered;
+}
+
+Array AIToolDefs::get_readonly_tools() {
+	Array all_tools = get_builtin_tools();
+	HashSet<StringName> readonly_names;
+	readonly_names.insert(StringName(AIToolNames::READ_FILES));
+	readonly_names.insert(StringName(AIToolNames::SEARCH_FILES));
+	readonly_names.insert(StringName(AIToolNames::LIST_FILES));
+	readonly_names.insert(StringName(AIToolNames::GREP_CODE));
+
+	Array filtered;
+	for (int i = 0; i < all_tools.size(); i++) {
+		Dictionary tool = all_tools[i];
+		Dictionary fn = tool["function"];
+		String name = fn["name"];
+		if (readonly_names.has(StringName(name))) {
+			filtered.push_back(tool);
+		}
+	}
+	return filtered;
+}
+
+bool AIToolDefs::is_consultation_message(const String &p_message) {
+	const String msg = p_message.to_lower().strip_edges();
+
+	// Pure question/consultation patterns — no implementation intent.
+	const bool consultation_keywords =
+			msg.contains("how should") || msg.contains("what is the best") ||
+			msg.contains("explain") || msg.contains("recommend") || msg.contains("difference between") ||
+			msg.contains("怎么设计") || msg.contains("为什么") || msg.contains("解释一下") ||
+			msg.contains("建议") || msg.contains("哪个好") || msg.contains("什么是") ||
+			msg.contains("帮我分析") || msg.contains("帮我看看怎么") || msg.contains("请问");
+
+	// Implementation intent overrides consultation.
+	const bool implementation_keywords =
+			msg.contains("modify") || msg.contains("fix") || msg.contains("add") || msg.contains("remove") ||
+			msg.contains("implement") || msg.contains("create") || msg.contains("build") || msg.contains("deploy") ||
+			msg.contains("修改") || msg.contains("修复") || msg.contains("调整") || msg.contains("增加") ||
+			msg.contains("添加") || msg.contains("删除") || msg.contains("实现") || msg.contains("创建") ||
+			msg.contains("帮我写") || msg.contains("帮我改") || msg.contains("帮我做") || msg.contains("打包") ||
+			msg.contains("构建") || msg.contains("运行") || msg.contains("测试");
+
+	return consultation_keywords && !implementation_keywords;
 }

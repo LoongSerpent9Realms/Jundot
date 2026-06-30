@@ -35,6 +35,7 @@
 
 class AIJundotPluginBackend;
 class HTTPRequest;
+class Timer;
 
 class AIChatService : public Node {
 	GDCLASS(AIChatService, Node)
@@ -52,10 +53,22 @@ class AIChatService : public Node {
 	int stream_completion_tokens = 0;
 	Array stream_tool_calls;
 
+	// Retry state for transient failures (429, 5xx, timeout).
+	Timer *retry_timer = nullptr;
+	int retry_count = 0;
+	Array retry_messages;
+	Array retry_tools;
+	bool retry_pending = false;
+
 	String _build_chat_url() const;
 	void _ensure_http_request();
+	void _ensure_retry_timer();
 	void _ensure_jundot_plugin_backend();
 	bool _should_use_jundot_plugin_backend() const;
+	bool _is_retryable_error(int p_result, int p_response_code, const String &p_body) const;
+	double _get_retry_wait_seconds(const PackedStringArray &p_headers) const;
+	bool _schedule_retry(const PackedStringArray &p_headers);
+	void _send_retry_request();
 	void _request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body);
 	void _jundot_plugin_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens);
 	void _jundot_plugin_stream_data(const String &p_delta, const String &p_full_content, int p_completion_tokens);

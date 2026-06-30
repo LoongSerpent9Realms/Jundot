@@ -22,26 +22,17 @@ public class ReleasesModel : AdminPageModel
     }
 
     public List<ReleaseVersion> Releases { get; set; } = new();
-<<<<<<< HEAD
     public List<EngineBranch> Branches { get; set; } = new();
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-    public List<GitHubRelease>? GitHubReleases { get; set; }
-
-    [BindProperty]
-    public ReleaseEditInput Input { get; set; } = new();
-
-    public bool ShowForm { get; set; }
-    public bool IsEditing { get; set; }
-<<<<<<< HEAD
-
-    [BindProperty]
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     public int EditId { get; set; }
 
     public string? SuccessMessage { get; set; }
     public string? ErrorMessage { get; set; }
+
+    public bool ShowForm { get; set; }
+    public bool IsEditing { get; set; }
+
+    [BindProperty]
+    public ReleaseEditInput Input { get; set; } = new();
 
     public class ReleaseEditInput
     {
@@ -61,13 +52,10 @@ public class ReleasesModel : AdminPageModel
         public bool IsPublished { get; set; }
         public bool IsBeta { get; set; }
         public DateTime ReleaseDate { get; set; } = DateTime.Now;
-<<<<<<< HEAD
 
         public LicenseType LicenseType { get; set; } = LicenseType.MIT;
 
         public int? EngineBranchId { get; set; }
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     }
 
     public async Task<IActionResult> OnGetAsync()
@@ -78,17 +66,12 @@ public class ReleasesModel : AdminPageModel
         ViewData["Title"] = "版本管理";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         return Page();
     }
 
@@ -100,17 +83,12 @@ public class ReleasesModel : AdminPageModel
         ViewData["Title"] = "新建版本";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         ShowForm = true;
         IsEditing = false;
         Input = new ReleaseEditInput { ReleaseDate = DateTime.Now };
@@ -125,17 +103,12 @@ public class ReleasesModel : AdminPageModel
         ViewData["Title"] = "编辑版本";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 
         var release = await _context.ReleaseVersions.FindAsync(id);
         if (release == null)
@@ -152,13 +125,9 @@ public class ReleasesModel : AdminPageModel
             DownloadUrl = release.DownloadUrl,
             IsPublished = release.IsPublished,
             IsBeta = release.IsBeta,
-<<<<<<< HEAD
             ReleaseDate = release.ReleaseDate,
             LicenseType = release.LicenseType,
             EngineBranchId = release.EngineBranchId
-=======
-            ReleaseDate = release.ReleaseDate
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         };
         ShowForm = true;
         IsEditing = true;
@@ -176,17 +145,12 @@ public class ReleasesModel : AdminPageModel
             ViewData["Title"] = "新建版本";
             Releases = await _context.ReleaseVersions
                 .Include(r => r.Features)
-<<<<<<< HEAD
                 .Include(r => r.EngineBranch)
                 .OrderByDescending(r => r.ReleaseDate)
                 .ToListAsync();
             Branches = await _context.EngineBranches
                 .OrderBy(b => b.Name)
                 .ToListAsync();
-=======
-                .OrderByDescending(r => r.ReleaseDate)
-                .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             ShowForm = true;
             IsEditing = false;
             return Page();
@@ -200,13 +164,9 @@ public class ReleasesModel : AdminPageModel
             DownloadUrl = Input.DownloadUrl,
             IsPublished = Input.IsPublished,
             IsBeta = Input.IsBeta,
-<<<<<<< HEAD
             ReleaseDate = Input.ReleaseDate,
             LicenseType = Input.LicenseType,
             EngineBranchId = Input.EngineBranchId
-=======
-            ReleaseDate = Input.ReleaseDate
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         };
 
         _context.ReleaseVersions.Add(release);
@@ -215,17 +175,12 @@ public class ReleasesModel : AdminPageModel
         SuccessMessage = "版本创建成功！";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         ShowForm = false;
         ViewData["Title"] = "版本管理";
 
@@ -242,17 +197,12 @@ public class ReleasesModel : AdminPageModel
             ViewData["Title"] = "编辑版本";
             Releases = await _context.ReleaseVersions
                 .Include(r => r.Features)
-<<<<<<< HEAD
                 .Include(r => r.EngineBranch)
                 .OrderByDescending(r => r.ReleaseDate)
                 .ToListAsync();
             Branches = await _context.EngineBranches
                 .OrderBy(b => b.Name)
                 .ToListAsync();
-=======
-                .OrderByDescending(r => r.ReleaseDate)
-                .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             ShowForm = true;
             IsEditing = true;
             return Page();
@@ -271,28 +221,8 @@ public class ReleasesModel : AdminPageModel
         release.IsPublished = Input.IsPublished;
         release.IsBeta = Input.IsBeta;
         release.ReleaseDate = Input.ReleaseDate;
-<<<<<<< HEAD
         release.LicenseType = Input.LicenseType;
         release.EngineBranchId = Input.EngineBranchId;
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-
-        await _context.SaveChangesAsync();
-
-        SuccessMessage = "版本更新成功！";
-        Releases = await _context.ReleaseVersions
-            .Include(r => r.Features)
-<<<<<<< HEAD
-            .Include(r => r.EngineBranch)
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
-        Branches = await _context.EngineBranches
-            .OrderBy(b => b.Name)
-            .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         ShowForm = false;
         ViewData["Title"] = "版本管理";
 
@@ -315,17 +245,12 @@ public class ReleasesModel : AdminPageModel
         ViewData["Title"] = "版本管理";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 
         return Page();
     }
@@ -390,17 +315,12 @@ public class ReleasesModel : AdminPageModel
         ViewData["Title"] = "版本管理";
         Releases = await _context.ReleaseVersions
             .Include(r => r.Features)
-<<<<<<< HEAD
             .Include(r => r.EngineBranch)
             .OrderByDescending(r => r.ReleaseDate)
             .ToListAsync();
         Branches = await _context.EngineBranches
             .OrderBy(b => b.Name)
             .ToListAsync();
-=======
-            .OrderByDescending(r => r.ReleaseDate)
-            .ToListAsync();
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 
         return Page();
     }

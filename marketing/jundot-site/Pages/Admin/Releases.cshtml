@@ -68,7 +68,6 @@
                 <div></div>
             </div>
 
-<<<<<<< HEAD
             <div class="form-row">
                 <div class="form-group">
                     <label asp-for="Input.LicenseType">许可类型</label>
@@ -92,8 +91,6 @@
                 </div>
             </div>
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">@(Model.IsEditing ? "保存修改" : "创建版本")</button>
                 <a href="/Admin/Releases" class="btn btn-secondary">取消</a>
@@ -101,84 +98,76 @@
         </form>
     </div>
 }
-else
-{
-    <div class="admin-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">版本列表</h3>
-            <div style="display: flex; gap: 10px;">
-                <form method="post" asp-page-handler="SyncFromGitHub" onsubmit="return confirm('确定要从 GitHub 同步最新 Release 吗？');">
-                    <button type="submit" class="btn btn-secondary">🔄 从 GitHub 同步</button>
-                </form>
-                <a href="/Admin/Releases?handler=Create" class="btn btn-primary">+ 新建版本</a>
-            </div>
+
+<div class="admin-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0;">版本列表</h3>
+        <div style="display: flex; gap: 8px;">
+            <form method="post" asp-page-handler="SyncFromGitHub" style="display: inline;" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='同步中...';">
+                <button type="submit" class="btn btn-secondary">从 GitHub 同步</button>
+            </form>
+            <a href="/Admin/Releases?handler=Create" class="btn btn-primary">+ 新建版本</a>
         </div>
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th>版本号</th>
-                    <th>标题</th>
-<<<<<<< HEAD
-                    <th>分支</th>
-                    <th>许可</th>
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-                    <th>状态</th>
-                    <th>发布日期</th>
-                    <th>下载量</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var release in Model.Releases)
-                {
-                    <tr>
-                        <td><strong>@release.VersionNumber</strong></td>
-                        <td>@release.Title</td>
-<<<<<<< HEAD
-                        <td>@(release.EngineBranch?.Name ?? "通用")</td>
-                        <td>
-                            @if (release.LicenseType == LicenseType.MIT)
-                            {
-                                <span class="badge badge-published">MIT</span>
-                            }
-                            else if (release.LicenseType == LicenseType.Commercial)
-                            {
-                                <span class="badge badge-beta">商业</span>
-                            }
-                            else
-                            {
-                                <span>@release.LicenseType</span>
-                            }
-                        </td>
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
-                        <td>
-                            @if (release.IsPublished)
-                            {
-                                <span class="badge badge-published">已发布</span>
-                            }
-                            else
-                            {
-                                <span class="badge badge-draft">草稿</span>
-                            }
-                            @if (release.IsBeta)
-                            {
-                                <span class="badge badge-beta" style="margin-left: 6px;">Beta</span>
-                            }
-                        </td>
-                        <td>@release.ReleaseDate.ToString("yyyy-MM-dd")</td>
-                        <td>@release.DownloadCount</td>
-                        <td>
-                            <a href="/Admin/Releases?handler=Edit&id=@release.Id" class="btn btn-primary btn-sm">编辑</a>
-                            <form method="post" asp-page-handler="Delete" style="display: inline;" onsubmit="return confirm('确定要删除这个版本吗？');">
-                                <input type="hidden" name="id" value="@release.Id" />
-                                <button type="submit" class="btn btn-danger btn-sm">删除</button>
-                            </form>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
     </div>
-}
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>版本</th>
+                <th>标题</th>
+                <th>分支</th>
+                <th>许可</th>
+                <th>状态</th>
+                <th>发布日期</th>
+                <th>下载量</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var release in Model.Releases)
+            {
+                <tr>
+                    <td><strong>@release.VersionNumber</strong></td>
+                    <td>@release.Title</td>
+                    <td>@(release.EngineBranch?.Name ?? "通用")</td>
+                    <td>
+                        @if (release.LicenseType == LicenseType.MIT)
+                        {
+                            <span class="badge badge-published">MIT</span>
+                        }
+                        else if (release.LicenseType == LicenseType.Commercial)
+                        {
+                            <span class="badge badge-beta">商业</span>
+                        }
+                        else
+                        {
+                            <span>@release.LicenseType</span>
+                        }
+                    </td>
+                    <td>
+                        @if (release.IsPublished)
+                        {
+                            <span class="badge badge-published">已发布</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-draft">草稿</span>
+                        }
+                        @if (release.IsBeta)
+                        {
+                            <span class="badge badge-beta" style="margin-left: 6px;">Beta</span>
+                        }
+                    </td>
+                    <td>@release.ReleaseDate.ToString("yyyy-MM-dd")</td>
+                    <td>@release.DownloadCount</td>
+                    <td>
+                        <a href="/Admin/Releases?handler=Edit&id=@release.Id" class="btn btn-primary btn-sm">编辑</a>
+                        <form method="post" asp-page-handler="Delete" style="display: inline;" onsubmit="return confirm('确定要删除这个版本吗？');">
+                            <input type="hidden" name="id" value="@release.Id" />
+                            <button type="submit" class="btn btn-danger btn-sm">删除</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

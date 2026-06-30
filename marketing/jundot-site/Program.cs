@@ -1,9 +1,20 @@
 using JundotSite.Data;
 using JundotSite.Models;
 using JundotSite.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(kestrel =>
+{
+    kestrel.Limits.MaxRequestBodySize = 1024 * 1024 * 1024; // 1GB
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1024L * 1024 * 1024; // 1GB
+});
 
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -373,6 +384,39 @@ public static class DbInitializer
             await createIndexCmd.ExecuteNonQueryAsync();
             
             Console.WriteLine("[Jundot] 数据库迁移完成：创建 EmailVerificationCodes 表");
+        }
+
+        // 检查 DocVideos 表是否存在
+        tableCheckCmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='DocVideos'";
+        var videosTable = await tableCheckCmd.ExecuteScalarAsync();
+        if (videosTable == null)
+        {
+            using var createVideosCmd = connection.CreateCommand();
+            createVideosCmd.CommandText = @"CREATE TABLE DocVideos (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL,
+                Description TEXT NULL,
+                SourceType INTEGER NOT NULL DEFAULT 0,
+                VideoUrl TEXT NOT NULL,
+                ThumbnailUrl TEXT NULL,
+                DocId TEXT NULL,
+                Category TEXT NULL,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                IsPublished INTEGER NOT NULL DEFAULT 1,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            )";
+            await createVideosCmd.ExecuteNonQueryAsync();
+
+            using var createVideoIndexCmd = connection.CreateCommand();
+            createVideoIndexCmd.CommandText = "CREATE INDEX IX_DocVideos_DocId ON DocVideos(DocId)";
+            await createVideoIndexCmd.ExecuteNonQueryAsync();
+
+            using var createVideoSortIndexCmd = connection.CreateCommand();
+            createVideoSortIndexCmd.CommandText = "CREATE INDEX IX_DocVideos_SortOrder ON DocVideos(SortOrder)";
+            await createVideoSortIndexCmd.ExecuteNonQueryAsync();
+
+            Console.WriteLine("[Jundot] 数据库迁移完成：创建 DocVideos 表");
         }
 
         await connection.CloseAsync();

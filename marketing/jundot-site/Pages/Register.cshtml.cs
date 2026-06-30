@@ -19,11 +19,7 @@ public class RegisterModel : PageModel
     public RegisterInput Input { get; set; } = new();
 
     [BindProperty]
-<<<<<<< HEAD
     public string? VerificationCode { get; set; }
-=======
-    public string VerificationCode { get; set; } = string.Empty;
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 
     public int Step { get; set; } = 1;
 

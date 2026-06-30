@@ -312,6 +312,14 @@ Error AIJundotPluginBackend::_send_messages_now(const Array &p_messages, const A
 	active_tools = p_tools.duplicate(true);
 	requesting = true;
 	request_start_usec = OS::get_singleton()->get_ticks_usec();
+
+	// Safety: ensure the HTTPRequest node is inside the scene tree before requesting.
+	if (!http_request->is_inside_tree()) {
+		requesting = false;
+		request_start_usec = 0;
+		ERR_FAIL_V_MSG(ERR_UNCONFIGURED, "AIJundotPluginBackend HTTPRequest is not inside the scene tree.");
+	}
+
 	const Error err = http_request->request(_build_plugin_url(), headers, HTTPClient::METHOD_POST, JSON::stringify(payload));
 	if (err != OK) {
 		requesting = false;

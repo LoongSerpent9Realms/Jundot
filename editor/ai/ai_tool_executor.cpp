@@ -665,6 +665,8 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _grep_code(args);
 	} else if (name == AIToolNames::CHECK_PROJECT_SCRIPTS) {
 		result = _check_project_scripts(args);
+	} else if (name == AIToolNames::CHECK_HTML_PROTOTYPE) {
+		result = _check_html_prototype(args);
 	} else if (name == AIToolNames::CHECK_UI_LAYOUT) {
 		result = _check_ui_layout(args);
 	} else if (name == AIToolNames::CREATE_3D_SCENE) {
@@ -725,6 +727,26 @@ Dictionary AIToolExecutor::execute(const Dictionary &p_tool_call) {
 		result = _request_engine_change(args);
 	} else if (name == AIToolNames::RETURN_TO_PROJECT_MODE) {
 		result = _return_to_project_mode(args);
+	} else if (name == AIToolNames::ADD_PHYSICS) {
+		result = _add_physics(args);
+	} else if (name == AIToolNames::ADD_ANIMATION) {
+		result = _add_animation(args);
+	} else if (name == AIToolNames::ADD_PARTICLES) {
+		result = _add_particles(args);
+	} else if (name == AIToolNames::ADD_VFX) {
+		result = _add_vfx(args);
+	} else if (name == AIToolNames::ADD_CHARACTER_CONTROLLER) {
+		result = _add_character_controller(args);
+	} else if (name == AIToolNames::REMOVE_NODE) {
+		result = _remove_node(args);
+	} else if (name == AIToolNames::MODIFY_NODE_PROPERTIES) {
+		result = _modify_node_properties(args);
+	} else if (name == AIToolNames::CONNECT_SIGNAL) {
+		result = _connect_signal(args);
+	} else if (name == AIToolNames::DUPLICATE_NODE) {
+		result = _duplicate_node(args);
+	} else if (name == AIToolNames::REPARENT_NODE) {
+		result = _reparent_node(args);
 	} else if (name == AIToolNames::BATCH_TOOLS) {
 		result = _batch_tools(args);
 	} else if (name.find_char('.') >= 0) {
@@ -1352,6 +1374,13 @@ Dictionary AIToolExecutor::_write_file(const Dictionary &p_args) {
 	if (AISettings::load().context_mode == AIContextMode::PROJECT) {
 		AIModifiedSceneTracker::mark_scene_written(path);
 	}
+
+	// Automatically open HTML prototypes after they are created/updated.
+	String path_lower = path.to_lower();
+	if (path_lower.contains(".jundotai/prototypes/") && (path_lower.ends_with(".html") || path_lower.ends_with(".htm"))) {
+		OS::get_singleton()->shell_open(full_path);
+	}
+
 	return _make_result(vformat("Successfully wrote %s (%d bytes).%s", path, expected_size, AISettings::load().develop_mode ? " [Develop Mode: local change only]" : ""));
 }
 
@@ -1404,6 +1433,1820 @@ Dictionary AIToolExecutor::_edit_file(const Dictionary &p_args) {
 	return result;
 }
 
+static String _extract_tscn_quoted_attr(const String &p_line, const String &p_key) {
+	const String needle = p_key + "=\"";
+	const int start = p_line.find(needle);
+	if (start < 0) {
+		return String();
+	}
+	const int value_start = start + needle.length();
+	const int value_end = p_line.find("\"", value_start);
+	if (value_end < 0) {
+		return String();
+	}
+	return p_line.substr(value_start, value_end - value_start);
+}
+
+static String _scene_node_path(const String &p_parent, const String &p_name) {
+	if (p_parent.is_empty() || p_parent == ".") {
+		return p_name;
+	}
+	return p_parent.path_join(p_name).replace("\\", "/");
+}
+
+static String _sanitize_scene_node_name(const String &p_name, const String &p_fallback) {
+	String value = p_name.strip_edges();
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == ' ') {
+			out += String::chr(c);
+		}
+	}
+	out = out.strip_edges();
+	return out.is_empty() ? p_fallback : out;
+}
+
+static Vector<double> _parse_number_list(String p_value) {
+	p_value = p_value.strip_edges();
+	const int open = p_value.find("(");
+	const int close = p_value.rfind(")");
+	if (open >= 0 && close > open) {
+		p_value = p_value.substr(open + 1, close - open - 1);
+	}
+	p_value = p_value.replace(";", ",").replace(" ", ",");
+	Vector<double> values;
+	PackedStringArray parts = p_value.split(",", false);
+	for (int i = 0; i < parts.size(); i++) {
+		const String part = String(parts[i]).strip_edges();
+		if (!part.is_empty() && part.is_valid_float()) {
+			values.push_back(part.to_float());
+		}
+	}
+	return values;
+}
+
+static Vector3 _parse_vector3_arg(const Dictionary &p_args, const String &p_key, const Vector3 &p_default, bool p_degrees_to_radians = false) {
+	if (!p_args.has(p_key)) {
+		return p_default;
+	}
+	const Vector<double> values = _parse_number_list(String(p_args.get(p_key, String())));
+	if (values.size() < 3) {
+		return p_default;
+	}
+	Vector3 result(values[0], values[1], values[2]);
+	if (p_degrees_to_radians) {
+		result.x = Math::deg_to_rad(result.x);
+		result.y = Math::deg_to_rad(result.y);
+		result.z = Math::deg_to_rad(result.z);
+	}
+	return result;
+}
+
+static String _format_vector2(const Vector2 &p_value) {
+	return vformat("Vector2(%.4f, %.4f)", p_value.x, p_value.y);
+}
+
+static String _format_vector3(const Vector3 &p_value) {
+	return vformat("Vector3(%.4f, %.4f, %.4f)", p_value.x, p_value.y, p_value.z);
+}
+
+static Vector3 _vector3_degrees_to_radians(const Vector3 &p_value) {
+	return Vector3(Math::deg_to_rad(p_value.x), Math::deg_to_rad(p_value.y), Math::deg_to_rad(p_value.z));
+}
+
+static String _format_color_arg(const Dictionary &p_args, const String &p_key, const String &p_default) {
+	if (!p_args.has(p_key)) {
+		return p_default;
+	}
+	String value = String(p_args.get(p_key, String())).strip_edges();
+	if (value.is_empty()) {
+		return p_default;
+	}
+	if (value.begins_with("Color(")) {
+		return value;
+	}
+	if (value.begins_with("#") && (value.length() == 7 || value.length() == 9)) {
+		const String hex = value.substr(1).to_lower();
+		int r = ("0x" + hex.substr(0, 2)).hex_to_int();
+		int g = ("0x" + hex.substr(2, 2)).hex_to_int();
+		int b = ("0x" + hex.substr(4, 2)).hex_to_int();
+		int a = hex.length() >= 8 ? ("0x" + hex.substr(6, 2)).hex_to_int() : 255;
+		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+	}
+	const Vector<double> values = _parse_number_list(value);
+	if (values.size() >= 3) {
+		const double scale = (values[0] > 1.0 || values[1] > 1.0 || values[2] > 1.0) ? 255.0 : 1.0;
+		const double alpha = values.size() >= 4 ? values[3] / (values[3] > 1.0 ? 255.0 : 1.0) : 1.0;
+		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", values[0] / scale, values[1] / scale, values[2] / scale, alpha);
+	}
+	return p_default;
+}
+
+static String _unique_tscn_id(const String &p_prefix, const String &p_name) {
+	String value = (p_prefix + "_" + p_name).to_lower();
+	String out;
+	for (int i = 0; i < value.length(); i++) {
+		const char32_t c = value[i];
+		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			out += String::chr(c);
+		} else if (c == '-' || c == ' ') {
+			out += "_";
+		}
+	}
+	return out.is_empty() ? p_prefix : out;
+}
+
+static String _increment_tscn_load_steps(String p_content, int p_added_steps) {
+	const int pos = p_content.find("load_steps=");
+	if (pos < 0) {
+		const int header_end = p_content.find("]");
+		if (header_end >= 0 && p_content.begins_with("[gd_scene")) {
+			return p_content.substr(0, header_end) + vformat(" load_steps=%d", MAX(1, p_added_steps)) + p_content.substr(header_end);
+		}
+		return p_content;
+	}
+	const int value_start = pos + String("load_steps=").length();
+	int value_end = value_start;
+	while (value_end < p_content.length() && p_content[value_end] >= '0' && p_content[value_end] <= '9') {
+		value_end++;
+	}
+	const int old_value = p_content.substr(value_start, value_end - value_start).to_int();
+	return p_content.substr(0, value_start) + String::num_int64(MAX(1, old_value + p_added_steps)) + p_content.substr(value_end);
+}
+
+static String _insert_tscn_subresources(const String &p_content, const String &p_resources) {
+	const int first_node = p_content.find("\n[node ");
+	if (first_node < 0) {
+		return p_content.strip_edges() + "\n\n" + p_resources.strip_edges() + "\n";
+	}
+	return p_content.substr(0, first_node + 1) + p_resources.strip_edges() + "\n\n" + p_content.substr(first_node + 1);
+}
+
+static String _mesh_resource_for_type(const String &p_mesh_type, const String &p_mesh_id, const Dictionary &p_args) {
+	const String mesh_type = p_mesh_type.strip_edges().to_lower();
+	const Vector<double> size_values = _parse_number_list(String(p_args.get("size", String())));
+	if (mesh_type == "sphere") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		return vformat("[sub_resource type=\"SphereMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius * 2.0);
+	}
+	if (mesh_type == "cylinder") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 1.0;
+		return vformat("[sub_resource type=\"CylinderMesh\" id=\"%s\"]\ntop_radius = %.4f\nbottom_radius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius, height);
+	}
+	if (mesh_type == "capsule") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
+		return vformat("[sub_resource type=\"CapsuleMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, height);
+	}
+	if (mesh_type == "plane" || mesh_type == "quad") {
+		const double width = size_values.size() >= 1 ? size_values[0] : 2.0;
+		const double depth = size_values.size() >= 2 ? size_values[1] : width;
+		const String resource_type = mesh_type == "quad" ? "QuadMesh" : "PlaneMesh";
+		return vformat("[sub_resource type=\"%s\" id=\"%s\"]\nsize = %s\n", resource_type, p_mesh_id, _format_vector2(Vector2(width, depth)));
+	}
+	const Vector3 size = size_values.size() >= 3 ? Vector3(size_values[0], size_values[1], size_values[2]) : Vector3(1, 1, 1);
+	return vformat("[sub_resource type=\"BoxMesh\" id=\"%s\"]\nsize = %s\n", p_mesh_id, _format_vector3(size));
+}
+
+// ---------------------------------------------------------------------------
+// add_physics: Add 2D/3D physics body with collision shape to a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_add_physics(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_physics is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "PhysicsBody");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_physics rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for physics editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_physics requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding physics (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	// Determine body type.
+	String body_type = String(p_args.get("body_type", "static_3d")).strip_edges().to_lower();
+	String body_node_type;
+	bool is_2d = false;
+	if (body_type == "static_2d") {
+		body_node_type = "StaticBody2D";
+		is_2d = true;
+	} else if (body_type == "rigid_2d") {
+		body_node_type = "RigidBody2D";
+		is_2d = true;
+	} else if (body_type == "character_2d") {
+		body_node_type = "CharacterBody2D";
+		is_2d = true;
+	} else if (body_type == "area_2d") {
+		body_node_type = "Area2D";
+		is_2d = true;
+	} else if (body_type == "rigid_3d") {
+		body_node_type = "RigidBody3D";
+	} else if (body_type == "character_3d") {
+		body_node_type = "CharacterBody3D";
+	} else if (body_type == "area_3d") {
+		body_node_type = "Area3D";
+	} else {
+		body_type = "static_3d";
+		body_node_type = "StaticBody3D";
+	}
+
+	// Determine shape type.
+	String shape_type = String(p_args.get("shape_type", is_2d ? "rectangle" : "box")).strip_edges().to_lower();
+	String shape_resource_type;
+	if (is_2d) {
+		if (shape_type == "circle") {
+			shape_resource_type = "CircleShape2D";
+		} else if (shape_type == "capsule") {
+			shape_resource_type = "CapsuleShape2D";
+		} else {
+			shape_type = "rectangle";
+			shape_resource_type = "RectangleShape2D";
+		}
+	} else {
+		if (shape_type == "sphere") {
+			shape_resource_type = "SphereShape3D";
+		} else if (shape_type == "capsule") {
+			shape_resource_type = "CapsuleShape3D";
+		} else if (shape_type == "cylinder") {
+			shape_resource_type = "CylinderShape3D";
+		} else {
+			shape_type = "box";
+			shape_resource_type = "BoxShape3D";
+		}
+	}
+
+	const String shape_id = _unique_tscn_id("Shape", node_name);
+	const String material_id = _unique_tscn_id("PhysMat", node_name);
+	const Vector<double> size_values = _parse_number_list(String(p_args.get("shape_size", String())));
+	const double friction = double(p_args.get("friction", 1.0));
+	const double bounce = double(p_args.get("bounce", 0.0));
+	const double mass = double(p_args.get("mass", 1.0));
+
+	// Build sub-resources.
+	String resources;
+	resources += vformat("[sub_resource type=\"%s\" id=\"%s\"]\n", shape_resource_type, shape_id);
+
+	if (shape_resource_type == "BoxShape3D") {
+		const Vector3 sz = size_values.size() >= 3 ? Vector3(size_values[0], size_values[1], size_values[2]) : Vector3(1, 1, 1);
+		resources += "size = " + _format_vector3(sz) + "\n";
+	} else if (shape_resource_type == "SphereShape3D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		resources += vformat("radius = %.4f\n", radius);
+	} else if (shape_resource_type == "CapsuleShape3D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
+		resources += vformat("radius = %.4f\n", radius);
+		resources += vformat("height = %.4f\n", height);
+	} else if (shape_resource_type == "CylinderShape3D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
+		resources += vformat("radius = %.4f\n", radius);
+		resources += vformat("height = %.4f\n", height);
+	} else if (shape_resource_type == "RectangleShape2D") {
+		const Vector2 sz = size_values.size() >= 2 ? Vector2(size_values[0], size_values[1]) : Vector2(1, 1);
+		resources += "size = " + _format_vector2(sz) + "\n";
+	} else if (shape_resource_type == "CircleShape2D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		resources += vformat("radius = %.4f\n", radius);
+	} else if (shape_resource_type == "CapsuleShape2D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
+		resources += vformat("radius = %.4f\n", radius);
+		resources += vformat("height = %.4f\n", height);
+	}
+
+	resources += "\n";
+	resources += vformat("[sub_resource type=\"PhysicsMaterial\" id=\"%s\"]\n", material_id);
+	resources += vformat("friction = %.4f\n", friction);
+	resources += vformat("bounce = %.4f\n", bounce);
+	resources += "\n";
+
+	// Build body node.
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s\"]\n", node_name, body_node_type, parent);
+
+	if (is_2d) {
+		const Vector<double> pos_values = _parse_number_list(String(p_args.get("position", String())));
+		if (pos_values.size() >= 2) {
+			node_text += "position = " + _format_vector2(Vector2(pos_values[0], pos_values[1])) + "\n";
+		}
+	} else {
+		const Vector3 position = _parse_vector3_arg(p_args, "position", Vector3());
+		if (!position.is_zero_approx()) {
+			node_text += "position = " + _format_vector3(position) + "\n";
+		}
+	}
+
+	if (body_type.begins_with("rigid")) {
+		resources = vformat("[sub_resource type=\"PhysicsMaterial\" id=\"%s\"]\nfriction = %.4f\nbounce = %.4f\n\n", material_id, friction, bounce) + resources;
+		node_text += vformat("mass = %.4f\n", mass);
+		node_text += vformat("physics_material_override = SubResource(\"%s\")\n", material_id);
+	} else if (!body_type.begins_with("area")) {
+		node_text += vformat("physics_material_override = SubResource(\"%s\")\n", material_id);
+	}
+
+	// Build collision shape child node.
+	const String collision_name = _sanitize_scene_node_name(node_name + "_Collision", "CollisionShape");
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s/%s\"]\n",
+			collision_name, is_2d ? "CollisionShape2D" : "CollisionShape3D", parent, node_name);
+	node_text += vformat("shape = SubResource(\"%s\")\n", shape_id);
+
+	content = _increment_tscn_load_steps(content, 2);
+	content = _insert_tscn_subresources(content, resources);
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded %s '%s' with %s collision. Run check_3d_scene on %s after physics edits.", body_node_type, node_name, shape_resource_type, scene_path));
+}
+
+// ---------------------------------------------------------------------------
+// add_animation: Add AnimationPlayer with animation to a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_add_animation(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_animation is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "AnimationPlayer");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_animation rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for animation editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_animation requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding animation (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	const String anim_name = String(p_args.get("animation_name", "default")).strip_edges();
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const double duration = double(p_args.get("duration", 1.0));
+	const bool loop_mode = bool(p_args.get("loop", false));
+
+	// Determine .tres path for the animation resource.
+	const String safe_name = _ai_safe_git_segment(anim_name, "anim");
+	String anim_tres_rel;
+	const int last_slash = scene_path.rfind("/");
+	if (last_slash >= 0) {
+		anim_tres_rel = scene_path.substr(0, last_slash + 1) + "animations/" + safe_name + ".tres";
+	} else {
+		anim_tres_rel = "animations/" + safe_name + ".tres";
+	}
+
+	// Build the .tres animation resource.
+	StringBuilder tres;
+	tres += "[gd_resource type=\"Animation\" format=3]\n\n";
+
+	// Parse optional tracks JSON.
+	const String tracks_json = String(p_args.get("tracks", String())).strip_edges();
+	Array tracks_array;
+	if (!tracks_json.is_empty()) {
+		Variant parsed = JSON::parse_string(tracks_json);
+		if (parsed.get_type() == Variant::ARRAY) {
+			tracks_array = parsed;
+		}
+	}
+
+	int track_count = tracks_array.size();
+	if (track_count == 0) {
+		// Create a placeholder track animating the root node visibility.
+		tres += "[resource]\n";
+		tres += vformat("length = %.4f\n", duration);
+		tres += vformat("loop_mode = %d\n", loop_mode ? 1 : 0);
+		tres += "tracks/0/type = \"value\"\n";
+		tres += "tracks/0/imported = false\n";
+		tres += "tracks/0/enabled = true\n";
+		tres += "tracks/0/path = NodePath(\".:visible\")\n";
+		tres += "tracks/0/interp = 1\n";
+		tres += "tracks/0/loop_wrap = -1\n";
+		tres += "tracks/0/keys = PackedFloat32Array(0, 1, 1)\n";
+	} else {
+		tres += "[resource]\n";
+		tres += vformat("length = %.4f\n", duration);
+		tres += vformat("loop_mode = %d\n", loop_mode ? 1 : 0);
+		for (int i = 0; i < track_count; i++) {
+			Dictionary track = tracks_array[i];
+			const String node_path = String(track.get("node_path", ".")).strip_edges();
+			const String property = String(track.get("property", "visible")).strip_edges();
+			const String track_type = String(track.get("type", "value")).strip_edges();
+			const String full_path_np = node_path + ":" + property;
+
+			tres += vformat("tracks/%d/type = \"%s\"\n", i, track_type);
+			tres += "tracks/" + String::num_int64(i) + "/imported = false\n";
+			tres += "tracks/" + String::num_int64(i) + "/enabled = true\n";
+			tres += vformat("tracks/%d/path = NodePath(\"%s\")\n", i, full_path_np);
+			tres += "tracks/" + String::num_int64(i) + "/interp = 1\n";
+			tres += "tracks/" + String::num_int64(i) + "/loop_wrap = -1\n";
+
+			// Build keys array.
+			Array keys = track.get("keys", Array());
+			if (keys.is_empty()) {
+				tres += "tracks/" + String::num_int64(i) + "/keys = PackedFloat32Array(0, 1, 1)\n";
+			} else {
+				// Build a PackedFloat32Array from keyframes: [time, transition, value, ...]
+				StringBuilder key_str;
+				key_str += "PackedFloat32Array(";
+				for (int k = 0; k < keys.size(); k++) {
+					Dictionary kf = keys[k];
+					const double time = double(kf.get("time", 0.0));
+					const double transition = double(kf.get("transition", 1.0));
+					const double value = double(kf.get("value", 0.0));
+					if (k > 0) {
+						key_str += ", ";
+					}
+					key_str += vformat("%.4f, %.4f, %.4f", time, transition, value);
+				}
+				key_str += ")";
+				tres += "tracks/" + String::num_int64(i) + "/keys = " + key_str.as_string() + "\n";
+			}
+		}
+	}
+
+	// Write the .tres file.
+	Dictionary tres_write_args;
+	tres_write_args["path"] = anim_tres_rel;
+	tres_write_args["content"] = tres.as_string();
+	Dictionary tres_result = _write_file(tres_write_args);
+	if (tres_result.has("is_error")) {
+		return _make_result(vformat("Failed to write animation resource: %s", String(tres_result.get("content", String()))), true);
+	}
+
+	// Add AnimationPlayer node to the scene.
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"AnimationPlayer\" parent=\"%s\"]\n", node_name, parent);
+	node_text += vformat("libraries = {&\"\": ExtResource(\"ext_resource_placeholder\")}\n");
+
+	// We need to add an ext_resource for the .tres file. Find the highest ext_resource id.
+	int max_ext_id = 0;
+	PackedStringArray content_lines = content.split("\n");
+	for (int i = 0; i < content_lines.size(); i++) {
+		const String line = String(content_lines[i]).strip_edges();
+		if (line.begins_with("[ext_resource ")) {
+			const String id_str = _extract_tscn_quoted_attr(line, "id");
+			if (!id_str.is_empty()) {
+				// ext_resource ids can be numeric or string.
+				const int numeric_id = id_str.to_int();
+				if (numeric_id > max_ext_id) {
+					max_ext_id = numeric_id;
+				}
+			}
+		}
+	}
+	const int new_ext_id = max_ext_id + 1;
+	const String ext_id_str = String::num_int64(new_ext_id);
+
+	// Insert ext_resource before the first [sub_resource] or [node].
+	const String ext_resource_line = vformat("[ext_resource type=\"Animation\" path=\"%s\" id=\"%s\"]\n", anim_tres_rel, ext_id_str);
+	const int first_sub = content.find("[sub_resource ");
+	const int first_node = content.find("[node ");
+	int insert_pos = -1;
+	if (first_sub >= 0 && (first_node < 0 || first_sub < first_node)) {
+		insert_pos = first_sub;
+	} else if (first_node >= 0) {
+		insert_pos = first_node;
+	}
+	if (insert_pos >= 0) {
+		content = content.substr(0, insert_pos) + ext_resource_line + "\n" + content.substr(insert_pos);
+	} else {
+		content = content.strip_edges() + "\n" + ext_resource_line;
+	}
+
+	// Fix the AnimationPlayer libraries to use the correct ext_resource id.
+	node_text = vformat("\n[node name=\"%s\" type=\"AnimationPlayer\" parent=\"%s\"]\n", node_name, parent);
+	node_text += vformat("libraries = {&\"\": ExtResource(\"%s\")}\n", ext_id_str);
+	node_text += vformat("autoplay = \"%s\"\n", anim_name);
+
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded AnimationPlayer '%s' with animation '%s' (%.2fs%s). Animation resource saved to %s.",
+			node_name, anim_name, duration, loop_mode ? ", looping" : "", anim_tres_rel));
+}
+
+// ---------------------------------------------------------------------------
+// add_particles: Add 2D/3D GPU particles to a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_add_particles(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_particles is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "Particles");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_particles rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for particle editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_particles requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding particles (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	const String dimension = String(p_args.get("dimension", "3d")).strip_edges().to_lower();
+	const bool is_2d = dimension == "2d" || dimension == "2";
+	const String particle_node = is_2d ? "GPUParticles2D" : "GPUParticles3D";
+
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const int amount = int(p_args.get("amount", 32));
+	const double lifetime = double(p_args.get("lifetime", 2.0));
+	const bool one_shot = bool(p_args.get("one_shot", false));
+	const double explosiveness = double(p_args.get("explosiveness", 0.0));
+	const double initial_velocity = double(p_args.get("initial_velocity", 2.0));
+	const double angular_velocity = double(p_args.get("angular_velocity", 0.0));
+	const double scale_amount = double(p_args.get("scale_amount", 1.0));
+	const double spread = double(p_args.get("spread", 45.0));
+
+	// Parse direction and gravity vectors.
+	const Vector<double> dir_values = _parse_number_list(String(p_args.get("direction", String())));
+	Vector3 direction(0, -1, 0);
+	if (dir_values.size() >= 3) {
+		direction = Vector3(dir_values[0], dir_values[1], dir_values[2]);
+	} else if (dir_values.size() >= 2) {
+		direction = Vector3(dir_values[0], dir_values[1], 0);
+	}
+
+	const Vector<double> grav_values = _parse_number_list(String(p_args.get("gravity", String())));
+	Vector3 gravity(0, -9.8, 0);
+	if (grav_values.size() >= 3) {
+		gravity = Vector3(grav_values[0], grav_values[1], grav_values[2]);
+	} else if (grav_values.size() >= 2) {
+		gravity = Vector3(grav_values[0], grav_values[1], 0);
+	}
+
+	const String color_str = _format_color_arg(p_args, "color", "Color(1, 1, 1, 1)");
+
+	// Emission shape.
+	const String emission_shape = String(p_args.get("emission_shape", "point")).strip_edges().to_lower();
+	const Vector<double> extent_values = _parse_number_list(String(p_args.get("emission_extents", String())));
+
+	// Build the .tres ParticleProcessMaterial.
+	const String safe_name = _ai_safe_git_segment(node_name, "particles");
+	String mat_tres_rel;
+	const int last_slash = scene_path.rfind("/");
+	if (last_slash >= 0) {
+		mat_tres_rel = scene_path.substr(0, last_slash + 1) + "particles/" + safe_name + "_material.tres";
+	} else {
+		mat_tres_rel = "particles/" + safe_name + "_material.tres";
+	}
+
+	StringBuilder mat_tres;
+	mat_tres += "[gd_resource type=\"ParticleProcessMaterial\" format=3]\n\n";
+	mat_tres += "[resource]\n";
+	mat_tres += vformat("direction = %s\n", _format_vector3(direction));
+	mat_tres += vformat("spread = %.4f\n", spread);
+	mat_tres += vformat("initial_velocity_min = %.4f\n", initial_velocity);
+	mat_tres += vformat("initial_velocity_max = %.4f\n", initial_velocity);
+	if (angular_velocity != 0.0) {
+		mat_tres += vformat("angular_velocity_min = %.4f\n", angular_velocity);
+		mat_tres += vformat("angular_velocity_max = %.4f\n", angular_velocity);
+	}
+	mat_tres += vformat("gravity = %s\n", _format_vector3(gravity));
+	mat_tres += vformat("damping_min = 0.0\n");
+	mat_tres += vformat("damping_max = 0.0\n");
+	mat_tres += vformat("scale_min = %.4f\n", scale_amount);
+	mat_tres += vformat("scale_max = %.4f\n", scale_amount);
+	mat_tres += vformat("color = %s\n", color_str);
+
+	// Emission shape.
+	if (emission_shape == "sphere") {
+		const double radius = extent_values.size() >= 1 ? extent_values[0] : 1.0;
+		mat_tres += "emission_shape = 1\n";
+		mat_tres += vformat("emission_sphere_radius = %.4f\n", radius);
+	} else if (emission_shape == "box") {
+		const Vector3 extents = extent_values.size() >= 3 ? Vector3(extent_values[0], extent_values[1], extent_values[2]) : Vector3(1, 1, 1);
+		mat_tres += "emission_shape = 2\n";
+		mat_tres += "emission_box_extents = " + _format_vector3(extents) + "\n";
+	}
+
+	// Write the .tres file.
+	Dictionary tres_write_args;
+	tres_write_args["path"] = mat_tres_rel;
+	tres_write_args["content"] = mat_tres.as_string();
+	Dictionary tres_result = _write_file(tres_write_args);
+	if (tres_result.has("is_error")) {
+		return _make_result(vformat("Failed to write particle material: %s", String(tres_result.get("content", String()))), true);
+	}
+
+	// Add ext_resource for the material.
+	int max_ext_id = 0;
+	PackedStringArray content_lines = content.split("\n");
+	for (int i = 0; i < content_lines.size(); i++) {
+		const String line = String(content_lines[i]).strip_edges();
+		if (line.begins_with("[ext_resource ")) {
+			const String id_str = _extract_tscn_quoted_attr(line, "id");
+			if (!id_str.is_empty()) {
+				const int numeric_id = id_str.to_int();
+				if (numeric_id > max_ext_id) {
+					max_ext_id = numeric_id;
+				}
+			}
+		}
+	}
+	const int new_ext_id = max_ext_id + 1;
+	const String ext_id_str = String::num_int64(new_ext_id);
+
+	const String ext_resource_line = vformat("[ext_resource type=\"ParticleProcessMaterial\" path=\"%s\" id=\"%s\"]\n", mat_tres_rel, ext_id_str);
+	const int first_sub = content.find("[sub_resource ");
+	const int first_node = content.find("[node ");
+	int insert_pos = -1;
+	if (first_sub >= 0 && (first_node < 0 || first_sub < first_node)) {
+		insert_pos = first_sub;
+	} else if (first_node >= 0) {
+		insert_pos = first_node;
+	}
+	if (insert_pos >= 0) {
+		content = content.substr(0, insert_pos) + ext_resource_line + "\n" + content.substr(insert_pos);
+	} else {
+		content = content.strip_edges() + "\n" + ext_resource_line;
+	}
+
+	// Build particle node.
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s\"]\n", node_name, particle_node, parent);
+
+	if (is_2d) {
+		const Vector<double> pos_values = _parse_number_list(String(p_args.get("position", String())));
+		if (pos_values.size() >= 2) {
+			node_text += "position = " + _format_vector2(Vector2(pos_values[0], pos_values[1])) + "\n";
+		}
+	} else {
+		const Vector3 position = _parse_vector3_arg(p_args, "position", Vector3());
+		if (!position.is_zero_approx()) {
+			node_text += "position = " + _format_vector3(position) + "\n";
+		}
+	}
+
+	node_text += vformat("amount = %d\n", amount);
+	node_text += vformat("lifetime = %.4f\n", lifetime);
+	if (one_shot) {
+		node_text += "one_shot = true\n";
+	}
+	if (explosiveness > 0.0) {
+		node_text += vformat("explosiveness = %.4f\n", explosiveness);
+	}
+	node_text += vformat("process_material = ExtResource(\"%s\")\n", ext_id_str);
+
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded %s '%s' (%d particles, %.2fs lifetime). Material saved to %s.",
+			particle_node, node_name, amount, lifetime, mat_tres_rel));
+}
+
+// ---------------------------------------------------------------------------
+// add_vfx: Add WorldEnvironment with visual effects to a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_add_vfx(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_vfx is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "WorldEnvironment");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_vfx rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for VFX editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_vfx requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding VFX (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const bool glow_enabled = bool(p_args.get("glow_enabled", false));
+	const double glow_intensity = double(p_args.get("glow_intensity", 0.3));
+	const bool ao_enabled = bool(p_args.get("ao_enabled", false));
+	const double ao_radius = double(p_args.get("ao_radius", 2.0));
+	const double ao_power = double(p_args.get("ao_power", 1.5));
+	const bool fog_enabled = bool(p_args.get("fog_enabled", false));
+	const String fog_color = _format_color_arg(p_args, "fog_color", "Color(0.7, 0.7, 0.7, 1)");
+	const double fog_depth_begin = double(p_args.get("fog_depth_begin", 10.0));
+	const double fog_depth_end = double(p_args.get("fog_depth_end", 100.0));
+	const bool volumetric_fog_enabled = bool(p_args.get("volumetric_fog_enabled", false));
+	const double volumetric_fog_density = double(p_args.get("volumetric_fog_density", 0.05));
+	const String ambient_color = _format_color_arg(p_args, "ambient_light_color", "Color(0.1, 0.1, 0.1, 1)");
+	const double ambient_energy = double(p_args.get("ambient_light_energy", 0.5));
+
+	// Tonemap mode.
+	String tonemap_str = String(p_args.get("tonemap_mode", "filmic")).strip_edges().to_lower();
+	int tonemap_mode_int = 3; // filmic
+	if (tonemap_str == "disabled") {
+		tonemap_mode_int = 0;
+	} else if (tonemap_str == "linear") {
+		tonemap_mode_int = 1;
+	} else if (tonemap_str == "reinhart") {
+		tonemap_mode_int = 2;
+	} else if (tonemap_str == "aces") {
+		tonemap_mode_int = 4;
+	}
+
+	const String env_id = _unique_tscn_id("Env", node_name);
+
+	// Build Environment sub-resource.
+	String resources;
+	resources += vformat("[sub_resource type=\"Environment\" id=\"%s\"]\n", env_id);
+	resources += vformat("tonemap_mode = %d\n", tonemap_mode_int);
+	resources += vformat("ambient_light_color = %s\n", ambient_color);
+	resources += vformat("ambient_light_energy = %.4f\n", ambient_energy);
+
+	if (glow_enabled) {
+		resources += "glow_enabled = true\n";
+		resources += vformat("glow_bloom = %.4f\n", glow_intensity);
+		// Parse glow strength per level if provided.
+		const String glow_strength_str = String(p_args.get("glow_strength", String())).strip_edges();
+		if (!glow_strength_str.is_empty()) {
+			const Vector<double> strength_values = _parse_number_list(glow_strength_str);
+			if (strength_values.size() >= 7) {
+				resources += "glow_strength = PackedFloat32Array(";
+				for (int i = 0; i < 7; i++) {
+					if (i > 0) {
+						resources += ", ";
+					}
+					resources += vformat("%.4f", strength_values[i]);
+				}
+				resources += ")\n";
+			}
+		}
+	}
+
+	if (ao_enabled) {
+		resources += "ssao_enabled = true\n";
+		resources += vformat("ssao_radius = %.4f\n", ao_radius);
+		resources += vformat("ssao_power = %.4f\n", ao_power);
+	}
+
+	if (fog_enabled) {
+		resources += "fog_enabled = true\n";
+		resources += vformat("fog_light_color = %s\n", fog_color);
+		resources += vformat("fog_depth_begin = %.4f\n", fog_depth_begin);
+		resources += vformat("fog_depth_end = %.4f\n", fog_depth_end);
+	}
+
+	if (volumetric_fog_enabled) {
+		resources += "volumetric_fog_enabled = true\n";
+		resources += vformat("volumetric_fog_density = %.4f\n", volumetric_fog_density);
+	}
+
+	// Build WorldEnvironment node.
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"WorldEnvironment\" parent=\"%s\"]\n", node_name, parent);
+	node_text += vformat("environment = SubResource(\"%s\")\n", env_id);
+
+	content = _increment_tscn_load_steps(content, 1);
+	content = _insert_tscn_subresources(content, resources);
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+
+	// Build a summary of enabled effects.
+	Vector<String> enabled_effects;
+	if (glow_enabled) {
+		enabled_effects.push_back("glow");
+	}
+	if (ao_enabled) {
+		enabled_effects.push_back("AO");
+	}
+	if (fog_enabled) {
+		enabled_effects.push_back("fog");
+	}
+	if (volumetric_fog_enabled) {
+		enabled_effects.push_back("volumetric fog");
+	}
+	String effects_summary;
+	for (int i = 0; i < enabled_effects.size(); i++) {
+		if (i > 0) {
+			effects_summary += ", ";
+		}
+		effects_summary += enabled_effects[i];
+	}
+	if (effects_summary.is_empty()) {
+		effects_summary = "ambient light + tonemap";
+	}
+
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded WorldEnvironment '%s' with effects: %s.", node_name, effects_summary));
+}
+
+// ---------------------------------------------------------------------------
+// add_character_controller: Add 2D/3D CharacterBody with movement script.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_add_character_controller(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("add_character_controller is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_name = _sanitize_scene_node_name(String(p_args.get("name", String())), "Character");
+	if (scene_path.is_empty() || String(p_args.get("name", String())).strip_edges().is_empty()) {
+		return _make_result("add_character_controller rejected: scene_path and name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available for character controller editing.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("add_character_controller requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene before adding character controller (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	const String dimension = String(p_args.get("dimension", "3d")).strip_edges().to_lower();
+	const bool is_2d = dimension == "2d" || dimension == "2";
+	const String body_node = is_2d ? "CharacterBody2D" : "CharacterBody3D";
+	const String parent = String(p_args.get("parent", ".")).strip_edges().is_empty() ? "." : String(p_args.get("parent", ".")).strip_edges();
+	const double speed = double(p_args.get("speed", 5.0));
+	const double jump_vel = double(p_args.get("jump_velocity", 4.5));
+
+	// Determine shape type and size.
+	String shape_type = String(p_args.get("shape_type", "capsule")).strip_edges().to_lower();
+	const String shape_id = _unique_tscn_id("CharShape", node_name);
+	const Vector<double> size_values = _parse_number_list(String(p_args.get("shape_size", String())));
+
+	String shape_resource_type;
+	if (is_2d) {
+		if (shape_type == "rectangle") {
+			shape_resource_type = "RectangleShape2D";
+		} else if (shape_type == "circle") {
+			shape_resource_type = "CircleShape2D";
+		} else {
+			shape_type = "capsule";
+			shape_resource_type = "CapsuleShape2D";
+		}
+	} else {
+		if (shape_type == "box") {
+			shape_resource_type = "BoxShape3D";
+		} else if (shape_type == "sphere") {
+			shape_resource_type = "SphereShape3D";
+		} else {
+			shape_type = "capsule";
+			shape_resource_type = "CapsuleShape3D";
+		}
+	}
+
+	// Build shape sub-resource.
+	String resources;
+	resources += vformat("[sub_resource type=\"%s\" id=\"%s\"]\n", shape_resource_type, shape_id);
+	if (shape_resource_type == "CapsuleShape3D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 1.8;
+		resources += vformat("radius = %.4f\n", radius);
+		resources += vformat("height = %.4f\n", height);
+	} else if (shape_resource_type == "SphereShape3D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		resources += vformat("radius = %.4f\n", radius);
+	} else if (shape_resource_type == "BoxShape3D") {
+		const Vector3 sz = size_values.size() >= 3 ? Vector3(size_values[0], size_values[1], size_values[2]) : Vector3(1, 1.8, 1);
+		resources += "size = " + _format_vector3(sz) + "\n";
+	} else if (shape_resource_type == "CapsuleShape2D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		const double height = size_values.size() >= 2 ? size_values[1] : 1.8;
+		resources += vformat("radius = %.4f\n", radius);
+		resources += vformat("height = %.4f\n", height);
+	} else if (shape_resource_type == "CircleShape2D") {
+		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
+		resources += vformat("radius = %.4f\n", radius);
+	} else if (shape_resource_type == "RectangleShape2D") {
+		const Vector2 sz = size_values.size() >= 2 ? Vector2(size_values[0], size_values[1]) : Vector2(1, 1.8);
+		resources += "size = " + _format_vector2(sz) + "\n";
+	}
+
+	// Determine script path.
+	String script_path_rel = String(p_args.get("script_path", String())).strip_edges();
+	if (script_path_rel.is_empty()) {
+		const String safe_name = _ai_safe_git_segment(node_name, "character");
+		script_path_rel = "scripts/" + safe_name + (is_2d ? "_controller_2d.gd" : "_controller.gd");
+	}
+
+	// Build GDScript content.
+	StringBuilder script_content;
+	if (is_2d) {
+		script_content += "extends CharacterBody2D\n\n";
+		script_content += vformat("const SPEED = %.1f\n", speed);
+		script_content += vformat("const JUMP_VELOCITY = %.1f\n\n", jump_vel);
+		script_content += "func _physics_process(delta: float) -> void:\n";
+		script_content += "\t# Add gravity.\n";
+		script_content += "\tif not is_on_floor():\n";
+		script_content += "\t\tvelocity += get_gravity() * delta\n\n";
+		script_content += "\t# Handle jump.\n";
+		script_content += "\tif Input.is_action_just_pressed(\"ui_accept\") and is_on_floor():\n";
+		script_content += "\t\tvelocity.y = JUMP_VELOCITY\n\n";
+		script_content += "\t# Get input direction.\n";
+		script_content += "\tvar direction := Input.get_vector(\"ui_left\", \"ui_right\", \"ui_up\", \"ui_down\")\n";
+		script_content += "\tif direction:\n";
+		script_content += "\t\tvelocity.x = direction.x * SPEED\n";
+		script_content += "\t\tvelocity.y = direction.y * SPEED\n";
+		script_content += "\telse:\n";
+		script_content += "\t\tvelocity.x = move_toward(velocity.x, 0, SPEED)\n\n";
+		script_content += "\tmove_and_slide()\n";
+	} else {
+		script_content += "extends CharacterBody3D\n\n";
+		script_content += vformat("const SPEED = %.1f\n", speed);
+		script_content += vformat("const JUMP_VELOCITY = %.1f\n\n", jump_vel);
+		script_content += "func _physics_process(delta: float) -> void:\n";
+		script_content += "\t# Add gravity.\n";
+		script_content += "\tif not is_on_floor():\n";
+		script_content += "\t\tvelocity += get_gravity() * delta\n\n";
+		script_content += "\t# Handle jump.\n";
+		script_content += "\tif Input.is_action_just_pressed(\"ui_accept\") and is_on_floor():\n";
+		script_content += "\t\tvelocity.y = JUMP_VELOCITY\n\n";
+		script_content += "\t# Get input direction.\n";
+		script_content += "\tvar input_dir := Input.get_vector(\"ui_left\", \"ui_right\", \"ui_up\", \"ui_down\")\n";
+		script_content += "\tvar direction := (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()\n";
+		script_content += "\tif direction:\n";
+		script_content += "\t\tvelocity.x = direction.x * SPEED\n";
+		script_content += "\t\tvelocity.z = direction.z * SPEED\n";
+		script_content += "\telse:\n";
+		script_content += "\t\tvelocity.x = move_toward(velocity.x, 0, SPEED)\n";
+		script_content += "\t\tvelocity.z = move_toward(velocity.z, 0, SPEED)\n\n";
+		script_content += "\tmove_and_slide()\n";
+	}
+
+	// Write the script file.
+	Dictionary script_write_args;
+	script_write_args["path"] = script_path_rel;
+	script_write_args["content"] = script_content.as_string();
+	Dictionary script_result = _write_file(script_write_args);
+	if (script_result.has("is_error")) {
+		return _make_result(vformat("Failed to write movement script: %s", String(script_result.get("content", String()))), true);
+	}
+
+	// Add ext_resource for the script.
+	int max_ext_id = 0;
+	PackedStringArray content_lines = content.split("\n");
+	for (int i = 0; i < content_lines.size(); i++) {
+		const String line = String(content_lines[i]).strip_edges();
+		if (line.begins_with("[ext_resource ")) {
+			const String id_str = _extract_tscn_quoted_attr(line, "id");
+			if (!id_str.is_empty()) {
+				const int numeric_id = id_str.to_int();
+				if (numeric_id > max_ext_id) {
+					max_ext_id = numeric_id;
+				}
+			}
+		}
+	}
+	const int new_ext_id = max_ext_id + 1;
+	const String ext_id_str = String::num_int64(new_ext_id);
+
+	const String ext_resource_line = vformat("[ext_resource type=\"Script\" path=\"%s\" id=\"%s\"]\n", script_path_rel, ext_id_str);
+	const int first_sub = content.find("[sub_resource ");
+	const int first_node = content.find("[node ");
+	int insert_pos = -1;
+	if (first_sub >= 0 && (first_node < 0 || first_sub < first_node)) {
+		insert_pos = first_sub;
+	} else if (first_node >= 0) {
+		insert_pos = first_node;
+	}
+	if (insert_pos >= 0) {
+		content = content.substr(0, insert_pos) + ext_resource_line + "\n" + content.substr(insert_pos);
+	} else {
+		content = content.strip_edges() + "\n" + ext_resource_line;
+	}
+
+	// Build CharacterBody node.
+	String node_text;
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s\"]\n", node_name, body_node, parent);
+
+	if (is_2d) {
+		const Vector<double> pos_values = _parse_number_list(String(p_args.get("position", String())));
+		if (pos_values.size() >= 2) {
+			node_text += "position = " + _format_vector2(Vector2(pos_values[0], pos_values[1])) + "\n";
+		}
+	} else {
+		const Vector3 position = _parse_vector3_arg(p_args, "position", Vector3());
+		if (!position.is_zero_approx()) {
+			node_text += "position = " + _format_vector3(position) + "\n";
+		}
+	}
+
+	node_text += vformat("script = ExtResource(\"%s\")\n", ext_id_str);
+
+	// Build collision shape child.
+	const String collision_name = _sanitize_scene_node_name(node_name + "_Collision", "CollisionShape");
+	node_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s/%s\"]\n",
+			collision_name, is_2d ? "CollisionShape2D" : "CollisionShape3D", parent, node_name);
+	node_text += vformat("shape = SubResource(\"%s\")\n", shape_id);
+
+	content = _increment_tscn_load_steps(content, 1);
+	content = _insert_tscn_subresources(content, resources);
+	content = content.strip_edges() + "\n" + node_text;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nAdded %s '%s' with %s collision and movement script (%s). Speed=%.1f, Jump=%.1f.",
+			body_node, node_name, shape_resource_type, script_path_rel, speed, jump_vel));
+}
+
+// ---------------------------------------------------------------------------
+// Helper: parse .tscn into node blocks.
+// ---------------------------------------------------------------------------
+struct AIToolNodeBlock {
+	String name;
+	String type;
+	String parent;
+	String full_path;
+	int start_line;
+	int end_line;
+	Vector<String> lines;
+};
+
+static Vector<AIToolNodeBlock> _parse_tscn_node_blocks(const String &p_content) {
+	Vector<AIToolNodeBlock> blocks;
+	PackedStringArray lines = p_content.split("\n");
+	AIToolNodeBlock current;
+	bool in_node = false;
+
+	for (int i = 0; i < lines.size(); i++) {
+		const String line = String(lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			if (in_node) {
+				blocks.push_back(current);
+			}
+			in_node = true;
+			current = AIToolNodeBlock();
+			current.name = _extract_tscn_quoted_attr(line, "name");
+			current.type = _extract_tscn_quoted_attr(line, "type");
+			current.parent = _extract_tscn_quoted_attr(line, "parent");
+			current.start_line = i;
+			current.lines.clear();
+			current.lines.push_back(String(lines[i]));
+			// Compute full path.
+			if (current.parent.is_empty() || current.parent == ".") {
+				current.full_path = current.name;
+			} else {
+				current.full_path = current.parent + "/" + current.name;
+			}
+		} else if (in_node) {
+			current.lines.push_back(String(lines[i]));
+		}
+	}
+	if (in_node) {
+		blocks.push_back(current);
+	}
+	return blocks;
+}
+
+static bool _is_descendant_path(const String &p_parent_path, const String &p_child_path) {
+	if (p_parent_path == p_child_path) {
+		return true;
+	}
+	return p_child_path.begins_with(p_parent_path + "/");
+}
+
+// ---------------------------------------------------------------------------
+// remove_node: Remove a node and its children from a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_remove_node(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("remove_node is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_path = String(p_args.get("node_path", String())).strip_edges();
+	if (scene_path.is_empty() || node_path.is_empty()) {
+		return _make_result("remove_node rejected: scene_path and node_path are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("remove_node requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	Vector<AIToolNodeBlock> blocks = _parse_tscn_node_blocks(content);
+	if (blocks.is_empty()) {
+		return _make_result("No nodes found in scene.", true);
+	}
+
+	// Find the target node.
+	int target_idx = -1;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (blocks[i].full_path == node_path || (node_path == "." && i == 0)) {
+			target_idx = i;
+			break;
+		}
+	}
+	if (target_idx < 0) {
+		return _make_result(vformat("Node '%s' not found in %s.", node_path, scene_path), true);
+	}
+
+	// Check if trying to remove root node.
+	if (target_idx == 0 && (blocks[0].parent.is_empty() || blocks[0].parent == ".")) {
+		return _make_result("Cannot remove the root node of a scene.", true);
+	}
+
+	// Collect indices to remove (target + all descendants).
+	const String target_full_path = blocks[target_idx].full_path;
+	Vector<bool> keep_flags;
+	keep_flags.resize(blocks.size());
+	int removed_count = 0;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (_is_descendant_path(target_full_path, blocks[i].full_path)) {
+			keep_flags.write[i] = false;
+			removed_count++;
+		} else {
+			keep_flags.write[i] = true;
+		}
+	}
+
+	// Rebuild content: keep header lines (before first node) and surviving node blocks.
+	PackedStringArray all_lines = content.split("\n");
+	StringBuilder result_content;
+
+	// Add header lines (everything before the first [node ...]).
+	for (int i = 0; i < all_lines.size(); i++) {
+		const String line = String(all_lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			break;
+		}
+		result_content += String(all_lines[i]) + "\n";
+	}
+
+	// Add surviving node blocks.
+	for (int i = 0; i < blocks.size(); i++) {
+		if (!keep_flags[i]) {
+			continue;
+		}
+		for (int j = 0; j < blocks[i].lines.size(); j++) {
+			result_content += blocks[i].lines[j] + "\n";
+		}
+	}
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = result_content.as_string();
+	Dictionary write_result = _write_file(write_args);
+	if (write_result.has("is_error")) {
+		return write_result;
+	}
+	return _make_result(String(write_result.get("content", String())) + vformat("\nRemoved node '%s' and %d descendant(s) from %s.", node_path, removed_count - 1, scene_path));
+}
+
+// ---------------------------------------------------------------------------
+// modify_node_properties: Modify properties of an existing node.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_modify_node_properties(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("modify_node_properties is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_path = String(p_args.get("node_path", String())).strip_edges();
+	const String properties_json = String(p_args.get("properties", String())).strip_edges();
+	if (scene_path.is_empty() || node_path.is_empty() || properties_json.is_empty()) {
+		return _make_result("modify_node_properties rejected: scene_path, node_path, and properties are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("modify_node_properties requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	// Parse properties JSON.
+	Dictionary properties;
+	Variant parsed = JSON::parse_string(properties_json);
+	if (parsed.get_type() == Variant::DICTIONARY) {
+		properties = parsed;
+	}
+	if (properties.is_empty()) {
+		return _make_result("modify_node_properties: properties must be a non-empty JSON object.", true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	Vector<AIToolNodeBlock> blocks = _parse_tscn_node_blocks(content);
+	int target_idx = -1;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (blocks[i].full_path == node_path || (node_path == "." && i == 0)) {
+			target_idx = i;
+			break;
+		}
+	}
+	if (target_idx < 0) {
+		return _make_result(vformat("Node '%s' not found in %s.", node_path, scene_path), true);
+	}
+
+	// Modify properties in the block's lines.
+	AIToolNodeBlock &block = blocks.write[target_idx];
+	Array keys = properties.keys();
+	int modified_count = 0;
+	int added_count = 0;
+
+	for (int k = 0; k < keys.size(); k++) {
+		const String prop_name = String(keys[k]).strip_edges();
+		const String prop_value = String(properties[keys[k]]).strip_edges();
+		if (prop_name.is_empty()) {
+			continue;
+		}
+
+		bool found = false;
+		for (int l = 1; l < block.lines.size(); l++) {
+			String line = block.lines[l];
+			const String stripped = line.strip_edges();
+			const int eq = stripped.find("=");
+			if (eq < 0) {
+				continue;
+			}
+			const String key = stripped.substr(0, eq).strip_edges();
+			if (key == prop_name) {
+				block.lines.write[l] = prop_name + " = " + prop_value;
+				found = true;
+				modified_count++;
+				break;
+			}
+		}
+		if (!found) {
+			block.lines.push_back(prop_name + " = " + prop_value);
+			added_count++;
+		}
+	}
+
+	// Rebuild content.
+	PackedStringArray all_lines = content.split("\n");
+	StringBuilder result_content;
+
+	// Add header lines.
+	for (int i = 0; i < all_lines.size(); i++) {
+		const String line = String(all_lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			break;
+		}
+		result_content += String(all_lines[i]) + "\n";
+	}
+
+	// Add all node blocks (with modified target).
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].lines.size(); j++) {
+			result_content += blocks[i].lines[j] + "\n";
+		}
+	}
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = result_content.as_string();
+	Dictionary write_result = _write_file(write_args);
+	if (write_result.has("is_error")) {
+		return write_result;
+	}
+	return _make_result(String(write_result.get("content", String())) + vformat("\nModified node '%s': %d properties updated, %d properties added.", node_path, modified_count, added_count));
+}
+
+// ---------------------------------------------------------------------------
+// connect_signal: Add a signal connection to a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_connect_signal(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("connect_signal is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String source_node = String(p_args.get("source_node", String())).strip_edges();
+	const String signal_name = String(p_args.get("signal_name", String())).strip_edges();
+	const String target_node = String(p_args.get("target_node", String())).strip_edges();
+	const String method_name = String(p_args.get("method_name", String())).strip_edges();
+	if (scene_path.is_empty() || source_node.is_empty() || signal_name.is_empty() || target_node.is_empty() || method_name.is_empty()) {
+		return _make_result("connect_signal rejected: scene_path, source_node, signal_name, target_node, and method_name are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("connect_signal requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	// Verify source and target nodes exist.
+	Vector<AIToolNodeBlock> blocks = _parse_tscn_node_blocks(content);
+	bool source_found = false;
+	bool target_found = false;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (blocks[i].full_path == source_node || (source_node == "." && i == 0)) {
+			source_found = true;
+		}
+		if (blocks[i].full_path == target_node || (target_node == "." && i == 0)) {
+			target_found = true;
+		}
+	}
+	if (!source_found) {
+		return _make_result(vformat("Source node '%s' not found in %s.", source_node, scene_path), true);
+	}
+	if (!target_found) {
+		return _make_result(vformat("Target node '%s' not found in %s.", target_node, scene_path), true);
+	}
+
+	// Build the connection line.
+	const int flags = int(p_args.get("flags", 0));
+	String connection_line = vformat("[connection signal=\"%s\" from=\"%s\" to=\"%s\" method=\"%s\"",
+			signal_name, source_node, target_node, method_name);
+	if (flags > 0) {
+		connection_line += vformat(" flags=%d", flags);
+	}
+	connection_line += "]\n";
+
+	// Append at end of file.
+	content = content.strip_edges() + "\n\n" + connection_line;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nConnected signal '%s' from '%s' to '%s.%s'.", signal_name, source_node, target_node, method_name));
+}
+
+// ---------------------------------------------------------------------------
+// duplicate_node: Duplicate a node and its children in a .tscn scene.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_duplicate_node(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("duplicate_node is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_path = String(p_args.get("node_path", String())).strip_edges();
+	if (scene_path.is_empty() || node_path.is_empty()) {
+		return _make_result("duplicate_node rejected: scene_path and node_path are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("duplicate_node requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	Vector<AIToolNodeBlock> blocks = _parse_tscn_node_blocks(content);
+	int target_idx = -1;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (blocks[i].full_path == node_path || (node_path == "." && i == 0)) {
+			target_idx = i;
+			break;
+		}
+	}
+	if (target_idx < 0) {
+		return _make_result(vformat("Node '%s' not found in %s.", node_path, scene_path), true);
+	}
+
+	const String original_name = blocks[target_idx].name;
+	const String original_parent = blocks[target_idx].parent;
+	const String new_name = _sanitize_scene_node_name(
+			String(p_args.get("new_name", original_name + "Copy")).strip_edges(),
+			original_name + "Copy");
+	const String new_parent = String(p_args.get("new_parent", original_parent)).strip_edges().is_empty()
+			? original_parent
+			: String(p_args.get("new_parent", original_parent)).strip_edges();
+
+	// Parse optional position offset.
+	const Vector3 offset = _parse_vector3_arg(p_args, "position_offset", Vector3());
+
+	// Collect the subtree blocks (target + descendants).
+	const String target_full_path = blocks[target_idx].full_path;
+	Vector<int> subtree_indices;
+	for (int i = target_idx; i < blocks.size(); i++) {
+		if (_is_descendant_path(target_full_path, blocks[i].full_path)) {
+			subtree_indices.push_back(i);
+		}
+	}
+
+	// Build duplicated node blocks.
+	StringBuilder dup_text;
+	for (int s = 0; s < subtree_indices.size(); s++) {
+		const AIToolNodeBlock &orig = blocks[subtree_indices[s]];
+
+		// Compute new node name and parent.
+		String dup_name;
+		String dup_parent;
+		if (s == 0) {
+			// Root of the duplicated subtree.
+			dup_name = new_name;
+			dup_parent = new_parent;
+		} else {
+			// Descendant: replace the original root prefix with new root.
+			const String orig_rel = orig.full_path.substr(target_full_path.length());
+			dup_name = orig.name;
+			if (new_parent.is_empty() || new_parent == ".") {
+				dup_parent = new_name + orig_rel.substr(0, orig_rel.rfind("/"));
+			} else {
+				dup_parent = new_parent + "/" + new_name + orig_rel.substr(0, orig_rel.rfind("/"));
+			}
+			if (dup_parent.ends_with("/")) {
+				dup_parent = dup_parent.substr(0, dup_parent.length() - 1);
+			}
+		}
+
+		// Build the node line.
+		dup_text += vformat("\n[node name=\"%s\" type=\"%s\" parent=\"%s\"]\n", dup_name, orig.type, dup_parent);
+
+		// Copy properties, applying offset to position if this is the root duplicate.
+		for (int l = 1; l < orig.lines.size(); l++) {
+			String line = orig.lines[l].strip_edges();
+			if (line.is_empty() || line.begins_with("[")) {
+				continue;
+			}
+			if (s == 0 && offset != Vector3() && line.begins_with("position =")) {
+				// Apply offset to position.
+				// Re-parse from the line.
+				const int eq = line.find("=");
+				if (eq >= 0) {
+					const String val = line.substr(eq + 1).strip_edges();
+					const Vector<double> vals = _parse_number_list(val);
+					if (vals.size() >= 3) {
+						Vector3 pos(vals[0], vals[1], vals[2]);
+						pos += offset;
+						dup_text += "position = " + _format_vector3(pos) + "\n";
+						continue;
+					}
+				}
+			}
+			// Remap SubResource IDs for the duplicate (append "_copy" suffix).
+			if (line.contains("SubResource(\"")) {
+				line = line.replace("SubResource(\"", "SubResource(\"dup_");
+			}
+			dup_text += line + "\n";
+		}
+	}
+
+	// Also duplicate sub_resources referenced by the subtree.
+	// Collect all SubResource IDs referenced in the subtree.
+	StringBuilder dup_resources;
+	PackedStringArray all_lines = content.split("\n");
+	bool in_sub_resource = false;
+	String current_sub_id;
+	String current_sub_content;
+	Vector<String> referenced_ids;
+
+	// Find referenced SubResource IDs.
+	for (int s = 0; s < subtree_indices.size(); s++) {
+		for (int l = 0; l < blocks[subtree_indices[s]].lines.size(); l++) {
+			const String line = blocks[subtree_indices[s]].lines[l];
+			int search_from = 0;
+			while (true) {
+				const int pos = line.find("SubResource(\"", search_from);
+				if (pos < 0) {
+					break;
+				}
+				const int id_start = pos + String("SubResource(\"").length();
+				const int id_end = line.find("\")", id_start);
+				if (id_end >= 0) {
+					const String ref_id = line.substr(id_start, id_end - id_start);
+					if (!referenced_ids.has(ref_id)) {
+						referenced_ids.push_back(ref_id);
+					}
+				}
+				search_from = id_end + 2;
+			}
+		}
+	}
+
+	// Find and duplicate the sub_resources.
+	for (int i = 0; i < all_lines.size(); i++) {
+		const String line = String(all_lines[i]).strip_edges();
+		if (line.begins_with("[sub_resource ")) {
+			in_sub_resource = true;
+			current_sub_id = _extract_tscn_quoted_attr(line, "id");
+			current_sub_content = String(all_lines[i]) + "\n";
+			continue;
+		}
+		if (in_sub_resource) {
+			if (line.begins_with("[") && !line.begins_with("[sub_resource")) {
+				in_sub_resource = false;
+				current_sub_content = String();
+				current_sub_id = String();
+			} else {
+				current_sub_content += String(all_lines[i]) + "\n";
+			}
+		}
+		if (!in_sub_resource && !current_sub_id.is_empty() && referenced_ids.has(current_sub_id)) {
+			// Duplicate this sub_resource with a new ID.
+			String dup_content = current_sub_content;
+			dup_content = dup_content.replace("id=\"" + current_sub_id + "\"", "id=\"dup_" + current_sub_id + "\"");
+			dup_resources += dup_content + "\n";
+			current_sub_id = String();
+			current_sub_content = String();
+		}
+	}
+
+	// Insert duplicated resources and nodes.
+	String insert_resources = dup_resources.as_string();
+	String insert_nodes = dup_text.as_string();
+
+	// Insert resources before first [node].
+	const int first_node = content.find("\n[node ");
+	if (first_node >= 0) {
+		content = content.substr(0, first_node + 1) + insert_resources.strip_edges() + "\n\n" + content.substr(first_node + 1);
+	} else {
+		content = content.strip_edges() + "\n\n" + insert_resources.strip_edges();
+	}
+
+	// Append nodes at end.
+	content = content.strip_edges() + "\n" + insert_nodes;
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = content;
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nDuplicated node '%s' as '%s' under parent '%s' (%d nodes in subtree).",
+			node_path, new_name, new_parent, subtree_indices.size()));
+}
+
+// ---------------------------------------------------------------------------
+// reparent_node: Move a node and its children to a different parent.
+// ---------------------------------------------------------------------------
+Dictionary AIToolExecutor::_reparent_node(const Dictionary &p_args) {
+	const AISettingsData settings = AISettings::load();
+	if (settings.context_mode != AIContextMode::PROJECT) {
+		return _make_result("reparent_node is only available in PROJECT mode.", true);
+	}
+
+	const String scene_path = String(p_args.get("scene_path", String())).strip_edges();
+	const String node_path = String(p_args.get("node_path", String())).strip_edges();
+	const String new_parent = String(p_args.get("new_parent", String())).strip_edges();
+	if (scene_path.is_empty() || node_path.is_empty() || new_parent.is_empty()) {
+		return _make_result("reparent_node rejected: scene_path, node_path, and new_parent are required.", true);
+	}
+
+	const String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root is available.", true);
+	}
+	String full_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, scene_path, full_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + scene_path, true);
+	}
+	if (!full_path.to_lower().ends_with(".tscn") || !FileAccess::exists(full_path)) {
+		return _make_result("reparent_node requires an existing .tscn scene file.\nPath: " + scene_path, true);
+	}
+
+	Error err = OK;
+	String content = FileAccess::get_file_as_string(full_path, &err);
+	if (err != OK) {
+		return _make_result(vformat("Failed to read scene (err=%d).\nPath: %s", (int)err, scene_path), true);
+	}
+
+	Vector<AIToolNodeBlock> blocks = _parse_tscn_node_blocks(content);
+	int target_idx = -1;
+	for (int i = 0; i < blocks.size(); i++) {
+		if (blocks[i].full_path == node_path) {
+			target_idx = i;
+			break;
+		}
+	}
+	if (target_idx < 0) {
+		return _make_result(vformat("Node '%s' not found in %s.", node_path, scene_path), true);
+	}
+
+	// Compute the new full path for the target.
+	String new_target_full;
+	if (new_parent == ".") {
+		new_target_full = blocks[target_idx].name;
+	} else {
+		new_target_full = new_parent + "/" + blocks[target_idx].name;
+	}
+
+	// Prevent reparenting to self or descendant.
+	if (_is_descendant_path(new_target_full, node_path)) {
+		return _make_result(vformat("Cannot reparent '%s' under '%s': would create a circular hierarchy.", node_path, new_parent), true);
+	}
+
+	const String old_full_path = blocks[target_idx].full_path;
+	int reparented_count = 0;
+
+	// Update parent paths for the target and all descendants.
+	for (int i = target_idx; i < blocks.size(); i++) {
+		if (!_is_descendant_path(old_full_path, blocks[i].full_path)) {
+			continue;
+		}
+		// Compute relative path from old root.
+		String relative;
+		if (blocks[i].full_path == old_full_path) {
+			relative = blocks[i].name;
+		} else {
+			relative = blocks[i].full_path.substr(old_full_path.length() + 1); // Skip the '/'
+		}
+
+		// Compute new parent for this node.
+		String node_new_parent;
+		if (blocks[i].full_path == old_full_path) {
+			node_new_parent = new_parent;
+		} else {
+			// The relative path contains intermediate segments.
+			const String relative_parent = relative.substr(0, relative.rfind("/"));
+			if (new_parent == ".") {
+				node_new_parent = blocks[target_idx].name + "/" + relative_parent;
+			} else {
+				node_new_parent = new_parent + "/" + blocks[target_idx].name + "/" + relative_parent;
+			}
+		}
+
+		// Update the parent attribute in the node header line.
+		String &header = blocks.write[i].lines.write[0];
+		const int parent_pos = header.find("parent=\"");
+		if (parent_pos >= 0) {
+			const int val_start = parent_pos + String("parent=\"").length();
+			const int val_end = header.find("\"", val_start);
+			if (val_end >= 0) {
+				header = header.substr(0, val_start) + node_new_parent + header.substr(val_end);
+			}
+		}
+		blocks.write[i].parent = node_new_parent;
+		reparented_count++;
+	}
+
+	// Rebuild content.
+	PackedStringArray all_lines = content.split("\n");
+	StringBuilder result_content;
+
+	// Add header lines.
+	for (int i = 0; i < all_lines.size(); i++) {
+		const String line = String(all_lines[i]).strip_edges();
+		if (line.begins_with("[node ")) {
+			break;
+		}
+		result_content += String(all_lines[i]) + "\n";
+	}
+
+	// Add all node blocks.
+	for (int i = 0; i < blocks.size(); i++) {
+		for (int j = 0; j < blocks[i].lines.size(); j++) {
+			result_content += blocks[i].lines[j] + "\n";
+		}
+	}
+
+	Dictionary write_args;
+	write_args["path"] = scene_path;
+	write_args["content"] = result_content.as_string();
+	Dictionary result = _write_file(write_args);
+	if (result.has("is_error")) {
+		return result;
+	}
+	return _make_result(String(result.get("content", String())) + vformat("\nReparented '%s' to '%s' (%d nodes updated).", node_path, new_parent, reparented_count));
+}
+
 Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 	Array operations = p_args.get("operations", Array());
 	if (operations.is_empty()) {
@@ -1449,12 +3292,24 @@ Dictionary AIToolExecutor::_batch_tools(const Dictionary &p_args) {
 		}
 		if (settings.context_mode != AIContextMode::PROJECT &&
 				(name == AIToolNames::SETUP_ENGINE_WORKSPACE ||
+						name == AIToolNames::CHECK_PROJECT_SCRIPTS ||
+						name == AIToolNames::CHECK_HTML_PROTOTYPE ||
 						name == AIToolNames::CHECK_UI_LAYOUT ||
 						name == AIToolNames::BUILD_PROJECT ||
 						name == AIToolNames::PACKAGE_PROJECT ||
 						name == AIToolNames::CHECK_PACKAGE_STATUS ||
 						name == AIToolNames::TEST_PACKAGE ||
-						name == AIToolNames::REQUEST_ENGINE_CHANGE)) {
+						name == AIToolNames::REQUEST_ENGINE_CHANGE ||
+						name == AIToolNames::ADD_PHYSICS ||
+						name == AIToolNames::ADD_ANIMATION ||
+						name == AIToolNames::ADD_PARTICLES ||
+						name == AIToolNames::ADD_VFX ||
+						name == AIToolNames::ADD_CHARACTER_CONTROLLER ||
+						name == AIToolNames::REMOVE_NODE ||
+						name == AIToolNames::MODIFY_NODE_PROPERTIES ||
+						name == AIToolNames::CONNECT_SIGNAL ||
+						name == AIToolNames::DUPLICATE_NODE ||
+						name == AIToolNames::REPARENT_NODE)) {
 			has_error = true;
 			sb += vformat("\n--- Operation %d: %s ---\nError: this tool is only available in project mode.\n", i + 1, name);
 			continue;
@@ -1512,19 +3367,6 @@ struct AIUILayoutNodeInfo {
 	int z_index = 0;
 };
 
-static String _extract_tscn_quoted_attr(const String &p_line, const String &p_key) {
-	const String needle = p_key + "=\"";
-	const int start = p_line.find(needle);
-	if (start < 0) {
-		return String();
-	}
-	const int value_start = start + needle.length();
-	const int value_end = p_line.find("\"", value_start);
-	if (value_end < 0) {
-		return String();
-	}
-	return p_line.substr(value_start, value_end - value_start);
-}
 
 static bool _parse_tscn_vector2(const String &p_value, Vector2 &r_value) {
 	const int open = p_value.find("(");
@@ -1607,12 +3449,6 @@ static bool _node_sorts_above(const AIUILayoutNodeInfo &p_a, const AIUILayoutNod
 	return p_a.order > p_b.order;
 }
 
-static String _scene_node_path(const String &p_parent, const String &p_name) {
-	if (p_parent.is_empty() || p_parent == ".") {
-		return p_name;
-	}
-	return p_parent.path_join(p_name).replace("\\", "/");
-}
 
 static bool _parse_tscn_ui_nodes(const String &p_content, Vector<AIUILayoutNodeInfo> &r_nodes, String &r_error) {
 	PackedStringArray lines = p_content.split("\n");
@@ -1965,161 +3801,6 @@ struct AI3DSceneNodeInfo {
 	bool has_shape = false;
 };
 
-static String _sanitize_scene_node_name(const String &p_name, const String &p_fallback) {
-	String value = p_name.strip_edges();
-	String out;
-	for (int i = 0; i < value.length(); i++) {
-		const char32_t c = value[i];
-		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == ' ') {
-			out += String::chr(c);
-		}
-	}
-	out = out.strip_edges();
-	return out.is_empty() ? p_fallback : out;
-}
-
-static Vector<double> _parse_number_list(String p_value) {
-	p_value = p_value.strip_edges();
-	const int open = p_value.find("(");
-	const int close = p_value.rfind(")");
-	if (open >= 0 && close > open) {
-		p_value = p_value.substr(open + 1, close - open - 1);
-	}
-	p_value = p_value.replace(";", ",").replace(" ", ",");
-	Vector<double> values;
-	PackedStringArray parts = p_value.split(",", false);
-	for (int i = 0; i < parts.size(); i++) {
-		const String part = String(parts[i]).strip_edges();
-		if (!part.is_empty() && part.is_valid_float()) {
-			values.push_back(part.to_float());
-		}
-	}
-	return values;
-}
-
-static Vector3 _parse_vector3_arg(const Dictionary &p_args, const String &p_key, const Vector3 &p_default, bool p_degrees_to_radians = false) {
-	if (!p_args.has(p_key)) {
-		return p_default;
-	}
-	const Vector<double> values = _parse_number_list(String(p_args.get(p_key, String())));
-	if (values.size() < 3) {
-		return p_default;
-	}
-	Vector3 result(values[0], values[1], values[2]);
-	if (p_degrees_to_radians) {
-		result.x = Math::deg_to_rad(result.x);
-		result.y = Math::deg_to_rad(result.y);
-		result.z = Math::deg_to_rad(result.z);
-	}
-	return result;
-}
-
-static String _format_vector2(const Vector2 &p_value) {
-	return vformat("Vector2(%.4f, %.4f)", p_value.x, p_value.y);
-}
-
-static String _format_vector3(const Vector3 &p_value) {
-	return vformat("Vector3(%.4f, %.4f, %.4f)", p_value.x, p_value.y, p_value.z);
-}
-
-static Vector3 _vector3_degrees_to_radians(const Vector3 &p_value) {
-	return Vector3(Math::deg_to_rad(p_value.x), Math::deg_to_rad(p_value.y), Math::deg_to_rad(p_value.z));
-}
-
-static String _format_color_arg(const Dictionary &p_args, const String &p_key, const String &p_default) {
-	if (!p_args.has(p_key)) {
-		return p_default;
-	}
-	String value = String(p_args.get(p_key, String())).strip_edges();
-	if (value.is_empty()) {
-		return p_default;
-	}
-	if (value.begins_with("Color(")) {
-		return value;
-	}
-	if (value.begins_with("#") && (value.length() == 7 || value.length() == 9)) {
-		const String hex = value.substr(1).to_lower();
-		int r = ("0x" + hex.substr(0, 2)).hex_to_int();
-		int g = ("0x" + hex.substr(2, 2)).hex_to_int();
-		int b = ("0x" + hex.substr(4, 2)).hex_to_int();
-		int a = hex.length() >= 8 ? ("0x" + hex.substr(6, 2)).hex_to_int() : 255;
-		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", r / 255.0, g / 255.0, b / 255.0, a / 255.0);
-	}
-	const Vector<double> values = _parse_number_list(value);
-	if (values.size() >= 3) {
-		const double scale = (values[0] > 1.0 || values[1] > 1.0 || values[2] > 1.0) ? 255.0 : 1.0;
-		const double alpha = values.size() >= 4 ? values[3] / (values[3] > 1.0 ? 255.0 : 1.0) : 1.0;
-		return vformat("Color(%.4f, %.4f, %.4f, %.4f)", values[0] / scale, values[1] / scale, values[2] / scale, alpha);
-	}
-	return p_default;
-}
-
-static String _unique_tscn_id(const String &p_prefix, const String &p_name) {
-	String value = (p_prefix + "_" + p_name).to_lower();
-	String out;
-	for (int i = 0; i < value.length(); i++) {
-		const char32_t c = value[i];
-		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
-			out += String::chr(c);
-		} else if (c == '-' || c == ' ') {
-			out += "_";
-		}
-	}
-	return out.is_empty() ? p_prefix : out;
-}
-
-static String _increment_tscn_load_steps(String p_content, int p_added_steps) {
-	const int pos = p_content.find("load_steps=");
-	if (pos < 0) {
-		const int header_end = p_content.find("]");
-		if (header_end >= 0 && p_content.begins_with("[gd_scene")) {
-			return p_content.substr(0, header_end) + vformat(" load_steps=%d", MAX(1, p_added_steps)) + p_content.substr(header_end);
-		}
-		return p_content;
-	}
-	const int value_start = pos + String("load_steps=").length();
-	int value_end = value_start;
-	while (value_end < p_content.length() && p_content[value_end] >= '0' && p_content[value_end] <= '9') {
-		value_end++;
-	}
-	const int old_value = p_content.substr(value_start, value_end - value_start).to_int();
-	return p_content.substr(0, value_start) + String::num_int64(MAX(1, old_value + p_added_steps)) + p_content.substr(value_end);
-}
-
-static String _insert_tscn_subresources(const String &p_content, const String &p_resources) {
-	const int first_node = p_content.find("\n[node ");
-	if (first_node < 0) {
-		return p_content.strip_edges() + "\n\n" + p_resources.strip_edges() + "\n";
-	}
-	return p_content.substr(0, first_node + 1) + p_resources.strip_edges() + "\n\n" + p_content.substr(first_node + 1);
-}
-
-static String _mesh_resource_for_type(const String &p_mesh_type, const String &p_mesh_id, const Dictionary &p_args) {
-	const String mesh_type = p_mesh_type.strip_edges().to_lower();
-	const Vector<double> size_values = _parse_number_list(String(p_args.get("size", String())));
-	if (mesh_type == "sphere") {
-		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
-		return vformat("[sub_resource type=\"SphereMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius * 2.0);
-	}
-	if (mesh_type == "cylinder") {
-		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
-		const double height = size_values.size() >= 2 ? size_values[1] : 1.0;
-		return vformat("[sub_resource type=\"CylinderMesh\" id=\"%s\"]\ntop_radius = %.4f\nbottom_radius = %.4f\nheight = %.4f\n", p_mesh_id, radius, radius, height);
-	}
-	if (mesh_type == "capsule") {
-		const double radius = size_values.size() >= 1 ? size_values[0] : 0.5;
-		const double height = size_values.size() >= 2 ? size_values[1] : 2.0;
-		return vformat("[sub_resource type=\"CapsuleMesh\" id=\"%s\"]\nradius = %.4f\nheight = %.4f\n", p_mesh_id, radius, height);
-	}
-	if (mesh_type == "plane" || mesh_type == "quad") {
-		const double width = size_values.size() >= 1 ? size_values[0] : 2.0;
-		const double depth = size_values.size() >= 2 ? size_values[1] : width;
-		const String resource_type = mesh_type == "quad" ? "QuadMesh" : "PlaneMesh";
-		return vformat("[sub_resource type=\"%s\" id=\"%s\"]\nsize = %s\n", resource_type, p_mesh_id, _format_vector2(Vector2(width, depth)));
-	}
-	const Vector3 size = size_values.size() >= 3 ? Vector3(size_values[0], size_values[1], size_values[2]) : Vector3(1, 1, 1);
-	return vformat("[sub_resource type=\"BoxMesh\" id=\"%s\"]\nsize = %s\n", p_mesh_id, _format_vector3(size));
-}
 
 static bool _parse_tscn_3d_nodes(const String &p_content, Vector<AI3DSceneNodeInfo> &r_nodes, String &r_error) {
 	PackedStringArray lines = p_content.split("\n");
@@ -4021,6 +5702,311 @@ Dictionary AIToolExecutor::_fetch_url(const Dictionary &p_args) {
 	}
 
 	return _make_result(vformat("Successfully downloaded %s to %s (SHA256: %s)", url, dest_path, sha256));
+}
+
+Dictionary AIToolExecutor::_check_html_prototype(const Dictionary &p_args) {
+	if (AISettings::load().context_mode != AIContextMode::PROJECT) {
+		return _make_result("check_html_prototype is only available in PROJECT mode.", true);
+	}
+
+	String rel_path = String(p_args.get("path", String())).strip_edges().replace("\\", "/");
+	if (rel_path.is_empty()) {
+		return _make_result("check_html_prototype rejected: path is required.", true);
+	}
+	rel_path = rel_path.trim_prefix("res://").simplify_path();
+	if (!rel_path.begins_with(".JundotAI/prototypes/") || rel_path.get_extension().to_lower() != "html") {
+		return _make_result("check_html_prototype only accepts .html files under .JundotAI/prototypes/.", true);
+	}
+
+	String project_root = _get_project_root();
+	if (project_root.is_empty()) {
+		return _make_result("No open project root was detected. Open a project with project.jundot before checking an HTML prototype.", true);
+	}
+
+	String html_path;
+	String path_error;
+	if (!_resolve_tool_file_path(project_root, rel_path, html_path, path_error)) {
+		return _make_result(path_error + "\nPath: " + rel_path, true);
+	}
+	if (!FileAccess::exists(html_path)) {
+		return _make_result("check_html_prototype file not found: " + rel_path, true);
+	}
+
+	const int wait_ms = CLAMP(int(p_args.get("wait_ms", 1500)), 0, 30000);
+	const bool take_screenshot = bool(p_args.get("screenshot", true));
+	const String out_dir = project_root.path_join(".JundotAI").path_join("browser_checks");
+	const String runtime_dir = project_root.path_join(".JundotAI").path_join("browser_runtime");
+	Error mkdir_err = DirAccess::make_dir_recursive_absolute(out_dir);
+	if (mkdir_err != OK) {
+		return _make_result(vformat("check_html_prototype failed to create browser check directory (err=%d): %s", (int)mkdir_err, out_dir), true);
+	}
+	mkdir_err = DirAccess::make_dir_recursive_absolute(runtime_dir);
+	if (mkdir_err != OK) {
+		return _make_result(vformat("check_html_prototype failed to create browser runtime directory (err=%d): %s", (int)mkdir_err, runtime_dir), true);
+	}
+
+	const String base_name = rel_path.get_file().get_basename().validate_filename();
+	const String stamp = itos((int)OS::get_singleton()->get_unix_time()) + "_" + itos((int)(OS::get_singleton()->get_ticks_msec() % 100000));
+	const String script_path = runtime_dir.path_join("check_html_prototype_runner.js");
+	const String screenshot_path = take_screenshot ? out_dir.path_join(base_name + "_" + stamp + ".png") : String();
+
+	Array click_array = p_args.get("click_selectors", Array());
+	String click_json = JSON::stringify(click_array);
+
+	String script = R"JS(
+const fs = require('fs');
+const { pathToFileURL } = require('url');
+
+async function main() {
+  const htmlPath = process.argv[2];
+  const screenshotPath = process.argv[3] || '';
+  const waitMs = Math.max(0, Number(process.argv[4] || 1500));
+  let clickSelectors = [];
+  try { clickSelectors = JSON.parse(process.argv[5] || '[]'); } catch (_) {}
+
+  let playwright;
+  try {
+    playwright = require('playwright');
+  } catch (firstError) {
+    try {
+      playwright = require('playwright-core');
+    } catch (secondError) {
+      console.log(JSON.stringify({
+        status: 'unavailable',
+        reason: 'Node is available, but the playwright or playwright-core package is not resolvable from this project/editor environment.',
+        hint: 'Install Playwright for browser-backed HTML prototype validation, or run the generated HTML manually and paste browser console errors.'
+      }, null, 2));
+      process.exit(3);
+    }
+  }
+
+  const issues = [];
+  const events = [];
+  let browser = null;
+  const launchAttempts = [
+    { channel: 'msedge' },
+    { channel: 'chrome' },
+    {}
+  ];
+  let launchError = null;
+  for (const options of launchAttempts) {
+    try {
+      browser = await playwright.chromium.launch({ headless: true, ...options });
+      break;
+    } catch (error) {
+      launchError = error;
+    }
+  }
+  if (!browser) {
+    console.log(JSON.stringify({
+      status: 'unavailable',
+      reason: 'Playwright is installed, but no Chromium/Chrome/Edge browser could be launched.',
+      error: launchError ? String(launchError.message || launchError) : 'Unknown browser launch error'
+    }, null, 2));
+    process.exit(3);
+  }
+
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  page.on('console', msg => {
+    const type = msg.type();
+    const text = msg.text();
+    events.push(`[console.${type}] ${text}`);
+    if (type === 'error') {
+      issues.push(`[console.error] ${text}`);
+    }
+  });
+  page.on('pageerror', error => issues.push(`[pageerror] ${error.message || String(error)}`));
+  page.on('requestfailed', request => issues.push(`[requestfailed] ${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`));
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      issues.push(`[http ${response.status()}] ${response.url()}`);
+    }
+  });
+
+  try {
+    await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.waitForTimeout(waitMs);
+    for (const selector of clickSelectors) {
+      try {
+        await page.locator(selector).first().click({ timeout: 3000 });
+        events.push(`[click] ${selector}`);
+        await page.waitForTimeout(250);
+      } catch (error) {
+        issues.push(`[click failed] ${selector}: ${error.message || String(error)}`);
+      }
+    }
+    if (screenshotPath) {
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+    }
+  } catch (error) {
+    issues.push(`[navigation] ${error.message || String(error)}`);
+  } finally {
+    await browser.close();
+  }
+
+  console.log(JSON.stringify({
+    status: issues.length ? 'failed' : 'passed',
+    html_path: htmlPath,
+    screenshot_path: screenshotPath || null,
+    wait_ms: waitMs,
+    clicked_selectors: clickSelectors,
+    issue_count: issues.length,
+    issues,
+    events: events.slice(-80)
+  }, null, 2));
+  process.exit(issues.length ? 2 : 0);
+}
+
+main().catch(error => {
+  console.log(JSON.stringify({ status: 'failed', issues: [`[runner] ${error.message || String(error)}`] }, null, 2));
+  process.exit(2);
+});
+)JS";
+
+	Ref<FileAccess> script_file = FileAccess::open(script_path, FileAccess::WRITE);
+	if (script_file.is_null()) {
+		return _make_result("check_html_prototype failed to write runner script: " + script_path, true);
+	}
+	script_file->store_string(script);
+	script_file.unref();
+
+	String node_program = "node";
+	String npm_program = "npm";
+	String bootstrap_log;
+	{
+		List<String> version_args;
+		version_args.push_back("--version");
+		String version_output;
+		int version_exit = -1;
+		const Error node_err = OS::get_singleton()->execute(node_program, version_args, &version_output, &version_exit, true);
+		if (node_err != OK || version_exit != 0) {
+#ifdef WINDOWS_ENABLED
+			const String bootstrap_script_path = runtime_dir.path_join("bootstrap_node_runtime.ps1");
+			String ps_script = R"PS(
+$ErrorActionPreference = 'Stop'
+$Runtime = $args[0]
+$NodeDir = Join-Path $Runtime 'node'
+$NodeExe = Join-Path $NodeDir 'node.exe'
+if (!(Test-Path $NodeExe)) {
+  New-Item -ItemType Directory -Force -Path $Runtime | Out-Null
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  $index = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json'
+  $release = $index | Where-Object { $_.lts -ne $false -and ($_.files -contains 'win-x64-zip') } | Select-Object -First 1
+  if ($null -eq $release) {
+    $release = $index | Where-Object { $_.files -contains 'win-x64-zip' } | Select-Object -First 1
+  }
+  if ($null -eq $release) { throw 'Could not find a Windows x64 Node.js release.' }
+  $version = $release.version
+  $zipName = "node-$version-win-x64.zip"
+  $zipPath = Join-Path $Runtime $zipName
+  $extractRoot = Join-Path $Runtime "node_extract"
+  $url = "https://nodejs.org/dist/$version/$zipName"
+  if (Test-Path $extractRoot) { Remove-Item -LiteralPath $extractRoot -Recurse -Force }
+  Invoke-WebRequest -Uri $url -OutFile $zipPath
+  Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+  $expanded = Get-ChildItem -LiteralPath $extractRoot -Directory | Select-Object -First 1
+  if ($null -eq $expanded) { throw 'Node.js archive did not contain an extracted directory.' }
+  if (Test-Path $NodeDir) { Remove-Item -LiteralPath $NodeDir -Recurse -Force }
+  Move-Item -LiteralPath $expanded.FullName -Destination $NodeDir
+  Remove-Item -LiteralPath $extractRoot -Recurse -Force
+}
+& $NodeExe --version
+)PS";
+			Ref<FileAccess> ps_file = FileAccess::open(bootstrap_script_path, FileAccess::WRITE);
+			if (ps_file.is_null()) {
+				return _make_result("check_html_prototype could not write Node bootstrap script: " + bootstrap_script_path, true);
+			}
+			ps_file->store_string(ps_script);
+			ps_file.unref();
+
+			List<String> ps_args;
+			ps_args.push_back("-NoProfile");
+			ps_args.push_back("-ExecutionPolicy");
+			ps_args.push_back("Bypass");
+			ps_args.push_back("-File");
+			ps_args.push_back(bootstrap_script_path);
+			ps_args.push_back(runtime_dir);
+			int bootstrap_exit = -1;
+			const Error ps_err = OS::get_singleton()->execute("powershell", ps_args, &bootstrap_log, &bootstrap_exit, true);
+			if (ps_err != OK || bootstrap_exit != 0) {
+				return _make_result(vformat("check_html_prototype could not auto-install portable Node.js (err=%d, exit=%d).\nRuntime: %s\nOutput:\n%s", (int)ps_err, bootstrap_exit, runtime_dir, bootstrap_log), true);
+			}
+			node_program = runtime_dir.path_join("node").path_join("node.exe");
+			npm_program = runtime_dir.path_join("node").path_join("npm.cmd");
+#else
+			return _make_result("check_html_prototype could not find Node.js. Automatic portable Node bootstrap is currently implemented on Windows only.", true);
+#endif
+		}
+	}
+
+	{
+		List<String> resolve_args;
+		resolve_args.push_back("-e");
+		resolve_args.push_back("require.resolve('playwright')");
+		String resolve_output;
+		int resolve_exit = -1;
+		String previous_cwd = OS::get_singleton()->get_cwd();
+		OS::get_singleton()->set_cwd(runtime_dir);
+		Error resolve_err = OS::get_singleton()->execute(node_program, resolve_args, &resolve_output, &resolve_exit, true);
+		OS::get_singleton()->set_cwd(previous_cwd);
+		if (resolve_err != OK || resolve_exit != 0) {
+			List<String> npm_args;
+			npm_args.push_back("install");
+			npm_args.push_back("playwright");
+			npm_args.push_back("--no-audit");
+			npm_args.push_back("--fund=false");
+			String npm_output;
+			int npm_exit = -1;
+			previous_cwd = OS::get_singleton()->get_cwd();
+			OS::get_singleton()->set_cwd(runtime_dir);
+			const Error npm_err = OS::get_singleton()->execute(npm_program, npm_args, &npm_output, &npm_exit, true);
+			OS::get_singleton()->set_cwd(previous_cwd);
+			bootstrap_log += "\n--- npm install playwright ---\n" + npm_output;
+			if (npm_err != OK || npm_exit != 0) {
+				return _make_result(vformat("check_html_prototype could not auto-install Playwright into the project browser runtime (err=%d, exit=%d).\nRuntime: %s\nOutput:\n%s", (int)npm_err, npm_exit, runtime_dir, bootstrap_log), true);
+			}
+		}
+	}
+
+	List<String> args;
+	args.push_back(script_path);
+	args.push_back(html_path);
+	args.push_back(screenshot_path);
+	args.push_back(itos(wait_ms));
+	args.push_back(click_json);
+
+	String output;
+	int exit_code = -1;
+	const String previous_cwd = OS::get_singleton()->get_cwd();
+	if (OS::get_singleton()->set_cwd(runtime_dir) != OK) {
+		return _make_result("check_html_prototype failed to switch to browser runtime directory: " + runtime_dir, true);
+	}
+	Error exec_err = OS::get_singleton()->execute(node_program, args, &output, &exit_code, true);
+	OS::get_singleton()->set_cwd(previous_cwd);
+	if (exec_err != OK) {
+		return _make_result(vformat("check_html_prototype could not start Node.js after dependency bootstrap (err=%d).\nRuntime: %s\nHTML: %s", (int)exec_err, runtime_dir, rel_path), true);
+	}
+
+	StringBuilder result;
+	result += "Tool: check_html_prototype\n";
+	result += "HTML: " + rel_path + "\n";
+	result += "Runtime: " + runtime_dir + "\n";
+	result += "Runner: " + script_path + "\n";
+	if (!screenshot_path.is_empty()) {
+		result += "Screenshot: " + screenshot_path + "\n";
+	}
+	if (!bootstrap_log.strip_edges().is_empty()) {
+		result += "\n--- dependency bootstrap ---\n" + bootstrap_log.strip_edges() + "\n";
+	}
+	result += vformat("Exit code: %d\n\n", exit_code);
+	result += output;
+	if (result.as_string().length() > 30000) {
+		String truncated = result.as_string().substr(0, 30000);
+		truncated += "\n\n[... truncated at 30000 chars]\n";
+		return _make_result(truncated, true);
+	}
+
+	return _make_result(result.as_string(), exit_code != 0);
 }
 
 Dictionary AIToolExecutor::_shell_command(const Dictionary &p_args) {

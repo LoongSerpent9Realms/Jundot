@@ -35,6 +35,16 @@
     </div>
 </section>
 
+<section class="showcase">
+    <div class="section-inner">
+        <div class="showcase-hero">
+            <div class="showcase-hero-gif">
+                <img src="/images/gifs/hero-demo.gif" alt="Jundot Engine 演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+            </div>
+        </div>
+    </div>
+</section>
+
 <section id="features" class="light">
     <div class="section-inner">
         <div class="section-head">
@@ -48,6 +58,9 @@
                 <p style="margin-top: 14px; line-height: 1.7; font-size: 16px;">
                     从想法到可玩原型，AI 陪你搭建项目、写脚本、调玩法。遇到报错或性能问题，AI 读取现场、定位根因、生成补丁，你只需要确认结果。工具永远是你的延伸，不会反过来限制你。
                 </p>
+                <div class="feature-gif">
+                    <img src="/images/gifs/feature-game-dev.gif" alt="游戏开发循环演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
             </article>
             <article class="feature" style="padding: 32px;">
                 <b style="display: inline-block; background: linear-gradient(135deg, var(--amber), var(--green)); color: #07100d; font-size: 18px; font-weight: 800; padding: 8px 16px; border-radius: 8px;">引擎进化循环</b>
@@ -55,6 +68,9 @@
                 <p style="margin-top: 14px; line-height: 1.7; font-size: 16px;">
                     当前引擎满足不了项目需求？AI 可以直接修改引擎源码来适配。经过你验证的通用能力，会通过 Package Builder 热更新分发给所有用户。每一个项目，都在让引擎变得更好。
                 </p>
+                <div class="feature-gif">
+                    <img src="/images/gifs/feature-engine-evolve.gif" alt="引擎进化循环演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
             </article>
         </div>
     </div>
@@ -68,26 +84,41 @@
         </div>
         <div class="timeline">
             <article class="step">
+                <div class="step-gif">
+                    <img src="/images/gifs/step-01-create.gif" alt="创建项目演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
                 <em>01</em>
                 <h3>和 AI 一起做项目</h3>
                 <p>描述你的游戏想法，AI 帮你创建项目、搭框架、写脚本、做场景，边聊边细化。</p>
             </article>
             <article class="step">
+                <div class="step-gif">
+                    <img src="/images/gifs/step-02-debug.gif" alt="问题修复演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
                 <em>02</em>
                 <h3>遇到问题现场修</h3>
                 <p>报错、性能问题、逻辑 bug？AI 读取项目上下文，定位根因，生成补丁，验证后交给你确认。</p>
             </article>
             <article class="step">
+                <div class="step-gif">
+                    <img src="/images/gifs/step-03-engine.gif" alt="引擎修改演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
                 <em>03</em>
                 <h3>引擎不够就改引擎</h3>
                 <p>当前引擎做不到？AI 判断是项目级修改还是引擎级修改，必要时直接改引擎源码来适配项目。</p>
             </article>
             <article class="step">
+                <div class="step-gif">
+                    <img src="/images/gifs/step-04-github.gif" alt="GitHub 上传演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
                 <em>04</em>
                 <h3>用户验证后上传 GitHub</h3>
                 <p>所有修改都经过你确认。验证通过的引擎改动，由 AI 自动提交到 GitHub，贡献给主分支。</p>
             </article>
             <article class="step">
+                <div class="step-gif">
+                    <img src="/images/gifs/step-05-hotupdate.gif" alt="热更新分发演示" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
                 <em>05</em>
                 <h3>热更新分发，引擎变强</h3>
                 <p>通过 Package Builder 构建更新包，所有用户都能热更到最新能力。项目越多，引擎越强。</p>
@@ -118,7 +149,6 @@
     </div>
 </section>
 
-<<<<<<< HEAD
 @if (Model.FeaturedBranches.Any())
 {
     <section id="branches" class="release">
@@ -176,8 +206,6 @@
     </section>
 }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 @if (Model.PublishedReleases.Any())
 {
     var latestRelease = Model.PublishedReleases.First();

@@ -51,6 +51,7 @@ private:
 	static Dictionary _list_files(const Dictionary &p_args);
 	static Dictionary _grep_code(const Dictionary &p_args);
 	static Dictionary _check_project_scripts(const Dictionary &p_args);
+	static Dictionary _check_html_prototype(const Dictionary &p_args);
 	static Dictionary _check_ui_layout(const Dictionary &p_args);
 	static Dictionary _create_3d_scene(const Dictionary &p_args);
 	static Dictionary _add_3d_object(const Dictionary &p_args);
@@ -81,6 +82,16 @@ private:
 	static Dictionary _setup_engine_workspace(const Dictionary &p_args);
 	static Dictionary _request_engine_change(const Dictionary &p_args);
 	static Dictionary _return_to_project_mode(const Dictionary &p_args);
+	static Dictionary _add_physics(const Dictionary &p_args);
+	static Dictionary _add_animation(const Dictionary &p_args);
+	static Dictionary _add_particles(const Dictionary &p_args);
+	static Dictionary _add_vfx(const Dictionary &p_args);
+	static Dictionary _add_character_controller(const Dictionary &p_args);
+	static Dictionary _remove_node(const Dictionary &p_args);
+	static Dictionary _modify_node_properties(const Dictionary &p_args);
+	static Dictionary _connect_signal(const Dictionary &p_args);
+	static Dictionary _duplicate_node(const Dictionary &p_args);
+	static Dictionary _reparent_node(const Dictionary &p_args);
 	static Dictionary _batch_tools(const Dictionary &p_args);
 	static Dictionary _execute_mcp_tool(const String &p_server_name, const String &p_tool_name, const String &p_args_json);
 

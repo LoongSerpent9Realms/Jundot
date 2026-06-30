@@ -31,6 +31,7 @@
 #include "project_export.h"
 
 #include "core/config/project_settings.h"
+#include "core/io/file_access.h"
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
@@ -1483,6 +1484,18 @@ void ProjectExportDialog::_export_project_to_path(const String &p_path) {
 	}
 
 	exporting = false;
+
+	// Automatically open the HTML file after a successful Web export.
+	if (err == OK && platform->get_name() == "Web") {
+		String html_file = p_path;
+		// Ensure the file has .html extension.
+		if (!html_file.ends_with(".html") && !html_file.ends_with(".htm")) {
+			html_file = html_file.get_basename() + ".html";
+		}
+		if (FileAccess::exists(html_file)) {
+			OS::get_singleton()->shell_open(html_file);
+		}
+	}
 }
 
 void ProjectExportDialog::_export_all_dialog() {

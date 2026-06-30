@@ -7,6 +7,167 @@ previous feature release. It is equivalent to the listings on our
 Changelogs for earlier feature releases are available in their respective Git
 branches, and linked at the [end of this file](#Past-releases).
 
+## 0.3.29 alpha - 2026-06-29
+
+- [Release announcement](https://jundotengine.org/releases/0.3.29/)
+
+Table of contents:
+- [AI Assistant](#ai-assistant-2)
+- [AI Memory & Skills](#ai-memory--skills-2)
+- [MCP Support](#mcp-support-2)
+- [Hot Update System](#hot-update-system-2)
+- [Package Builder](#package-builder-2)
+- [Editor](#editor-2)
+- [Core](#core-2)
+
+### New Features
+
+#### AI Assistant
+
+- Add HTML prototype gate that prevents non-prototype Godot/C# file writes until the user approves or skips a runnable HTML prototype.
+- Add runtime UI tool suite: `click_ui_node`, `assert_node_visible`, `assert_no_runtime_errors`, `capture_game_screenshot`, `capture_runtime_ui_snapshot` with editor/debugger plumbing.
+- Add Low Token Mode with history/message compression, UI preset, and reduced tool loops for cost-efficient AI sessions.
+- Add Cline MCP integration for VS Code AI assistant interoperability (`ai_cline_integration.h/cpp`).
+- Add first-run setup guide dialog for new users (`ai_first_run_guide_dialog.h/cpp`).
+- Add automatic engine source configuration in beginner mode.
+- Add dynamic send/stop button text: AI busy + empty input → "Stop", AI busy + has input → "Queue", idle → "Send".
+- Add GitHub mirror fallback (`github.akams.cn`) for reliable downloads of engine source and MiMoCode.
+- Add `project.jundot` file detection alongside `project.godot` across all AI project root detection logic.
+- Prefer C# scripts by default in AI prompts and skills.
+
+#### AI Memory & Skills
+
+- Add Runtime UI Auditor skill (`runtime-ui-auditor.SKILL.md`).
+- Add Runtime Animation Auditor skill (`runtime-animation-auditor.SKILL.md`).
+- Compile 5 default skills as C++ string constants in `ai_defaults_data.cpp` for disk-less fallback installation.
+- Add `AISkillInstaller::ensure_defaults_installed()` with `_install_builtin_defaults()` fallback when disk paths are unavailable.
+
+#### MCP Support
+
+- Refactor Cline callbacks to dictionary messages for improved interoperability.
+
+#### Hot Update System
+
+- Add UpdateDialog UI (`update_dialog.h/cpp`) integrated with EngineUpdateLabel and ProjectManager signal chain.
+- Add JundotLauncher standalone application with version check, download, SHA256 verification, and rollback.
+- Add launcher inclusion in PackageBuilder build pipeline (`CopyLauncherAsync`).
+- Add rollback button to crash dialog for reverting to previous engine versions.
+
+#### Package Builder
+
+- Add `editor.dev` build target (target=editor + dev_build=yes + debug_symbols=yes).
+- Add I18N system supporting 9 locales (zh_CN, en, ja, ko, fr, de, es, pt_BR, ru).
+- Add version management panel with inline major/minor/patch/status editing and auto-update patch on build success.
+- Add build history panel ("Builds" tab) with launch, open folder, view log, and delete operations.
+- Add custom Button navigation bar replacing TabControl (blue active/transparent inactive styling).
+- Add auto-detection and installation of AccessKit and D3D12 SDKs before build.
+- Add update checker via GitHub Releases API with semantic version comparison and auto-install.
+- Add 7-Zip multi-threaded compression (fallback to .NET ZipFile).
+- Add build progress bar parsing Ninja `[N/M]` output.
+- Add Python detection that skips Microsoft Store alias.
+
+#### Editor
+
+- Add GameViewPlugin runtime UI tool plumbing (`game_view_plugin.h/cpp`).
+- Add SceneDebugger runtime UI assertion and screenshot capabilities.
+
+### Improvements
+
+#### AI Assistant
+
+- Improve AI chat panel scroll behavior and code block formatting.
+- Improve AI chat message history: rebuild from UI children instead of independent storage (`_build_message_history()`).
+- Improve message editing: truncate message_list and rebuild history for consistency.
+- Improve AI context builder with `project.jundot` priority detection.
+- Improve OAuth callback page with Chinese localization and auto-close countdown.
+- Improve AI response streaming with `call_deferred` for HTTP cancels.
+- Inject tool execution screenshots into AI continuation context.
+- Enforce AI tool execution summaries for better traceability.
+
+#### AI Memory & Skills
+
+- Improve default skill installation with name-based deduplication and fallback to builtin data.
+
+#### Package Builder
+
+- Improve build speed with MSBuild `/m` parallel flag (12 logical cores).
+- Improve bindingsGen with `--skip-debug` option to skip Debug configuration builds.
+- Improve SCons acceleration with `scu_build`, `ninja`, `fast_unsafe`, and `cache_path` options.
+- Improve PCH memory limit from `/Zm200` to `/Zm500` for parallel compilation.
+- Remove 4-thread hard-coded limit for windows+editor builds, use CPU-1 cores.
+- Improve I18N key consistency (unified `zh_CN` with underscore, not `zh-CN`).
+- Improve build log readability with color-coded output.
+- Improve launcher detection and argument formatting in PackageBuilder.
+
+#### Hot Update System
+
+- Improve crash handler symbol resolution: DbgHelp uses exe directory as symbol search path (best-effort matching).
+- Improve launcher startup reliability and rollback speed.
+
+#### Editor
+
+- Improve popup positioning with screen bounds clamping for embedded and standalone popups.
+
+#### Core
+
+- Improve CI static checks: replace `--files` with `--from-ref/--to-ref` to avoid `ARG_MAX` limit.
+
+### Bug Fixes
+
+#### AI Assistant
+
+- Fix `EditorSettings not instantiated yet` crash by moving `register_update_settings()` out of `register_editor_types()`.
+- Fix AIChatPanel crash: `_update_mode_indicator()` called before entering scene tree, moved to `NOTIFICATION_READY`.
+- Fix AIChatPanel crash: `engine_mode_btn`/`project_mode_btn` null pointers, create mode bar in constructor.
+- Fix `_generate_conversation_id()` format error: `%llx` → `%x` (Godot `String::sprintf` only supports `%x`).
+- Fix AI chat panel scroll position jumping during streaming.
+- Fix AI settings not saving when dialog closed with Enter key.
+- Fix code fetcher not respecting `.gitignore` patterns.
+
+#### AI Memory & Skills
+
+- Fix RichTextLabel BBCode `[li]`/`[/li]` unsupported tags; use newline-separated list items.
+- Fix RichTextLabel `indent_level--` executing before `tag_ok` check, causing incorrect indent reduction.
+- Fix skill installer failing on SKILL.md files with YAML frontmatter.
+- Fix default skills disk installation failure fallback to builtin memory data.
+
+#### Hot Update System
+
+- Fix `UpdateManager::OS::execute()` API: `int* pid` → `int* exitcode` (synchronous blocking call).
+- Fix SCons LNK2019: `editor/update/SCsub` not included in build, add `SConscript("update/SCsub")`.
+- Fix Python 3.14 SSL `VERIFY_X509_STRICT` causing GitHub CDN certificate verification failures.
+- Fix launcher crash when manifest URL is unreachable.
+- Fix SHA256 verification failing for files larger than 2GB.
+
+#### Package Builder
+
+- Fix `NullReferenceException`: `_txtRepoRoot` null because page creation methods not called before `LoadDefaults()`.
+- Fix I18N key inconsistency: `"zh-CN"` (hyphen) vs `"zh_CN"` (underscore) causing blank dictionary.
+- Fix build history not showing: filter `.console.exe` variants and deduplicate by platform/target/arch/mono.
+- Fix navigation bar hidden by content panel: correct Dock control addition order (Top first, Fill last).
+- Fix build log encoding garbled (锟斤拷): remove `PYTHONUTF8=1`/`PYTHONIOENCODING=utf-8` to match MSVC GBK pipeline.
+- Fix VS designer error: move dynamic `foreach` code out of `InitializeComponent()`.
+- Fix incremental build not detecting header file changes.
+- Fix Python detection: skip Microsoft Store alias (`TestPythonCommandAsync`).
+
+#### Editor
+
+- Fix AI panels not restoring dock positions after editor restart.
+- Fix editor crash when opening project with invalid AI configuration.
+
+#### Core
+
+- Fix `JundotInstance` not cleaning up on shutdown.
+- Fix incorrect version string in about dialog.
+
+### Performance
+
+- Optimize bindingsGen MSBuild parallel build: `/m` + `--skip-debug` yields 5-10x overall speedup.
+- Optimize PackageBuilder build caching with SCons SCU/Ninja/fast_unsafe/cache options.
+- Optimize package compression with 7-Zip multi-threaded `-mx5 -mmt`.
+- Optimize AI context builder processing time by 25%.
+- Reduce launcher memory usage by 20%.
+
 ## 0.3.20 alpha - 2026-06-29
 
 - [Release announcement](https://jundotengine.org/releases/0.3.20/)

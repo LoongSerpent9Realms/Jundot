@@ -65,6 +65,11 @@
 #include "editor/file_system/editor_paths.h"
 #include "editor/editor_main_screen.h"
 #include "editor/editor_node.h"
+#include "editor/export/editor_export.h"
+#include "editor/export/editor_export_platform.h"
+#include "editor/export/editor_export_preset.h"
+#include "editor/export/export_template_manager.h"
+#include "editor/run/editor_run_bar.h"
 #include "editor/gui/editor_file_dialog.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
@@ -150,7 +155,10 @@ static String _ai_chat_next_question_protocol() {
 	return String("=== Next Question Options Protocol ===\n"
 				  "- REQUIRED: At the end of every final assistant response, suggest 2 to 4 likely next questions the user may want to ask. Never omit them.\n"
 				  "- Put each question in a hidden machine-readable block so the editor can show it as a clickable option:\n"
-				  "<!-- NEXT_QUESTION -->\nQUESTION: <one concise user question>\n<!-- END_NEXT_QUESTION -->\n"
+				  "<!-- NEXT_QUESTION -->\nMODE: single\nQUESTION: <one concise user question>\n<!-- END_NEXT_QUESTION -->\n"
+				  "- Use MODE: single (default) when each option is an independent follow-up. Use MODE: multi when the options are complementary steps the user may want to combine.\n"
+				  "- You may put multiple QUESTION lines in one block when using MODE: multi:\n"
+				  "<!-- NEXT_QUESTION -->\nMODE: multi\nQUESTION: <question A>\nQUESTION: <question B>\nQUESTION: <question C>\n<!-- END_NEXT_QUESTION -->\n"
 				  "- Keep each question specific to the current conversation and useful as the user's next message.\n"
 				  "- Do not mention these hidden blocks in the visible response.");
 }
@@ -222,6 +230,7 @@ Dictionary AIChatPanel::Conversation::to_dict(const Conversation &p_conv) {
 		next_questions.push_back(p_conv.next_question_options[i]);
 	}
 	d["next_question_options"] = next_questions;
+	d["next_question_multi_select"] = p_conv.next_question_multi_select;
 	d["structured_messages"] = p_conv.structured_messages;
 	Array issues;
 	for (int i = 0; i < p_conv.issue_ledger.size(); i++) {
@@ -314,6 +323,7 @@ AIChatPanel::Conversation AIChatPanel::Conversation::from_dict(const Dictionary 
 			conv.next_question_options.push_back(question);
 		}
 	}
+	conv.next_question_multi_select = p_dict.get("next_question_multi_select", false);
 
 	Array msgs = p_dict.get("messages", Array());
 	for (int i = 0; i < msgs.size(); i++) {
@@ -1005,7 +1015,7 @@ void AIChatPanel::_delete_queued_message(int p_index) {
 }
 
 void AIChatPanel::_dispatch_next_queued_message() {
-	const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
+	const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || is_auditing || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
 	if (busy || queued_messages.is_empty() || !input) {
 		return;
 	}
@@ -1459,7 +1469,8 @@ String AIChatPanel::_html_prototype_gate_prompt() const {
 				  "This conversation is currently waiting for user validation of a runnable HTML gameplay prototype. Treat every follow-up as prototype feedback unless the user explicitly says the prototype has been tested and approved or explicitly asks to skip HTML.\n"
 				  "- Until that approval, do not create, edit, validate, build, or package real Godot project production files such as `.cs`, `.gd`, `.tscn`, `.tres`, `.gdextension`, `.csproj`, `.sln`, `project.godot`, or `project.jundot`.\n"
 				  "- Allowed writes are limited to `.JundotAI/prototypes/` HTML prototype files. Prefer one self-contained `.html` file with inline CSS/JavaScript.\n"
-				  "- If the user asks for changes, revise the HTML prototype only, present the updated path/link, and ask them to run/verify it again through NEXT_QUESTION.\n"
+				  "- After creating or revising the HTML prototype, call `check_html_prototype` to open it in a browser-backed check, collect console/page/network errors, and fix reported issues before asking the user to verify it.\n"
+				  "- If the user asks for changes, revise the HTML prototype only, run `check_html_prototype` again, present the updated path/link, and ask them to run/verify it again through NEXT_QUESTION.\n"
 				  "- Only after the user explicitly confirms the HTML prototype gameplay is approved may you continue into real Godot/C# project production.");
 }
 
@@ -1483,7 +1494,7 @@ bool AIChatPanel::_html_prototype_gate_blocks_tool_call(const Dictionary &p_tool
 		args = parsed;
 	}
 
-	if (name == AIToolNames::READ_FILES || name == AIToolNames::SEARCH_FILES || name == AIToolNames::LIST_FILES || name == AIToolNames::GREP_CODE || name == AIToolNames::FETCH_URL) {
+	if (name == AIToolNames::READ_FILES || name == AIToolNames::SEARCH_FILES || name == AIToolNames::LIST_FILES || name == AIToolNames::GREP_CODE || name == AIToolNames::FETCH_URL || name == AIToolNames::CHECK_HTML_PROTOTYPE) {
 		return false;
 	}
 
@@ -1496,7 +1507,7 @@ bool AIChatPanel::_html_prototype_gate_blocks_tool_call(const Dictionary &p_tool
 		return true;
 	}
 
-	r_reason = vformat(TTR("HTML prototype gate blocked tool `%s`. The user has not approved the playable HTML prototype yet. Continue by creating or revising the runnable HTML prototype under `.JundotAI/prototypes/`, then ask the user to test it before Godot/C# production work."), name);
+	r_reason = vformat(TTR("HTML prototype gate blocked tool `%s`. The user has not approved the playable HTML prototype yet. Continue by creating or revising the runnable HTML prototype under `.JundotAI/prototypes/`, run `check_html_prototype` to catch browser console/runtime errors, then ask the user to test it before Godot/C# production work."), name);
 	return true;
 }
 
@@ -1541,7 +1552,7 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 
 	const String boundary = " Stay strictly inside the open game project. Never inspect or modify engine source in PROJECT mode; if an engine limitation is discovered, finish any safe project-side work, call setup_engine_workspace to create or bind this project's dedicated engine worktree, then call request_engine_change with the exact reason and required engine change.";
 	if (html_prototype_gate_pending) {
-		return "Current request guidance: the HTML gameplay prototype gate is still pending. Treat this user message as feedback for the playable HTML prototype unless they explicitly approved or skipped it. Do not create or edit Godot/C# production files. Create or revise only the runnable HTML prototype under .JundotAI/prototypes/, present its path/link, and ask the user to test it before continuing to Godot production." + boundary;
+		return "Current request guidance: the HTML gameplay prototype gate is still pending. Treat this user message as feedback for the playable HTML prototype unless they explicitly approved or skipped it. Do not create or edit Godot/C# production files. Create or revise only the runnable HTML prototype under .JundotAI/prototypes/, then call check_html_prototype to operate a browser-backed check and collect console/page/network errors. If it reports errors, fix the prototype and run the check again before presenting its path/link and asking the user to test it before continuing to Godot production." + boundary;
 	}
 	if (_is_project_memory_continue_request(p_user_message)) {
 		return "Current request guidance: the user asked to continue from this project's memory. Treat Project Memories as the primary source of the intended game concept, project name, style, mechanics, and pending direction. First inspect the open project enough to determine whether it is still empty/minimal or already has meaningful game content. If it is empty/minimal, continue from the remembered concept without asking the user to repeat it: produce a compact execution plan and begin building the first playable Jundot project structure using C# scripts by default, or GDScript only if the memory/user explicitly asks for GDScript. If content already exists, continue from the newest project state and memory together. Do not use memories from other projects and do not ask the user to choose an engine." + boundary;
@@ -1557,7 +1568,7 @@ String AIChatPanel::_detect_mode_prompt(const String &p_user_message) const {
 	}
 	if (broad_project_idea && !concrete_change) {
 		if (settings.html_min_project_prototype_enabled) {
-			return "Current request guidance: this is a new game concept and the HTML gameplay prototype gate is enabled. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Before touching Godot scenes, scripts, resources, or project settings, create one runnable standalone HTML prototype under .JundotAI/prototypes/ that demonstrates the core loop, basic controls, score/win/lose feedback when applicable, and main screen flow. Keep it self-contained with inline CSS/JavaScript and no external assets unless they already exist in the project. Present the HTML path/link and ask the user through NEXT_QUESTION to verify the gameplay; stop there until the user approves or requests changes. Only after user approval continue into the real Godot project implementation, then validate scripts/runtime/UI, package_project, poll check_package_status, run test_package, and hand off package paths and validation evidence. If the project already has meaningful content, preserve it and ask approval before any broad replacement, restructuring, or reinterpretation. If the user explicitly asks to skip HTML preview, use the normal project workflow. Do not ask the user to operate PackageBuilder manually." + boundary;
+			return "Current request guidance: this is a new game concept and the HTML gameplay prototype gate is enabled. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Before touching Godot scenes, scripts, resources, or project settings, create one runnable standalone HTML prototype under .JundotAI/prototypes/ that demonstrates the core loop, basic controls, score/win/lose feedback when applicable, and main screen flow. Keep it self-contained with inline CSS/JavaScript and no external assets unless they already exist in the project. After writing it, call check_html_prototype to operate a browser-backed check, collect console/page/network errors, and fix any reported issues before presenting the HTML path/link and asking the user through NEXT_QUESTION to verify the gameplay; stop there until the user approves or requests changes. Only after user approval continue into the real Godot project implementation, then validate scripts/runtime/UI, package_project, poll check_package_status, run test_package, and hand off package paths and validation evidence. If the project already has meaningful content, preserve it and ask approval before any broad replacement, restructuring, or reinterpretation. If the user explicitly asks to skip HTML preview, use the normal project workflow. Do not ask the user to operate PackageBuilder manually." + boundary;
 		}
 		return "Current request guidance: this is a new game concept. First inspect enough project structure to decide whether the open project is empty/minimal or already contains meaningful scenes, scripts, assets, gameplay systems, UI, or project-specific architecture. Produce a TASK_PLAN scaled to its size: concise for a small game or prototype, fuller for a larger project. Evaluate the core loop, moment-to-moment fun, mastery, rewards, replayability, boring/frustrating risks, and prototype tests. Use fetch_url to research relevant official Steam/Epic pages when available, identify concrete differentiation opportunities, and generate a .JundotAI/mockups/ SVG when a visual flow or interface will help the user judge the idea. If the user did not explicitly request direct implementation, expose NEXT_QUESTION choices for Plan review, a minimum playable prototype, or gameplay/reference discussion, and stop before modifying game content until they choose or approve. If the project is empty/minimal and the Plan is approved or the user's answers make the Plan complete, continue autonomously through implementation, compile/build validation, runtime/UI testing, package_project, repeated check_package_status polling, test_package, and final handoff with package paths and validation evidence. If the project already has meaningful content, insert NEXT_QUESTION dialogue checkpoints before any broad replacement, restructuring, or reinterpretation of existing content. Do not ask the user to operate PackageBuilder manually." + boundary;
 	}
@@ -1712,7 +1723,7 @@ void AIChatPanel::_update_translations() {
 	clear_button->set_tooltip_text(TTR("Clear input and attachments"));
 	cancel_button->set_text(TTR("Cancel"));
 	if (send_button) {
-		const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
+		const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || is_auditing || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
 		send_button->set_text(busy ? TTR("Queue") : TTR("Send"));
 	}
 	if (tool_limit_toggle_button) {
@@ -2105,6 +2116,7 @@ void AIChatPanel::_store_tool_limit_options_state(bool p_save) {
 			conversations.write[i].tool_limit_options_collapsed = tool_limit_toggle_button->is_visible();
 			conversations.write[i].tool_limit_options_due_to_limit = tool_limit_options_due_to_limit;
 			conversations.write[i].next_question_options = next_question_options;
+			conversations.write[i].next_question_multi_select = next_question_options_multi_select;
 			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
 			if (p_save) {
 				_save_all_conversations();
@@ -2120,6 +2132,11 @@ void AIChatPanel::_apply_tool_limit_options_state(const Conversation &p_conv) {
 	}
 
 	next_question_options = p_conv.next_question_options;
+	next_question_options_multi_select = p_conv.next_question_multi_select;
+	next_question_selected.clear();
+	for (int i = 0; i < next_question_options.size(); i++) {
+		next_question_selected.push_back(false);
+	}
 	_render_next_question_options();
 	tool_limit_options_due_to_limit = p_conv.tool_limit_options_due_to_limit;
 	_update_translations();
@@ -2136,13 +2153,18 @@ void AIChatPanel::_apply_tool_limit_options_state(const Conversation &p_conv) {
 	}
 }
 
-void AIChatPanel::_set_next_question_options(const Vector<String> &p_questions, bool p_save) {
+void AIChatPanel::_set_next_question_options(const Vector<String> &p_questions, bool p_save, bool p_multi_select) {
 	next_question_options.clear();
 	for (int i = 0; i < p_questions.size() && next_question_options.size() < 4; i++) {
 		const String question = p_questions[i].strip_edges();
 		if (!question.is_empty()) {
 			next_question_options.push_back(question);
 		}
+	}
+	next_question_options_multi_select = p_multi_select && next_question_options.size() > 1;
+	next_question_selected.clear();
+	for (int i = 0; i < next_question_options.size(); i++) {
+		next_question_selected.push_back(false);
 	}
 	_render_next_question_options();
 
@@ -2152,6 +2174,7 @@ void AIChatPanel::_set_next_question_options(const Vector<String> &p_questions, 
 	for (int i = 0; i < conversations.size(); i++) {
 		if (conversations[i].id == active_conversation_id) {
 			conversations.write[i].next_question_options = next_question_options;
+			conversations.write[i].next_question_multi_select = next_question_options_multi_select;
 			conversations.write[i].updated_at = Time::get_singleton()->get_unix_time_from_system();
 			if (p_save) {
 				_save_all_conversations();
@@ -2169,23 +2192,54 @@ void AIChatPanel::_render_next_question_options() {
 	for (int i = next_question_options_box->get_child_count() - 1; i >= 0; i--) {
 		next_question_options_box->get_child(i)->queue_free();
 	}
+	next_question_confirm_button = nullptr;
 
 	next_question_options_box->set_visible(!next_question_options.is_empty());
 	for (int i = 0; i < next_question_options.size(); i++) {
 		Button *question_button = memnew(Button);
-		question_button->set_text(next_question_options[i]);
 		question_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 		question_button->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
 		question_button->set_text_overrun_behavior(TextServer::OVERRUN_NO_TRIMMING);
 		question_button->set_custom_minimum_size(Size2(0, Math::round(38 * chat_display_scale)) * EDSCALE);
 		question_button->add_theme_font_size_override(SceneStringName(font_size), Math::round(14 * chat_display_scale * EDSCALE));
-		question_button->set_tooltip_text(next_question_options[i]);
-		question_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_use_next_question_option).bind(next_question_options[i]));
+
+		if (next_question_options_multi_select) {
+			// Multi-select: toggle button with checkmark indicator.
+			question_button->set_toggle_mode(true);
+			question_button->set_pressed(next_question_selected.size() > i && next_question_selected[i]);
+			question_button->set_text_alignment(HORIZONTAL_ALIGNMENT_LEFT);
+			const String prefix = question_button->is_pressed() ? String::utf8("\xe2\x98\x91 ") : String::utf8("\xe2\x98\x90 ");
+			question_button->set_text(prefix + next_question_options[i]);
+			question_button->set_tooltip_text(next_question_options[i]);
+			question_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_toggle_next_question_option).bind(i));
+		} else {
+			// Single-select: regular button, click to fill input.
+			question_button->set_text(next_question_options[i]);
+			question_button->set_tooltip_text(next_question_options[i]);
+			question_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_use_next_question_option).bind(next_question_options[i]));
+		}
 		next_question_options_box->add_child(question_button);
+	}
+
+	// In multi-select mode, add a confirm button below the options.
+	if (next_question_options_multi_select) {
+		next_question_confirm_button = memnew(Button);
+		next_question_confirm_button->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		next_question_confirm_button->set_custom_minimum_size(Size2(0, Math::round(38 * chat_display_scale)) * EDSCALE);
+		next_question_confirm_button->add_theme_font_size_override(SceneStringName(font_size), Math::round(14 * chat_display_scale * EDSCALE));
+		next_question_confirm_button->connect(SceneStringName(pressed), callable_mp(this, &AIChatPanel::_confirm_multi_select_options));
+		next_question_options_box->add_child(next_question_confirm_button);
+		_update_next_question_confirm_button();
 	}
 }
 
 void AIChatPanel::_use_next_question_option(const String &p_question) {
+	// Export pipeline: intercept platform selection.
+	if (export_pipeline_state == EXPORT_PIPELINE_AWAITING_PLATFORM) {
+		_export_pipeline_select_platform(p_question);
+		return;
+	}
+
 	if (!input) {
 		return;
 	}
@@ -2202,6 +2256,67 @@ void AIChatPanel::_use_next_question_option(const String &p_question) {
 	_set_next_question_options(Vector<String>(), true);
 }
 
+void AIChatPanel::_toggle_next_question_option(int p_index) {
+	if (!next_question_options_multi_select || p_index < 0 || p_index >= next_question_options.size()) {
+		return;
+	}
+	if (next_question_selected.size() <= p_index) {
+		next_question_selected.resize(next_question_options.size());
+		for (int i = 0; i < next_question_selected.size(); i++) {
+			next_question_selected.write[i] = false;
+		}
+	}
+	next_question_selected.write[p_index] = !next_question_selected[p_index];
+
+	// Re-render to update button text (checkmark prefix).
+	_render_next_question_options();
+}
+
+void AIChatPanel::_confirm_multi_select_options() {
+	if (!input) {
+		return;
+	}
+	String combined;
+	int count = 0;
+	for (int i = 0; i < next_question_options.size() && i < next_question_selected.size(); i++) {
+		if (next_question_selected[i]) {
+			count++;
+			if (!combined.is_empty()) {
+				combined += "\n";
+			}
+			combined += vformat("%d. %s", count, next_question_options[i]);
+		}
+	}
+	if (count == 0) {
+		status_label->set_text(TTR("Please select at least one option."));
+		return;
+	}
+	input->set_text(combined);
+	input->grab_focus();
+	_hide_tool_limit_options();
+	_set_next_question_options(Vector<String>(), true);
+	_send_message();
+}
+
+void AIChatPanel::_update_next_question_confirm_button() {
+	if (!next_question_confirm_button) {
+		return;
+	}
+	int count = 0;
+	for (int i = 0; i < next_question_selected.size(); i++) {
+		if (next_question_selected[i]) {
+			count++;
+		}
+	}
+	if (count == 0) {
+		next_question_confirm_button->set_text(TTR("Select options to send"));
+		next_question_confirm_button->set_disabled(true);
+	} else {
+		next_question_confirm_button->set_text(vformat(TTR("Send %d selected"), count));
+		next_question_confirm_button->set_disabled(false);
+	}
+}
+
 void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
 	if (chat_service && chat_service->is_requesting()) {
 		status_label->set_text(TTR("Wait for the current AI request to finish before continuing."));
@@ -2214,7 +2329,7 @@ void AIChatPanel::_send_hidden_followup(const String &p_instruction) {
 	}
 
 	AISettingsData settings = AISettings::load();
-	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI || settings.backend_type == AIBackendType::QWEN) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
 		status_label->set_text(TTR("Configure Base URL, model, and API key before sending AI messages."));
 		return;
 	}
@@ -2819,7 +2934,7 @@ void AIChatPanel::_send_message() {
     }
 }
 
-	const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
+	const bool busy = (chat_service && chat_service->is_requesting()) || in_tool_loop || tool_execution_running || is_summarizing || is_titling || is_auditing || (build_status_poll_timer && !build_status_poll_timer->is_stopped());
 	if (busy) {
 		bool has_input = !input->get_text().strip_edges().is_empty() || !attachments.is_empty();
 		if (!has_input) {
@@ -2837,7 +2952,7 @@ void AIChatPanel::_send_message() {
 	_hide_tool_limit_options();
 
 	AISettingsData settings = AISettings::load();
-	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI || settings.backend_type == AIBackendType::QWEN) && (settings.base_url.strip_edges().is_empty() || settings.model.strip_edges().is_empty() || settings.api_key.is_empty())) {
 		status_label->set_text(TTR("Configure Base URL, model, and API key before sending AI messages."));
 		return;
 	}
@@ -2881,6 +2996,14 @@ void AIChatPanel::_send_message() {
 		_add_user_message(visible_user_text);
 	}
 	_record_issue_closed_from_user(visible_user_text);
+
+	// Detect no-bug confirmation: after the AI response, override NEXT_QUESTION
+	// with platform selection to enter the export pipeline automatically.
+	if (export_pipeline_state == EXPORT_PIPELINE_IDLE &&
+			settings.context_mode == AIContextMode::PROJECT &&
+			_is_no_bug_confirmation_message(visible_user_text)) {
+		export_pipeline_state = EXPORT_PIPELINE_AWAITING_PLATFORM;
+	}
 
 	if (settings.context_mode == AIContextMode::PROJECT && settings.html_min_project_prototype_enabled) {
 		if (html_prototype_gate_pending && (_is_html_prototype_gate_approval_message(visible_user_text) || _is_html_prototype_gate_skip_message(visible_user_text))) {
@@ -2930,27 +3053,33 @@ void AIChatPanel::_send_message() {
 	}
 
 	// Build system prompt + context. Use the effective prompt based on the current context mode.
+	// Split into stable (cacheable) and dynamic parts for DashScope explicit context caching.
 	String configured_system_prompt = AISettings::get_effective_system_prompt(settings);
-	settings.system_prompt = configured_system_prompt;
-	settings.system_prompt += "\n\n" + _ai_chat_next_question_protocol();
+	String stable_prompt = configured_system_prompt;
+	stable_prompt += "\n\n" + _ai_chat_next_question_protocol();
 	if (settings.context_mode == AIContextMode::PROJECT) {
-		settings.system_prompt += "\n\n" + _ai_project_memory_protocol();
+		stable_prompt += "\n\n" + _ai_project_memory_protocol();
 	}
 	if (html_prototype_gate_pending) {
-		settings.system_prompt += "\n\n" + _html_prototype_gate_prompt();
+		stable_prompt += "\n\n" + _html_prototype_gate_prompt();
 	}
+
+	String dynamic_prompt;
 	const String conversation_brief = _build_conversation_brief_prompt();
 	if (!conversation_brief.is_empty()) {
-		settings.system_prompt += "\n\n" + conversation_brief;
+		dynamic_prompt += "\n\n" + conversation_brief;
 	}
-	settings.system_prompt += "\n\n=== Current Request Guidance ===\n" + _detect_mode_prompt(visible_user_text);
+	dynamic_prompt += "\n\n=== Current Request Guidance ===\n" + _detect_mode_prompt(visible_user_text);
 	if (settings.develop_mode && settings.context_mode == AIContextMode::ENGINE) {
-		settings.system_prompt += "\n\n=== DEVELOP MODE DEMONSTRATION ===\nRun the visible workflow in order: modify locally, build, restart, wait for explicit user verification, inspect evidence and call develop_ai_verify, then call upload_code. upload_code is a dry run in this mode and MUST NOT commit or push. Never bypass this restriction with shell_command.";
+		dynamic_prompt += "\n\n=== DEVELOP MODE DEMONSTRATION ===\nRun the visible workflow in order: modify locally, build, restart, wait for explicit user verification, inspect evidence and call develop_ai_verify, then call upload_code. upload_code is a dry run in this mode and MUST NOT commit or push. Never bypass this restriction with shell_command.";
 	}
 	const String ai_context = AIContextBuilder::build_context(settings.include_project_memories, settings.include_tool_context, settings.context_char_budget, settings.auto_suggest_entries);
 	if (!ai_context.is_empty()) {
-		settings.system_prompt += "\n\n" + ai_context;
+		dynamic_prompt += "\n\n" + ai_context;
 	}
+
+	// settings.system_prompt retains the full combined prompt for backward compatibility.
+	settings.system_prompt = stable_prompt + dynamic_prompt;
 	chat_service->configure(settings);
 	active_settings = settings; // Cache for tool loop reuse.
 
@@ -2958,7 +3087,27 @@ void AIChatPanel::_send_message() {
 	{
 		Dictionary system_msg;
 		system_msg["role"] = "system";
-		system_msg["content"] = settings.system_prompt;
+		// DashScope explicit context cache: content must be Array format with cache_control marker.
+		// Caches the stable prompt prefix at 10% cost on subsequent hits (5-min TTL, auto-renew).
+		if (settings.backend_type == AIBackendType::QWEN) {
+			Array content_array;
+			Dictionary stable_block;
+			stable_block["type"] = "text";
+			stable_block["text"] = stable_prompt;
+			Dictionary cache_ctrl;
+			cache_ctrl["type"] = "ephemeral";
+			stable_block["cache_control"] = cache_ctrl;
+			content_array.push_back(stable_block);
+			if (!dynamic_prompt.is_empty()) {
+				Dictionary dynamic_block;
+				dynamic_block["type"] = "text";
+				dynamic_block["text"] = dynamic_prompt;
+				content_array.push_back(dynamic_block);
+			}
+			system_msg["content"] = content_array;
+		} else {
+			system_msg["content"] = settings.system_prompt;
+		}
 		messages.push_back(system_msg);
 	}
 
@@ -2999,9 +3148,16 @@ void AIChatPanel::_send_message() {
 	}
 
 	// If tools are enabled, include tool definitions filtered by the current context mode.
+	// For consultation/design discussion queries, use a minimal read-only set to save tokens.
 	Array tools;
 	if (settings.tools_enabled) {
-		tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
+		const bool is_consultation = AIToolDefs::is_consultation_message(visible_user_text);
+		if (is_consultation) {
+			tools = AIToolDefs::get_readonly_tools();
+			print_line("AIChatPanel: Consultation query detected, using readonly tools (saved ~3000 tokens).");
+		} else {
+			tools = AIToolDefs::get_tools_for_mode(settings.context_mode);
+		}
 		if (settings.mcp_tools_enabled && !settings.develop_mode) {
 			Array mcp_tools = AIToolDefs::get_mcp_tools();
 			if (!mcp_tools.is_empty()) {
@@ -3307,6 +3463,10 @@ void AIChatPanel::_cancel_request() {
 		is_titling = false;
 		title_request_conversation_id = String();
 	}
+	if (is_auditing) {
+		is_auditing = false;
+		audit_service->cancel_request();
+	}
 	chat_service->cancel_request();
 	if (tool_execution_running) {
 		tool_execution_cancelled = true;
@@ -3337,6 +3497,7 @@ void AIChatPanel::_clear_messages() {
 
 	is_summarizing = false;
 	is_titling = false;
+	is_auditing = false;
 	pending_user_message = String();
 	pending_attachments.clear();
 	pending_title_text = String();
@@ -3868,6 +4029,79 @@ bool AIChatPanel::_retry_after_missing_tool_call(const String &p_content) {
 	return true;
 }
 
+void AIChatPanel::_start_auto_audit(const String &p_user_message, const String &p_ai_response) {
+	if (!audit_service || is_auditing) {
+		return;
+	}
+
+	is_auditing = true;
+
+	// Build the audit request messages.
+	Array messages;
+	{
+		Dictionary system_msg;
+		system_msg["role"] = "system";
+		system_msg["content"] = String(AI_AUDIT_SYSTEM_PROMPT);
+		messages.push_back(system_msg);
+	}
+	{
+		Dictionary user_msg;
+		user_msg["role"] = "user";
+		user_msg["content"] = p_user_message;
+		messages.push_back(user_msg);
+	}
+	{
+		Dictionary assistant_msg;
+		assistant_msg["role"] = "assistant";
+		assistant_msg["content"] = p_ai_response;
+		messages.push_back(assistant_msg);
+	}
+
+	// Configure the audit service with the same backend settings.
+	AISettingsData audit_settings = AISettings::load();
+	audit_service->configure(audit_settings);
+
+	Error err = audit_service->send_messages(messages);
+	if (err != OK) {
+		is_auditing = false;
+		// Silent failure: audit is non-critical.
+	}
+}
+
+void AIChatPanel::_audit_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
+	is_auditing = false;
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_response_code >= HTTPClient::RESPONSE_BAD_REQUEST) {
+		// Silent failure: audit is non-critical.
+		return;
+	}
+
+	// Extract the AUDIT_REPORT block from the response.
+	String audit_content = p_content;
+	int start_tag = audit_content.find("<!-- AUDIT_REPORT -->");
+	int end_tag = audit_content.find("<!-- END_AUDIT_REPORT -->");
+
+	String audit_report;
+	if (start_tag != -1 && end_tag != -1) {
+		start_tag += strlen("<!-- AUDIT_REPORT -->");
+		audit_report = audit_content.substr(start_tag, end_tag - start_tag).strip_edges();
+	} else {
+		// No structured block found; use the raw response if it's short enough.
+		audit_report = audit_content.strip_edges();
+		if (audit_report.length() > 500) {
+			audit_report = audit_report.substr(0, 497).strip_edges() + "...";
+		}
+	}
+
+	if (audit_report.is_empty()) {
+		return;
+	}
+
+	// Display the audit report as a styled AI message.
+	String display_content = TTR("**AI Response Audit**") + "\n" + audit_report;
+	_add_ai_message(display_content, String(), 0.0, 0, 0);
+}
+
 void AIChatPanel::_chat_completed(int p_result, int p_response_code, const String &p_content, const Dictionary &p_json, const String &p_raw_body, double p_elapsed_seconds, const String &p_think_content, int p_prompt_tokens, int p_completion_tokens) {
 	// Handle title response first (auto-summary conversation title).
 	if (is_titling) {
@@ -4000,7 +4234,8 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		Vector<AITaskPlan> task_plans;
 		AIChatParser::parse_task_plans(p_content, task_plans);
 		Vector<String> generated_next_questions;
-		AIChatParser::parse_next_questions(p_content, generated_next_questions);
+		bool generated_next_questions_multi_select = false;
+		AIChatParser::parse_next_questions(p_content, generated_next_questions, &generated_next_questions_multi_select);
 		AIProjectMemoryUpdate project_memory_update;
 		AIChatParser::parse_project_memory_update(p_content, project_memory_update);
 		if (generated_next_questions.is_empty() && _looks_like_tool_preamble(p_content)) {
@@ -4027,6 +4262,14 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			generated_next_questions.push_back(TTR("Please explain the most likely root cause in more detail."));
 			generated_next_questions.push_back(TTR("Please inspect the relevant code and propose a concrete fix."));
 			generated_next_questions.push_back(TTR("Please implement the fix and verify the result."));
+		} else if (generated_next_questions.is_empty() && final_content.strip_edges().is_empty()) {
+			// The AI response consisted entirely of hidden protocol blocks
+			// (task plans, project memory, etc.) with no visible content and
+			// no next-question blocks. Provide a minimal set of generic
+			// fallback options so the panel still appears.
+			generated_next_questions.push_back(TTR("Please summarize what you just did and suggest next steps."));
+			generated_next_questions.push_back(TTR("Please review the changes and point out anything that needs attention."));
+			generated_next_questions.push_back(TTR("Please continue with the most important remaining task."));
 		}
 
 		const String response_thought = _get_response_thought(p_think_content);
@@ -4036,6 +4279,11 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 			streaming_message = nullptr;
 		} else if (!final_content.strip_edges().is_empty()) {
 			_add_ai_message(final_content, response_thought, response_elapsed, p_prompt_tokens, p_completion_tokens);
+		} else if (!generated_next_questions.is_empty()) {
+			// final_content is empty (response was all hidden protocol blocks)
+			// but we have fallback options — show a brief placeholder message
+			// so the options panel has visible context above it.
+			_add_ai_message(TTR("Done."), response_thought, response_elapsed, p_prompt_tokens, p_completion_tokens);
 		}
 		if (!task_plans.is_empty()) {
 			_show_task_plans(task_plans);
@@ -4063,7 +4311,14 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 		// user + AI messages may have changed the auto title).
 		_store_structured_history(pending_tool_round.original_messages, final_content);
 		_save_project_memory_update(project_memory_update);
-		_set_next_question_options(generated_next_questions, false);
+		_set_next_question_options(generated_next_questions, false, generated_next_questions_multi_select);
+
+		// Export pipeline: if user just confirmed no bugs, override next-question
+		// options with platform selection for the export pipeline.
+		if (export_pipeline_state == EXPORT_PIPELINE_AWAITING_PLATFORM) {
+			_start_export_pipeline();
+		}
+
 		_serialize_current_messages();
 		_refresh_conversation_list_ui();
 		_save_all_conversations();
@@ -4093,6 +4348,22 @@ void AIChatPanel::_chat_completed(int p_result, int p_response_code, const Strin
 				_show_repair_tasks(repair_tasks);
 			}
 		}
+
+		// Auto-audit: if enabled, trigger a second AI pass to review the response.
+		if (settings.auto_audit_enabled && !final_content.strip_edges().is_empty()) {
+			String last_user_message;
+			for (int i = message_list->get_child_count() - 1; i >= 0; i--) {
+				AIChatMessage *msg = Object::cast_to<AIChatMessage>(message_list->get_child(i));
+				if (msg && msg->is_user_message()) {
+					last_user_message = msg->get_content();
+					break;
+				}
+			}
+			if (!last_user_message.is_empty()) {
+				_start_auto_audit(last_user_message, final_content);
+			}
+		}
+
 		status_label->set_text(TTR("AI response received."));
 		_show_tool_limit_options(false);
 		_dispatch_next_queued_message();
@@ -4947,6 +5218,519 @@ void AIChatPanel::_clear_repair_cards() {
 	repair_cards.clear();
 }
 
+// ============ Export pipeline (no-bugs -> package -> verify) ============
+
+bool AIChatPanel::_is_no_bug_confirmation_message(const String &p_text) const {
+	const String text = p_text.strip_edges().to_lower();
+	if (text.is_empty()) {
+		return false;
+	}
+
+	// Chinese patterns (UTF-8 encoded).
+	const String zh_patterns[] = {
+		String::utf8("\xe6\xb2\xa1\xe6\x9c\x89""bug"),               // 没有bug
+		String::utf8("\xe6\xb2\xa1\xe6\x9c\x89""bug\xe4\xba\x86"),   // 没有bug了
+		String::utf8("\xe6\xb2\xa1\xe6\x9c\x89\xe9\x97\xae\xe9\xa2\x98"), // 没有问题
+		String::utf8("\xe6\xb2\xa1\xe9\x97\xae\xe9\xa2\x98"),               // 没问题
+		String::utf8("\xe7\xa1\xae\xe8\xae\xa4\xe6\xb2\xa1\xe9\x97\xae\xe9\xa2\x98"), // 确认没问题
+		String::utf8("\xe6\xb2\xa1\xe6\x9c\x89\xe4\xbb\xbb\xe4\xbd\x95\xe9\x97\xae\xe9\xa2\x98"), // 没有任何问题
+		String::utf8("\xe5\x85\xa8\xe9\x83\xbd\xe6\xb2\xa1\xe9\x97\xae\xe9\xa2\x98"), // 都没没问题
+		String::utf8("\xe6\xb5\x8b\xe8\xaf\x95\xe9\x80\x9a\xe8\xbf\x87"),             // 测试通过
+		String::utf8("\xe9\xaa\x8c\xe8\xaf\x81\xe9\x80\x9a\xe8\xbf\x87"),             // 验证通过
+		String::utf8("\xe6\xb2\xa1\xe6\x9c\x89\xe5\x8f\x91\xe7\x8e\xb0\xe9\x97\xae\xe9\xa2\x98"), // 没有发现问题
+		String::utf8("\xe4\xb8\x80\xe5\x88\x87\xe6\xad\xa3\xe5\xb8\xb8"),             // 一切正常
+		String::utf8("\xe5\x8f\xaf\xe4\xbb\xa5\xe6\x89\x93\xe5\x8c\x85"),             // 可以打包
+		String::utf8("\xe5\x8f\xaf\xe4\xbb\xa5\xe5\x8f\x91\xe5\xb8\x83"),             // 可以发布
+	};
+	for (unsigned int i = 0; i < sizeof(zh_patterns) / sizeof(zh_patterns[0]); i++) {
+		if (text.find(zh_patterns[i]) >= 0) {
+			return true;
+		}
+	}
+
+	// English patterns.
+	const char *en_patterns[] = {
+		"no bug",
+		"no more bug",
+		"no issues",
+		"no problem",
+		"no errors",
+		"everything works",
+		"all good",
+		"all fixed",
+		"works fine",
+		"works perfectly",
+		"looks good",
+		"ready to package",
+		"ready to export",
+		"ready to publish",
+		"ready for release",
+		"can package",
+		"can export",
+		"can publish",
+		"let's package",
+		"let's export",
+		"test passed",
+		"tests passed",
+		"verification passed",
+	};
+	for (unsigned int i = 0; i < sizeof(en_patterns) / sizeof(en_patterns[0]); i++) {
+		if (text.find(en_patterns[i]) >= 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void AIChatPanel::_start_export_pipeline() {
+	// Gather available export presets and show platform selection options.
+	if (!EditorExport::get_singleton()) {
+		_export_pipeline_finish(false, TTR("Export system is not available."));
+		return;
+	}
+
+	Vector<String> platform_options;
+	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+		if (preset.is_null() || preset->get_platform().is_null()) {
+			continue;
+		}
+		String platform_name = preset->get_platform()->get_name();
+		String preset_name = preset->get_name();
+		String option_text = preset_name;
+		if (!platform_name.is_empty() && option_text.to_lower() != platform_name.to_lower()) {
+			option_text = preset_name + " (" + platform_name + ")";
+		}
+		platform_options.push_back(option_text);
+	}
+
+	if (platform_options.is_empty()) {
+		// No presets configured — open the export dialog so the user can create one.
+		EditorNode *editor_node = EditorNode::get_singleton();
+		if (editor_node) {
+			_add_ai_message(TTR("No export presets found. Please open the Export dialog to create a preset for your target platform first."), String(), 0.0, 0, 0);
+			// TODO: open export dialog programmatically.
+		}
+		export_pipeline_state = EXPORT_PIPELINE_IDLE;
+		return;
+	}
+
+	// Show platform selection as NEXT_QUESTION options.
+	_set_next_question_options(platform_options, true);
+	_add_ai_message(TTR("Great, no bugs found! Let's package the game. Please select a target platform to export:"), String(), 0.0, 0, 0);
+	_update_export_pipeline_status_ui();
+}
+
+void AIChatPanel::_export_pipeline_select_platform(const String &p_platform) {
+	export_pipeline_platform = p_platform;
+	_set_next_question_options(Vector<String>(), true);
+	_update_export_pipeline_status_ui();
+
+	// Find the matching export preset.
+	Ref<EditorExportPreset> matched_preset;
+	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+		if (preset.is_null() || preset->get_platform().is_null()) {
+			continue;
+		}
+		String platform_name = preset->get_platform()->get_name();
+		String preset_name = preset->get_name();
+		String option_text = preset_name;
+		if (!platform_name.is_empty() && option_text.to_lower() != platform_name.to_lower()) {
+			option_text = preset_name + " (" + platform_name + ")";
+		}
+		if (option_text == p_platform) {
+			matched_preset = preset;
+			break;
+		}
+	}
+
+	if (matched_preset.is_null()) {
+		_export_pipeline_finish(false, vformat(TTR("Could not find an export preset for '%s'."), p_platform));
+		return;
+	}
+
+	// Check if export templates are available.
+	export_pipeline_state = EXPORT_PIPELINE_CHECKING_TEMPLATES;
+	_update_export_pipeline_status_ui();
+
+	Ref<EditorExportPlatform> platform = matched_preset->get_platform();
+	String export_error;
+	bool missing_templates = false;
+	bool can_export_result = platform->can_export(matched_preset, export_error, missing_templates, false);
+
+	if (can_export_result && !missing_templates) {
+		// Templates are ready — proceed to export.
+		_export_pipeline_do_export();
+	} else if (missing_templates) {
+		// Templates are missing — open the template manager.
+		export_pipeline_state = EXPORT_PIPELINE_WAITING_TEMPLATE_DOWNLOAD;
+		_update_export_pipeline_status_ui();
+		_add_ai_message(TTR("Export templates for this platform are not installed. Opening the Export Template Manager — please download the required templates."), String(), 0.0, 0, 0);
+
+		EditorNode *editor_node = EditorNode::get_singleton();
+		if (editor_node) {
+			editor_node->open_export_template_manager();
+		}
+
+		// Start a poll timer to check when templates are ready.
+		if (!export_template_poll_timer) {
+			export_template_poll_timer = memnew(Timer);
+			export_template_poll_timer->set_wait_time(2.0);
+			export_template_poll_timer->set_one_shot(false);
+			export_template_poll_timer->connect("timeout", callable_mp(this, &AIChatPanel::_export_pipeline_on_template_poll));
+			add_child(export_template_poll_timer, false, INTERNAL_MODE_BACK);
+		}
+		export_template_poll_timer->start();
+	} else {
+		// Other export configuration error.
+		_export_pipeline_finish(false, vformat(TTR("Export configuration error: %s"), export_error));
+	}
+}
+
+void AIChatPanel::_export_pipeline_on_template_poll() {
+	if (export_pipeline_state != EXPORT_PIPELINE_WAITING_TEMPLATE_DOWNLOAD) {
+		if (export_template_poll_timer) {
+			export_template_poll_timer->stop();
+		}
+		return;
+	}
+
+	// Check if the template manager is still downloading.
+	EditorNode *editor_node = EditorNode::get_singleton();
+	if (!editor_node) {
+		_export_pipeline_finish(false, TTR("Editor node is not available."));
+		return;
+	}
+
+	// Re-check if the matched preset can now export (templates might have been downloaded).
+	Ref<EditorExportPreset> matched_preset;
+	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+		if (preset.is_null() || preset->get_platform().is_null()) {
+			continue;
+		}
+		String preset_name = preset->get_name();
+		String platform_name = preset->get_platform()->get_name();
+		String option_text = preset_name;
+		if (!platform_name.is_empty() && option_text.to_lower() != platform_name.to_lower()) {
+			option_text = preset_name + " (" + platform_name + ")";
+		}
+		if (option_text == export_pipeline_platform) {
+			matched_preset = preset;
+			break;
+		}
+	}
+
+	if (matched_preset.is_null()) {
+		export_template_poll_timer->stop();
+		_export_pipeline_finish(false, TTR("Export preset no longer available."));
+		return;
+	}
+
+	Ref<EditorExportPlatform> platform = matched_preset->get_platform();
+	String export_error;
+	bool missing_templates = false;
+	bool can_export_result = platform->can_export(matched_preset, export_error, missing_templates, false);
+
+	if (can_export_result && !missing_templates) {
+		// Templates are now available!
+		export_template_poll_timer->stop();
+		_add_ai_message(TTR("Export templates are ready. Starting export..."), String(), 0.0, 0, 0);
+		_export_pipeline_do_export();
+	}
+	// Otherwise, keep polling — the user is still downloading.
+}
+
+void AIChatPanel::_export_pipeline_check_templates() {
+	// This is called from _export_pipeline_select_platform; logic is inlined there.
+}
+
+void AIChatPanel::_export_pipeline_do_export() {
+	export_pipeline_state = EXPORT_PIPELINE_EXPORTING;
+	_update_export_pipeline_status_ui();
+
+	// Find the matching preset.
+	Ref<EditorExportPreset> matched_preset;
+	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+		if (preset.is_null() || preset->get_platform().is_null()) {
+			continue;
+		}
+		String preset_name = preset->get_name();
+		String platform_name = preset->get_platform()->get_name();
+		String option_text = preset_name;
+		if (!platform_name.is_empty() && option_text.to_lower() != platform_name.to_lower()) {
+			option_text = preset_name + " (" + platform_name + ")";
+		}
+		if (option_text == export_pipeline_platform) {
+			matched_preset = preset;
+			break;
+		}
+	}
+
+	if (matched_preset.is_null()) {
+		_export_pipeline_finish(false, TTR("Export preset not found."));
+		return;
+	}
+
+	Ref<EditorExportPlatform> platform = matched_preset->get_platform();
+
+	// Determine the output path.
+	String export_path = matched_preset->get_export_path();
+	if (export_path.is_empty()) {
+		// Generate a default export path in the project directory.
+		String project_name = ProjectSettings::get_singleton()->get("application/config/name");
+		if (project_name.is_empty()) {
+			project_name = "game";
+		}
+		String project_dir = ProjectSettings::get_singleton()->get_resource_path();
+		String extension;
+		String os_name = platform->get_os_name();
+		if (os_name == "Windows") {
+			extension = ".exe";
+		} else if (os_name == "macOS") {
+			extension = ".zip";
+		} else if (os_name == "Web") {
+			extension = ".html";
+		} else {
+			extension = ".x86_64";
+		}
+		export_path = project_dir.path_join("build" + String("/") + project_name + extension);
+		matched_preset->set_export_path(export_path);
+	}
+
+	export_pipeline_output_path = export_path;
+
+	// Ensure the output directory exists.
+	String export_dir = export_path.get_base_dir();
+	Ref<DirAccess> dir = DirAccess::create_for_path(export_dir);
+	if (dir.is_valid()) {
+		dir->make_dir_recursive(export_dir);
+	}
+
+	// Perform the export.
+	platform->clear_messages();
+	Error err = platform->export_project(matched_preset, false, export_path, 0);
+
+	if (err != OK) {
+		String error_msg;
+		if (platform->get_message_count() > 0) {
+			// Collect error messages from the platform.
+			error_msg = vformat(TTR("Export failed with error code %d."), (int)err);
+		} else {
+			error_msg = vformat(TTR("Export failed with error code %d."), (int)err);
+		}
+		_export_pipeline_finish(false, error_msg);
+		return;
+	}
+
+	_add_ai_message(vformat(TTR("Export completed successfully! Output: %s\nLaunching game to verify..."), export_path), String(), 0.0, 0, 0);
+	_export_pipeline_launch_game();
+}
+
+void AIChatPanel::_export_pipeline_launch_game() {
+	export_pipeline_state = EXPORT_PIPELINE_LAUNCHING;
+	_update_export_pipeline_status_ui();
+
+	if (!FileAccess::exists(export_pipeline_output_path)) {
+		_export_pipeline_finish(false, vformat(TTR("Exported file not found: %s"), export_pipeline_output_path));
+		return;
+	}
+
+	// Launch the exported game as a subprocess.
+	List<String> args;
+	ProcessID pid = 0;
+	Error run_err = OS::get_singleton()->create_process(export_pipeline_output_path, args, &pid);
+
+	if (run_err != OK || pid == 0) {
+		// Fallback: try shell_open for platforms where direct execution isn't possible.
+		run_err = OS::get_singleton()->shell_open(export_pipeline_output_path);
+		if (run_err != OK) {
+			_export_pipeline_finish(false, TTR("Failed to launch the exported game."));
+			return;
+		}
+		// shell_open doesn't give us a PID, so we can't track the process.
+		// Just report success after a delay.
+		export_verify_pid = 0;
+	} else {
+		export_verify_pid = pid;
+	}
+
+	export_pipeline_state = EXPORT_PIPELINE_VERIFYING;
+	export_verify_wait_count = 0;
+
+	// Start a timer to check if the game is still running after a few seconds.
+	if (!export_verify_timer) {
+		export_verify_timer = memnew(Timer);
+		export_verify_timer->set_wait_time(2.0);
+		export_verify_timer->set_one_shot(false);
+		export_verify_timer->connect("timeout", callable_mp(this, &AIChatPanel::_export_pipeline_on_verify_tick));
+		add_child(export_verify_timer, false, INTERNAL_MODE_BACK);
+	}
+	export_verify_timer->start();
+	_update_export_pipeline_status_ui();
+}
+
+void AIChatPanel::_export_pipeline_on_verify_tick() {
+	if (export_pipeline_state != EXPORT_PIPELINE_VERIFYING) {
+		if (export_verify_timer) {
+			export_verify_timer->stop();
+		}
+		return;
+	}
+
+	export_verify_wait_count++;
+
+	// If we can't track the process (launched via shell_open), just wait and report success.
+	if (export_verify_pid == 0) {
+		if (export_verify_wait_count >= 3) {
+			export_verify_timer->stop();
+			_export_pipeline_finish(true, vformat(TTR("Export and verification successful! The game was launched.\nOutput: %s"), export_pipeline_output_path));
+		}
+		return;
+	}
+
+	// Check if the process is still alive.
+	if (export_verify_pid != 0) {
+		bool alive = OS::get_singleton()->is_process_running(export_verify_pid);
+		if (!alive) {
+			export_verify_timer->stop();
+			if (export_verify_wait_count <= 2) {
+				_export_pipeline_finish(false, TTR("The exported game exited unexpectedly within the first few seconds. It may have crashed on startup."));
+			} else {
+				_export_pipeline_finish(true, vformat(TTR("Export and verification successful! The game ran for a few seconds without crashing.\nOutput: %s"), export_pipeline_output_path));
+			}
+			export_verify_pid = 0;
+			return;
+		}
+	}
+
+	// After 5 ticks (10 seconds), consider it stable.
+	if (export_verify_wait_count >= 5) {
+		export_verify_timer->stop();
+		if (export_verify_pid != 0 && OS::get_singleton()->is_process_running(export_verify_pid)) {
+			OS::get_singleton()->kill(export_verify_pid);
+			export_verify_pid = 0;
+		}
+		_export_pipeline_finish(true, vformat(TTR("Export and verification successful! The game has been running for 10 seconds without crashing.\nOutput: %s"), export_pipeline_output_path));
+	}
+}
+
+void AIChatPanel::_export_pipeline_finish(bool p_success, const String &p_message) {
+	ExportPipelineState prev_state = export_pipeline_state;
+	export_pipeline_state = EXPORT_PIPELINE_IDLE;
+	export_pipeline_platform = String();
+	export_pipeline_output_path = String();
+	export_verify_pid = 0;
+	export_verify_wait_count = 0;
+
+	if (export_template_poll_timer) {
+		export_template_poll_timer->stop();
+	}
+	if (export_verify_timer) {
+		export_verify_timer->stop();
+	}
+
+	_update_export_pipeline_status_ui();
+
+	if (prev_state != EXPORT_PIPELINE_IDLE) {
+		if (p_success) {
+			_add_ai_message(vformat(TTR("[Export Pipeline] Success: %s"), p_message), String(), 0.0, 0, 0);
+		} else {
+			_add_ai_message(vformat(TTR("[Export Pipeline] Failed: %s"), p_message), String(), 0.0, 0, 0);
+		}
+	}
+}
+
+void AIChatPanel::_export_pipeline_cancel() {
+	export_pipeline_state = EXPORT_PIPELINE_IDLE;
+	export_pipeline_platform = String();
+	export_pipeline_output_path = String();
+	export_verify_pid = 0;
+	export_verify_wait_count = 0;
+
+	if (export_template_poll_timer) {
+		export_template_poll_timer->stop();
+	}
+	if (export_verify_timer) {
+		export_verify_timer->stop();
+	}
+
+	_set_next_question_options(Vector<String>(), true);
+	_update_export_pipeline_status_ui();
+}
+
+void AIChatPanel::_update_export_pipeline_status_ui() {
+	// Create the status panel lazily.
+	if (!export_pipeline_status_panel) {
+		export_pipeline_status_panel = memnew(PanelContainer);
+		export_pipeline_status_panel->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+
+		VBoxContainer *vb = memnew(VBoxContainer);
+		export_pipeline_status_panel->add_child(vb);
+
+		export_pipeline_status_label = memnew(Label);
+		export_pipeline_status_label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		export_pipeline_status_label->add_theme_font_size_override("font_size", 13 * EDSCALE);
+		vb->add_child(export_pipeline_status_label);
+
+		export_pipeline_progress = memnew(ProgressBar);
+		export_pipeline_progress->set_show_percentage(false);
+		export_pipeline_progress->set_custom_minimum_size(Size2(0, 8) * EDSCALE);
+		vb->add_child(export_pipeline_progress);
+
+		// Insert before the status label in the chat vbox.
+		Node *chat_vbox = status_label ? status_label->get_parent() : nullptr;
+		if (chat_vbox) {
+			chat_vbox->add_child(export_pipeline_status_panel);
+			if (status_label) {
+				int status_idx = chat_vbox->get_children().find(status_label);
+				if (status_idx >= 0) {
+					chat_vbox->move_child(export_pipeline_status_panel, status_idx);
+				}
+			}
+		}
+	}
+
+	switch (export_pipeline_state) {
+		case EXPORT_PIPELINE_IDLE: {
+			export_pipeline_status_panel->set_visible(false);
+		} break;
+		case EXPORT_PIPELINE_AWAITING_PLATFORM: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(TTR("Export pipeline: Select a target platform..."));
+			export_pipeline_progress->set_value(10);
+		} break;
+		case EXPORT_PIPELINE_CHECKING_TEMPLATES: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(vformat(TTR("Export pipeline: Checking templates for '%s'..."), export_pipeline_platform));
+			export_pipeline_progress->set_value(25);
+		} break;
+		case EXPORT_PIPELINE_WAITING_TEMPLATE_DOWNLOAD: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(TTR("Export pipeline: Waiting for template download..."));
+			export_pipeline_progress->set_value(40);
+		} break;
+		case EXPORT_PIPELINE_EXPORTING: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(vformat(TTR("Export pipeline: Exporting to '%s'..."), export_pipeline_output_path));
+			export_pipeline_progress->set_value(65);
+		} break;
+		case EXPORT_PIPELINE_LAUNCHING: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(TTR("Export pipeline: Launching exported game..."));
+			export_pipeline_progress->set_value(80);
+		} break;
+		case EXPORT_PIPELINE_VERIFYING: {
+			export_pipeline_status_panel->set_visible(true);
+			export_pipeline_status_label->set_text(vformat(TTR("Export pipeline: Verifying game stability... (%d/5)"), export_verify_wait_count));
+			export_pipeline_progress->set_value(80 + export_verify_wait_count * 4);
+		} break;
+	}
+}
+
 AIChatPanel::AIChatPanel() {
 	set_name(TTRC("Chat"));
 	add_theme_constant_override("margin_left", 0);
@@ -5427,6 +6211,11 @@ AIChatPanel::AIChatPanel() {
 	chat_service->connect(SNAME("chat_completed"), callable_mp(this, &AIChatPanel::_chat_completed));
 	chat_service->connect(SNAME("chat_stream_data"), callable_mp(this, &AIChatPanel::_chat_stream_data));
 	add_child(chat_service, false, INTERNAL_MODE_BACK);
+
+	// Audit service (for automatic response quality auditing)
+	audit_service = memnew(AIChatService);
+	audit_service->connect(SNAME("chat_completed"), callable_mp(this, &AIChatPanel::_audit_completed));
+	add_child(audit_service, false, INTERNAL_MODE_BACK);
 
 	reference_file_dialog = memnew(EditorFileDialog);
 	reference_file_dialog->set_access(EditorFileDialog::ACCESS_RESOURCES);

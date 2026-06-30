@@ -77,6 +77,7 @@ static constexpr int OUTPUT_LANGUAGE_GERMAN = 8;
 static constexpr int BACKEND_TYPE_JUNDOT_PLUGIN = 0;
 static constexpr int BACKEND_TYPE_CODEX = 1;
 static constexpr int BACKEND_TYPE_LEGACY_OPENAI = 2;
+static constexpr int BACKEND_TYPE_QWEN = 3;
 static constexpr const char *MIMOCODE_RELEASE_TAG = "v0.4";
 static constexpr const char *MIMOCODE_RELEASE_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/tag/v0.4";
 static constexpr const char *MIMOCODE_DOWNLOAD_URL = "https://github.com/LoongSerpent9Realms/MiMo-Code-jundot/releases/download/v0.4/mimocode-windows-x64.zip";
@@ -344,14 +345,26 @@ static AIBackendType _backend_type_from_id(int p_id) {
 	if (p_id == BACKEND_TYPE_CODEX) {
 		return AIBackendType::CODEX;
 	}
-	return p_id == BACKEND_TYPE_LEGACY_OPENAI ? AIBackendType::LEGACY_OPENAI : AIBackendType::JUNDOT_PLUGIN;
+	if (p_id == BACKEND_TYPE_LEGACY_OPENAI) {
+		return AIBackendType::LEGACY_OPENAI;
+	}
+	if (p_id == BACKEND_TYPE_QWEN) {
+		return AIBackendType::QWEN;
+	}
+	return AIBackendType::JUNDOT_PLUGIN;
 }
 
 static int _backend_type_to_id(AIBackendType p_backend_type) {
 	if (p_backend_type == AIBackendType::CODEX) {
 		return BACKEND_TYPE_CODEX;
 	}
-	return p_backend_type == AIBackendType::LEGACY_OPENAI ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN;
+	if (p_backend_type == AIBackendType::LEGACY_OPENAI) {
+		return BACKEND_TYPE_LEGACY_OPENAI;
+	}
+	if (p_backend_type == AIBackendType::QWEN) {
+		return BACKEND_TYPE_QWEN;
+	}
+	return BACKEND_TYPE_JUNDOT_PLUGIN;
 }
 
 static String _get_external_mcp_base_url(const String &p_bind_address, int p_port) {
@@ -626,6 +639,7 @@ OptionButton *AIConfigPanel::_add_backend_type_row(GridContainer *p_grid, Label 
 	option->add_item(TTR("jundot Plugin (MiMoCode)"), BACKEND_TYPE_JUNDOT_PLUGIN);
 	option->add_item(TTR("Codex"), BACKEND_TYPE_CODEX);
 	option->add_item(TTR("Legacy OpenAI-Compatible"), BACKEND_TYPE_LEGACY_OPENAI);
+	option->add_item(TTR("Qwen Cloud (千问云)"), BACKEND_TYPE_QWEN);
 	p_grid->add_child(option);
 	return option;
 }
@@ -680,6 +694,8 @@ void AIConfigPanel::_update_translations() {
 	develop_mode_check->set_tooltip_text(TTR("Demonstrates modify, build, restart, user verification, AI verification, and upload validation. Git commit and push are always skipped."));
 	mcp_tools_enabled_check->set_text(TTR("Enable MCP server tools (external services)"));
 	auto_suggest_entries_check->set_text(TTR("Allow AI to suggest Skill/MCP/Memory entries"));
+	auto_audit_enabled_check->set_text(TTR("Auto-audit AI responses (accuracy, completeness, quality)"));
+	auto_audit_enabled_check->set_tooltip_text(TTR("When enabled, each AI response is automatically reviewed by a second AI pass that checks accuracy, completeness, code quality, safety, and actionability. Audit results are shown below the response."));
 	html_min_project_prototype_check->set_text(TTR("Require HTML gameplay prototype before project implementation"));
 	html_min_project_prototype_check->set_tooltip_text(TTR("When enabled, new game/project concept requests first create a runnable standalone HTML prototype under .JundotAI/prototypes, then wait for user verification before editing Godot project files."));
 	feature_design_philosophy_check->set_text(TTR("Require Jundot design philosophy check for feature expansion"));
@@ -698,10 +714,10 @@ void AIConfigPanel::_update_translations() {
 	base_url_edit->set_placeholder(AISettings::get_default_base_url());
 	jundot_plugin_id_edit->set_placeholder(JUNDOT_MIMOCODE_PLUGIN_ID);
 	jundot_plugin_url_edit->set_placeholder("http://127.0.0.1:4096");
-	model_edit->set_placeholder(AISettings::get_default_model());
 	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_JUNDOT_PLUGIN), TTR("jundot Plugin (MiMoCode)"));
 	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_CODEX), TTR("Codex"));
 	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_LEGACY_OPENAI), TTR("Legacy OpenAI-Compatible"));
+	backend_type_option->set_item_text(backend_type_option->get_item_index(BACKEND_TYPE_QWEN), TTR("Qwen Cloud (千问云)"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_AUTO), TTR("System Language (Auto)"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_ENGLISH), TTR("English"));
 	output_language_option->set_item_text(output_language_option->get_item_index(OUTPUT_LANGUAGE_SIMPLIFIED_CHINESE), TTR("Chinese (Simplified)"));
@@ -782,8 +798,11 @@ void AIConfigPanel::_update_backend_controls() {
 	if (model_label) {
 		model_label->set_visible(!use_mimocode);
 	}
-	if (model_edit) {
-		model_edit->set_visible(!use_mimocode);
+	if (model_option) {
+		model_option->set_visible(!use_mimocode);
+	}
+	if (model_refresh_button) {
+		model_refresh_button->set_visible(!use_mimocode);
 	}
 	if (api_key_label) {
 		api_key_label->set_visible(!use_mimocode);
@@ -819,8 +838,143 @@ void AIConfigPanel::_update_mimocode_button() {
 }
 
 void AIConfigPanel::_on_backend_type_selected(int p_index) {
-	(void)p_index;
+	const AIBackendType backend = _backend_type_from_id(p_index);
+	if (backend == AIBackendType::QWEN) {
+		base_url_edit->set_text(AISettings::get_qwen_default_base_url());
+	}
 	_update_backend_controls();
+	_fetch_available_models();
+}
+
+void AIConfigPanel::_on_model_refresh_pressed() {
+	_fetch_available_models();
+}
+
+void AIConfigPanel::_fetch_available_models() {
+	if (!model_option || !model_refresh_button || !model_list_request) {
+		return;
+	}
+
+	const AIBackendType backend = backend_type_option ? _backend_type_from_id(backend_type_option->get_selected_id()) : AIBackendType::JUNDOT_PLUGIN;
+	if (backend == AIBackendType::JUNDOT_PLUGIN) {
+		return;
+	}
+
+	const String base_url = base_url_edit ? base_url_edit->get_text().strip_edges() : String();
+	const String api_key = api_key_edit ? api_key_edit->get_text() : String();
+
+	if (base_url.is_empty() || api_key.is_empty()) {
+		status_label->set_text(TTR("Please configure Base URL and API Key first."));
+		return;
+	}
+
+	if (model_list_request->get_http_client_status() != HTTPClient::STATUS_DISCONNECTED) {
+		status_label->set_text(TTR("Model list is already being fetched."));
+		return;
+	}
+
+	String models_url = base_url;
+	while (models_url.ends_with("/")) {
+		models_url = models_url.substr(0, models_url.length() - 1);
+	}
+	models_url += "/models";
+
+	Vector<String> headers;
+	headers.push_back("Authorization: Bearer " + api_key);
+	headers.push_back("Accept: application/json");
+
+	model_refresh_button->set_disabled(true);
+	model_option->clear();
+	model_option->add_item(TTR("Loading models..."), 0);
+
+	const Error err = model_list_request->request(models_url, headers, HTTPClient::METHOD_GET);
+	if (err != OK) {
+		model_refresh_button->set_disabled(false);
+		model_option->clear();
+		model_option->add_item(TTR("Failed to fetch models"), 0);
+		status_label->set_text(vformat(TTR("Failed to request model list. Error: %d"), (int)err));
+	}
+}
+
+void AIConfigPanel::_on_model_list_request_completed(int p_result, int p_response_code, const PackedStringArray &p_headers, const PackedByteArray &p_body) {
+	if (!model_option || !model_refresh_button) {
+		return;
+	}
+
+	model_refresh_button->set_disabled(false);
+	model_option->clear();
+
+	if (p_result != HTTPRequest::RESULT_SUCCESS) {
+		model_option->add_item(TTR("Failed to fetch models"), 0);
+		status_label->set_text(vformat(TTR("Model list request failed. Result: %d"), (int)p_result));
+		return;
+	}
+
+	if (p_response_code != 200) {
+		model_option->add_item(TTR("Failed to fetch models"), 0);
+		status_label->set_text(vformat(TTR("Model list request failed. HTTP %d"), p_response_code));
+		return;
+	}
+
+	String response_text;
+	response_text = String::utf8((const char *)p_body.ptr(), p_body.size());
+
+	JSON json;
+	const Error parse_err = json.parse(response_text);
+	if (parse_err != OK) {
+		model_option->add_item(TTR("Failed to parse models response"), 0);
+		status_label->set_text(TTR("Failed to parse model list response."));
+		return;
+	}
+
+	const Variant json_data = json.get_data();
+	if (json_data.get_type() != Variant::DICTIONARY) {
+		model_option->add_item(TTR("Invalid models response format"), 0);
+		status_label->set_text(TTR("Invalid model list format."));
+		return;
+	}
+
+	const Dictionary dict = json_data;
+	const Array models = dict.get("data", Array());
+	if (models.is_empty()) {
+		model_option->add_item(TTR("No models available"), 0);
+		status_label->set_text(TTR("No models available from this API."));
+		return;
+	}
+
+	Vector<String> model_ids;
+	for (int i = 0; i < models.size(); i++) {
+		const Variant model_var = models[i];
+		if (model_var.get_type() == Variant::DICTIONARY) {
+			const Dictionary model_dict = model_var;
+			const String id = model_dict.get("id", String());
+			if (!id.is_empty()) {
+				model_ids.push_back(id);
+			}
+		}
+	}
+
+	model_ids.sort();
+
+	String current_model;
+	if (model_option->get_item_count() > 0) {
+		current_model = model_option->get_item_text(model_option->get_selected());
+	}
+
+	for (int i = 0; i < model_ids.size(); i++) {
+		model_option->add_item(model_ids[i], i);
+	}
+
+	if (!current_model.is_empty()) {
+		for (int i = 0; i < model_option->get_item_count(); i++) {
+			if (model_option->get_item_text(i) == current_model) {
+				model_option->select(i);
+				break;
+			}
+		}
+	}
+
+	status_label->set_text(vformat(TTR("Loaded %d available models."), model_ids.size()));
 }
 
 void AIConfigPanel::_on_mimocode_download_button_pressed() {
@@ -1317,7 +1471,12 @@ void AIConfigPanel::_load_settings() {
 	jundot_plugin_id_edit->set_text(settings.jundot_ai_plugin_id);
 	jundot_plugin_url_edit->set_text(settings.jundot_ai_plugin_url);
 	base_url_edit->set_text(settings.base_url);
-	model_edit->set_text(settings.model);
+
+	// Set model from settings - will be populated after fetch.
+	const String saved_model = settings.model;
+	model_option->clear();
+	model_option->add_item(saved_model.is_empty() ? TTR("Select a model") : saved_model, 0);
+
 	api_key_edit->set_text(settings.api_key);
 	temperature_spin->set_value(settings.temperature);
 	max_tokens_spin->set_value(settings.max_tokens);
@@ -1334,6 +1493,7 @@ void AIConfigPanel::_load_settings() {
 	develop_mode_check->set_pressed(settings.develop_mode);
 	mcp_tools_enabled_check->set_pressed(settings.mcp_tools_enabled);
 	auto_suggest_entries_check->set_pressed(settings.auto_suggest_entries);
+	auto_audit_enabled_check->set_pressed(settings.auto_audit_enabled);
 	html_min_project_prototype_check->set_pressed(settings.html_min_project_prototype_enabled);
 	feature_design_philosophy_check->set_pressed(settings.feature_design_philosophy_check);
 	external_api_enabled_check->set_pressed(settings.external_api_enabled);
@@ -1358,6 +1518,11 @@ void AIConfigPanel::_load_settings() {
 	_update_engine_source_status();
 	_update_github_status();
 	_update_gitee_status();
+
+	// Auto-fetch models if not using Jundot plugin.
+	if (settings.backend_type != AIBackendType::JUNDOT_PLUGIN) {
+		_fetch_available_models();
+	}
 }
 
 void AIConfigPanel::_save_settings() {
@@ -1367,7 +1532,7 @@ void AIConfigPanel::_save_settings() {
 	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
 	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
-	settings.model = model_edit->get_text().strip_edges();
+	settings.model = model_option->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = max_tokens_spin->get_value();
@@ -1384,6 +1549,7 @@ void AIConfigPanel::_save_settings() {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.auto_audit_enabled = auto_audit_enabled_check->is_pressed();
 	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.user_extra_instructions = user_extra_instructions_edit->get_text();
@@ -1424,7 +1590,7 @@ void AIConfigPanel::_test_connection() {
 	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
 	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
-	settings.model = model_edit->get_text().strip_edges();
+	settings.model = model_option->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = MIN<int>(max_tokens_spin->get_value(), 64);
@@ -1441,6 +1607,7 @@ void AIConfigPanel::_test_connection() {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.auto_audit_enabled = auto_audit_enabled_check->is_pressed();
 	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
@@ -1451,7 +1618,7 @@ void AIConfigPanel::_test_connection() {
 		return;
 	}
 
-	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI) && (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty())) {
+	if ((settings.backend_type == AIBackendType::CODEX || settings.backend_type == AIBackendType::LEGACY_OPENAI || settings.backend_type == AIBackendType::QWEN) && (settings.base_url.is_empty() || settings.model.is_empty() || settings.api_key.is_empty())) {
 		status_label->set_text(TTR("Base URL, model, and API key are required before testing the connection."));
 		return;
 	}
@@ -1505,7 +1672,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.jundot_ai_plugin_id = jundot_plugin_id_edit->get_text().strip_edges();
 	settings.jundot_ai_plugin_url = jundot_plugin_url_edit->get_text().strip_edges();
 	settings.base_url = base_url_edit->get_text().strip_edges();
-	settings.model = model_edit->get_text().strip_edges();
+	settings.model = model_option->get_text().strip_edges();
 	settings.api_key = api_key_edit->get_text();
 	settings.temperature = temperature_spin->get_value();
 	settings.max_tokens = max_tokens_spin->get_value();
@@ -1522,13 +1689,14 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	settings.develop_mode = develop_mode_check->is_pressed();
 	settings.mcp_tools_enabled = mcp_tools_enabled_check->is_pressed();
 	settings.auto_suggest_entries = auto_suggest_entries_check->is_pressed();
+	settings.auto_audit_enabled = auto_audit_enabled_check->is_pressed();
 	settings.html_min_project_prototype_enabled = html_min_project_prototype_check->is_pressed();
 	settings.feature_design_philosophy_check = feature_design_philosophy_check->is_pressed();
 	settings.system_prompt = AISettings::get_default_system_prompt();
 	AISettings::apply_low_token_mode(settings);
 
 	Dictionary root;
-	root["backend_type"] = settings.backend_type == AIBackendType::CODEX ? "codex" : (settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : "jundot_plugin");
+	root["backend_type"] = settings.backend_type == AIBackendType::CODEX ? "codex" : (settings.backend_type == AIBackendType::LEGACY_OPENAI ? "legacy_openai" : (settings.backend_type == AIBackendType::QWEN ? "qwen" : "jundot_plugin"));
 	root["jundot_ai_plugin_id"] = settings.jundot_ai_plugin_id;
 	root["jundot_ai_plugin_url"] = settings.jundot_ai_plugin_url;
 	root["allow_legacy_openai_backend"] = settings.allow_legacy_openai_backend;
@@ -1548,6 +1716,7 @@ void AIConfigPanel::_export_config_confirmed(const String &p_path) {
 	root["history_char_budget"] = settings.history_char_budget;
 	root["max_tool_iterations"] = settings.max_tool_iterations;
 	root["auto_suggest_entries"] = settings.auto_suggest_entries;
+	root["auto_audit_enabled"] = settings.auto_audit_enabled;
 	root["html_min_project_prototype_enabled"] = settings.html_min_project_prototype_enabled;
 	root["output_language"] = settings.output_language;
 	root["feature_universality_threshold"] = settings.feature_universality_threshold;
@@ -1662,7 +1831,15 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	const Dictionary root = json_data;
 	if (root.has("backend_type")) {
 		const String backend_type = root["backend_type"];
-		backend_type_option->select(backend_type_option->get_item_index(backend_type == "codex" ? BACKEND_TYPE_CODEX : (backend_type == "legacy_openai" ? BACKEND_TYPE_LEGACY_OPENAI : BACKEND_TYPE_JUNDOT_PLUGIN)));
+		int backend_id = BACKEND_TYPE_JUNDOT_PLUGIN;
+		if (backend_type == "codex") {
+			backend_id = BACKEND_TYPE_CODEX;
+		} else if (backend_type == "legacy_openai") {
+			backend_id = BACKEND_TYPE_LEGACY_OPENAI;
+		} else if (backend_type == "qwen") {
+			backend_id = BACKEND_TYPE_QWEN;
+		}
+		backend_type_option->select(backend_type_option->get_item_index(backend_id));
 	}
 	if (root.has("jundot_ai_plugin_id")) {
 		jundot_plugin_id_edit->set_text(root["jundot_ai_plugin_id"]);
@@ -1674,7 +1851,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 		base_url_edit->set_text(root["base_url"]);
 	}
 	if (root.has("model")) {
-		model_edit->set_text(root["model"]);
+		String imported_model = String(root["model"]).strip_edges();
+		model_option->clear();
+		model_option->add_item(imported_model.is_empty() ? TTR("Select a model") : imported_model, 0);
 	}
 	if (root.has("api_key")) {
 		api_key_edit->set_text(root["api_key"]);
@@ -1723,6 +1902,9 @@ void AIConfigPanel::_import_config_confirmed(const String &p_path) {
 	}
 	if (root.has("auto_suggest_entries")) {
 		auto_suggest_entries_check->set_pressed(root["auto_suggest_entries"]);
+	}
+	if (root.has("auto_audit_enabled")) {
+		auto_audit_enabled_check->set_pressed(root["auto_audit_enabled"]);
 	}
 	if (root.has("html_min_project_prototype_enabled")) {
 		html_min_project_prototype_check->set_pressed(root["html_min_project_prototype_enabled"]);
@@ -2078,7 +2260,33 @@ AIConfigPanel::AIConfigPanel() {
 	grid->add_child(mimocode_download_button);
 
 	base_url_edit = _add_line_edit_row(grid, &base_url_label, TTR("Base URL"), AISettings::get_default_base_url());
-	model_edit = _add_line_edit_row(grid, &model_label, TTR("Model"), AISettings::get_default_model());
+
+	// Model row: OptionButton + refresh Button.
+	{
+		Label *label = memnew(Label);
+		label->set_text(TTR("Model"));
+		label->set_autowrap_mode(TextServer::AUTOWRAP_WORD_SMART);
+		label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		grid->add_child(label);
+		model_label = label;
+
+		HBoxContainer *model_hbox = memnew(HBoxContainer);
+		model_hbox->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+
+		model_option = memnew(OptionButton);
+		model_option->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		model_option->add_item(TTR("Loading models..."), 0);
+		model_hbox->add_child(model_option);
+
+		model_refresh_button = memnew(Button);
+		model_refresh_button->set_text(TTR("Refresh"));
+		model_refresh_button->set_tooltip_text(TTR("Fetch available models from the API"));
+		model_refresh_button->connect(SceneStringName(pressed), callable_mp(this, &AIConfigPanel::_on_model_refresh_pressed));
+		model_hbox->add_child(model_refresh_button);
+
+		grid->add_child(model_hbox);
+	}
+
 	api_key_edit = _add_line_edit_row(grid, &api_key_label, TTR("API Key"), String(), true);
 	temperature_spin = _add_spin_box_row(grid, &temperature_label, TTR("Temperature"), 0.0, 2.0, 0.05);
 	max_tokens_spin = _add_spin_box_row(grid, &max_tokens_label, TTR("Max Tokens"), 1, 262144, 1);
@@ -2116,6 +2324,9 @@ AIConfigPanel::AIConfigPanel() {
 
 	auto_suggest_entries_check = memnew(CheckBox);
 	root->add_child(auto_suggest_entries_check);
+
+	auto_audit_enabled_check = memnew(CheckBox);
+	root->add_child(auto_audit_enabled_check);
 
 	html_min_project_prototype_check = memnew(CheckBox);
 	root->add_child(html_min_project_prototype_check);
@@ -2383,6 +2594,11 @@ AIConfigPanel::AIConfigPanel() {
 	engine_source_download_request->set_timeout(300.0);
 	engine_source_download_request->connect(SNAME("request_completed"), callable_mp(this, &AIConfigPanel::_on_engine_source_download_request_completed));
 	add_child(engine_source_download_request, false, INTERNAL_MODE_BACK);
+
+	model_list_request = memnew(HTTPRequest);
+	model_list_request->set_timeout(30.0);
+	model_list_request->connect(SNAME("request_completed"), callable_mp(this, &AIConfigPanel::_on_model_list_request_completed));
+	add_child(model_list_request, false, INTERNAL_MODE_BACK);
 
 	usage_agreement_dialog = memnew(AIUsageAgreementDialog);
 	add_child(usage_agreement_dialog);

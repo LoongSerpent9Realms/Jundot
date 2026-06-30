@@ -22,27 +22,18 @@ public class DocsModel : PageModel
     public string CurrentDocTitle { get; set; } = "开始使用";
     public string CurrentLanguage { get; set; } = "zh-CN";
     public string CurrentLanguageLabel => SupportedLanguages.First(l => l.Id == CurrentLanguage).Label;
-<<<<<<< HEAD
     public bool IsCurrentDocBuiltIn { get; set; } = true;
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     public string? SuccessMessage { get; set; }
     public string? ErrorMessage { get; set; }
+    public string ActiveTab { get; set; } = "edit";
+    public string? CustomCss { get; set; }
 
     [BindProperty]
     public DocEditInput Input { get; set; } = new();
 
-<<<<<<< HEAD
     [BindProperty]
     public DocCreateInput CreateInput { get; set; } = new();
 
-    [BindProperty]
-    public string? CustomCss { get; set; } = string.Empty;
-
-    public string ActiveTab { get; set; } = "content";
-
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     public class DocEditInput
     {
         public string? DocId { get; set; } = "index";
@@ -50,7 +41,6 @@ public class DocsModel : PageModel
         public string? Html { get; set; } = string.Empty;
     }
 
-<<<<<<< HEAD
     public class DocCreateInput
     {
         [StringLength(80)]
@@ -70,11 +60,6 @@ public class DocsModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(string doc = "index", string? lang = null)
     {
-=======
-    public async Task<IActionResult> OnGetAsync(string doc = "index", string? lang = null)
-    {
-        // 检查用户是否已登录
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         var userId = HttpContext.Session.GetString("UserId");
         if (string.IsNullOrEmpty(userId))
         {
@@ -121,7 +106,6 @@ public class DocsModel : PageModel
         return Page();
     }
 
-<<<<<<< HEAD
     public async Task<IActionResult> OnPostCreateAsync()
     {
         var userId = HttpContext.Session.GetString("UserId");
@@ -262,8 +246,6 @@ public class DocsModel : PageModel
         return Page();
     }
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     private async Task LoadDocAsync(string docId, string language)
     {
         Documents = GetDocuments();
@@ -272,35 +254,25 @@ public class DocsModel : PageModel
         CurrentDocId = doc.Id;
         CurrentDocTitle = doc.Title;
         CurrentLanguage = NormalizeLanguage(language);
-<<<<<<< HEAD
         IsCurrentDocBuiltIn = doc.IsBuiltIn;
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
 
         var path = GetSafeDocPath(doc, CurrentLanguage);
         var html = System.IO.File.Exists(path) ? await System.IO.File.ReadAllTextAsync(path) : "";
 
-<<<<<<< HEAD
         var cssPath = GetCustomCssPath();
         CustomCss = System.IO.File.Exists(cssPath) ? await System.IO.File.ReadAllTextAsync(cssPath) : "";
 
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
         Input = new DocEditInput
         {
             DocId = doc.Id,
             Language = CurrentLanguage,
             Html = html
         };
-<<<<<<< HEAD
 
         CreateInput = new DocCreateInput
         {
-            Language = CurrentLanguage,
-            Category = "参考"
+            Language = CurrentLanguage
         };
-=======
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a
     }
 
     private DocumentationPage? FindDoc(string docId)
@@ -349,7 +321,6 @@ public class DocsModel : PageModel
         }
         return path;
     }
-<<<<<<< HEAD
 
     private string GetCustomCssPath()
     {
@@ -371,8 +342,3 @@ public class DocsModel : PageModel
 }
 
 public record DocLanguageOption(string Id, string Label);
-=======
-}
-
-public record DocLanguageOption(string Id, string Label);
->>>>>>> c7f9d010c646874787784cec71c02cc31b0b537a

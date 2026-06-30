@@ -10,6 +10,7 @@ public static class DocumentationCatalog
         new("index", "开始使用", "_Index.cshtml", "Jundot 核心流程和文档入口", "入门", true),
         new("installation", "安装指南", "_Installation.cshtml", "下载、启动、AI 后端配置", "入门", true),
         new("quickstart", "快速入门", "_Quickstart.cshtml", "用 AI 创建并细化项目", "入门", true),
+        new("current-version", "现版本说明", "_CurrentVersion.cshtml", "Jundot Engine 0.3.32 alpha 的功能入口和使用流程", "入门", true),
         new("scripting-api", "脚本 API 与 Godot 文档", "_ScriptingApi.cshtml", "Godot API 关系和速查", "脚本开发", true),
         new("ai-assistant", "AI 助手", "_AiAssistant.cshtml", "创建项目、修复问题和改引擎", "核心功能", true),
         new("hot-update", "更新与发布", "_HotUpdate.cshtml", "GitHub、Package Builder 与 Launcher", "核心功能", true),

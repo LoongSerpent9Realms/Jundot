@@ -1,0 +1,56 @@
+@model string
+@{
+    var url = Model ?? "";
+    string? embedUrl = null;
+
+    // Try to convert known video platform URLs to embed URLs
+    if (url.Contains("bilibili.com", StringComparison.OrdinalIgnoreCase))
+    {
+        // Extract BV number from various bilibili URL formats
+        var bvMatch = System.Text.RegularExpressions.Regex.Match(url, @"(BV[a-zA-Z0-9]+)");
+        if (bvMatch.Success)
+        {
+            var bv = bvMatch.Groups[1].Value;
+            embedUrl = $"//player.bilibili.com/player.html?bvid={bv}&high_quality=1&danmaku=0";
+        }
+    }
+    else if (url.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) || url.Contains("youtu.be", StringComparison.OrdinalIgnoreCase))
+    {
+        // Extract video ID from YouTube URLs
+        string? videoId = null;
+        var ytMatch = System.Text.RegularExpressions.Regex.Match(url, @"(?:v=|youtu\.be/|embed/)([a-zA-Z0-9_-]{11})");
+        if (ytMatch.Success)
+        {
+            videoId = ytMatch.Groups[1].Value;
+        }
+        if (videoId != null)
+        {
+            embedUrl = $"https://www.youtube.com/embed/{videoId}";
+        }
+    }
+
+    if (embedUrl != null)
+    {
+        <div class="docs-video-embed">
+            <iframe src="@embedUrl" frameborder="0" allowfullscreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    loading="lazy"></iframe>
+        </div>
+    }
+    else
+    {
+        // Fallback: try as direct embed URL or show a link
+        if (url.Contains("embed", StringComparison.OrdinalIgnoreCase) || url.Contains("player", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="docs-video-embed">
+                <iframe src="@url" frameborder="0" allowfullscreen loading="lazy"></iframe>
+            </div>
+        }
+        else
+        {
+            <div class="docs-video-embed">
+                <iframe src="@url" frameborder="0" allowfullscreen loading="lazy"></iframe>
+            </div>
+        }
+    }
+}

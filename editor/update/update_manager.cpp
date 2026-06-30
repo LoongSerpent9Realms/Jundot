@@ -154,6 +154,12 @@ void UpdateManager::check_for_updates() {
 	headers.push_back("Accept: application/json");
 	headers.push_back(vformat("User-Agent: Jundot-Editor/%s", _get_current_version_string()));
 
+	// Safety: ensure the HTTPRequest node is inside the scene tree before requesting.
+	if (!http->is_inside_tree()) {
+		_set_check_status(CHECK_ERROR);
+		return;
+	}
+
 	Error err = http->request(manifest_url, headers);
 	if (err != OK) {
 		_set_check_status(CHECK_ERROR);

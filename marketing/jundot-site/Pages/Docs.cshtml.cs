@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using JundotSite.Data;
 using Microsoft.EntityFrameworkCore;
+using JundotSite.Data;
+using JundotSite.Models;
 using JundotSite.Services;
 
 namespace JundotSite.Pages;
@@ -16,6 +17,7 @@ public class DocsModel : PageModel
     public string? CurrentSection { get; set; }
     public string CurrentDocHtml { get; set; } = string.Empty;
     public List<DocLanguageOption> SupportedLanguages { get; } = GetSupportedLanguages();
+    public List<DocVideo> DocVideos { get; set; } = new();
 
     public DocsModel(ApplicationDbContext context, IWebHostEnvironment environment)
     {
@@ -32,6 +34,13 @@ public class DocsModel : PageModel
 
         ViewData["Title"] = GetDocTitle(normalizedDoc);
         CurrentDocHtml = await LoadDocHtmlAsync(normalizedDoc, CurrentLanguage);
+
+        // Load published videos associated with this doc
+        DocVideos = await _context.DocVideos
+            .Where(v => v.DocId == normalizedDoc && v.IsPublished)
+            .OrderBy(v => v.SortOrder)
+            .ThenByDescending(v => v.CreatedAt)
+            .ToListAsync();
     }
 
     private string GetDocTitle(string doc)

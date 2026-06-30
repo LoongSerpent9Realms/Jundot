@@ -58,6 +58,7 @@ static constexpr const char *EDITOR_AI_HTML_MIN_PROJECT_PROTOTYPE_ENABLED_KEY = 
 static constexpr const char *EDITOR_AI_LOW_TOKEN_MODE_KEY = "ai_settings/context/low_token_mode";
 static constexpr const char *EDITOR_AI_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_function_calling";
 static constexpr const char *EDITOR_AI_MCP_TOOLS_ENABLED_KEY = "ai_settings/tools/enable_mcp_tools";
+static constexpr const char *EDITOR_AI_AUTO_AUDIT_ENABLED_KEY = "ai_settings/audit/auto_audit_enabled";
 static constexpr const char *EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY = "ai_settings/context/context_char_budget";
 static constexpr const char *EDITOR_AI_HISTORY_CHAR_BUDGET_KEY = "ai_settings/context/history_char_budget";
 static constexpr const char *EDITOR_AI_MAX_TOOL_ITERATIONS_KEY = "ai_settings/context/max_tool_call_iterations";
@@ -152,6 +153,9 @@ static AIBackendType _backend_type_from_string(const String &p_backend_type) {
 	if (p_backend_type == "legacy_openai") {
 		return AIBackendType::LEGACY_OPENAI;
 	}
+	if (p_backend_type == "qwen") {
+		return AIBackendType::QWEN;
+	}
 	return AIBackendType::JUNDOT_PLUGIN;
 }
 
@@ -161,6 +165,8 @@ static String _backend_type_to_string(AIBackendType p_backend_type) {
 			return "codex";
 		case AIBackendType::LEGACY_OPENAI:
 			return "legacy_openai";
+		case AIBackendType::QWEN:
+			return "qwen";
 		case AIBackendType::JUNDOT_PLUGIN:
 		default:
 			return "jundot_plugin";
@@ -216,6 +222,9 @@ static void _apply_editor_settings(AISettingsData &r_settings, bool p_only_chang
 	if (_should_read_editor_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_only_changed)) {
 		r_settings.mcp_tools_enabled = editor_settings->get_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY);
 	}
+	if (_should_read_editor_setting(EDITOR_AI_AUTO_AUDIT_ENABLED_KEY, p_only_changed)) {
+		r_settings.auto_audit_enabled = editor_settings->get_setting(EDITOR_AI_AUTO_AUDIT_ENABLED_KEY);
+	}
 	if (_should_read_editor_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY, p_only_changed)) {
 		r_settings.context_char_budget = editor_settings->get_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY);
 	}
@@ -262,6 +271,7 @@ static void _write_editor_settings(const AISettingsData &p_settings) {
 	editor_settings->set_setting(EDITOR_AI_LOW_TOKEN_MODE_KEY, p_settings.low_token_mode);
 	editor_settings->set_setting(EDITOR_AI_TOOLS_ENABLED_KEY, p_settings.tools_enabled);
 	editor_settings->set_setting(EDITOR_AI_MCP_TOOLS_ENABLED_KEY, p_settings.mcp_tools_enabled);
+	editor_settings->set_setting(EDITOR_AI_AUTO_AUDIT_ENABLED_KEY, p_settings.auto_audit_enabled);
 	editor_settings->set_setting(EDITOR_AI_CONTEXT_CHAR_BUDGET_KEY, p_settings.context_char_budget);
 	editor_settings->set_setting(EDITOR_AI_HISTORY_CHAR_BUDGET_KEY, p_settings.history_char_budget);
 	editor_settings->set_setting(EDITOR_AI_MAX_TOOL_ITERATIONS_KEY, p_settings.max_tool_iterations);
@@ -326,6 +336,14 @@ int AISettings::get_default_history_char_budget() {
 
 int AISettings::get_default_max_tool_iterations() {
 	return 10;
+}
+
+String AISettings::get_qwen_default_base_url() {
+	return QWEN_DASHSCOPE_BASE_URL;
+}
+
+String AISettings::get_qwen_default_model() {
+	return QWEN_DEFAULT_MODEL;
 }
 
 int AISettings::get_low_token_max_tokens() {
@@ -455,6 +473,14 @@ AISettingsData AISettings::load() {
 	settings.base_url = root.get("base_url", get_default_base_url());
 	settings.model = root.get("model", get_default_model());
 	settings.api_key = root.get("api_key", String());
+	// Fall back to environment variable when no API key is stored locally.
+	// This prevents the key from being written to any config file on disk.
+	if (settings.api_key.is_empty() && OS::get_singleton()) {
+		const String env_key = OS::get_singleton()->get_environment(QWEN_API_KEY_ENV_VAR);
+		if (!env_key.is_empty()) {
+			settings.api_key = env_key;
+		}
+	}
 	settings.temperature = root.get("temperature", 0.7);
 	settings.max_tokens = root.get("max_tokens", 40960);
 	settings.system_prompt = get_default_system_prompt();
@@ -468,6 +494,7 @@ AISettingsData AISettings::load() {
 	settings.history_char_budget = root.get("history_char_budget", get_default_history_char_budget());
 	settings.max_tool_iterations = root.get("max_tool_iterations", get_default_max_tool_iterations());
 	settings.auto_suggest_entries = root.get("auto_suggest_entries", true);
+	settings.auto_audit_enabled = root.get("auto_audit_enabled", false);
 	settings.html_min_project_prototype_enabled = root.get("html_min_project_prototype_enabled", true);
 	settings.user_extra_instructions = root.get("user_extra_instructions", String());
 	settings.output_language = root.get("output_language", "auto");
@@ -567,6 +594,7 @@ Error AISettings::save(const AISettingsData &p_settings) {
 	root["history_char_budget"] = p_settings.history_char_budget;
 	root["max_tool_iterations"] = p_settings.max_tool_iterations;
 	root["auto_suggest_entries"] = p_settings.auto_suggest_entries;
+	root["auto_audit_enabled"] = p_settings.auto_audit_enabled;
 	root["html_min_project_prototype_enabled"] = p_settings.html_min_project_prototype_enabled;
 	root["user_extra_instructions"] = p_settings.user_extra_instructions;
 	root["output_language"] = p_settings.output_language;
